@@ -1,9 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="corporate">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ApHinity Analytics</title>
+    <title>ApHinity Technologies</title>
+    <script>
+      (() => {
+        const applyTheme = () => {
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute(
+            "data-theme",
+            prefersDark ? "dark" : "corporate"
+          );
+        };
+        applyTheme();
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
+        if (media.addEventListener) {
+          media.addEventListener("change", applyTheme);
+        } else if (media.addListener) {
+          media.addListener(applyTheme);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
