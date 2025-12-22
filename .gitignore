@@ -50,3 +50,9 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+### Node.js ###
+node_modules/
+frontend/node_modules/
+frontend/.vite/
+frontend/dist/
+src/main/resources/static/
