@@ -5,8 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class FrontendController {
-    // example for now. For SPA routing this will need to be more of a catch-all
-    // to handle API requests as a forward to index.html
+    // TODO change this get mapping to intercept api requests
     @GetMapping("/")
     public String forwardToIndex() {
         return "forward:index.html";
