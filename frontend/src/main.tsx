@@ -1,6 +1,8 @@
 import { render } from "solid-js/web";
 import { Route, Router } from "@solidjs/router";
 import App from "./App";
+import { AuthenticatedLayout } from "./layouts/AuthenticatedLayout";
+import { LandingLayout } from "./layouts/LandingLayout";
 import { HomePage } from "./pages/landing/HomePage";
 import { LoginPage } from "./pages/landing/LoginPage";
 import { SignupPage } from "./pages/landing/SignupPage";
@@ -16,12 +18,19 @@ if (root) {
   render(
     () => (
       <Router root={App}>
-        <Route path="/" component={HomePage} />
-        <Route path="/login" component={LoginPage} />
-        <Route path="/signup" component={SignupPage} />
-        <Route path="/recovery" component={RecoveryPage} />
-        <Route path="/support" component={SupportPage} />
-        <Route path="/home" component={Dashboard} />
+        <Route path="/" component={LandingLayout}>
+          <Route path="/" component={HomePage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/signup" component={SignupPage} />
+          <Route path="/support" component={SupportPage} />
+          <Route path="/recovery">
+            <Route path="/" component={RecoveryPage} />
+            <Route path="/:token" component={RecoveryPage} />
+          </Route>
+        </Route>
+        <Route path="/home" component={AuthenticatedLayout}>
+          <Route path="/" component={Dashboard} />
+        </Route>
       </Router>
     ),
     root

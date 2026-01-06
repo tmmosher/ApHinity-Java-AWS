@@ -12,7 +12,7 @@ export const Dashboard = () => (
               </p>
               <ul class="menu mt-2">
                 <li>
-                  <A class="active" href="/app" aria-current="page">
+                  <A class="active" href="/home" aria-current="page">
                     Home
                   </A>
                 </li>

@@ -18,7 +18,7 @@ export const LoginPage = () => {
       <form class="w-full flex flex-col gap-4 text-left"
             aria-label="Login form"
             onSubmit={() => {
-              navigate("/dashboard")
+              navigate("/home")
             }}
       >
         <label class="form-control w-full">
