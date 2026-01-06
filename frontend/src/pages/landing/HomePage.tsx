@@ -1,3 +1,5 @@
+import {Banner} from "../../components/Banner";
+
 export const HomePage = () => (
   <main class="hero w-full" aria-labelledby="home-title">
     <div class="hero-content text-center">

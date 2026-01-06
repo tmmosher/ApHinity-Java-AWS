@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router";
-import { AuthCard } from "../components/AuthCard";
+import { AuthCard } from "../../components/AuthCard";
 
 export const SignupPage = () => (
   <main class="w-full" aria-label="Sign up page">

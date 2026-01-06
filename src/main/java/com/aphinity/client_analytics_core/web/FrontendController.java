@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class FrontendController {
-    // TODO change this get mapping to intercept api requests
+    // TODO change this get mapping to ignore api requests
     @GetMapping("/")
     public String forwardToIndex() {
         return "forward:index.html";
