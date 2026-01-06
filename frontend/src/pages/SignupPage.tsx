@@ -2,53 +2,59 @@ import { A } from "@solidjs/router";
 import { AuthCard } from "../components/AuthCard";
 
 export const SignupPage = () => (
-  <AuthCard
-    title="Sign Up"
-    footer={
-      <div class="space-y-2">
-        <p>
-          Already a member? <A class="link link-primary" href="/login">Login here!</A>
-        </p>
-        <p>
-          Need help? <A class="link link-primary" href="/recovery">Recover your email here!</A>
-        </p>
-      </div>
-    }
-  >
-    <form class="w-full flex flex-col gap-4 text-left">
-      <label class="form-control w-full">
-        <div class="label">
-          <span class="label-text">Full name</span>
+  <main class="w-full" aria-label="Sign up page">
+    <AuthCard
+      title="Sign Up"
+      footer={
+        <div class="space-y-2 text-left">
+          <p>
+            Need help? <A class="link link-primary" href="/support">Contact support here!</A>
+          </p>
         </div>
-        <input
-          type="text"
-          placeholder="Alex Morgan"
-          class="input input-bordered w-full"
-        />
-      </label>
-      <label class="form-control w-full">
-        <div class="label">
-          <span class="label-text">Work email</span>
-        </div>
-        <input
-          type="email"
-          placeholder="alex@company.com"
-          class="input input-bordered w-full"
-        />
-      </label>
-      <label class="form-control w-full">
-        <div class="label">
-          <span class="label-text">Password</span>
-        </div>
-        <input
-          type="password"
-          placeholder="Create a password"
-          class="input input-bordered w-full"
-        />
-      </label>
-      <button type="submit" class="btn btn-primary w-full text-center">
-        Submit
-      </button>
-    </form>
-  </AuthCard>
+      }
+    >
+      <form class="w-full flex flex-col gap-4 text-left" aria-label="Sign up form">
+        <label class="form-control w-full">
+          <div class="label">
+            <span class="label-text">Full name</span>
+          </div>
+          <input
+            type="text"
+            placeholder="John Doe"
+            class="input opacity-70 input-bordered w-full"
+            aria-label="Full name"
+          />
+        </label>
+        <label class="form-control w-full">
+          <div class="label">
+            <span class="label-text">Work email</span>
+          </div>
+          <input
+            type="email"
+            placeholder="john@company.com"
+            class="input opacity-70 input-bordered w-full"
+            aria-label="Work email"
+          />
+        </label>
+        <label class="form-control w-full">
+          <div class="label">
+            <span class="label-text">Password</span>
+          </div>
+          <input
+            type="password"
+            placeholder="A secure password"
+            class="input opacity-70 input-bordered w-full"
+            aria-label="Password"
+          />
+        </label>
+        <button
+          type="submit"
+          class="btn btn-primary w-full text-center"
+          aria-label="Submit sign up form"
+        >
+          Submit
+        </button>
+      </form>
+    </AuthCard>
+  </main>
 );
