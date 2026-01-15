@@ -1,6 +1,40 @@
 import { A } from "@solidjs/router";
+import { For, Match, Switch } from "solid-js";
+import type { JSX } from "solid-js";
 
-export const Dashboard = () => (
+export type UserRole = "admin" | "partner" | "client";
+export type NavItem = {
+  label: string;
+  href?: string;
+};
+
+type DashboardShellProps = {
+  role: UserRole;
+  sidebarItems: NavItem[];
+  children: JSX.Element;
+};
+
+const SidebarNav = (props: { items: NavItem[] }) => (
+  <ul class="menu mt-2">
+    <For each={props.items}>
+      {(item) => (
+        <li>
+          {item.href ? (
+            <A href={item.href} activeClass="active" end preload>
+              {item.label}
+            </A>
+          ) : (
+            <span class="opacity-70 cursor-not-allowed" aria-disabled="true">
+              {item.label}
+            </span>
+          )}
+        </li>
+      )}
+    </For>
+  </ul>
+);
+
+export const DashboardShell = (props: DashboardShellProps) => (
   <main class="w-full" aria-label="Authenticated home page">
     <div class="w-full max-w-5xl mx-auto">
       <div class="card bg-base-100 shadow-md w-full">
@@ -10,27 +44,10 @@ export const Dashboard = () => (
               <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                 Routes
               </p>
-              <ul class="menu mt-2">
-                <li>
-                  <A class="active" href="/home" aria-current="page">
-                    Home
-                  </A>
-                </li>
-              </ul>
+              <SidebarNav items={props.sidebarItems} />
             </aside>
             <section class="p-6" aria-labelledby="auth-home-title">
-              <h1 id="auth-home-title" class="text-2xl md:text-3xl font-bold">
-                Account Home
-              </h1>
-              <p class="mt-2 text-base-content/70">
-                This is your authenticated homepage. More routes will appear in the sidebar as they go live.
-              </p>
-              <div class="mt-6 rounded-box bg-base-200 p-4">
-                <p class="text-sm font-semibold">Status</p>
-                <p class="text-sm text-base-content/70">
-                  Your account is ready. Check back for profile and organization settings.
-                </p>
-              </div>
+              {props.children}
             </section>
           </div>
         </div>
@@ -38,3 +55,71 @@ export const Dashboard = () => (
     </div>
   </main>
 );
+
+// TODO: Replace with role resolution from the auth context.
+const resolveRole = (): UserRole => {
+  if (typeof window === "undefined") {
+    return "client";
+  }
+
+  return "client";
+};
+
+const roleNavItems: Record<UserRole, NavItem[]> = {
+  admin: [
+    { label: "Overview", href: "/home" },
+    { label: "User management" },
+    { label: "Compliance queue" },
+    { label: "Reporting" }
+  ],
+  partner: [
+    { label: "Overview", href: "/home" },
+    { label: "Active projects" },
+    { label: "Submissions" },
+    { label: "Reports" }
+  ],
+  client: [
+    { label: "Overview", href: "/home" },
+    { label: "Facilities" },
+    { label: "Documents" },
+    { label: "Support" }
+  ]
+};
+
+export const Dashboard = () => {
+  const role = resolveRole();
+  return (
+    <DashboardShell
+      role={role}
+      sidebarItems={roleNavItems[role]}
+    >
+      <div class="mt-8 space-y-4">
+        <Switch>
+          <Match when={role === "admin"}>
+            <div class="space-y-3">
+              <h2 class="text-lg font-semibold">Admin panel</h2>
+                {/*TODO*/}
+            </div>
+          </Match>
+          <Match when={role === "partner"}>
+            <div class="space-y-3">
+              <h2 class="text-lg font-semibold">Partner priorities</h2>
+              <ul class="list-disc list-inside text-sm text-base-content/70">
+                {/*TODO*/}
+              </ul>
+            </div>
+          </Match>
+          <Match when={role === "client"}>
+            <div class="space-y-3">
+              <h2 class="text-lg font-semibold">Client</h2>
+              <ul class="list-disc list-inside text-sm text-base-content/70">
+                <li>Review facility performance indicators at a glance.</li>
+                <li>Request support or schedule a consultation.</li>
+              </ul>
+            </div>
+          </Match>
+        </Switch>
+      </div>
+    </DashboardShell>
+  );
+};

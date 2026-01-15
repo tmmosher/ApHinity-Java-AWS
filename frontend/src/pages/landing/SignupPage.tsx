@@ -1,60 +1,65 @@
 import { A } from "@solidjs/router";
 import { AuthCard } from "../../components/AuthCard";
+import { createSignal, Match, Show, Switch } from "solid-js";
+import ClientSignup from "./ClientSignup";
+import AphinitySignup from "./AphinitySignup";
 
-export const SignupPage = () => (
-  <main class="w-full" aria-label="Sign up page">
-    <AuthCard
-      title="Sign Up"
-      footer={
-        <div class="space-y-2 text-left">
-          <p>
-            Need help? <A class="link link-primary" href="/support">Contact support here!</A>
-          </p>
-        </div>
-      }
-    >
-      <form class="w-full flex flex-col gap-4 text-left" aria-label="Sign up form">
-        <label class="form-control w-full">
-          <div class="label">
-            <span class="label-text">Full name</span>
+export const SignupPage = () => {
+  const [chosen, setChosen] = createSignal(false);
+  const [signupChoice, setSignupChoice] = createSignal("");
+
+  return (
+    <main class="w-full" aria-label="Sign up page">
+      <AuthCard
+        title="Sign Up"
+        footer={
+          <div class="space-y-2 text-left">
+            <p>
+              Need help? <A class="link link-primary" href="/support">Contact support here!</A>
+            </p>
           </div>
-          <input
-            type="text"
-            placeholder="John Doe"
-            class="input opacity-70 input-bordered w-full"
-            aria-label="Full name"
-          />
-        </label>
-        <label class="form-control w-full">
-          <div class="label">
-            <span class="label-text">Work email</span>
+        }
+      >
+        <Show when={!chosen()}>
+          <div class="w-full flex flex-col gap-2 text-left">
+            <p class="text-sm text-base-content/70">Are you a client or an ApHinity partner?</p>
+            <button
+              class="btn btn-primary w-full text-center"
+              onClick={() => {
+                setChosen(true);
+                setSignupChoice("client");
+              }}
+            >
+              Client
+            </button>
+            <button
+              class="btn btn-primary w-full text-center"
+              onClick={() => {
+                setChosen(true);
+                setSignupChoice("partner");
+              }}
+            >
+              Partner
+            </button>
           </div>
-          <input
-            type="email"
-            placeholder="john@company.com"
-            class="input opacity-70 input-bordered w-full"
-            aria-label="Work email"
-          />
-        </label>
-        <label class="form-control w-full">
-          <div class="label">
-            <span class="label-text">Password</span>
+        </Show>
+        <Show when={chosen()}>
+          <div class="w-full flex flex-col gap-2 text-left">
+            <p class="text-sm text-base-content/70">As a {signupChoice()}, we need....</p>
+            <Switch fallback={<p class="text-sm text-base-content/70">Loading...</p>}>
+              <Match when={signupChoice() === "client"}>
+                <ClientSignup />
+              </Match>
+              <Match when={signupChoice() === "partner"}>
+                <AphinitySignup />
+              </Match>
+            </Switch>
+            <button class="btn btn-outline w-full text-center" onClick={() => setChosen(false)}>
+              Back
+            </button>
           </div>
-          <input
-            type="password"
-            placeholder="A secure password"
-            class="input opacity-70 input-bordered w-full"
-            aria-label="Password"
-          />
-        </label>
-        <button
-          type="submit"
-          class="btn btn-primary w-full text-center"
-          aria-label="Submit sign up form"
-        >
-          Submit
-        </button>
-      </form>
-    </AuthCard>
-  </main>
-);
+        </Show>
+      </AuthCard>
+    </main>
+  );
+};

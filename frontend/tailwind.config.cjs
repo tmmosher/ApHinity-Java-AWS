@@ -1,4 +1,6 @@
 /** @type {import("tailwindcss").Config} */
+const { corporate, forest } = require("daisyui/src/theming/themes");
+
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
@@ -6,6 +8,15 @@ module.exports = {
   },
   plugins: [require("daisyui")],
   daisyui: {
-    themes: ["corporate", "dark"]
+    themes: [
+      "corporate",
+      {
+        "forest-corporate": {
+          ...forest,
+          "--rounded-btn": corporate["--rounded-btn"]
+        }
+      }
+    ]
   }
 };
+

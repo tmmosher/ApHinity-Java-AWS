@@ -6,7 +6,9 @@ export const HomePage = () => (
           ApHinity Technologies
         </h1>
         <p class="py-6 text-lg">
-          Blah blah placeholder blah blah lorem ipsum dolime
+          ApHinity Technologies is a leading provider of innovative water and air treatment solutions,
+          dedicated to improving environmental outcomes by delivering sustainable and effective solutions to
+          help clients reach their compliance goals.
         </p>
       </div>
     </div>

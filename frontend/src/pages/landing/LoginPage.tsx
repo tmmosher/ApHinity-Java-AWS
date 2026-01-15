@@ -3,7 +3,8 @@ import { AuthCard } from "../../components/AuthCard";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
-  return(<main class="w-full" aria-label="Login page">
+  return(
+  <main class="w-full" aria-label="Login page">
     <AuthCard
         title="Login"
         footer={
@@ -15,7 +16,7 @@ export const LoginPage = () => {
         }
     >
       {/*TODO turn this into an action when auth system implemented*/}
-      <form class="w-full flex flex-col gap-4 text-left"
+      <form class="w-full flex flex-col gap-2 text-left"
             aria-label="Login form"
             onSubmit={() => {
               navigate("/home")

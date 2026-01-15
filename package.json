@@ -10,6 +10,7 @@
     "frontend:preview": "npm --workspace frontend run preview"
   },
   "dependencies": {
-    "@types/node": "^25.0.3"
+    "@types/node": "^25.0.3",
+    "theme-change": "^2.5.0"
   }
 }
