@@ -8,6 +8,7 @@ import com.aphinity.client_analytics_core.api.entities.AppUser;
 import com.aphinity.client_analytics_core.api.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.logging.AppLoggingProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.*;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
@@ -25,15 +31,11 @@ public class AuthService {
     private static final int REFRESH_TOKEN_BYTES = 32;
     private final AppLoggingProperties loggingProperties = new AppLoggingProperties();
     private final AsyncLogService asyncLogService = new AsyncLogService(loggingProperties);
-    private final String len_8_plus = "^.{8,}$",
-            has_digit = ".*\\d.*",
-            has_letter = ".*\\p{L}.",
-            has_special = ".*[!@#$%^&*()_+\\-=[\\]{};':\"\\\\|,.<>/?`~].*";
-    private final Map<String, String> passwordRequirements =
-            Map.of(len_8_plus, "Must be at least 8 characters",
-                has_digit, "Must contain at least one digit",
-                has_letter, "Must contain at least one letter",
-                has_special, "Must contain at least one special character");
+    private static final Pattern LEN_8_PLUS = Pattern.compile(".{8,}");
+    private static final Pattern HAS_DIGIT = Pattern.compile("\\d");
+    private static final Pattern HAS_LETTER = Pattern.compile("\\p{L}");
+    private static final Pattern HAS_SPECIAL = Pattern.compile("[!@#$%^&*()_+\\-={};':\"\\\\|,.<>/?`~]");
+    private final Map<Pattern, String> passwordRequirements = buildPasswordRequirements();
 
     // services
     private final AppUserRepository appUserRepository;
@@ -52,6 +54,15 @@ public class AuthService {
         this.authSessionRepository = authSessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+    }
+
+    private Map<Pattern, String> buildPasswordRequirements() {
+        Map<Pattern, String> requirements = new LinkedHashMap<>();
+        requirements.put(LEN_8_PLUS, "Must be at least 8 characters");
+        requirements.put(HAS_DIGIT, "Must contain at least one digit");
+        requirements.put(HAS_LETTER, "Must contain at least one letter");
+        requirements.put(HAS_SPECIAL, "Must contain at least one special character");
+        return Map.copyOf(requirements);
     }
 
     @Transactional
@@ -76,15 +87,17 @@ public class AuthService {
     }
 
     @Transactional
-    public void signup(String email, String password, String ipAddress, String userAgent) {
+    public void signup(String email, String password, String name,
+                       String ipAddress, String userAgent) {
         AppUser potentialUser = appUserRepository.findByEmail(email).orElse(null);
         if (potentialUser != null) throw userAlreadyExists();
-        for (String req : passwordRequirements.keySet()) {
-            if (!password.matches(req))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, passwordRequirements.get(req));
+        for (Map.Entry<Pattern, String> requirement : passwordRequirements.entrySet()) {
+            if (!requirement.getKey().matcher(password).find()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, requirement.getValue());
+            }
         }
         boolean isAphinity = email.toLowerCase().endsWith("@aphinitytech.com");
-        AppUser user = buildUser(email, password, isAphinity);
+        AppUser user = buildUser(email, password, isAphinity, name);
         appUserRepository.save(user);
         asyncLogService.log("User with email: '" + email + "' created at ipv4: '"
                 + ipAddress + "' from agent '" + userAgent + "'.");
@@ -148,11 +161,12 @@ public class AuthService {
         return session;
     }
 
-    private AppUser buildUser(String email, String password, boolean isAphinity) {
+    private AppUser buildUser(String email, String password, boolean isAphinity, String name) {
         AppUser user = new AppUser();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setCreatedAt(Instant.now());
+        user.setName(name);
         Set<Role> roles = new HashSet<>();
         Role clientRole = new Role();
         // Roles are additive, all partners get 'client', admins get 'partner' & 'client'
@@ -186,9 +200,5 @@ public class AuthService {
 
     private ResponseStatusException userAlreadyExists() {
         return new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
-    }
-
-    private ResponseStatusException passwordTooShort() {
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters long");
     }
 }

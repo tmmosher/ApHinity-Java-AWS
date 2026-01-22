@@ -39,6 +39,9 @@ public class AppUser {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "name")
+    private String name;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_role",
@@ -117,5 +120,13 @@ public class AppUser {
 
     public void setRoles(Set<Role> roles) {
         this.roles = roles;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 }

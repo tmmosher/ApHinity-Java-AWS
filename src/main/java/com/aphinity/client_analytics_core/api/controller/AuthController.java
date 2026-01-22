@@ -61,10 +61,11 @@ public class AuthController {
         authService.signup(
             request.email(),
             request.password(),
+            request.name(),
             extractIp(httpRequest),
             extractUserAgent(httpRequest)
         );
-        return ResponseEntity.ok("Signup successful");
+        return ResponseEntity.ok("Account created successfully.");
     }
 
     @PostMapping("/refresh")
