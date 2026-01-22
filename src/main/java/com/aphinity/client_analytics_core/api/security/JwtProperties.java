@@ -1,4 +1,4 @@
-package com.aphinity.client_analytics_core.security;
+package com.aphinity.client_analytics_core.api.security;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.Min;

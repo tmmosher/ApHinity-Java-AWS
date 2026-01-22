@@ -1,4 +1,4 @@
-package com.aphinity.client_analytics_core.security;
+package com.aphinity.client_analytics_core.api.security;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

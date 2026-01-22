@@ -1,9 +1,10 @@
-package com.aphinity.client_analytics_core.api;
+package com.aphinity.client_analytics_core.api.controller;
 
 import com.aphinity.client_analytics_core.api.request.LoginRequest;
+import com.aphinity.client_analytics_core.api.request.SignupRequest;
 import com.aphinity.client_analytics_core.api.response.AuthTokensResponse;
-import com.aphinity.client_analytics_core.auth.AuthService;
-import com.aphinity.client_analytics_core.auth.IssuedTokens;
+import com.aphinity.client_analytics_core.api.auth.AuthService;
+import com.aphinity.client_analytics_core.api.auth.IssuedTokens;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,11 +12,13 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 
@@ -45,14 +48,32 @@ public class AuthController {
             extractUserAgent(httpRequest)
         );
         addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
-        return toResponse(tokens);
+        return toAuthTokenResponse(tokens);
+    }
+
+    // Signing up won't grant auth tokens, this is so I can
+    // do email verification later.
+    @PostMapping("/signup")
+    public ResponseEntity<String> signup(
+            @Valid @RequestBody SignupRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        authService.signup(
+            request.email(),
+            request.password(),
+            extractIp(httpRequest),
+            extractUserAgent(httpRequest)
+        );
+        return ResponseEntity.ok("Signup successful");
     }
 
     @PostMapping("/refresh")
-    public AuthTokensResponse refresh(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+    public AuthTokensResponse refresh(HttpServletRequest httpRequest,
+                                      HttpServletResponse httpResponse
+    ) {
         String refreshToken = extractRefreshToken(httpRequest);
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new org.springframework.web.server.ResponseStatusException(
+            throw new ResponseStatusException(
                 HttpStatus.UNAUTHORIZED,
                 "Missing refresh token"
             );
@@ -63,7 +84,7 @@ public class AuthController {
             extractUserAgent(httpRequest)
         );
         addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
-        return toResponse(tokens);
+        return toAuthTokenResponse(tokens);
     }
 
     @PostMapping("/logout")
@@ -140,7 +161,7 @@ public class AuthController {
         return forwardedProto != null && forwardedProto.equalsIgnoreCase("https");
     }
 
-    private AuthTokensResponse toResponse(IssuedTokens tokens) {
+    private AuthTokensResponse toAuthTokenResponse(IssuedTokens tokens) {
         return new AuthTokensResponse(
             tokens.accessToken(),
             tokens.tokenType(),

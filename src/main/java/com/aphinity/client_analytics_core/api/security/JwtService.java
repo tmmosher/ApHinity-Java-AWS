@@ -1,7 +1,7 @@
-package com.aphinity.client_analytics_core.security;
+package com.aphinity.client_analytics_core.api.security;
 
-import com.aphinity.client_analytics_core.user.AppUser;
-import com.aphinity.client_analytics_core.user.Role;
+import com.aphinity.client_analytics_core.api.entities.AppUser;
+import com.aphinity.client_analytics_core.api.entities.Role;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
