@@ -42,10 +42,11 @@ public class AuthController {
         HttpServletResponse httpResponse
     ) {
         IssuedTokens tokens = authService.login(
-            request.email(),
-            request.password(),
+            request.email().toLowerCase().strip(),
+            request.password().strip(),
             extractIp(httpRequest),
-            extractUserAgent(httpRequest)
+            extractUserAgent(httpRequest),
+            request.captchaToken()
         );
         addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
         return toAuthTokenResponse(tokens);
@@ -59,9 +60,9 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         authService.signup(
-            request.email(),
-            request.password(),
-            request.name(),
+            request.email().toLowerCase().strip(),
+            request.password().strip(),
+            request.name().strip().toUpperCase(),
             extractIp(httpRequest),
             extractUserAgent(httpRequest)
         );

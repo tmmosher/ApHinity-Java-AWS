@@ -2,12 +2,16 @@ import {A, action, useNavigate, useSubmission} from "@solidjs/router";
 import { AuthCard } from "../../components/AuthCard";
 import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
+import {AuthResult} from "../../components/Types";
 
 const host = "http://localhost:8080";
 
 export const SignupPage = () => {
     const submitSignup = action(async (formData: FormData) => {
         //TODO Zod schema validation before client submission
+        const actionResult: AuthResult = {
+            ok: false
+        };
         try {
             const response = await fetch(host + "/api/auth/signup", {
                 method: "POST",
@@ -21,13 +25,18 @@ export const SignupPage = () => {
                 })
             });
             if (response.ok) {
-                return { ok: true };
+                actionResult.ok = true;
             }
-            const errorBody = await response.json().catch(() => null);
-            return { ok: false, message: errorBody?.message ?? "Signup failed" };
+            else {
+                const errorBody = await response.json().catch(() => null);
+                actionResult.ok = false;
+                actionResult.message = errorBody?.message ?? "Login failed";
+            }
         } catch (error) {
-            return { ok: false, message: "Signup failed" };
+            actionResult.ok = false;
+            actionResult.message = "Signup failed";
         }
+        return actionResult;
     }, "submitSignup");
 
     const submission = useSubmission(submitSignup);

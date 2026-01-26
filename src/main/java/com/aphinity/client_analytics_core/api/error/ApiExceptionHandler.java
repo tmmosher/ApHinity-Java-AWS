@@ -25,7 +25,10 @@ public class ApiExceptionHandler {
         Map.entry("Must contain at least one digit", new ErrorDefinition("password_missing_digit", "Must contain at least one digit")),
         Map.entry("Must contain at least one letter", new ErrorDefinition("password_missing_letter", "Must contain at least one letter")),
         Map.entry("Must contain at least one special character", new ErrorDefinition("password_missing_special", "Must contain at least one special character")),
-        Map.entry("Password must be at least 8 characters long", new ErrorDefinition("password_too_short", "Password must be at least 8 characters long"))
+        Map.entry("Password must be at least 8 characters long", new ErrorDefinition("password_too_short", "Password must be at least 8 characters long")),
+        Map.entry("Captcha required", new ErrorDefinition("captcha_required", "Captcha required")),
+        Map.entry("Invalid captcha", new ErrorDefinition("captcha_invalid", "Invalid captcha")),
+        Map.entry("Captcha not configured", new ErrorDefinition("captcha_unavailable", "Captcha not configured"))
     );
 
     @ExceptionHandler(ResponseStatusException.class)
