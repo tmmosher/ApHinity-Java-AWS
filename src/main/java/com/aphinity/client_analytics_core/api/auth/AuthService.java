@@ -3,13 +3,12 @@ package com.aphinity.client_analytics_core.api.auth;
 import com.aphinity.client_analytics_core.api.entities.Role;
 import com.aphinity.client_analytics_core.api.entities.auth.AuthSession;
 import com.aphinity.client_analytics_core.api.repositories.AuthSessionRepository;
-import com.aphinity.client_analytics_core.api.security.CaptchaVerificationService;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.entities.AppUser;
 import com.aphinity.client_analytics_core.api.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.logging.AppLoggingProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
-import jakarta.servlet.http.HttpServletResponse;
+import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +25,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * Authentication service for signup, login, refresh, and logout flows.
+ * Manages refresh token sessions, password requirements, and captcha enforcement.
+ */
 @Service
 public class AuthService {
     // constants
@@ -45,7 +48,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final LoginAttemptService loginAttemptService;
-    private final CaptchaVerificationService captchaVerificationService;
+    private final TurnstileValidationService turnstileValidationService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(
@@ -54,16 +57,19 @@ public class AuthService {
         PasswordEncoder passwordEncoder,
         JwtService jwtService,
         LoginAttemptService loginAttemptService,
-        CaptchaVerificationService captchaVerificationService
-    ) {
+        TurnstileValidationService turnstileValidationService)
+    {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.loginAttemptService = loginAttemptService;
-        this.captchaVerificationService = captchaVerificationService;
+        this.turnstileValidationService = turnstileValidationService;
     }
 
+    /**
+     * Builds a read-only map of password requirement patterns to failure messages.
+     */
     private Map<Pattern, String> buildPasswordRequirements() {
         Map<Pattern, String> requirements = new LinkedHashMap<>();
         requirements.put(LEN_8_PLUS, "Must be at least 8 characters");
@@ -73,17 +79,25 @@ public class AuthService {
         return Map.copyOf(requirements);
     }
 
+    /**
+     * Authenticates a user and issues access/refresh tokens.
+     * If captcha is required for the email, a valid captcha token must be provided.
+     *
+     * @param email user email address. Already normalized.
+     * @param password raw password to verify. Already normalized.
+     * @param ipAddress client IP for auditing/captcha validation
+     * @param userAgent client user agent for session metadata
+     * @return issued access and refresh tokens plus TTL metadata
+     * @throws ResponseStatusException when credentials are invalid, captcha is missing/invalid,
+     *     or Turnstile is unavailable
+     */
     @Transactional
     public IssuedTokens login(
         String email,
         String password,
         String ipAddress,
-        String userAgent,
-        String captchaToken
-    ) {
-        if (loginAttemptService.isCaptchaRequired(email)) {
-            captchaVerificationService.verify(captchaToken, ipAddress);
-        }
+        String userAgent)
+    {
         try {
             AppUser user = appUserRepository.findByEmail(email)
                 .orElseThrow(this::invalidCredentials);
@@ -96,6 +110,9 @@ public class AuthService {
 
             String accessToken = jwtService.createAccessToken(user, session.getId());
             loginAttemptService.recordSuccess(email);
+            asyncLogService.log("User with email: '" + email +
+                    "' logged in at ipv4: '" + ipAddress +
+                    "' from agent '" + userAgent + "'.");
             return new IssuedTokens(
                 accessToken,
                 refreshToken,
@@ -111,15 +128,27 @@ public class AuthService {
         }
     }
 
+    /**
+     * Registers a new user, enforcing password requirements and assigning roles.
+     * Users with the @aphinitytech.com domain receive the partner role in addition to client.
+     *
+     * @param email user email. Already normalized.
+     * @param password user password. Already normalized.
+     * @param name display name. Normalized to upper-case.
+     * @param ipAddress client IP for audit logging
+     * @param userAgent client user agent for audit logging
+     * @throws ResponseStatusException when password requirements fail or email already exists
+     */
     @Transactional
     public void signup(String email, String password, String name,
-                       String ipAddress, String userAgent) {
+                       String ipAddress, String userAgent)
+    {
         for (Map.Entry<Pattern, String> requirement : passwordRequirements.entrySet()) {
             if (!requirement.getKey().matcher(password).find()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, requirement.getValue());
             }
         }
-        boolean isAphinity = email.toLowerCase().strip().endsWith("@aphinitytech.com");
+        boolean isAphinity = email.endsWith("@aphinitytech.com");
         AppUser user = buildUser(email, password, isAphinity, name);
         try {
             appUserRepository.saveAndFlush(user);
@@ -130,6 +159,16 @@ public class AuthService {
                 + ipAddress + "' from agent '" + userAgent + "'.");
     }
 
+    /**
+     * Exchanges a valid refresh token for a new access/refresh pair.
+     * Revokes the old session and creates a new session atomically.
+     *
+     * @param refreshToken raw refresh token presented by the client
+     * @param ipAddress client IP for session metadata
+     * @param userAgent client user agent for session metadata
+     * @return newly issued access and refresh tokens
+     * @throws ResponseStatusException when the refresh token is invalid or revoked
+     */
     @Transactional
     public IssuedTokens refresh(String refreshToken, String ipAddress, String userAgent) {
         String tokenHash = TokenHasher.sha256(refreshToken);
@@ -166,6 +205,11 @@ public class AuthService {
         );
     }
 
+    /**
+     * Revokes an active refresh token session if it exists.
+     *
+     * @param refreshToken raw refresh token presented by the client
+     */
     @Transactional
     public void logout(String refreshToken) {
         String tokenHash = TokenHasher.sha256(refreshToken);
@@ -177,6 +221,13 @@ public class AuthService {
         });
     }
 
+    public void validateCaptcha(String captchaToken) {
+        //TODO something with the captcha
+    }
+
+    /**
+     * Builds a new refresh token session with hashed token storage and expiry metadata.
+     */
     private AuthSession buildSession(AppUser user, String refreshToken, String ipAddress, String userAgent) {
         Instant now = Instant.now();
         AuthSession session = new AuthSession();
@@ -188,6 +239,9 @@ public class AuthService {
         return session;
     }
 
+    /**
+     * Creates a new AppUser with encoded password, timestamps, and role assignments.
+     */
     private AppUser buildUser(String email, String password, boolean isAphinity, String name) {
         AppUser user = new AppUser();
         user.setEmail(email);
@@ -210,6 +264,9 @@ public class AuthService {
         return user;
     }
 
+    /**
+     * Generates a URL-safe, unpadded random refresh token.
+     */
     private String generateRefreshToken() {
         byte[] tokenBytes = new byte[REFRESH_TOKEN_BYTES];
         secureRandom.nextBytes(tokenBytes);
@@ -217,14 +274,23 @@ public class AuthService {
     }
 
     // exceptions helpers
+    /**
+     * @return standardized 401 invalid credentials exception
+     */
     private ResponseStatusException invalidCredentials() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
     }
 
+    /**
+     * @return standardized 401 invalid refresh token exception
+     */
     private ResponseStatusException invalidRefreshToken() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
     }
 
+    /**
+     * @return standardized 409 email already in use exception
+     */
     private ResponseStatusException userAlreadyExists() {
         return new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
     }

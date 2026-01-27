@@ -3,45 +3,14 @@ import { AuthCard } from "../../components/AuthCard";
 import { AuthResult } from "../../components/Types";
 import {toast} from "solid-toast";
 import {createEffect, createSignal, Show} from "solid-js";
+import TurnstileWidget from "../../components/TurnstileWidget";
+import {useApiHost} from "../../context/ApiHostContext";
 
-declare global {
-    interface Window {
-        turnstile?: {
-            render: (container: Element, options: Record<string, unknown>) => string;
-            reset: (widgetId: string) => void;
-        };
-    }
-}
-
-//TODO temp before domain use
-const host = "http://localhost:8080";
+//TODO temp before domain set up
+const host = useApiHost();
 
 export const LoginPage = () => {
-    const [captchaRequired, setCaptchaRequired] = createSignal(false);
-    const [captchaToken, setCaptchaToken] = createSignal("");
-    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
-    let captchaContainer: HTMLDivElement | undefined;
-    let widgetId: string | undefined;
-
-    const renderCaptcha = () => {
-        if (!captchaContainer || !siteKey) {
-            return;
-        }
-        const turnstile = window.turnstile;
-        if (!turnstile) {
-            setTimeout(renderCaptcha, 50);
-            return;
-        }
-        captchaContainer.innerHTML = "";
-        widgetId = turnstile.render(captchaContainer, {
-            sitekey: siteKey,
-            callback: (token: string) => setCaptchaToken(token),
-            "expired-callback": () => setCaptchaToken(""),
-            "error-callback": () => setCaptchaToken("")
-        });
-    };
-
-    const submitLogin = action(async (formData: FormData) => {
+  const submitLogin = action(async (formData: FormData) => {
     const actionResult: AuthResult = {
       ok: false
     };
@@ -75,6 +44,7 @@ export const LoginPage = () => {
 
   const submission = useSubmission(submitLogin);
   const navigate = useNavigate();
+  const [failCount, setFailCount] = createSignal(0);
 
   createEffect(() => {
     const result = submission.result;
@@ -82,16 +52,12 @@ export const LoginPage = () => {
       return;
     }
     if (result.ok) {
+      setFailCount(0);
       toast.success("Logged in successfully!");
-      setCaptchaRequired(false);
-      setCaptchaToken("");
       navigate("/home");
       return;
     }
-    if (result.code === "captcha_required" || result.code === "captcha_invalid") {
-      setCaptchaRequired(true);
-      renderCaptcha();
-    }
+    setFailCount(failCount() + 1);
     toast.error(result.message ?? "Login failed");
   });
 
@@ -136,14 +102,8 @@ export const LoginPage = () => {
               aria-label="Password"
           />
         </label>
-        <input type="hidden" name="captchaToken" value={captchaToken()} />
-        <Show when={captchaRequired()}>
-          <div class="space-y-2">
-            <div ref={el => (captchaContainer = el)} />
-            <Show when={!siteKey}>
-              <p class="text-xs text-error">CAPTCHA site key is not configured.</p>
-            </Show>
-          </div>
+        <Show when={failCount() > 3}>
+          <TurnstileWidget/>
         </Show>
         <button
             type="submit"

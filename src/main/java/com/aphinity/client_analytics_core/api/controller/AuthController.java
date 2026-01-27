@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.controller;
 
+import com.aphinity.client_analytics_core.api.request.CaptchaRequest;
 import com.aphinity.client_analytics_core.api.request.LoginRequest;
 import com.aphinity.client_analytics_core.api.request.SignupRequest;
 import com.aphinity.client_analytics_core.api.response.AuthTokensResponse;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -42,11 +44,10 @@ public class AuthController {
         HttpServletResponse httpResponse
     ) {
         IssuedTokens tokens = authService.login(
-            request.email().toLowerCase().strip(),
+            request.email().strip().toLowerCase(Locale.ROOT),
             request.password().strip(),
             extractIp(httpRequest),
-            extractUserAgent(httpRequest),
-            request.captchaToken()
+            extractUserAgent(httpRequest)
         );
         addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
         return toAuthTokenResponse(tokens);
@@ -60,7 +61,7 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         authService.signup(
-            request.email().toLowerCase().strip(),
+            request.email().strip().toLowerCase(Locale.ROOT),
             request.password().strip(),
             request.name().strip().toUpperCase(),
             extractIp(httpRequest),
@@ -99,10 +100,21 @@ public class AuthController {
         clearRefreshCookie(httpRequest, httpResponse);
     }
 
+    @PostMapping("/captcha")
+    public ResponseEntity<String> captcha(
+            @Valid @RequestBody CaptchaRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        String token = request.captchaToken();
+        authService.validateCaptcha(token);
+        //TODO this is just for testing
+        return ResponseEntity.ok("Captcha validated successfully.");
+    }
+
     private String extractIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+            return forwarded.split(",")[0].strip();
         }
         return request.getRemoteAddr();
     }

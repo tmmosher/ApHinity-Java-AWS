@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class, CaptchaProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -42,8 +42,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/signup").permitAll()
-                .requestMatchers("/api/auth/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                 .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/error").permitAll()
                 .anyRequest().authenticated()
             )
