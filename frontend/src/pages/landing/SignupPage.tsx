@@ -2,7 +2,7 @@ import {A, action, useNavigate, useSubmission} from "@solidjs/router";
 import { AuthCard } from "../../components/AuthCard";
 import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
-import {AuthResult} from "../../components/Types";
+import {AuthResult} from "../../types/Types";
 
 const host = "http://localhost:8080";
 

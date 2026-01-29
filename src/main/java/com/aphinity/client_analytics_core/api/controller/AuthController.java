@@ -29,7 +29,7 @@ import java.util.Locale;
 public class AuthController {
     private static final String REFRESH_COOKIE_NAME = "aphinity_refresh";
     private static final String REFRESH_COOKIE_PATH = "/api/auth";
-    private static final String REFRESH_COOKIE_SAME_SITE = "Lax";
+    private static final String REFRESH_COOKIE_SAME_SITE = "Strict";
 
     private final AuthService authService;
 
@@ -47,7 +47,8 @@ public class AuthController {
             request.email().strip().toLowerCase(Locale.ROOT),
             request.password().strip(),
             extractIp(httpRequest),
-            extractUserAgent(httpRequest)
+            extractUserAgent(httpRequest),
+            request.captchaToken()
         );
         addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
         return toAuthTokenResponse(tokens);
@@ -98,17 +99,6 @@ public class AuthController {
             authService.logout(refreshToken);
         }
         clearRefreshCookie(httpRequest, httpResponse);
-    }
-
-    @PostMapping("/captcha")
-    public ResponseEntity<String> captcha(
-            @Valid @RequestBody CaptchaRequest request,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
-        String token = request.captchaToken();
-        authService.validateCaptcha(token);
-        //TODO this is just for testing
-        return ResponseEntity.ok("Captcha validated successfully.");
     }
 
     private String extractIp(HttpServletRequest request) {

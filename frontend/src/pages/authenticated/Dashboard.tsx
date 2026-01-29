@@ -1,38 +1,16 @@
 import { A } from "@solidjs/router";
-import { For, Match, Switch } from "solid-js";
+import { For } from "solid-js";
 import type { JSX } from "solid-js";
+import SidebarNav, {NavItem} from "../../components/SidebarNav";
 
 export type UserRole = "admin" | "partner" | "client";
-export type NavItem = {
-  label: string;
-  href?: string;
-};
+
 
 type DashboardShellProps = {
   role: UserRole;
   sidebarItems: NavItem[];
   children: JSX.Element;
 };
-
-const SidebarNav = (props: { items: NavItem[] }) => (
-  <ul class="menu mt-2">
-    <For each={props.items}>
-      {(item) => (
-        <li>
-          {item.href ? (
-            <A href={item.href} activeClass="active" end preload>
-              {item.label}
-            </A>
-          ) : (
-            <span class="opacity-70 cursor-not-allowed" aria-disabled="true">
-              {item.label}
-            </span>
-          )}
-        </li>
-      )}
-    </For>
-  </ul>
-);
 
 export const DashboardShell = (props: DashboardShellProps) => (
   <main class="w-full" aria-label="Authenticated home page">
@@ -56,7 +34,7 @@ export const DashboardShell = (props: DashboardShellProps) => (
   </main>
 );
 
-// TODO: Replace with role resolution from the auth context.
+// TODO: Replace with role resolution
 const resolveRole = (): UserRole => {
   if (typeof window === "undefined") {
     return "client";
@@ -94,31 +72,7 @@ export const Dashboard = () => {
       sidebarItems={roleNavItems[role]}
     >
       <div class="mt-8 space-y-4">
-        <Switch>
-          <Match when={role === "admin"}>
-            <div class="space-y-3">
-              <h2 class="text-lg font-semibold">Admin panel</h2>
-                {/*TODO*/}
-            </div>
-          </Match>
-          <Match when={role === "partner"}>
-            <div class="space-y-3">
-              <h2 class="text-lg font-semibold">Partner priorities</h2>
-              <ul class="list-disc list-inside text-sm text-base-content/70">
-                {/*TODO*/}
-              </ul>
-            </div>
-          </Match>
-          <Match when={role === "client"}>
-            <div class="space-y-3">
-              <h2 class="text-lg font-semibold">Client</h2>
-              <ul class="list-disc list-inside text-sm text-base-content/70">
-                <li>Review facility performance indicators at a glance.</li>
-                <li>Request support or schedule a consultation.</li>
-              </ul>
-            </div>
-          </Match>
-        </Switch>
+        {/*TODO*/}
       </div>
     </DashboardShell>
   );

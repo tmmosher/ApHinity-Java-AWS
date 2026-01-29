@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@nerimity/solid-turnstile": "^1.1.0",
     "@solidjs/router": "^0.13.6",
     "solid-js": "^1.8.0"
   },

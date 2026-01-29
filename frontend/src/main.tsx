@@ -62,7 +62,7 @@ if (root) {
             <Route path="/:token" component={RecoveryPage} />
           </Route>
         </Route>
-        <Route path="/home" component={AuthenticatedLayout}>
+        <Route path="/dashboard" component={AuthenticatedLayout}>
           <Route path="/" component={Dashboard} />
         </Route>
       </Router>

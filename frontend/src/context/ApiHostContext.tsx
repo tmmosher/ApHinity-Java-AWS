@@ -2,7 +2,7 @@ import { createContext, useContext } from "solid-js";
 import type { ParentProps } from "solid-js";
 
 // Update this value when the backend host changes.
-const API_HOST = "http://localhost:8080";
+const API_HOST = "https://aphinityms.com/";
 
 const ApiHostContext = createContext<string>(API_HOST);
 

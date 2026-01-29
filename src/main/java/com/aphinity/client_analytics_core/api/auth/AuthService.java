@@ -52,12 +52,11 @@ public class AuthService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(
-        AppUserRepository appUserRepository,
-        AuthSessionRepository authSessionRepository,
-        PasswordEncoder passwordEncoder,
-        JwtService jwtService,
-        LoginAttemptService loginAttemptService,
-        TurnstileValidationService turnstileValidationService)
+            AppUserRepository appUserRepository,
+            AuthSessionRepository authSessionRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            LoginAttemptService loginAttemptService, TurnstileValidationService turnstileValidationService)
     {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
@@ -87,6 +86,7 @@ public class AuthService {
      * @param password raw password to verify. Already normalized.
      * @param ipAddress client IP for auditing/captcha validation
      * @param userAgent client user agent for session metadata
+     * @param captchaToken Turnstile token when captcha is required
      * @return issued access and refresh tokens plus TTL metadata
      * @throws ResponseStatusException when credentials are invalid, captcha is missing/invalid,
      *     or Turnstile is unavailable
@@ -96,8 +96,23 @@ public class AuthService {
         String email,
         String password,
         String ipAddress,
-        String userAgent)
+        String userAgent,
+        String captchaToken)
     {
+        if (loginAttemptService.isCaptchaRequired(email)) {
+            if (captchaToken == null || captchaToken.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Captcha required");
+            }
+            boolean valid;
+            try {
+                valid = turnstileValidationService.validateTurnstileResponse(captchaToken, ipAddress);
+            } catch (RuntimeException ex) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Captcha not configured", ex);
+            }
+            if (!valid) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Invalid captcha");
+            }
+        }
         try {
             AppUser user = appUserRepository.findByEmail(email)
                 .orElseThrow(this::invalidCredentials);

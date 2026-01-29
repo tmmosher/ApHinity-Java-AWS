@@ -21,6 +21,8 @@ import org.springframework.security.web.SecurityFilterChain;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.aphinity.client_analytics_core.api.auth.LoginAttemptProperties;
+import com.digitalsanctuary.cf.turnstile.TurnstileConfiguration;
+import org.springframework.context.annotation.Import;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
+@Import(TurnstileConfiguration.class)
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -37,13 +40,22 @@ public class SecurityConfig {
     ) throws Exception {
         RedirectAuthenticationEntryPoint redirectEntryPoint =
             new RedirectAuthenticationEntryPoint("/login");
-
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
-                .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/error").permitAll()
+                .requestMatchers(
+                    "/",
+                    "/index.html",
+                    "/assets/**",
+                    "/favicon.ico",
+                    "/error",
+                    "/login",
+                    "/signup",
+                    "/support",
+                    "/recovery/**"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(exception -> exception.authenticationEntryPoint(redirectEntryPoint))
@@ -51,7 +63,6 @@ public class SecurityConfig {
                 .authenticationEntryPoint(redirectEntryPoint)
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
             );
-
         return http.build();
     }
 

@@ -1,29 +1,23 @@
 // @ts-ignore
-import {Turnstile} from "solid-turnstile";
+import {Turnstile, TurnstileRef} from "@nerimity/solid-turnstile";
 import {toast} from "solid-toast";
 import {useApiHost} from "../context/ApiHostContext";
+import {createEffect} from "solid-js";
 
-const host = useApiHost();
-
+// pretty much a 1-1 of the docs. See https://www.npmjs.com/package/@nerimity/solid-turnstile.
 const TurnstileWidget = () => {
+    let ref: TurnstileRef | undefined;
+    // import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
     return <Turnstile
-        sitekey={process.env.VITE_TURNSTILE_SITE_KEY as string | undefined}
-        onVerify={async (token: string) => {
-            const response = await fetch(host+"/api/auth/captcha", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    captchaToken: token
-                })
-            });
+        sitekey={"0x4AAAAAACT3h056peO4g-ht"}
+        onVerify={() => {
+            toast.success("Captcha verified successfully!");
         }}
         onError={() => {
             toast.error("Unable to verify captcha. Please retry.");
         }}
-        onExpire={() => {
-            toast.error("Captcha expired. Please retry.");
+        onTimeout={() => {
+            toast.error("Captcha timed out. Please retry.");
         }}
     />;
 }

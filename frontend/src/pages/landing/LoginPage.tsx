@@ -1,6 +1,6 @@
 import {A, action, useNavigate, useSubmission} from "@solidjs/router";
 import { AuthCard } from "../../components/AuthCard";
-import { AuthResult } from "../../components/Types";
+import { AuthResult } from "../../types/Types";
 import {toast} from "solid-toast";
 import {createEffect, createSignal, Show} from "solid-js";
 import TurnstileWidget from "../../components/TurnstileWidget";
@@ -54,11 +54,13 @@ export const LoginPage = () => {
     if (result.ok) {
       setFailCount(0);
       toast.success("Logged in successfully!");
-      navigate("/home");
-      return;
+      navigate("/dashboard");
+    } else {
+      setFailCount(failCount() + 1);
+      toast.error(result.message ?? "Login failed");
     }
-    setFailCount(failCount() + 1);
-    toast.error(result.message ?? "Login failed");
+    submission.clear();
+    return;
   });
 
   return(
