@@ -3,10 +3,12 @@ export const HomePage = () => (
     <div class="hero-content text-center">
       <div class="max-w-2xl">
         <h1 id="home-title" class="text-4xl md:text-5xl font-bold">
-          ApHinity Technologies
+          ApHinity Technologies Management Solutions
         </h1>
         <p class="py-6 text-lg">
-          Blah blah placeholder blah blah lorem ipsum dolime
+          ApHinity Technologies is a leading provider of innovative water and air treatment solutions,
+          dedicated to improving environmental outcomes by delivering sustainable and effective solutions to
+          help clients reach their compliance goals.
         </p>
       </div>
     </div>
