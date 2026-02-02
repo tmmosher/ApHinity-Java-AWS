@@ -1,0 +1,31 @@
+name: aphinity
+
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.runtime
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env.runtime
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$DEV_DB_USERNAME -d $$DEV_DB_URL"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

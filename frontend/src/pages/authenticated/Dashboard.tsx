@@ -5,7 +5,6 @@ import SidebarNav, {NavItem} from "../../components/SidebarNav";
 
 export type UserRole = "admin" | "partner" | "client";
 
-
 type DashboardShellProps = {
   role: UserRole;
   sidebarItems: NavItem[];

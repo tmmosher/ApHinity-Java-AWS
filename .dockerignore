@@ -1,0 +1,14 @@
+.git
+.gradle
+.idea
+.vscode
+build
+frontend/dist
+frontend/node_modules
+node_modules
+logs
+*.log
+*.iml
+*.classpath
+*.project
+*.settings
