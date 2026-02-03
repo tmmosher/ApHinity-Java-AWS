@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.aphinity'
-version = '0.0.1-SNAPSHOT'
+version = '0.1'
 description = 'The server back end for the ApHinity Analytics web application.'
 
 java {
