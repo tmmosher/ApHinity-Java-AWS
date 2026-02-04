@@ -1,6 +1,6 @@
 import { A, action, useNavigate, useSubmission } from "@solidjs/router";
 import { AuthCard } from "../../components/AuthCard";
-import { AuthResult } from "../../types/Types";
+import { ActionResult } from "../../types/Types";
 import {toast} from "solid-toast";
 import {createEffect, createSignal, Show} from "solid-js";
 import TurnstileWidget from "../../components/TurnstileWidget";
@@ -10,7 +10,7 @@ const host = useApiHost();
 
 export const LoginPage = () => {
   const submitLogin = action(async (formData: FormData) => {
-    const actionResult: AuthResult = {
+    const actionResult: ActionResult = {
       ok: false
     };
     //TODO also add Zod checks for client here
@@ -47,9 +47,7 @@ export const LoginPage = () => {
 
   createEffect(() => {
     const result = submission.result;
-    if (!result) {
-      return;
-    }
+    if (!result) return;
     if (result.ok) {
       setFailCount(0);
       toast.success("Logged in successfully!");

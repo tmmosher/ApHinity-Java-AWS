@@ -1,4 +1,4 @@
-package com.aphinity.client_analytics_core.api.auth;
+package com.aphinity.client_analytics_core.api.auth.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

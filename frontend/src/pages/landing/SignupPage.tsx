@@ -2,14 +2,14 @@ import {A, action, useNavigate, useSubmission} from "@solidjs/router";
 import { AuthCard } from "../../components/AuthCard";
 import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
-import {AuthResult} from "../../types/Types";
+import {ActionResult} from "../../types/Types";
 
 const host = "http://localhost:8080";
 
 export const SignupPage = () => {
     const submitSignup = action(async (formData: FormData) => {
         //TODO Zod schema validation before client submission
-        const actionResult: AuthResult = {
+        const actionResult: ActionResult = {
             ok: false
         };
         try {
@@ -50,9 +50,11 @@ export const SignupPage = () => {
         if (result.ok) {
             toast.success("Account created successfully!");
             navigate("/login");
-            return;
+        } else {
+            toast.error(result.message ?? "Signup failed");
         }
-        toast.error(result.message ?? "Signup failed");
+        submission.clear();
+        return;
     });
 
     return (

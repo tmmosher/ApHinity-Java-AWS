@@ -1,22 +1,30 @@
-package com.aphinity.client_analytics_core.api.auth;
+package com.aphinity.client_analytics_core.api.auth.services;
 
-import com.aphinity.client_analytics_core.api.entities.Role;
-import com.aphinity.client_analytics_core.api.entities.auth.AuthSession;
-import com.aphinity.client_analytics_core.api.repositories.AuthSessionRepository;
+import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
+import com.aphinity.client_analytics_core.api.auth.entities.Role;
+import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
+import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
 import com.aphinity.client_analytics_core.api.security.JwtService;
-import com.aphinity.client_analytics_core.api.entities.AppUser;
-import com.aphinity.client_analytics_core.api.repositories.AppUserRepository;
+import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
+import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.logging.AppLoggingProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HashSet;
@@ -49,14 +57,25 @@ public class AuthService {
     private final JwtService jwtService;
     private final LoginAttemptService loginAttemptService;
     private final TurnstileValidationService turnstileValidationService;
+    private final JdbcTemplate jdbcTemplate;
+    private final MailSendingService mailSendingService;
     private final SecureRandom secureRandom = new SecureRandom();
+
+    @Value("${app.recovery.token-ttl-seconds:3600}")
+    private long recoveryTokenTtlSeconds;
+
+    @Value("${app.recovery.code-length:6}")
+    private int recoveryCodeLength;
 
     public AuthService(
             AppUserRepository appUserRepository,
             AuthSessionRepository authSessionRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            LoginAttemptService loginAttemptService, TurnstileValidationService turnstileValidationService)
+            LoginAttemptService loginAttemptService,
+            TurnstileValidationService turnstileValidationService,
+            JdbcTemplate jdbcTemplate,
+            MailSendingService mailSendingService)
     {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
@@ -64,6 +83,8 @@ public class AuthService {
         this.jwtService = jwtService;
         this.loginAttemptService = loginAttemptService;
         this.turnstileValidationService = turnstileValidationService;
+        this.jdbcTemplate = jdbcTemplate;
+        this.mailSendingService = mailSendingService;
     }
 
     /**
@@ -222,7 +243,6 @@ public class AuthService {
 
     /**
      * Revokes an active refresh token session if it exists.
-     *
      * @param refreshToken raw refresh token presented by the client
      */
     @Transactional
@@ -236,8 +256,138 @@ public class AuthService {
         });
     }
 
-    public void validateCaptcha(String captchaToken) {
-        //TODO something with the captcha
+    /**
+     * Responsible for receiving email / captcha, verifying captcha, and sending recovery email
+     * @param email normalized email address for the user
+     * @param captchaToken Turnstile token. Captcha is always required for email recovery
+     * @param ipAddress IP Address of the request
+     */
+    @Transactional
+    public void recovery(String email, String captchaToken, String ipAddress) {
+        // ensure the captcha is correct
+        boolean validCaptcha;
+        try {
+            validCaptcha = turnstileValidationService.validateTurnstileResponse(captchaToken, ipAddress);
+        } catch (RuntimeException ex) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Captcha not configured", ex);
+        }
+        if (!validCaptcha) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid captcha token");
+        }
+        AppUser user = appUserRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return;
+        }
+
+        Instant now = Instant.now();
+        jdbcTemplate.update(
+            "update password_reset_token set consumed_at = ? where user_id = ? and consumed_at is null",
+            Timestamp.from(now),
+            user.getId()
+        );
+
+        String recoveryCode = generateRecoveryCode();
+        String resetTokenHash = TokenHasher.sha256(recoveryCode);
+        Instant expiresAt = now.plusSeconds(recoveryTokenTtlSeconds);
+
+        try {
+            jdbcTemplate.update(
+                "insert into password_reset_token (user_id, token_hash, expires_at) values (?, ?, ?)",
+                user.getId(),
+                resetTokenHash,
+                Timestamp.from(expiresAt)
+            );
+        } catch (DataIntegrityViolationException ex) {
+            return;
+        }
+
+        Runnable sendEmail = () -> {
+            try {
+                mailSendingService.sendRecoveryEmail(
+                    user.getEmail(),
+                    recoveryCode,
+                    recoveryTokenTtlSeconds
+                );
+            } catch (MailException ex) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send recovery email", ex);
+            }
+        };
+        //makes sure recovery token is available before sending email
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendEmail.run();
+                }
+            });
+        } else {
+            sendEmail.run();
+        }
+    }
+
+    /**
+     * Responsible for receiving the verification number and verifying it against the database
+     * @param email normalized email address for the user
+     * @param recoveryCode
+     * @param ipAddress
+     * @param userAgent
+     * @return
+     */
+    @Transactional
+    public IssuedTokens recoveryVerify(String email, String recoveryCode, String ipAddress, String userAgent) {
+        String normalizedCode = normalizeRecoveryCode(recoveryCode);
+        if (normalizedCode == null) {
+            throw invalidRecoveryCode();
+        }
+        AppUser user = appUserRepository.findByEmail(email).orElseThrow(this::invalidRecoveryCode);
+
+        String tokenHash = TokenHasher.sha256(normalizedCode);
+        Instant now = Instant.now();
+        Long tokenId;
+        Instant expiresAt;
+        try {
+            Map<String, Object> row = jdbcTemplate.queryForMap(
+                "select id, expires_at from password_reset_token " +
+                    "where user_id = ? and token_hash = ? and consumed_at is null",
+                user.getId(),
+                tokenHash
+            );
+            tokenId = ((Number) row.get("id")).longValue();
+            expiresAt = ((Timestamp) row.get("expires_at")).toInstant();
+        } catch (EmptyResultDataAccessException ex) {
+            throw invalidRecoveryCode();
+        }
+
+        if (!expiresAt.isAfter(now)) {
+            jdbcTemplate.update(
+                "update password_reset_token set consumed_at = ? where id = ? and consumed_at is null",
+                Timestamp.from(now),
+                tokenId
+            );
+            throw invalidRecoveryCode();
+        }
+
+        int updated = jdbcTemplate.update(
+            "update password_reset_token set consumed_at = ? where id = ? and consumed_at is null",
+            Timestamp.from(now),
+            tokenId
+        );
+        if (updated == 0) {
+            throw invalidRecoveryCode();
+        }
+
+        String refreshToken = generateRefreshToken();
+        AuthSession session = buildSession(user, refreshToken, ipAddress, userAgent);
+        authSessionRepository.save(session);
+
+        String accessToken = jwtService.createAccessToken(user, session.getId());
+        return new IssuedTokens(
+            accessToken,
+            refreshToken,
+            TOKEN_TYPE,
+            jwtService.getAccessTokenTtlSeconds(),
+            jwtService.getRefreshTokenTtlSeconds()
+        );
     }
 
     /**
@@ -288,6 +438,41 @@ public class AuthService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
+    /**
+     * @return A random numeric recovery code
+     */
+    private String generateRecoveryCode() {
+        int length = normalizedRecoveryCodeLength();
+        int lowerBound = (int) Math.pow(10, length - 1);
+        int upperBound = (int) Math.pow(10, length) - 1;
+        int code = lowerBound + secureRandom.nextInt(upperBound - lowerBound + 1);
+        return Integer.toString(code);
+    }
+
+    private String normalizeRecoveryCode(String code) {
+        if (code == null) {
+            return null;
+        }
+        String trimmed = code.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        int expectedLength = normalizedRecoveryCodeLength();
+        if (trimmed.length() != expectedLength) {
+            return null;
+        }
+        for (int i = 0; i < trimmed.length(); i++) {
+            if (!Character.isDigit(trimmed.charAt(i))) {
+                return null;
+            }
+        }
+        return trimmed;
+    }
+
+    private int normalizedRecoveryCodeLength() {
+        return Math.max(4, Math.min(9, recoveryCodeLength));
+    }
+
     // exceptions helpers
     /**
      * @return standardized 401 invalid credentials exception
@@ -308,5 +493,12 @@ public class AuthService {
      */
     private ResponseStatusException userAlreadyExists() {
         return new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+    }
+
+    /**
+     * @return standardized 401 invalid recovery code exception
+     */
+    private ResponseStatusException invalidRecoveryCode() {
+        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid recovery code");
     }
 }

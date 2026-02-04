@@ -1,4 +1,4 @@
-package com.aphinity.client_analytics_core.api.response;
+package com.aphinity.client_analytics_core.api.auth.response;
 
 public record AuthTokensResponse(
     String accessToken,

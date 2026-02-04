@@ -1,11 +1,12 @@
-package com.aphinity.client_analytics_core.api.controller;
+package com.aphinity.client_analytics_core.api.auth.controllers;
 
-import com.aphinity.client_analytics_core.api.request.CaptchaRequest;
-import com.aphinity.client_analytics_core.api.request.LoginRequest;
-import com.aphinity.client_analytics_core.api.request.SignupRequest;
-import com.aphinity.client_analytics_core.api.response.AuthTokensResponse;
-import com.aphinity.client_analytics_core.api.auth.AuthService;
-import com.aphinity.client_analytics_core.api.auth.IssuedTokens;
+import com.aphinity.client_analytics_core.api.auth.requests.LoginRequest;
+import com.aphinity.client_analytics_core.api.auth.requests.RecoveryRequest;
+import com.aphinity.client_analytics_core.api.auth.requests.RecoveryVerifyRequest;
+import com.aphinity.client_analytics_core.api.auth.requests.SignupRequest;
+import com.aphinity.client_analytics_core.api.auth.response.AuthTokensResponse;
+import com.aphinity.client_analytics_core.api.auth.services.AuthService;
+import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -99,6 +100,34 @@ public class AuthController {
             authService.logout(refreshToken);
         }
         clearRefreshCookie(httpRequest, httpResponse);
+    }
+
+    @PostMapping("/recovery")
+    public ResponseEntity<String> recovery(
+            @Valid @RequestBody RecoveryRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String email = request.email().strip().toLowerCase(Locale.ROOT);
+        String captchaToken = request.captchaToken().strip();
+        String ipAddress = extractIp(httpRequest);
+        authService.recovery(email, captchaToken, ipAddress);
+        return ResponseEntity.ok("Recovery email sent.");
+    }
+
+    @PostMapping("/verify")
+    public AuthTokensResponse recoveryVerify(
+        @Valid @RequestBody RecoveryVerifyRequest request,
+        HttpServletRequest httpRequest,
+        HttpServletResponse httpResponse
+    ) {
+        IssuedTokens tokens = authService.recoveryVerify(
+            request.email().strip().toLowerCase(Locale.ROOT),
+            request.code().strip(),
+            extractIp(httpRequest),
+            extractUserAgent(httpRequest)
+        );
+        addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
+        return toAuthTokenResponse(tokens);
     }
 
     private String extractIp(HttpServletRequest request) {

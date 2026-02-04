@@ -1,5 +1,6 @@
-package com.aphinity.client_analytics_core.api.auth;
+package com.aphinity.client_analytics_core.api.auth.services;
 
+import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Service;

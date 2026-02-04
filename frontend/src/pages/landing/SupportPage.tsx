@@ -15,7 +15,7 @@ export const SupportPage = () => (
         </ul>
         <a
           class="btn btn-primary w-full text-center"
-          href="mailto:tmosher@aphinitytech.com"
+          href="mailto:help@aphinityms.com"
           aria-label="Email ApHinity support"
         >
           Email Support
