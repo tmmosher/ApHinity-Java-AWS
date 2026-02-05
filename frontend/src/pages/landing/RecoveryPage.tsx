@@ -6,7 +6,6 @@ import {createEffect, createSignal, Match, Show, Switch} from "solid-js";
 import {toast} from "solid-toast";
 import SendRecovery from "../../components/SendRecovery";
 import SendVerification from "../../components/SendVerification";
-import sendVerification from "../../components/SendVerification";
 
 const host = useApiHost();
 

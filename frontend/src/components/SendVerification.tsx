@@ -1,8 +1,8 @@
-import {JSX} from "solid-js";
-import SerializableAttributeValue = JSX.SerializableAttributeValue;
+import {ActionResult} from "../types/Types";
+import {Action} from "@solidjs/router";
 
 interface SendVerificationProps {
-    action: string | SerializableAttributeValue | undefined;
+    action: Action<[FormData], ActionResult>;
     email: string;
 }
 

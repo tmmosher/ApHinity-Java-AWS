@@ -4,7 +4,7 @@ import type { ParentProps } from "solid-js";
 // "https://aphinityms.com"
 // "http://localhost:8080"
 
-const API_HOST = "https://aphinityms.com";
+const API_HOST = "http://localhost:8080";
 
 const ApiHostContext = createContext<string>(API_HOST);
 

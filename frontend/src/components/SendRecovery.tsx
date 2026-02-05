@@ -1,8 +1,10 @@
 import TurnstileWidget from "./TurnstileWidget";
-import {JSX, Setter} from "solid-js";
+import {Setter} from "solid-js";
+import {Action} from "@solidjs/router";
+import { ActionResult } from "../types/Types";
 
 interface MailSendComponentProps {
-    action: string | JSX.SerializableAttributeValue | undefined;
+    action: Action<[FormData], ActionResult>;
     setEmail: Setter<string>;
 }
 
