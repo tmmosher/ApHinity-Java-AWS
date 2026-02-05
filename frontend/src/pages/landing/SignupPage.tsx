@@ -3,8 +3,9 @@ import { AuthCard } from "../../components/AuthCard";
 import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
 import {ActionResult} from "../../types/Types";
+import {useApiHost} from "../../context/ApiHostContext";
 
-const host = "http://localhost:8080";
+const host = useApiHost();
 
 export const SignupPage = () => {
     const submitSignup = action(async (formData: FormData) => {
