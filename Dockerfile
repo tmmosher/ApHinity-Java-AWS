@@ -17,6 +17,10 @@ RUN npm ci
 FROM amazoncorretto:21-al2023 AS backend-build
 WORKDIR /app
 
+RUN dnf install -y findutils \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
 COPY gradlew gradlew.bat settings.gradle build.gradle ./
 COPY gradle ./gradle
 RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
