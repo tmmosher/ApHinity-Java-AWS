@@ -2,7 +2,7 @@ package com.aphinity.client_analytics_core.api.auth.controllers;
 
 import com.aphinity.client_analytics_core.api.auth.requests.LoginRequest;
 import com.aphinity.client_analytics_core.api.auth.requests.RecoveryRequest;
-import com.aphinity.client_analytics_core.api.auth.requests.RecoveryVerifyRequest;
+import com.aphinity.client_analytics_core.api.auth.requests.VerifyRequest;
 import com.aphinity.client_analytics_core.api.auth.requests.SignupRequest;
 import com.aphinity.client_analytics_core.api.auth.response.AuthTokensResponse;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
@@ -115,8 +115,8 @@ public class AuthController {
     }
 
     @PostMapping("/verify")
-    public AuthTokensResponse recoveryVerify(
-        @Valid @RequestBody RecoveryVerifyRequest request,
+    public AuthTokensResponse verify(
+        @Valid @RequestBody VerifyRequest request,
         HttpServletRequest httpRequest,
         HttpServletResponse httpResponse
     ) {

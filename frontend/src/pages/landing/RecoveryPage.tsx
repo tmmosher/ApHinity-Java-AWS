@@ -2,13 +2,15 @@ import { AuthCard } from "../../components/AuthCard";
 import {useApiHost} from "../../context/ApiHostContext";
 import {action, useNavigate, useSubmission} from "@solidjs/router";
 import {ActionResult} from "../../types/Types";
-import TurnstileWidget from "../../components/TurnstileWidget";
-import {createEffect} from "solid-js";
+import {createEffect, createSignal, Match, Show, Switch} from "solid-js";
 import {toast} from "solid-toast";
+import SendRecovery from "../../components/SendRecovery";
+import SendVerification from "../../components/SendVerification";
+import sendVerification from "../../components/SendVerification";
 
 const host = useApiHost();
 
-export const RecoveryPage = () => {
+const RecoveryPage = () => {
   const submitRecovery = action(async (formData: FormData) => {
     const actionResult: ActionResult = {
       ok: false
@@ -39,53 +41,94 @@ export const RecoveryPage = () => {
     return actionResult;
   }, "submitRecovery");
 
-  const submission = useSubmission(submitRecovery);
+  const submitVerification = action(async (formData: FormData) => {
+        const actionResult: ActionResult = {
+            ok: false
+        };
+        const response = await fetch(host + "/api/auth/verify", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                verifyValue: formData.get("verifyValue")
+            })
+        });
+        try {
+            if (response.ok) {
+                actionResult.ok = true;
+            } else {
+                const errorBody = await response.json().catch(() => null);
+                actionResult.ok = false;
+                actionResult.code = errorBody?.code;
+                actionResult.message = errorBody?.message ?? "Code verification failed";
+            }
+        } catch (error) {
+            actionResult.ok = false;
+            actionResult.message = "Code verification failed";
+        }
+        return actionResult;
+  }, "submitVerification");
+
+  const recoverySubmission = useSubmission(submitRecovery);
+  const verificationSubmission = useSubmission(submitVerification);
+  const [verifyVisible, setVerifyVisible] = createSignal(false);
   const navigate = useNavigate();
 
   createEffect(() => {
-    const result = submission.result;
+    const result = recoverySubmission.result;
     if (!result) return;
     if (result.ok) {
       toast.success("Recovery email sent successfully!");
-      // timeout to wait for user to read the toast
-      setTimeout(() => navigate("/login"), 1000);
+      setVerifyVisible(true);
     } else {
       toast.error(result.message ?? "Recovery email failed to send");
     }
-    submission.clear();
+    recoverySubmission.clear();
     return;
-  })
+  });
+
+  createEffect(() => {
+    const result = verificationSubmission.result;
+    if (!result) return;
+    if (result.ok) {
+      toast.success("Code verification successful!");
+      // timeout to wait for user to read the toast
+      setTimeout(() => navigate("/dashboard"), 500);
+    } else {
+      toast.error(result.message ?? "Recovery email failed to send");
+    }
+    verificationSubmission.clear();
+    return;
+  });
 
   return (
-      <main class="w-full" aria-label="Email recovery page">
-        <AuthCard title="Email Recovery">
-          <form
-              class="w-full flex flex-col gap-4 text-left"
-              aria-label="Email recovery form"
-              action={submitRecovery}
-          >
-            <label class="form-control w-full">
-              <div class="label">
-                <span class="label-text">Email</span>
-              </div>
-              <input
-                  type="email"
-                  name="email"
-                  placeholder="you@company.com"
-                  class="input opacity-70 input-bordered w-full"
-                  aria-label="Email"
-              />
-            </label>
-            <TurnstileWidget/>
-            <button
-                type="submit"
-                class="btn btn-primary w-full text-center"
-                aria-label="Submit email recovery form"
-            >
-              Submit
-            </button>
-          </form>
-        </AuthCard>
-      </main>
+    <main class="w-full" aria-label="Email recovery page">
+      <AuthCard title="Email Recovery"
+        footer={
+          <Show when={verifyVisible()}>
+            <div>
+                <p onclick={() => setVerifyVisible(false)}
+                    class="text-sm text-base-content/60 cursor-pointer"
+                    aria-label="Change email to send"
+                >
+                    Send to a different email
+                </p>
+            </div>
+          </Show>
+        }
+      >
+        <Switch>
+          <Match when={!verifyVisible()}>
+            <SendRecovery action={submitRecovery}/>
+          </Match>
+          <Match when={verifyVisible()}>
+            <SendVerification action={submitVerification}/>
+          </Match>
+        </Switch>
+      </AuthCard>
+    </main>
   );
 }
+
+export default RecoveryPage;

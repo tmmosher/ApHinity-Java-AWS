@@ -328,10 +328,10 @@ public class AuthService {
     /**
      * Responsible for receiving the verification number and verifying it against the database
      * @param email normalized email address for the user
-     * @param recoveryCode
-     * @param ipAddress
-     * @param userAgent
-     * @return
+     * @param recoveryCode stripped recovery code provided by the user
+     * @param ipAddress IP address of the request
+     * @param userAgent User agent of the request
+     * @return new tokens authenticating the user for access
      */
     @Transactional
     public IssuedTokens recoveryVerify(String email, String recoveryCode, String ipAddress, String userAgent) {
@@ -358,21 +358,12 @@ public class AuthService {
             throw invalidRecoveryCode();
         }
 
-        if (!expiresAt.isAfter(now)) {
-            jdbcTemplate.update(
-                "update password_reset_token set consumed_at = ? where id = ? and consumed_at is null",
-                Timestamp.from(now),
-                tokenId
-            );
-            throw invalidRecoveryCode();
-        }
-
         int updated = jdbcTemplate.update(
             "update password_reset_token set consumed_at = ? where id = ? and consumed_at is null",
             Timestamp.from(now),
             tokenId
         );
-        if (updated == 0) {
+        if (updated == 0 || !expiresAt.isAfter(now)) {
             throw invalidRecoveryCode();
         }
 
@@ -442,7 +433,7 @@ public class AuthService {
      * @return A random numeric recovery code
      */
     private String generateRecoveryCode() {
-        int length = normalizedRecoveryCodeLength();
+        int length = recoveryCodeLength;
         int lowerBound = (int) Math.pow(10, length - 1);
         int upperBound = (int) Math.pow(10, length) - 1;
         int code = lowerBound + secureRandom.nextInt(upperBound - lowerBound + 1);
@@ -450,27 +441,17 @@ public class AuthService {
     }
 
     private String normalizeRecoveryCode(String code) {
-        if (code == null) {
+        if (code == null
+                || code.isEmpty()
+                || code.length() != recoveryCodeLength) {
             return null;
         }
-        String trimmed = code.trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
-        int expectedLength = normalizedRecoveryCodeLength();
-        if (trimmed.length() != expectedLength) {
-            return null;
-        }
-        for (int i = 0; i < trimmed.length(); i++) {
-            if (!Character.isDigit(trimmed.charAt(i))) {
+        for (int i = 0; i < code.length(); i++) {
+            if (!Character.isDigit(code.charAt(i))) {
                 return null;
             }
         }
-        return trimmed;
-    }
-
-    private int normalizedRecoveryCodeLength() {
-        return Math.max(4, Math.min(9, recoveryCodeLength));
+        return code;
     }
 
     // exceptions helpers
