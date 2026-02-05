@@ -1,15 +1,11 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-slim AS frontend-build
+FROM node:20-slim AS frontend-deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY frontend/package.json frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/postcss.config.cjs frontend/tailwind.config.cjs frontend/index.html frontend/.env ./frontend/
+COPY frontend/package.json ./frontend/
 RUN npm ci
-
-RUN mkdir -p /app/src/main/resources
-COPY frontend/src ./frontend/src
-RUN npm --workspace frontend run build
 
 FROM amazoncorretto:21 AS backend-build
 WORKDIR /app
@@ -19,14 +15,22 @@ COPY gradle ./gradle
 RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
 COPY src ./src
-COPY --from=frontend-build /app/src/main/resources/static ./src/main/resources/static
 
 RUN ./gradlew bootJar --no-daemon
 
-FROM amazoncorretto:21
+FROM node:20-slim
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y openjdk-21-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=backend-build /app/build/libs/*.jar /app/app.jar
+COPY package.json package-lock.json ./
+COPY frontend ./frontend
+COPY --from=frontend-deps /app/node_modules ./node_modules
+
+ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/frontend/dist/,classpath:/static/
 
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+ENTRYPOINT ["sh","-c","npm run frontend:build && exec java -jar /app/app.jar"]

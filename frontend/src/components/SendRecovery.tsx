@@ -1,9 +1,8 @@
 import TurnstileWidget from "./TurnstileWidget";
 import {JSX, Setter} from "solid-js";
-import SerializableAttributeValue = JSX.SerializableAttributeValue;
 
 interface MailSendComponentProps {
-    action: string | SerializableAttributeValue | undefined;
+    action: string | JSX.SerializableAttributeValue | undefined;
     setEmail: Setter<string>;
 }
 

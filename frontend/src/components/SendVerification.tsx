@@ -1,4 +1,3 @@
-import {Serializer} from "node:v8";
 import {JSX} from "solid-js";
 import SerializableAttributeValue = JSX.SerializableAttributeValue;
 
