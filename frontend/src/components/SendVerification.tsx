@@ -4,6 +4,7 @@ import SerializableAttributeValue = JSX.SerializableAttributeValue;
 
 interface SendVerificationProps {
     action: string | SerializableAttributeValue | undefined;
+    email: string;
 }
 
 const SendVerification = (props: SendVerificationProps) => {
@@ -24,6 +25,7 @@ const SendVerification = (props: SendVerificationProps) => {
                          aria-label="Verification code"
                          placeholder="123456"/>
               </label>
+              <input type="hidden" name="email" value={props.email}/>
               <button type="submit"
                       class="btn btn-primary text-center w-full"
                       aria-label="Submit verification form"

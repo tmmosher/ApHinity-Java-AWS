@@ -73,6 +73,7 @@ const RecoveryPage = () => {
   const recoverySubmission = useSubmission(submitRecovery);
   const verificationSubmission = useSubmission(submitVerification);
   const [verifyVisible, setVerifyVisible] = createSignal(false);
+  const [email, setEmail] = createSignal<string>("");
   const navigate = useNavigate();
 
   createEffect(() => {
@@ -120,10 +121,10 @@ const RecoveryPage = () => {
       >
         <Switch>
           <Match when={!verifyVisible()}>
-            <SendRecovery action={submitRecovery}/>
+            <SendRecovery action={submitRecovery} setEmail={setEmail}/>
           </Match>
           <Match when={verifyVisible()}>
-            <SendVerification action={submitVerification}/>
+            <SendVerification action={submitVerification} email={email()}/>
           </Match>
         </Switch>
       </AuthCard>

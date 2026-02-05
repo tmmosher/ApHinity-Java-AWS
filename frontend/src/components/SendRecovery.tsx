@@ -1,9 +1,10 @@
 import TurnstileWidget from "./TurnstileWidget";
-import {JSX} from "solid-js";
+import {JSX, Setter} from "solid-js";
 import SerializableAttributeValue = JSX.SerializableAttributeValue;
 
 interface MailSendComponentProps {
     action: string | SerializableAttributeValue | undefined;
+    setEmail: Setter<string>;
 }
 
 const SendRecovery = (props: MailSendComponentProps) => {
@@ -23,6 +24,7 @@ const SendRecovery = (props: MailSendComponentProps) => {
                     placeholder="you@company.com"
                     class="input opacity-70 input-bordered w-full"
                     aria-label="Email"
+                    onInput={(e) => props.setEmail(e.currentTarget.value)}
                 />
             </label>
             <TurnstileWidget/>
