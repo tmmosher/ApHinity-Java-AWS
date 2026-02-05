@@ -1,13 +1,11 @@
 # syntax=docker/dockerfile:1
 
-FROM amazoncorretto:21 AS node-base
+FROM amazoncorretto:21-al2023 AS node-base
 WORKDIR /app
 
-RUN yum install -y curl \
-    && curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - \
-    && yum install -y nodejs \
-    && yum clean all \
-    && rm -rf /var/cache/yum
+RUN dnf install -y nodejs \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
 
 FROM node-base AS frontend-deps
 WORKDIR /app
@@ -16,7 +14,7 @@ COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 RUN npm ci
 
-FROM amazoncorretto:21 AS backend-build
+FROM amazoncorretto:21-al2023 AS backend-build
 WORKDIR /app
 
 COPY gradlew gradlew.bat settings.gradle build.gradle ./
