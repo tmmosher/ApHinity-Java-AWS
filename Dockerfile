@@ -1,6 +1,15 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-slim AS frontend-deps
+FROM amazoncorretto:21 AS node-base
+WORKDIR /app
+
+RUN yum install -y curl \
+    && curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - \
+    && yum install -y nodejs \
+    && yum clean all \
+    && rm -rf /var/cache/yum
+
+FROM node-base AS frontend-deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -18,20 +27,14 @@ COPY src ./src
 
 RUN ./gradlew bootJar --no-daemon
 
-FROM amazoncorretto:21
+FROM node-base
 WORKDIR /app
-
-COPY --from=frontend-deps /usr/local/bin/node /usr/local/bin/node
-COPY --from=frontend-deps /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=frontend-deps /usr/local/bin/npx /usr/local/bin/npx
-COPY --from=frontend-deps /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 COPY --from=backend-build /app/build/libs/*.jar /app/app.jar
 COPY package.json package-lock.json ./
 COPY frontend ./frontend
 COPY --from=frontend-deps /app/node_modules ./node_modules
 
-ENV PATH=/usr/local/bin:$PATH
 ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/frontend/dist/,classpath:/static/
 
 EXPOSE 8080
