@@ -10,7 +10,7 @@ import sendVerification from "../../components/SendVerification";
 
 const host = useApiHost();
 
-const RecoveryPage = () => {
+export const RecoveryPage = () => {
   const submitRecovery = action(async (formData: FormData) => {
     const actionResult: ActionResult = {
       ok: false
@@ -131,5 +131,3 @@ const RecoveryPage = () => {
     </main>
   );
 }
-
-export default RecoveryPage;

@@ -54,7 +54,8 @@ public class SecurityConfig {
                     "/login",
                     "/signup",
                     "/support",
-                    "/recovery/**"
+                    "/recovery",
+                    "/verify"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
