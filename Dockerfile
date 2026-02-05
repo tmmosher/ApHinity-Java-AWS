@@ -18,18 +18,20 @@ COPY src ./src
 
 RUN ./gradlew bootJar --no-daemon
 
-FROM node:20-slim
+FROM amazoncorretto:21
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y openjdk-21-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=frontend-deps /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend-deps /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=frontend-deps /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=frontend-deps /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 COPY --from=backend-build /app/build/libs/*.jar /app/app.jar
 COPY package.json package-lock.json ./
 COPY frontend ./frontend
 COPY --from=frontend-deps /app/node_modules ./node_modules
 
+ENV PATH=/usr/local/bin:$PATH
 ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/frontend/dist/,classpath:/static/
 
 EXPOSE 8080
