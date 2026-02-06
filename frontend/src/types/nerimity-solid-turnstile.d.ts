@@ -19,4 +19,7 @@ declare module "@nerimity/solid-turnstile" {
     }
 
     export const Turnstile: Component<TurnstileProps>;
+
+    export class TurnstileRef {
+    }
 }
