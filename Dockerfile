@@ -37,7 +37,7 @@ COPY package.json package-lock.json ./
 COPY frontend ./frontend
 COPY --from=frontend-deps /app/node_modules ./node_modules
 
-ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/frontend/dist/
+ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/src/main/resources/static/
 
 EXPOSE 8080
 ENTRYPOINT ["sh","-c","if [ -n \"$TURNSTILE_SITE_KEY\" ]; then export VITE_TURNSTILE_SITE_KEY=\"$TURNSTILE_SITE_KEY\"; fi; npm run frontend:build && exec java -jar /app/app.jar"]
