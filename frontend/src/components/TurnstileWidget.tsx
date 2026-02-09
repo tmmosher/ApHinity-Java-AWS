@@ -17,10 +17,10 @@ const TurnstileWidget = () => {
     return <Turnstile
         sitekey={siteKey}
         onError={() => {
-            toast.error("Captcha failed to load. Refresh and try again.");
+            toast.error("Turnstile failed to load. Refresh and try again.");
         }}
         onVerify={() => {
-            toast.success("Captcha verified successfully!");
+            console.log("Client Turnstile verified.")
         }}
     />
 }

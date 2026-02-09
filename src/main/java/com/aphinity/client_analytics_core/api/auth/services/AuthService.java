@@ -334,7 +334,7 @@ public class AuthService {
      * @return new tokens authenticating the user for access
      */
     @Transactional
-    public IssuedTokens recoveryVerify(String email, String recoveryCode, String ipAddress, String userAgent) {
+    public IssuedTokens verify(String email, String recoveryCode, String ipAddress, String userAgent) {
         String normalizedCode = normalizeRecoveryCode(recoveryCode);
         if (normalizedCode == null) {
             throw invalidRecoveryCode();

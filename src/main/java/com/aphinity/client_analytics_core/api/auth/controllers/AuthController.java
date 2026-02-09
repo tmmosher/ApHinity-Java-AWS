@@ -120,7 +120,7 @@ public class AuthController {
         HttpServletRequest httpRequest,
         HttpServletResponse httpResponse
     ) {
-        IssuedTokens tokens = authService.recoveryVerify(
+        IssuedTokens tokens = authService.verify(
             request.email().strip().toLowerCase(Locale.ROOT),
             request.code().strip(),
             extractIp(httpRequest),
