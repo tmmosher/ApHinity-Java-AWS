@@ -21,7 +21,7 @@ export const RecoveryPage = () => {
       },
       body: JSON.stringify({
         email: formData.get("email"),
-        captchaToken: formData.get("captchaToken")
+        captchaToken: formData.get("cf-turnstile-response")
       })
     });
     try {

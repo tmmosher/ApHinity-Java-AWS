@@ -22,7 +22,7 @@ export const LoginPage = () => {
       body: JSON.stringify({
         email: formData.get("email"),
         password: formData.get("password"),
-        captchaToken: formData.get("captchaToken")
+        captchaToken: formData.get("cf-turnstile-response")
       })
     });
     try {
