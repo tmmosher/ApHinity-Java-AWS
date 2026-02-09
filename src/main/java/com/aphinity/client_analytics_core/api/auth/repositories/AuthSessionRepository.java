@@ -1,6 +1,6 @@
-package com.aphinity.client_analytics_core.api.repositories;
+package com.aphinity.client_analytics_core.api.auth.repositories;
 
-import com.aphinity.client_analytics_core.api.entities.auth.AuthSession;
+import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

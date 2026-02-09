@@ -1,6 +1,6 @@
-package com.aphinity.client_analytics_core.api.entities.auth;
+package com.aphinity.client_analytics_core.api.auth.entities.auth;
 
-import com.aphinity.client_analytics_core.api.entities.AppUser;
+import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

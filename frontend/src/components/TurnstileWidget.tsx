@@ -1,25 +1,28 @@
+import { toast } from "solid-toast";
 // @ts-ignore
-import {Turnstile, TurnstileRef} from "@nerimity/solid-turnstile";
-import {toast} from "solid-toast";
-import {useApiHost} from "../context/ApiHostContext";
-import {createEffect} from "solid-js";
+import Turnstile from "solid-turnstile";
 
-// pretty much a 1-1 of the docs. See https://www.npmjs.com/package/@nerimity/solid-turnstile.
+const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim();
+
 const TurnstileWidget = () => {
-    let ref: TurnstileRef | undefined;
-    // import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
+    if (!siteKey) {
+        console.error("[Turnstile] Missing VITE_TURNSTILE_SITE_KEY.");
+        return (
+            <p class="text-xs text-error">
+                Captcha is unavailable. Please contact support.
+            </p>
+        );
+    }
+
     return <Turnstile
-        sitekey={"0x4AAAAAACT3h056peO4g-ht"}
-        onVerify={() => {
-            toast.success("Captcha verified successfully!");
-        }}
+        sitekey={siteKey}
         onError={() => {
-            toast.error("Unable to verify captcha. Please retry.");
+            toast.error("Turnstile failed to load. Refresh and try again.");
         }}
-        onTimeout={() => {
-            toast.error("Captcha timed out. Please retry.");
+        onVerify={() => {
+            console.log("Client Turnstile verified.")
         }}
-    />;
+    />
 }
 
 export default TurnstileWidget;

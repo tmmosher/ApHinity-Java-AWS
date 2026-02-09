@@ -1,10 +1,14 @@
 package com.aphinity.client_analytics_core.api.auth;
 
-import com.aphinity.client_analytics_core.api.entities.AppUser;
-import com.aphinity.client_analytics_core.api.entities.Role;
-import com.aphinity.client_analytics_core.api.entities.auth.AuthSession;
-import com.aphinity.client_analytics_core.api.repositories.AppUserRepository;
-import com.aphinity.client_analytics_core.api.repositories.AuthSessionRepository;
+import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
+import com.aphinity.client_analytics_core.api.auth.entities.Role;
+import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
+import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
+import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
+import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
+import com.aphinity.client_analytics_core.api.auth.services.AuthService;
+import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
+import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.junit.jupiter.api.Test;

@@ -1,5 +1,7 @@
 package com.aphinity.client_analytics_core.api.auth;
 
+import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
+import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;

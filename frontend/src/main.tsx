@@ -41,6 +41,11 @@ const SupportPage = lazy(() =>
     default: module.SupportPage
   }))
 );
+const ErrorPage = lazy(() =>
+  import("./pages/landing/ErrorPage").then((module) => ({
+    default: module.ErrorPage
+  }))
+);
 const Dashboard = lazy(() =>
   import("./pages/authenticated/Dashboard").then((module) => ({
     default: module.Dashboard
@@ -56,11 +61,13 @@ if (root) {
           <Route path="/login" component={LoginPage} />
           <Route path="/signup" component={SignupPage} />
           <Route path="/support" component={SupportPage} />
+          <Route path="/error" component={ErrorPage} />
           <Route path="/recovery">
             <Route path="/" component={RecoveryPage} />
           {/*this will obviously need to be changed to a recovery code page*/}
             <Route path="/:token" component={RecoveryPage} />
           </Route>
+          <Route path="*404" component={ErrorPage} />
         </Route>
         <Route path="/dashboard" component={AuthenticatedLayout}>
           <Route path="/" component={Dashboard} />

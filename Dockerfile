@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+
+FROM amazoncorretto:21-al2023 AS node-base
+WORKDIR /app
+
+RUN dnf install -y nodejs \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+FROM node-base AS frontend-deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
+RUN npm ci
+
+FROM amazoncorretto:21-al2023 AS backend-build
+WORKDIR /app
+
+RUN dnf install -y findutils \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+COPY gradlew gradlew.bat settings.gradle build.gradle ./
+COPY gradle ./gradle
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
+
+COPY src ./src
+
+RUN ./gradlew bootJar --no-daemon
+
+FROM node-base
+WORKDIR /app
+
+COPY --from=backend-build /app/build/libs/*.jar /app/app.jar
+COPY package.json package-lock.json ./
+COPY frontend ./frontend
+COPY --from=frontend-deps /app/node_modules ./node_modules
+
+ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/src/main/resources/static/
+
+EXPOSE 8080
+ENTRYPOINT ["sh","-c","if [ -n \"$TURNSTILE_SITE_KEY\" ]; then export VITE_TURNSTILE_SITE_KEY=\"$TURNSTILE_SITE_KEY\"; fi; npm run frontend:build && exec java -jar /app/app.jar"]

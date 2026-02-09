@@ -20,7 +20,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.web.SecurityFilterChain;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import com.aphinity.client_analytics_core.api.auth.LoginAttemptProperties;
+import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
 import com.digitalsanctuary.cf.turnstile.TurnstileConfiguration;
 import org.springframework.context.annotation.Import;
 import javax.crypto.SecretKey;
@@ -54,7 +54,8 @@ public class SecurityConfig {
                     "/login",
                     "/signup",
                     "/support",
-                    "/recovery/**"
+                    "/recovery",
+                    "/verify"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
