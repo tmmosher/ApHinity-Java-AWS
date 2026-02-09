@@ -13,6 +13,7 @@ const SendVerification = (props: SendVerificationProps) => {
               class="w-full flex flex-col gap-4 text-left"
               aria-label="Verification form"
               action={props.action}
+              method="post"
           >
               <label class="form-control w-full" for="verifyValue">
                   <div class="label">

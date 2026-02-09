@@ -12,6 +12,7 @@ const SendRecovery = (props: MailSendComponentProps) => {
     return (
         <form
             class="w-full flex flex-col gap-4 text-left"
+            method="post"
             aria-label="Email recovery form"
             action={props.action}
         >

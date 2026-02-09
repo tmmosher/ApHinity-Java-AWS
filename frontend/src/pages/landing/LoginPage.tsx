@@ -5,27 +5,26 @@ import {toast} from "solid-toast";
 import {createEffect, createSignal, Show} from "solid-js";
 import TurnstileWidget from "../../components/TurnstileWidget";
 import {useApiHost} from "../../context/ApiHostContext";
+import { FieldError, parseLoginFormData } from "../../validation/landingSchemas";
 
 const host = useApiHost();
 
 export const LoginPage = () => {
+  const [failCount, setFailCount] = createSignal(0);
+
   const submitLogin = action(async (formData: FormData) => {
     const actionResult: ActionResult = {
       ok: false
     };
-    //TODO also add Zod checks for client here
-    const response = await fetch(host + "/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email: formData.get("email"),
-        password: formData.get("password"),
-        captchaToken: formData.get("cf-turnstile-response")
-      })
-    });
     try {
+      const payload = parseLoginFormData(formData, failCount() > 3);
+      const response = await fetch(host + "/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
       if (response.ok) {
         actionResult.ok = true;
       } else {
@@ -36,6 +35,11 @@ export const LoginPage = () => {
       }
     } catch (error) {
       actionResult.ok = false;
+      if (error instanceof FieldError) {
+        actionResult.code = "validation_failed";
+        actionResult.message = error.message;
+        return actionResult;
+      }
       actionResult.message = "Login failed";
     }
     return actionResult;
@@ -43,7 +47,6 @@ export const LoginPage = () => {
 
   const submission = useSubmission(submitLogin);
   const navigate = useNavigate();
-  const [failCount, setFailCount] = createSignal(0);
 
   createEffect(() => {
     const result = submission.result;
@@ -53,7 +56,9 @@ export const LoginPage = () => {
       toast.success("Logged in successfully!");
       navigate("/dashboard");
     } else {
-      setFailCount(failCount() + 1);
+      if (result.code !== "validation_failed") {
+        setFailCount(failCount() + 1);
+      }
       toast.error(result.message ?? "Login failed");
     }
     submission.clear();

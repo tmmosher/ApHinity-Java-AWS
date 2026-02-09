@@ -6,6 +6,7 @@ import {createEffect, createSignal, Match, Show, Switch} from "solid-js";
 import {toast} from "solid-toast";
 import SendRecovery from "../../components/SendRecovery";
 import SendVerification from "../../components/SendVerification";
+import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../validation/landingSchemas";
 
 const host = useApiHost();
 
@@ -14,17 +15,15 @@ export const RecoveryPage = () => {
     const actionResult: ActionResult = {
       ok: false
     };
-    const response = await fetch(host + "/api/auth/recovery", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email: formData.get("email"),
-        captchaToken: formData.get("cf-turnstile-response")
-      })
-    });
     try {
+      const payload = parseRecoveryFormData(formData);
+      const response = await fetch(host + "/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
       if (response.ok) {
         actionResult.ok = true;
       } else {
@@ -35,6 +34,11 @@ export const RecoveryPage = () => {
       }
     } catch (error) {
       actionResult.ok = false;
+      if (error instanceof FieldError) {
+        actionResult.code = "validation_failed";
+        actionResult.message = error.message;
+        return actionResult;
+      }
       actionResult.message = "Recovery email failed to send";
     }
     return actionResult;
@@ -44,16 +48,15 @@ export const RecoveryPage = () => {
         const actionResult: ActionResult = {
             ok: false
         };
-        const response = await fetch(host + "/api/auth/verify", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                verifyValue: formData.get("verifyValue")
-            })
-        });
         try {
+            const payload = parseVerifyFormData(formData);
+            const response = await fetch(host + "/api/auth/verify", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
             if (response.ok) {
                 actionResult.ok = true;
             } else {
@@ -64,6 +67,11 @@ export const RecoveryPage = () => {
             }
         } catch (error) {
             actionResult.ok = false;
+            if (error instanceof FieldError) {
+                actionResult.code = "validation_failed";
+                actionResult.message = error.message;
+                return actionResult;
+            }
             actionResult.message = "Code verification failed";
         }
         return actionResult;

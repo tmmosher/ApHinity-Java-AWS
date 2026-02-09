@@ -4,26 +4,23 @@ import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
 import {ActionResult} from "../../types/Types";
 import {useApiHost} from "../../context/ApiHostContext";
+import { FieldError, parseSignupFormData } from "../../validation/landingSchemas";
 
 const host = useApiHost();
 
 export const SignupPage = () => {
     const submitSignup = action(async (formData: FormData) => {
-        //TODO Zod schema validation before client submission
         const actionResult: ActionResult = {
             ok: false
         };
         try {
+            const payload = parseSignupFormData(formData);
             const response = await fetch(host + "/api/auth/signup", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    name: formData.get("name"),
-                    email: formData.get("email"),
-                    password: formData.get("password")
-                })
+                body: JSON.stringify(payload)
             });
             if (response.ok) {
                 actionResult.ok = true;
@@ -35,6 +32,11 @@ export const SignupPage = () => {
             }
         } catch (error) {
             actionResult.ok = false;
+            if (error instanceof FieldError) {
+                actionResult.code = "validation_failed";
+                actionResult.message = error.message;
+                return actionResult;
+            }
             actionResult.message = "Signup failed";
         }
         return actionResult;
