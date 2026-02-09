@@ -7,17 +7,34 @@ import {toast} from "solid-toast";
 import SendRecovery from "../../components/SendRecovery";
 import SendVerification from "../../components/SendVerification";
 import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../validation/landingSchemas";
+import {
+  createRecoverySubmissionControl,
+  getRecoveryCooldownActionResult,
+  isRecoverySubmitDisabled
+} from "../../util/recoverySubmissionControl";
 
-const host = useApiHost();
+const HOST = useApiHost();
 
 export const RecoveryPage = () => {
+  const {
+    recoveryCooldownActive,
+    turnstileInstance,
+    startRecoveryCooldown,
+    resetRecoveryCaptcha
+  } = createRecoverySubmissionControl();
+
   const submitRecovery = action(async (formData: FormData) => {
     const actionResult: ActionResult = {
       ok: false
     };
+    if (recoveryCooldownActive()) {
+      return getRecoveryCooldownActionResult();
+    }
     try {
       const payload = parseRecoveryFormData(formData);
-      const response = await fetch(host + "/api/auth/recovery", {
+      startRecoveryCooldown();
+      resetRecoveryCaptcha();
+      const response = await fetch(HOST + "/api/auth/recovery", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -30,7 +47,7 @@ export const RecoveryPage = () => {
         const errorBody = await response.json().catch(() => null);
         actionResult.ok = false;
         actionResult.code = errorBody?.code;
-        actionResult.message = errorBody?.message ?? "Recovery email failed to send failed";
+        actionResult.message = errorBody?.message ?? "Recovery email failed to send";
       }
     } catch (error) {
       actionResult.ok = false;
@@ -50,7 +67,7 @@ export const RecoveryPage = () => {
         };
         try {
             const payload = parseVerifyFormData(formData);
-            const response = await fetch(host + "/api/auth/verify", {
+            const response = await fetch(HOST + "/api/auth/verify", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -128,7 +145,12 @@ export const RecoveryPage = () => {
       >
         <Switch>
           <Match when={!verifyVisible()}>
-            <SendRecovery action={submitRecovery} setEmail={setEmail}/>
+            <SendRecovery
+              action={submitRecovery}
+              setEmail={setEmail}
+              isSubmitDisabled={isRecoverySubmitDisabled(recoveryCooldownActive(), (recoverySubmission.pending || false))}
+              turnstileInstance={turnstileInstance()}
+            />
           </Match>
           <Match when={verifyVisible()}>
             <SendVerification action={submitVerification} email={email()}/>

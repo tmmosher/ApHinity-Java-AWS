@@ -31,12 +31,6 @@ public class MailSendingService {
     }
 
     public void sendRecoveryEmail(String toEmail, String recoveryCode, long expiresInSeconds) {
-        logService.log(
-            "Recovery email send requested | to=" + safeValue(toEmail)
-                + ", from=" + safeValue(recoveryFromEmail)
-                + ", sender=" + mailSender.getClass().getName()
-                + ", expiresInSeconds=" + expiresInSeconds
-        );
         MimeMessagePreparator preparator = mimeMessage -> {
             MimeMessageHelper helper = new MimeMessageHelper(
                 mimeMessage,
@@ -50,10 +44,6 @@ public class MailSendingService {
         };
         try {
             mailSender.send(preparator);
-            logService.log(
-                "Recovery email send succeeded | to=" + safeValue(toEmail)
-                    + ", from=" + safeValue(recoveryFromEmail)
-            );
         } catch (MailException ex) {
             logService.log(
                 "Recovery email send failed | to=" + safeValue(toEmail)

@@ -21,7 +21,8 @@ const SendVerification = (props: SendVerificationProps) => {
                   </div>
                   <input id="verifyValue"
                          name="verifyValue"
-                         type="number"
+                         type="text"
+                         inputmode="numeric"
                          aria-label="Verification code"
                          placeholder="123456"/>
               </label>

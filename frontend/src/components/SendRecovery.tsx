@@ -1,11 +1,14 @@
 import TurnstileWidget from "./TurnstileWidget";
-import {Setter} from "solid-js";
+import {Setter, Show} from "solid-js";
 import {Action} from "@solidjs/router";
 import { ActionResult } from "../types/Types";
+import { getRecoverySubmitButtonClass } from "../util/recoverySubmissionControl";
 
 interface MailSendComponentProps {
     action: Action<[FormData], ActionResult>;
     setEmail: Setter<string>;
+    isSubmitDisabled: boolean;
+    turnstileInstance: number;
 }
 
 const SendRecovery = (props: MailSendComponentProps) => {
@@ -29,11 +32,14 @@ const SendRecovery = (props: MailSendComponentProps) => {
                     onInput={(e) => props.setEmail(e.currentTarget.value)}
                 />
             </label>
-            <TurnstileWidget/>
+            <Show when={props.turnstileInstance} keyed>
+                <TurnstileWidget/>
+            </Show>
             <button
                 type="submit"
-                class="btn btn-primary w-full text-center"
+                class={getRecoverySubmitButtonClass(props.isSubmitDisabled)}
                 aria-label="Submit email recovery form"
+                disabled={props.isSubmitDisabled}
             >
                 Submit
             </button>
