@@ -57,6 +57,7 @@ public class SecurityConfig {
                     "/recovery",
                     "/verify"
                 ).permitAll()
+                .requestMatchers("/api/core/**").authenticated()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(exception -> exception.authenticationEntryPoint(redirectEntryPoint))

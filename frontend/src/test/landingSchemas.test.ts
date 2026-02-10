@@ -5,7 +5,7 @@ import {
   parseRecoveryFormData,
   parseSignupFormData,
   parseVerifyFormData
-} from "./landingSchemas";
+} from "../util/landingSchemas";
 
 const makeFormData = (values: Record<string, string>): FormData => {
   const formData = new FormData();

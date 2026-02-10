@@ -6,7 +6,7 @@ import {createEffect, createSignal, Match, Show, Switch} from "solid-js";
 import {toast} from "solid-toast";
 import SendRecovery from "../../components/SendRecovery";
 import SendVerification from "../../components/SendVerification";
-import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../validation/landingSchemas";
+import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../util/landingSchemas";
 import {
   createRecoverySubmissionControl,
   getRecoveryCooldownActionResult,

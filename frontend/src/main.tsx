@@ -64,8 +64,6 @@ if (root) {
           <Route path="/error" component={ErrorPage} />
           <Route path="/recovery">
             <Route path="/" component={RecoveryPage} />
-          {/*this will obviously need to be changed to a recovery code page*/}
-            <Route path="/:token" component={RecoveryPage} />
           </Route>
           <Route path="*404" component={ErrorPage} />
         </Route>

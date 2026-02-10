@@ -13,6 +13,7 @@
     "@nerimity/solid-turnstile": "^1.1.0",
     "@solidjs/router": "^0.13.6",
     "solid-js": "^1.8.0",
+    "solid-motionone": "^1.0.4",
     "zod": "^3.25.76"
   },
   "devDependencies": {
