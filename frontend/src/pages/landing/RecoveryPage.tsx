@@ -36,6 +36,7 @@ export const RecoveryPage = () => {
       resetRecoveryCaptcha();
       const response = await fetch(HOST + "/api/auth/recovery", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         },
@@ -69,6 +70,7 @@ export const RecoveryPage = () => {
             const payload = parseVerifyFormData(formData);
             const response = await fetch(HOST + "/api/auth/verify", {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },

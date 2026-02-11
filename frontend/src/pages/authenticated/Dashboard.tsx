@@ -1,7 +1,6 @@
-import { A } from "@solidjs/router";
-import { For } from "solid-js";
 import type { JSX } from "solid-js";
 import SidebarNav, {NavItem} from "../../components/SidebarNav";
+import Profile from "../../components/Profile";
 
 export type UserRole = "admin" | "partner" | "client";
 
@@ -44,21 +43,20 @@ const resolveRole = (): UserRole => {
 
 const roleNavItems: Record<UserRole, NavItem[]> = {
   admin: [
-    { label: "Overview", href: "/home" },
+    { label: "Overview", href: "/dashboard" },
     { label: "User management" },
     { label: "Compliance queue" },
     { label: "Reporting" }
   ],
   partner: [
-    { label: "Overview", href: "/home" },
+    { label: "Overview", href: "/dashboard" },
     { label: "Active projects" },
     { label: "Submissions" },
     { label: "Reports" }
   ],
   client: [
-    { label: "Overview", href: "/home" },
+    { label: "Overview", href: "/dashboard" },
     { label: "Facilities" },
-    { label: "Documents" },
     { label: "Support" }
   ]
 };
@@ -70,9 +68,7 @@ export const Dashboard = () => {
       role={role}
       sidebarItems={roleNavItems[role]}
     >
-      <div class="mt-8 space-y-4">
-        {/*TODO*/}
-      </div>
+      <Profile />
     </DashboardShell>
   );
 };

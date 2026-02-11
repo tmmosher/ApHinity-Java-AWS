@@ -49,15 +49,15 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
     title: "Engineered Water Treatment Programs",
     tagline: "Engineered Resin, Forward Osmosis, and membrane process programs.",
     paragraphs: [
-      "ApHinity water solutions include Engineered Resin Technology, Forward Osmosis, Reverse Osmosis, Ultrafiltration, Nanofiltration, Microfiltration, and Capacitive Deionization.",
-      "Within ApHinityMS, partner teams can map each treatment train to performance cards for utilization, reliability, water conservation, and compliance exceptions.",
-      "The resulting reports allow client teams to evaluate treatment outcomes with enough engineering context to support plant-level decisions."
+      "ApHinity Technology solutions include water and air treatment technologies fit for wide applications. Trusted by a variety of technology, healthcare, food preparation, and agricultural systems.",
+      "With the ApHinity Management System, partner teams can map performance metrics for utilization, reliability, water conservation, and compliance exceptions.",
+      "Our visualizations allow client teams to evaluate treatment outcomes with a bird's eye view to support plant-level decisions."
     ]
   },
   {
     id: "oxidant-programs",
     title: "Oxidant Generation and Disinfection Programs",
-    tagline: "Chlorine dioxide, mixed oxidants, hypochlorite, and chloramine programs.",
+    tagline: "Chlorine dioxide, Sulfur Dioxide",
     paragraphs: [
       "ApHinity oxidant generation programs cover gas and liquid phase chlorine dioxide, mixed oxidants, hypochlorite generation, and high purity chloramine generation workflows.",
       "Portal graphs can track setpoints, treatment efficacy, intervention timing, and verification results across water and process disinfection applications.",
@@ -69,7 +69,7 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
     title: "Engineered Air Programs",
     tagline: "NOx/SOx abatement, odor mitigation, and airborne microbiological control.",
     paragraphs: [
-      "ApHinity engineered air solutions focus on environmentally regulated compounds, including nitrogen oxides, sulfur oxides, odors, and airborne microbiological concerns.",
+      "ApHinity Technologies engineered air solutions focus on environmentally regulated compounds, including nitrogen oxides, sulfur oxides, odors, and airborne microbiological concerns.",
       "In ApHinityMS, partners can publish trend views and event notes that explain root causes, corrective actions, and performance stabilization windows.",
       "This supports clear client communication on air-related risk and mitigation status."
     ]
@@ -171,7 +171,7 @@ export const HomePage = () => {
             <h2 class="text-2xl font-semibold">Client Coverage</h2>
             <p class="text-sm text-base-content/75 leading-6">
               Partner reporting structures support a broad client mix, including organizations such as TSMC,
-              HelloFresh, Dexcom, and various regulated agricultural operations across manufacturing and processing
+              HelloFresh, Dexcom, and various regulated healthcare and agricultural operations across manufacturing and processing
               environments.
             </p>
             <div class="flex flex-wrap gap-2">
