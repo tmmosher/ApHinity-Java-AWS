@@ -33,6 +33,10 @@ const Profile = () => {
     const updateThemePreference = (next: ThemePreference) => {
         setThemePreference(next);
         setStoredThemePreference(next);
+        document.documentElement.setAttribute(
+            "data-theme",
+            next === "dark" ? "forest-corporate" : "corporate"
+        );
         toast.success(`Theme changed to ${next} mode.`);
     };
 
