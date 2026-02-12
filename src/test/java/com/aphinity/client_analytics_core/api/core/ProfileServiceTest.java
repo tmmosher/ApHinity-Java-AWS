@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.Role;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
+import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.core.response.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.ProfileService;
@@ -25,6 +26,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +43,9 @@ class ProfileServiceTest {
 
     @Spy
     private PasswordPolicyValidator passwordPolicyValidator;
+
+    @Mock
+    private AuthService authService;
 
     @InjectMocks
     private ProfileService profileService;
@@ -110,9 +115,12 @@ class ProfileServiceTest {
 
         assertEquals("Updated Name", response.name());
         assertEquals("updated@example.com", response.email());
+        assertEquals(false, response.verified());
         assertEquals(AccountRole.CLIENT, response.role());
         assertEquals("Updated Name", user.getName());
         assertEquals("updated@example.com", user.getEmail());
+        assertEquals(null, user.getEmailVerifiedAt());
+        verify(authService).issueAndSendVerificationCode(3L, "updated@example.com");
     }
 
     @Test
@@ -206,6 +214,92 @@ class ProfileServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("Account email is not verified", ex.getReason());
+    }
+
+    @Test
+    void updateProfileRejectsPartnerEmailChange() {
+        AppUser user = new AppUser();
+        user.setId(12L);
+        user.setName("Partner");
+        user.setEmail("partner@example.com");
+        user.setEmailVerifiedAt(Instant.now());
+        user.setRoles(Set.of(role("partner")));
+
+        when(appUserRepository.findById(12L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.PARTNER);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            profileService.updateProfile(12L, "Partner", "partner-new@example.com")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Email changes are not allowed for this role", ex.getReason());
+    }
+
+    @Test
+    void updateProfileRejectsAdminEmailChange() {
+        AppUser user = new AppUser();
+        user.setId(13L);
+        user.setName("Admin");
+        user.setEmail("admin@example.com");
+        user.setEmailVerifiedAt(Instant.now());
+        user.setRoles(Set.of(role("admin")));
+
+        when(appUserRepository.findById(13L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.ADMIN);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            profileService.updateProfile(13L, "Admin", "admin-new@example.com")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Email changes are not allowed for this role", ex.getReason());
+    }
+
+    @Test
+    void updateProfileAllowsPartnerNameChangeWhenEmailIsUnchanged() {
+        AppUser user = new AppUser();
+        Instant verifiedAt = Instant.now();
+        user.setId(14L);
+        user.setName("Partner Original");
+        user.setEmail("partner@example.com");
+        user.setEmailVerifiedAt(verifiedAt);
+        user.setRoles(Set.of(role("partner")));
+
+        when(appUserRepository.findById(14L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.PARTNER);
+        when(appUserRepository.saveAndFlush(user)).thenReturn(user);
+
+        ProfileResponse response = profileService.updateProfile(14L, "Partner Updated", "partner@example.com");
+
+        assertEquals("Partner Updated", response.name());
+        assertEquals("partner@example.com", response.email());
+        assertEquals(true, response.verified());
+        assertEquals(verifiedAt, user.getEmailVerifiedAt());
+        verify(authService, never()).issueAndSendVerificationCode(14L, "partner@example.com");
+    }
+
+    @Test
+    void updateProfileKeepsVerificationWhenClientEmailIsUnchanged() {
+        AppUser user = new AppUser();
+        Instant verifiedAt = Instant.now();
+        user.setId(15L);
+        user.setName("Client Original");
+        user.setEmail("client@example.com");
+        user.setEmailVerifiedAt(verifiedAt);
+        user.setRoles(Set.of(role("client")));
+
+        when(appUserRepository.findById(15L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.CLIENT);
+        when(appUserRepository.saveAndFlush(user)).thenReturn(user);
+
+        ProfileResponse response = profileService.updateProfile(15L, "Client Updated", "CLIENT@example.com");
+
+        assertEquals("Client Updated", response.name());
+        assertEquals("client@example.com", response.email());
+        assertEquals(true, response.verified());
+        assertEquals(verifiedAt, user.getEmailVerifiedAt());
+        verify(authService, never()).issueAndSendVerificationCode(15L, "client@example.com");
     }
 
     @Test

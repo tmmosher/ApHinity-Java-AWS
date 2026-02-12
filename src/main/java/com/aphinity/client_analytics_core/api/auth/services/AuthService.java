@@ -189,11 +189,23 @@ public class AuthService {
         asyncLogService.log("User with email: '" + email + "' created at ipv4: '"
                 + ipAddress + "' from agent '" + userAgent + "'.");
 
-        String verificationCode = issueVerificationCode(user.getId());
+        issueAndSendVerificationCode(user.getId(), user.getEmail());
+    }
+
+    /**
+     * Issues a new email verification code and delivers it to the provided address.
+     * Existing active verification codes for the same user are consumed first so only one
+     * verification code remains active at a time.
+     *
+     * @param userId account id receiving the verification code
+     * @param email destination email address
+     */
+    public void issueAndSendVerificationCode(Long userId, String email) {
+        String verificationCode = issueVerificationCode(userId);
         Runnable sendEmail = () -> {
             try {
                 mailSendingService.sendVerificationEmail(
-                    user.getEmail(),
+                    email,
                     verificationCode,
                     verificationTokenTtlSeconds
                 );

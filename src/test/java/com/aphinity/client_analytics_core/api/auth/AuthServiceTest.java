@@ -27,6 +27,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
@@ -48,6 +49,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -485,6 +487,38 @@ class AuthServiceTest {
         assertEquals("access-token", tokens.accessToken());
         assertNotNull(user.getEmailVerifiedAt());
         verify(appUserRepository).save(user);
+    }
+
+    @Test
+    void issueAndSendVerificationCodeWritesTokenAndSendsEmail() {
+        authService.issueAndSendVerificationCode(42L, "user@example.com");
+
+        verify(jdbcTemplate).update(
+            eq("update email_verification_token set consumed_at = ? where user_id = ? and consumed_at is null"),
+            any(Timestamp.class),
+            eq(42L)
+        );
+        verify(jdbcTemplate).update(
+            eq("insert into email_verification_token (user_id, token_hash, expires_at) values (?, ?, ?)"),
+            eq(42L),
+            anyString(),
+            any(Timestamp.class)
+        );
+        verify(mailSendingService).sendVerificationEmail(eq("user@example.com"), anyString(), eq(600L));
+    }
+
+    @Test
+    void issueAndSendVerificationCodeFailsWhenMailDeliveryFails() {
+        MailException deliveryFailure = new MailException("smtp unavailable") {};
+        doThrow(deliveryFailure).when(mailSendingService)
+            .sendVerificationEmail(eq("user@example.com"), anyString(), eq(600L));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            authService.issueAndSendVerificationCode(42L, "user@example.com")
+        );
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatusCode());
+        assertEquals("Unable to send verification email", ex.getReason());
     }
 
     private AppUser buildUser(String email) {

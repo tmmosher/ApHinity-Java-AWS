@@ -2,6 +2,8 @@ package com.aphinity.client_analytics_core.api.core.services;
 
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
+import com.aphinity.client_analytics_core.api.auth.services.AuthService;
+import com.aphinity.client_analytics_core.api.core.response.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.ProfileResponse;
 import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,17 +24,20 @@ public class ProfileService {
     private final PasswordEncoder passwordEncoder;
     private final AccountRoleService accountRoleService;
     private final PasswordPolicyValidator passwordPolicyValidator;
+    private final AuthService authService;
 
     public ProfileService(
         AppUserRepository appUserRepository,
         PasswordEncoder passwordEncoder,
         AccountRoleService accountRoleService,
-        PasswordPolicyValidator passwordPolicyValidator
+        PasswordPolicyValidator passwordPolicyValidator,
+        AuthService authService
     ) {
         this.appUserRepository = appUserRepository;
         this.passwordEncoder = passwordEncoder;
         this.accountRoleService = accountRoleService;
         this.passwordPolicyValidator = passwordPolicyValidator;
+        this.authService = authService;
     }
 
     /**
@@ -62,11 +67,14 @@ public class ProfileService {
         AppUser user = appUserRepository.findById(userId)
             .orElseThrow(this::invalidAuthenticatedUser);
         requireVerified(user);
+        AccountRole accountRole = accountRoleService.resolveAccountRole(user);
 
         String normalizedName = normalizeName(name).strip();
         String normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
+        boolean emailChanged = !user.getEmail().equalsIgnoreCase(normalizedEmail);
 
-        if (!user.getEmail().equalsIgnoreCase(normalizedEmail)) {
+        if (emailChanged) {
+            rejectEmailChangeForRole(accountRole);
             // Fast-path duplicate detection for clearer conflict errors before flush.
             appUserRepository.findByEmail(normalizedEmail)
                 .filter(existing -> !existing.getId().equals(userId))
@@ -76,12 +84,19 @@ public class ProfileService {
         }
 
         user.setName(normalizedName);
-        user.setEmail(normalizedEmail);
+        if (emailChanged) {
+            user.setEmail(normalizedEmail);
+            user.setEmailVerifiedAt(null);
+        }
 
         try {
             appUserRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
             throw userAlreadyExists();
+        }
+
+        if (emailChanged) {
+            authService.issueAndSendVerificationCode(user.getId(), normalizedEmail);
         }
 
         return toProfileResponse(user);
@@ -144,6 +159,12 @@ public class ProfileService {
 
     private ResponseStatusException invalidAuthenticatedUser() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authenticated user");
+    }
+
+    private void rejectEmailChangeForRole(AccountRole accountRole) {
+        if (accountRole == AccountRole.ADMIN || accountRole == AccountRole.PARTNER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email changes are not allowed for this role");
+        }
     }
 
     private void requireVerified(AppUser user) {

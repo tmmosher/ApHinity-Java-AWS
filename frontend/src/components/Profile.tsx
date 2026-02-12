@@ -9,6 +9,7 @@ import {
 } from "../util/themePreference";
 import {apiFetch} from "../util/apiFetch";
 import {useNavigate} from "@solidjs/router";
+import {canEditProfileEmail} from "../util/profileAccess";
 
 const Profile = () => {
     const host = useApiHost();
@@ -22,6 +23,7 @@ const Profile = () => {
     const [isSavingProfile, setIsSavingProfile] = createSignal(false);
     const [isSavingPassword, setIsSavingPassword] = createSignal(false);
     const [themePreference, setThemePreference] = createSignal<ThemePreference>(getStoredThemePreference());
+    const canEditEmail = () => canEditProfileEmail(profileContext.profile()?.role);
 
     createEffect(() => {
         const profile = profileContext.profile();
@@ -56,7 +58,9 @@ const Profile = () => {
                 },
                 body: JSON.stringify({
                     name: name().trim(),
-                    email: email().trim()
+                    email: canEditEmail()
+                        ? email().trim()
+                        : (profileContext.profile()?.email ?? email()).trim()
                 })
             });
 
@@ -66,7 +70,7 @@ const Profile = () => {
                 return;
             }
             profileContext.refreshProfile();
-            toast.success("Profile updated.");
+            toast.success("Profile updated. If you changed emails, please verify your new email address.");
         } catch {
             toast.error("Unable to update profile.");
         } finally {
@@ -150,7 +154,11 @@ const Profile = () => {
 
                     <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
                         <h2 class="text-lg font-semibold">Account details</h2>
-                        <p class="mt-1 text-sm text-base-content/70">Update your display name and account email.</p>
+                        <p class="mt-1 text-sm text-base-content/70">
+                            {canEditEmail()
+                                ? "Update your display name and account email."
+                                : "Update your display name. Partner account email changes are managed by administrators."}
+                        </p>
                         <p class="mt-1 text-xs text-base-content/60">
                             Role: {profileContext.profile()?.role ?? "client"}
                         </p>
@@ -164,15 +172,17 @@ const Profile = () => {
                                     onInput={(event) => setName(event.currentTarget.value)}
                                 />
                             </label>
-                            <label class="form-control">
-                                <span class="label-text">Email</span>
-                                <input
-                                    type="email"
-                                    class="input input-bordered mt-1"
-                                    value={email()}
-                                    onInput={(event) => setEmail(event.currentTarget.value)}
-                                />
-                            </label>
+                            <Show when={canEditEmail()}>
+                                <label class="form-control">
+                                    <span class="label-text">Email</span>
+                                    <input
+                                        type="email"
+                                        class="input input-bordered mt-1"
+                                        value={email()}
+                                        onInput={(event) => setEmail(event.currentTarget.value)}
+                                    />
+                                </label>
+                            </Show>
                             <button type="submit" class="btn btn-primary w-fit" disabled={isSavingProfile()}>
                                 {isSavingProfile() ? "Saving..." : "Save profile"}
                             </button>
