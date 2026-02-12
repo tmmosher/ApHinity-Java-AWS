@@ -7,6 +7,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
+    @Override
+    @EntityGraph(attributePaths = "roles")
+    Optional<AppUser> findById(Long id);
+
     @EntityGraph(attributePaths = "roles")
     Optional<AppUser> findByEmail(String email);
 }

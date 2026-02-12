@@ -51,6 +51,46 @@ const Dashboard = lazy(() =>
     default: module.Dashboard
   }))
 );
+const DashboardHomePanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardHomePanel").then((module) => ({
+    default: module.DashboardHomePanel
+  }))
+);
+const DashboardProfilePanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardProfilePanel").then((module) => ({
+    default: module.DashboardProfilePanel
+  }))
+);
+const DashboardLocationsPanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardLocationsPanel").then((module) => ({
+    default: module.DashboardLocationsPanel
+  }))
+);
+const DashboardLocationDetailPanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardLocationDetailPanel").then((module) => ({
+    default: module.DashboardLocationDetailPanel
+  }))
+);
+const DashboardInvitesPanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardInvitesPanel").then((module) => ({
+    default: module.DashboardInvitesPanel
+  }))
+);
+const DashboardInviteUsersPanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardInviteUsersPanel").then((module) => ({
+    default: module.DashboardInviteUsersPanel
+  }))
+);
+const DashboardPermissionsPanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardPermissionsPanel").then((module) => ({
+    default: module.DashboardPermissionsPanel
+  }))
+);
+const DashboardManagementPanel = lazy(() =>
+  import("./pages/authenticated/panels/DashboardManagementPanel").then((module) => ({
+    default: module.DashboardManagementPanel
+  }))
+);
 
 if (root) {
   render(
@@ -68,7 +108,16 @@ if (root) {
           <Route path="*404" component={ErrorPage} />
         </Route>
         <Route path="/dashboard" component={AuthenticatedLayout}>
-          <Route path="/" component={Dashboard} />
+          <Route path="/" component={Dashboard}>
+            <Route path="/" component={DashboardHomePanel} />
+            <Route path="/locations" component={DashboardLocationsPanel} />
+            <Route path="/locations/:locationId" component={DashboardLocationDetailPanel} />
+            <Route path="/invites" component={DashboardInvitesPanel} />
+            <Route path="/invite-users" component={DashboardInviteUsersPanel} />
+            <Route path="/permissions" component={DashboardPermissionsPanel} />
+            <Route path="/management" component={DashboardManagementPanel} />
+            <Route path="/profile" component={DashboardProfilePanel} />
+          </Route>
         </Route>
       </Router>
     ),

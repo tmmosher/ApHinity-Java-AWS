@@ -1,8 +1,9 @@
 import {useApiHost} from "./ApiHostContext";
 import {Accessor, createContext, createEffect, createResource, ParentProps, useContext} from "solid-js";
-import {Profile} from "../types/Types";
+import {AccountRole, Profile} from "../types/Types";
 import {useNavigate} from "@solidjs/router";
 import {toast} from "solid-toast";
+import {apiFetch} from "../util/apiFetch";
 
 type ProfileContextValue = {
     profile: Accessor<Profile | undefined>;
@@ -16,15 +17,21 @@ const validateProfileStructure = (toValidate: unknown): Profile => {
         throw new Error("Invalid response structure");
     }
     const profileLike = toValidate as Record<string, unknown>;
+    const rawRole = profileLike.role;
+    if (rawRole !== "admin" && rawRole !== "partner" && rawRole !== "client") {
+        throw new Error("Invalid profile role");
+    }
     if (typeof profileLike.email !== "string"
         || typeof profileLike.name !== "string"
-        || typeof profileLike.verified !== "boolean") {
+        || typeof profileLike.verified !== "boolean"
+    ) {
         throw new Error("Invalid profile structure");
     }
     return {
         name: profileLike.name,
         email: profileLike.email,
-        verified: profileLike.verified
+        verified: profileLike.verified,
+        role: rawRole as AccountRole
     };
 };
 
@@ -35,9 +42,8 @@ export const ProfileProvider = (props: ParentProps) => {
     const navigate = useNavigate();
 
     const profileRequest = async (): Promise<Profile> => {
-        const response = await fetch(host + "/api/core/profile", {
-            method: "GET",
-            credentials: "include"
+        const response = await apiFetch(host + "/api/core/profile", {
+            method: "GET"
         });
         if (!response.ok) {
             throw new Error("Unable to fetch profile");

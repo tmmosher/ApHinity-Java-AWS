@@ -7,9 +7,8 @@ import TurnstileWidget from "../../components/TurnstileWidget";
 import {useApiHost} from "../../context/ApiHostContext";
 import { FieldError, parseLoginFormData } from "../../util/landingSchemas";
 
-const HOST = useApiHost();
-
 export const LoginPage = () => {
+  const host = useApiHost();
   const [failCount, setFailCount] = createSignal(0);
 
   const submitLogin = action(async (formData: FormData) => {
@@ -18,8 +17,9 @@ export const LoginPage = () => {
     };
     try {
       const payload = parseLoginFormData(formData, failCount() > 3);
-      const response = await fetch(HOST + "/api/auth/login", {
+      const response = await fetch(host + "/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         },

@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,7 +16,12 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
@@ -36,12 +40,38 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
         HttpSecurity http,
-        JwtAuthenticationConverter jwtAuthenticationConverter
+        JwtAuthenticationConverter jwtAuthenticationConverter,
+        BearerTokenResolver bearerTokenResolver,
+        AccessTokenRefreshFilter accessTokenRefreshFilter,
+        CsrfCookieFilter csrfCookieFilter,
+        ApiAuthenticationEntryPoint apiAuthenticationEntryPoint
     ) throws Exception {
         RedirectAuthenticationEntryPoint redirectEntryPoint =
             new RedirectAuthenticationEntryPoint("/login");
+        AuthenticationEntryPoint authEntryPoint = (request, response, authException) -> {
+            String path = request.getRequestURI();
+            boolean isApiPath = path.equals("/api")
+                || path.startsWith("/api/")
+                || path.equals("/core")
+                || path.startsWith("/core/");
+            if (isApiPath) {
+                apiAuthenticationEntryPoint.commence(request, response, authException);
+                return;
+            }
+            redirectEntryPoint.commence(request, response, authException);
+        };
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookiePath("/");
         http
-            .csrf(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfTokenRepository)
+                .ignoringRequestMatchers(
+                    "/api/auth/login",
+                    "/api/auth/signup",
+                    "/api/auth/recovery",
+                    "/api/auth/verify"
+                )
+            )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
@@ -60,11 +90,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/core/**").authenticated()
                 .anyRequest().authenticated()
             )
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(redirectEntryPoint))
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint(authEntryPoint)
+            )
             .oauth2ResourceServer(oauth2 -> oauth2
-                .authenticationEntryPoint(redirectEntryPoint)
+                .bearerTokenResolver(bearerTokenResolver)
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
-            );
+            )
+            .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
+            .addFilterBefore(accessTokenRefreshFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
@@ -100,5 +134,10 @@ public class SecurityConfig {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return converter;
+    }
+
+    @Bean
+    BearerTokenResolver bearerTokenResolver() {
+        return new CookieBearerTokenResolver();
     }
 }

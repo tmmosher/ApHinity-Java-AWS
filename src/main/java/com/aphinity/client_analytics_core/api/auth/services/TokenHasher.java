@@ -5,12 +5,21 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
+/**
+ * Utility for deterministic hashing of token material before persistence.
+ */
 public final class TokenHasher {
     private static final HexFormat HEX = HexFormat.of();
 
     private TokenHasher() {
     }
 
+    /**
+     * Hashes the provided value using SHA-256 and returns lowercase hexadecimal output.
+     *
+     * @param value raw token value
+     * @return SHA-256 hash in hex form
+     */
     public static String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

@@ -1,19 +1,19 @@
 package com.aphinity.client_analytics_core.api.auth.controllers;
 
+import com.aphinity.client_analytics_core.api.auth.AuthCookieNames;
 import com.aphinity.client_analytics_core.api.auth.requests.LoginRequest;
 import com.aphinity.client_analytics_core.api.auth.requests.RecoveryRequest;
 import com.aphinity.client_analytics_core.api.auth.requests.VerifyRequest;
 import com.aphinity.client_analytics_core.api.auth.requests.SignupRequest;
-import com.aphinity.client_analytics_core.api.auth.response.AuthTokensResponse;
+import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
+import com.aphinity.client_analytics_core.api.security.ClientRequestMetadataResolver;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,24 +22,42 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Duration;
 import java.util.Locale;
 
+/**
+ * REST entry points for authentication and account recovery flows.
+ * <p>
+ * The controller is intentionally thin: it normalizes raw input, resolves request metadata,
+ * delegates business decisions to {@link AuthService}, and writes auth cookies via
+ * {@link AuthCookieService}.
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private static final String REFRESH_COOKIE_NAME = "aphinity_refresh";
-    private static final String REFRESH_COOKIE_PATH = "/api/auth";
-    private static final String REFRESH_COOKIE_SAME_SITE = "Strict";
-
     private final AuthService authService;
+    private final AuthCookieService authCookieService;
+    private final ClientRequestMetadataResolver requestMetadataResolver;
 
-    public AuthController(AuthService authService) {
+    public AuthController(
+        AuthService authService,
+        AuthCookieService authCookieService,
+        ClientRequestMetadataResolver requestMetadataResolver
+    ) {
         this.authService = authService;
+        this.authCookieService = authCookieService;
+        this.requestMetadataResolver = requestMetadataResolver;
     }
 
+    /**
+     * Authenticates a user and issues fresh access/refresh cookies.
+     *
+     * @param request validated login payload
+     * @param httpRequest servlet request used for metadata resolution and secure-cookie detection
+     * @param httpResponse servlet response used to write auth cookies
+     * @return HTTP 204 when credentials are accepted
+     */
     @PostMapping("/login")
-    public AuthTokensResponse login(
+    public ResponseEntity<Void> login(
         @Valid @RequestBody LoginRequest request,
         HttpServletRequest httpRequest,
         HttpServletResponse httpResponse
@@ -47,16 +65,25 @@ public class AuthController {
         IssuedTokens tokens = authService.login(
             request.email().strip().toLowerCase(Locale.ROOT),
             request.password().strip(),
-            extractIp(httpRequest),
-            extractUserAgent(httpRequest),
+            requestMetadataResolver.resolveClientIp(httpRequest),
+            requestMetadataResolver.resolveUserAgent(httpRequest),
             request.captchaToken()
         );
-        addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
-        return toAuthTokenResponse(tokens);
+        authCookieService.addAccessCookie(httpRequest, httpResponse, tokens.accessToken(), tokens.expiresIn());
+        authCookieService.addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
+        return ResponseEntity.noContent().build();
     }
 
-    // Signing up won't grant auth tokens, this is so I can
-    // do email verification later.
+    /**
+     * Creates an account but does not create an authenticated session.
+     * <p>
+     * Signup is intentionally separated from token issuance so verification policy can be enforced
+     * independently.
+     *
+     * @param request validated signup payload
+     * @param httpRequest servlet request used for audit metadata resolution
+     * @return success message when account creation succeeds
+     */
     @PostMapping("/signup")
     public ResponseEntity<String> signup(
             @Valid @RequestBody SignupRequest request,
@@ -66,15 +93,22 @@ public class AuthController {
             request.email().strip().toLowerCase(Locale.ROOT),
             request.password().strip(),
             request.name().strip().toUpperCase(),
-            extractIp(httpRequest),
-            extractUserAgent(httpRequest)
+            requestMetadataResolver.resolveClientIp(httpRequest),
+            requestMetadataResolver.resolveUserAgent(httpRequest)
         );
         return ResponseEntity.ok("Account created successfully.");
     }
 
+    /**
+     * Rotates refresh tokens and re-issues access credentials.
+     *
+     * @param httpRequest servlet request containing the refresh cookie
+     * @param httpResponse servlet response used to write rotated cookies
+     * @return HTTP 204 when the refresh token is valid
+     */
     @PostMapping("/refresh")
-    public AuthTokensResponse refresh(HttpServletRequest httpRequest,
-                                      HttpServletResponse httpResponse
+    public ResponseEntity<Void> refresh(HttpServletRequest httpRequest,
+                                        HttpServletResponse httpResponse
     ) {
         String refreshToken = extractRefreshToken(httpRequest);
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -85,13 +119,20 @@ public class AuthController {
         }
         IssuedTokens tokens = authService.refresh(
             refreshToken,
-            extractIp(httpRequest),
-            extractUserAgent(httpRequest)
+            requestMetadataResolver.resolveClientIp(httpRequest),
+            requestMetadataResolver.resolveUserAgent(httpRequest)
         );
-        addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
-        return toAuthTokenResponse(tokens);
+        authCookieService.addAccessCookie(httpRequest, httpResponse, tokens.accessToken(), tokens.expiresIn());
+        authCookieService.addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
+        return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Revokes the current refresh session (if present) and removes auth cookies from the client.
+     *
+     * @param httpRequest servlet request used to locate the refresh token cookie
+     * @param httpResponse servlet response used to clear auth cookies
+     */
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
@@ -99,9 +140,17 @@ public class AuthController {
         if (refreshToken != null && !refreshToken.isBlank()) {
             authService.logout(refreshToken);
         }
-        clearRefreshCookie(httpRequest, httpResponse);
+        authCookieService.clearRefreshCookie(httpRequest, httpResponse);
+        authCookieService.clearAccessCookie(httpRequest, httpResponse);
     }
 
+    /**
+     * Starts password recovery by validating captcha and creating a one-time recovery code.
+     *
+     * @param request validated recovery payload
+     * @param httpRequest servlet request used for client IP resolution
+     * @return success message when processing is complete
+     */
     @PostMapping("/recovery")
     public ResponseEntity<String> recovery(
             @Valid @RequestBody RecoveryRequest request,
@@ -109,13 +158,21 @@ public class AuthController {
     ) {
         String email = request.email().strip().toLowerCase(Locale.ROOT);
         String captchaToken = request.captchaToken().strip();
-        String ipAddress = extractIp(httpRequest);
+        String ipAddress = requestMetadataResolver.resolveClientIp(httpRequest);
         authService.recovery(email, captchaToken, ipAddress);
         return ResponseEntity.ok("Recovery email sent.");
     }
 
+    /**
+     * Verifies a recovery code and issues a fresh authenticated session.
+     *
+     * @param request validated verification payload
+     * @param httpRequest servlet request used for metadata resolution
+     * @param httpResponse servlet response used to write auth cookies
+     * @return HTTP 204 when verification succeeds
+     */
     @PostMapping("/verify")
-    public AuthTokensResponse verify(
+    public ResponseEntity<Void> verify(
         @Valid @RequestBody VerifyRequest request,
         HttpServletRequest httpRequest,
         HttpServletResponse httpResponse
@@ -123,83 +180,30 @@ public class AuthController {
         IssuedTokens tokens = authService.verify(
             request.email().strip().toLowerCase(Locale.ROOT),
             request.code().strip(),
-            extractIp(httpRequest),
-            extractUserAgent(httpRequest)
+            requestMetadataResolver.resolveClientIp(httpRequest),
+            requestMetadataResolver.resolveUserAgent(httpRequest)
         );
-        addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
-        return toAuthTokenResponse(tokens);
+        authCookieService.addAccessCookie(httpRequest, httpResponse, tokens.accessToken(), tokens.expiresIn());
+        authCookieService.addRefreshCookie(httpRequest, httpResponse, tokens.refreshToken(), tokens.refreshExpiresIn());
+        return ResponseEntity.noContent().build();
     }
 
-    private String extractIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].strip();
-        }
-        return request.getRemoteAddr();
-    }
-
-    private String extractUserAgent(HttpServletRequest request) {
-        String userAgent = request.getHeader("User-Agent");
-        if (userAgent == null || userAgent.isBlank()) {
-            return null;
-        }
-        return userAgent;
-    }
-
-    private void addRefreshCookie(
-        HttpServletRequest request,
-        HttpServletResponse response,
-        String refreshToken,
-        long maxAgeSeconds
-    ) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE_NAME, refreshToken)
-            .httpOnly(true)
-            .secure(isSecureRequest(request))
-            .path(REFRESH_COOKIE_PATH)
-            .maxAge(Duration.ofSeconds(maxAgeSeconds))
-            .sameSite(REFRESH_COOKIE_SAME_SITE)
-            .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-    }
-
-    private void clearRefreshCookie(HttpServletRequest request, HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE_NAME, "")
-            .httpOnly(true)
-            .secure(isSecureRequest(request))
-            .path(REFRESH_COOKIE_PATH)
-            .maxAge(Duration.ZERO)
-            .sameSite(REFRESH_COOKIE_SAME_SITE)
-            .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-    }
-
+    /**
+     * Extracts the refresh token from cookies without failing when cookies are absent.
+     *
+     * @param request incoming servlet request
+     * @return raw refresh token value, or {@code null} when no refresh cookie is present
+     */
     private String extractRefreshToken(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;
         }
         for (Cookie cookie : cookies) {
-            if (REFRESH_COOKIE_NAME.equals(cookie.getName())) {
+            if (AuthCookieNames.REFRESH_COOKIE_NAME.equals(cookie.getName())) {
                 return cookie.getValue();
             }
         }
         return null;
-    }
-
-    private boolean isSecureRequest(HttpServletRequest request) {
-        if (request.isSecure()) {
-            return true;
-        }
-        String forwardedProto = request.getHeader("X-Forwarded-Proto");
-        return forwardedProto != null && forwardedProto.equalsIgnoreCase("https");
-    }
-
-    private AuthTokensResponse toAuthTokenResponse(IssuedTokens tokens) {
-        return new AuthTokensResponse(
-            tokens.accessToken(),
-            tokens.tokenType(),
-            tokens.expiresIn(),
-            tokens.refreshExpiresIn()
-        );
     }
 }

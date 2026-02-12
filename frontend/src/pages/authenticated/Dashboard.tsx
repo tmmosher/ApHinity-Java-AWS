@@ -1,74 +1,69 @@
-import type { JSX } from "solid-js";
-import SidebarNav, {NavItem} from "../../components/SidebarNav";
-import Profile from "../../components/Profile";
+import {useLocation, useNavigate} from "@solidjs/router";
+import {Show, createEffect, type ParentProps} from "solid-js";
+import SidebarNav from "../../components/SidebarNav";
+import {useProfile} from "../../context/ProfileContext";
+import {dashboardNavByRole, isDashboardPathAllowed} from "./dashboardConfig";
 
-export type UserRole = "admin" | "partner" | "client";
+export const Dashboard = (props: ParentProps) => {
+  const profileContext = useProfile();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-type DashboardShellProps = {
-  role: UserRole;
-  sidebarItems: NavItem[];
-  children: JSX.Element;
-};
+  createEffect(() => {
+    if (profileContext.isLoading()) {
+      return;
+    }
 
-export const DashboardShell = (props: DashboardShellProps) => (
-  <main class="w-full" aria-label="Authenticated home page">
-    <div class="w-full max-w-5xl mx-auto">
-      <div class="card bg-base-100 shadow-md w-full">
-        <div class="card-body p-0">
-          <div class="grid grid-cols-1 md:grid-cols-[220px_1fr]">
-            <aside class="border-b md:border-b-0 md:border-r border-base-200 p-4" aria-label="Sidebar">
-              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-                Routes
-              </p>
-              <SidebarNav items={props.sidebarItems} />
-            </aside>
-            <section class="p-6" aria-labelledby="auth-home-title">
-              {props.children}
-            </section>
+    const profile = profileContext.profile();
+    if (!profile) {
+      return;
+    }
+
+    if (!isDashboardPathAllowed(profile.role, location.pathname)) {
+      void navigate("/dashboard", {
+        replace: true
+      });
+    }
+  });
+
+  const shouldRenderPanel = () => {
+    if (profileContext.isLoading()) {
+      return false;
+    }
+    const profile = profileContext.profile();
+    if (!profile) {
+      return false;
+    }
+    return isDashboardPathAllowed(profile.role, location.pathname);
+  };
+
+  return (
+    <main class="w-full" aria-label="Authenticated dashboard">
+      <div class="w-full max-w-6xl mx-auto">
+        <div class="card bg-base-100 shadow-md w-full">
+          <div class="card-body p-0">
+            <div class="grid grid-cols-1 md:grid-cols-[220px_1fr]">
+              <aside class="border-b md:border-b-0 md:border-r border-base-200 p-4" aria-label="Dashboard navigation">
+                <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                  Panels
+                </p>
+                <Show when={profileContext.profile()} fallback={<p class="mt-2 text-sm text-base-content/60">Loading...</p>}>
+                  {(profile) => <SidebarNav items={dashboardNavByRole[profile().role]}/>}
+                </Show>
+              </aside>
+              <section class="p-6" aria-label="Dashboard panel">
+                <Show when={shouldRenderPanel()} fallback={
+                  <p class="text-base-content/70">
+                    {profileContext.isLoading() ? "Loading dashboard..." : "Redirecting..."}
+                  </p>
+                }>
+                  {props.children}
+                </Show>
+              </section>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </main>
-);
-
-// TODO: Replace with role resolution
-const resolveRole = (): UserRole => {
-  if (typeof window === "undefined") {
-    return "client";
-  }
-
-  return "client";
-};
-
-const roleNavItems: Record<UserRole, NavItem[]> = {
-  admin: [
-    { label: "Overview", href: "/dashboard" },
-    { label: "User management" },
-    { label: "Compliance queue" },
-    { label: "Reporting" }
-  ],
-  partner: [
-    { label: "Overview", href: "/dashboard" },
-    { label: "Active projects" },
-    { label: "Submissions" },
-    { label: "Reports" }
-  ],
-  client: [
-    { label: "Overview", href: "/dashboard" },
-    { label: "Facilities" },
-    { label: "Support" }
-  ]
-};
-
-export const Dashboard = () => {
-  const role = resolveRole();
-  return (
-    <DashboardShell
-      role={role}
-      sidebarItems={roleNavItems[role]}
-    >
-      <Profile />
-    </DashboardShell>
+    </main>
   );
 };

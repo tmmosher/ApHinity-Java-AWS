@@ -27,7 +27,7 @@ const PORTAL_CAPABILITIES = [
   {
     title: "Partner Reporting Workspaces",
     description:
-      "Management partners can structure dashboards by site, treatment system, and contract scope to deliver clean monthly reporting."
+      "Partners manage reactive dashboards by site and treatment system to deliver clean monthly reporting."
   },
   {
     title: "Client Visibility",
@@ -41,7 +41,7 @@ const PORTAL_CAPABILITIES = [
   }
 ];
 
-const CLIENT_EXAMPLES = ["TSMC", "HelloFresh", "Dexcom", "Semiconductor Facilities", "Food Processing"];
+const CLIENT_EXAMPLES = ["TSMC", "HelloFresh", "Dexcom", "Leprino Foods"];
 
 const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
   {

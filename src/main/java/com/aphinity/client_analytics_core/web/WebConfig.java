@@ -8,10 +8,19 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/{spring:\\w+}")
-                .setViewName("forward:/");
-        registry.addViewController("/**/{spring:\\w+}")
-                .setViewName("forward:/");
+        String[] directRoutes = {
+            "/login",
+            "/signup",
+            "/support",
+            "/recovery",
+            "/verify",
+            "/dashboard",
+            "/dashboard/"
+        };
+        for (String route : directRoutes) {
+            registry.addViewController(route).setViewName("forward:/");
+        }
+        registry.addViewController("/dashboard/{*path}").setViewName("forward:/");
     }
 }
 

@@ -13,9 +13,8 @@ import {
   isRecoverySubmitDisabled
 } from "../../util/recoverySubmissionControl";
 
-const HOST = useApiHost();
-
 export const RecoveryPage = () => {
+  const host = useApiHost();
   const {
     recoveryCooldownActive,
     turnstileInstance,
@@ -34,7 +33,7 @@ export const RecoveryPage = () => {
       const payload = parseRecoveryFormData(formData);
       startRecoveryCooldown();
       resetRecoveryCaptcha();
-      const response = await fetch(HOST + "/api/auth/recovery", {
+      const response = await fetch(host + "/api/auth/recovery", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -68,7 +67,7 @@ export const RecoveryPage = () => {
         };
         try {
             const payload = parseVerifyFormData(formData);
-            const response = await fetch(HOST + "/api/auth/verify", {
+            const response = await fetch(host + "/api/auth/verify", {
                 method: "POST",
                 credentials: "include",
                 headers: {
@@ -123,7 +122,7 @@ export const RecoveryPage = () => {
       // timeout to wait for user to read the toast
       setTimeout(() => navigate("/dashboard"), 500);
     } else {
-      toast.error(result.message ?? "Recovery email failed to send");
+      toast.error(result.message ?? "Code verification failed");
     }
     verificationSubmission.clear();
     return;

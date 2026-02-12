@@ -5,17 +5,21 @@ import com.aphinity.client_analytics_core.api.auth.entities.Role;
 import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
+import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
 import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
+import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.aphinity.client_analytics_core.api.security.JwtService;
+import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -47,6 +51,9 @@ class AuthServiceTest {
     private AuthSessionRepository authSessionRepository;
 
     @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -58,11 +65,18 @@ class AuthServiceTest {
     @Mock
     private TurnstileValidationService turnstileValidationService;
 
+    @Mock
+    private AsyncLogService asyncLogService;
+
+    @Spy
+    private PasswordPolicyValidator passwordPolicyValidator;
+
     @InjectMocks
     private AuthService authService;
 
     @Test
     void signupRejectsExistingUser() {
+        when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
         when(appUserRepository.saveAndFlush(any(AppUser.class)))
             .thenThrow(new DataIntegrityViolationException("duplicate"));
 
@@ -86,6 +100,7 @@ class AuthServiceTest {
 
     @Test
     void signupCreatesClientRoleForExternalEmail() {
+        when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
         when(passwordEncoder.encode("Abcd123!")).thenReturn("hashed");
         when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -100,11 +115,12 @@ class AuthServiceTest {
         assertEquals(1, saved.getRoles().size());
         Role role = saved.getRoles().iterator().next();
         assertEquals("client", role.getName());
-        assertEquals(1L, role.getId());
+        assertEquals(17L, role.getId());
     }
 
     @Test
-    void signupCreatesPartnerRoleForAphinityEmail() {
+    void signupCreatesOnlyClientRoleForAphinityEmail() {
+        when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
         when(passwordEncoder.encode("Abcd123!")).thenReturn("hashed");
         when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -116,7 +132,9 @@ class AuthServiceTest {
 
         assertEquals("user@aphinitytech.com", saved.getEmail());
         assertEquals("hashed", saved.getPasswordHash());
-        assertEquals(Set.of("client", "partner"), saved.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(Set.of("client"), saved.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(Set.of(17L), saved.getRoles().stream().map(Role::getId).collect(java.util.stream.Collectors.toSet()));
+        verify(roleRepository, never()).findByName("partner");
     }
 
     @Test
@@ -357,4 +375,12 @@ class AuthServiceTest {
         session.setExpiresAt(expiresAt);
         return session;
     }
+
+    private Role clientRole(Long id) {
+        Role role = new Role();
+        role.setId(id);
+        role.setName("client");
+        return role;
+    }
+
 }

@@ -4,10 +4,11 @@ import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import com.aphinity.client_analytics_core.api.auth.entities.Role;
 import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
+import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
+import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
-import com.aphinity.client_analytics_core.logging.AppLoggingProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,37 +29,34 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
- * Authentication service for signup, login, refresh, and logout flows.
- * Manages refresh token sessions, password requirements, and captcha enforcement.
+ * Orchestrates auth-domain workflows for login, signup, session refresh, logout, and
+ * password recovery.
+ * This service is the single point where security-sensitive policies are enforced:
+ * captcha checks, password policy validation, refresh token rotation, and single-use
+ * recovery code verification.
  */
 @Service
 public class AuthService {
     // constants
     private static final String TOKEN_TYPE = "Bearer";
     private static final int REFRESH_TOKEN_BYTES = 32;
-    private final AppLoggingProperties loggingProperties = new AppLoggingProperties();
-    private final AsyncLogService asyncLogService = new AsyncLogService(loggingProperties);
-    private static final Pattern LEN_8_PLUS = Pattern.compile(".{8,}");
-    private static final Pattern HAS_DIGIT = Pattern.compile("\\d");
-    private static final Pattern HAS_LETTER = Pattern.compile("\\p{L}");
-    private static final Pattern HAS_SPECIAL = Pattern.compile("[!@#$%^&*()_+\\-={};':\"\\\\|,.<>/?`~]");
-    private final Map<Pattern, String> passwordRequirements = buildPasswordRequirements();
 
     // services
     private final AppUserRepository appUserRepository;
     private final AuthSessionRepository authSessionRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PasswordPolicyValidator passwordPolicyValidator;
     private final LoginAttemptService loginAttemptService;
     private final TurnstileValidationService turnstileValidationService;
     private final JdbcTemplate jdbcTemplate;
     private final MailSendingService mailSendingService;
+    private final AsyncLogService asyncLogService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${app.recovery.token-ttl-seconds:3600}")
@@ -70,33 +68,27 @@ public class AuthService {
     public AuthService(
             AppUserRepository appUserRepository,
             AuthSessionRepository authSessionRepository,
+            RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
+            PasswordPolicyValidator passwordPolicyValidator,
             LoginAttemptService loginAttemptService,
             TurnstileValidationService turnstileValidationService,
             JdbcTemplate jdbcTemplate,
-            MailSendingService mailSendingService)
+            MailSendingService mailSendingService,
+            AsyncLogService asyncLogService)
     {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.passwordPolicyValidator = passwordPolicyValidator;
         this.loginAttemptService = loginAttemptService;
         this.turnstileValidationService = turnstileValidationService;
         this.jdbcTemplate = jdbcTemplate;
         this.mailSendingService = mailSendingService;
-    }
-
-    /**
-     * Builds a read-only map of password requirement patterns to failure messages.
-     */
-    private Map<Pattern, String> buildPasswordRequirements() {
-        Map<Pattern, String> requirements = new LinkedHashMap<>();
-        requirements.put(LEN_8_PLUS, "Must be at least 8 characters");
-        requirements.put(HAS_DIGIT, "Must contain at least one digit");
-        requirements.put(HAS_LETTER, "Must contain at least one letter");
-        requirements.put(HAS_SPECIAL, "Must contain at least one special character");
-        return Map.copyOf(requirements);
+        this.asyncLogService = asyncLogService;
     }
 
     /**
@@ -120,6 +112,7 @@ public class AuthService {
         String userAgent,
         String captchaToken)
     {
+        // Escalate to captcha only when recent failures exceed configured thresholds.
         if (loginAttemptService.isCaptchaRequired(email)) {
             if (captchaToken == null || captchaToken.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Captcha required");
@@ -140,6 +133,7 @@ public class AuthService {
             if (user.getPasswordHash() == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
                 throw invalidCredentials();
             }
+            // Persist refresh sessions as token hashes so raw refresh secrets never hit storage.
             String refreshToken = generateRefreshToken();
             AuthSession session = buildSession(user, refreshToken, ipAddress, userAgent);
             authSessionRepository.save(session);
@@ -158,6 +152,7 @@ public class AuthService {
             );
         } catch (ResponseStatusException ex) {
             if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                // Only credential failures should increase captcha pressure for this email.
                 loginAttemptService.recordFailure(email);
             }
             throw ex;
@@ -166,7 +161,7 @@ public class AuthService {
 
     /**
      * Registers a new user, enforcing password requirements and assigning roles.
-     * Users with the @aphinitytech.com domain receive the partner role in addition to client.
+     * Signup always creates the lowest-privilege account role.
      *
      * @param email user email. Already normalized.
      * @param password user password. Already normalized.
@@ -179,13 +174,8 @@ public class AuthService {
     public void signup(String email, String password, String name,
                        String ipAddress, String userAgent)
     {
-        for (Map.Entry<Pattern, String> requirement : passwordRequirements.entrySet()) {
-            if (!requirement.getKey().matcher(password).find()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, requirement.getValue());
-            }
-        }
-        boolean isAphinity = email.endsWith("@aphinitytech.com");
-        AppUser user = buildUser(email, password, isAphinity, name);
+        passwordPolicyValidator.validateOrThrow(password);
+        AppUser user = buildUser(email, password, name);
         try {
             appUserRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
@@ -212,6 +202,8 @@ public class AuthService {
             .orElseThrow(this::invalidRefreshToken);
 
         Instant now = Instant.now();
+        // If a rotated/revoked refresh token is reused, revoke all active sessions for this user.
+        // This mitigates replay after token theft.
         if (session.getRevokedAt() != null || session.getReplacedBySessionId() != null) {
             authSessionRepository.revokeAllActiveForUser(session.getUser().getId(), now);
             throw invalidRefreshToken();
@@ -223,6 +215,7 @@ public class AuthService {
             throw invalidRefreshToken();
         }
 
+        // Rotate token material on every refresh to enforce one-time refresh token semantics.
         String newRefreshToken = generateRefreshToken();
         AuthSession newSession = buildSession(session.getUser(), newRefreshToken, ipAddress, userAgent);
         authSessionRepository.save(newSession);
@@ -257,14 +250,17 @@ public class AuthService {
     }
 
     /**
-     * Responsible for receiving email / captcha, verifying captcha, and sending recovery email
+     * Creates a one-time recovery code and delivers it to the account email.
+     * <p>
+     * The method is intentionally tolerant of unknown emails to avoid account enumeration.
+     *
      * @param email normalized email address for the user
      * @param captchaToken Turnstile token. Captcha is always required for email recovery
      * @param ipAddress IP Address of the request
      */
     @Transactional
     public void recovery(String email, String captchaToken, String ipAddress) {
-        // ensure the captcha is correct
+        // Recovery always requires captcha because the endpoint can be abused at scale.
         boolean validCaptcha;
         try {
             validCaptcha = turnstileValidationService.validateTurnstileResponse(captchaToken, ipAddress);
@@ -276,10 +272,12 @@ public class AuthService {
         }
         AppUser user = appUserRepository.findByEmail(email).orElse(null);
         if (user == null) {
+            // Do not disclose whether the email exists.
             return;
         }
 
         Instant now = Instant.now();
+        // Invalidate prior unused tokens so only one active recovery code exists per user.
         jdbcTemplate.update(
             "update password_reset_token set consumed_at = ? where user_id = ? and consumed_at is null",
             Timestamp.from(now),
@@ -298,6 +296,7 @@ public class AuthService {
                 Timestamp.from(expiresAt)
             );
         } catch (DataIntegrityViolationException ex) {
+            // Keep endpoint response stable if a race created a token first.
             return;
         }
 
@@ -312,7 +311,7 @@ public class AuthService {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send recovery email", ex);
             }
         };
-        //makes sure recovery token is available before sending email
+        // Send only after commit so recipients never get a code that failed to persist.
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -326,7 +325,11 @@ public class AuthService {
     }
 
     /**
-     * Responsible for receiving the verification number and verifying it against the database
+     * Verifies and consumes a recovery code, then issues a new authenticated session.
+     * <p>
+     * Codes are single-use: token consumption happens with an update guard so concurrent
+     * requests cannot both succeed.
+     *
      * @param email normalized email address for the user
      * @param recoveryCode stripped recovery code provided by the user
      * @param ipAddress IP address of the request
@@ -358,6 +361,7 @@ public class AuthService {
             throw invalidRecoveryCode();
         }
 
+        // Consume-once semantics: only the first updater can mark the token as used.
         int updated = jdbcTemplate.update(
             "update password_reset_token set consumed_at = ? where id = ? and consumed_at is null",
             Timestamp.from(now),
@@ -398,26 +402,24 @@ public class AuthService {
     /**
      * Creates a new AppUser with encoded password, timestamps, and role assignments.
      */
-    private AppUser buildUser(String email, String password, boolean isAphinity, String name) {
+    private AppUser buildUser(String email, String password, String name) {
         AppUser user = new AppUser();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setCreatedAt(Instant.now());
         user.setName(name);
         Set<Role> roles = new HashSet<>();
-        Role clientRole = new Role();
-        // Roles are additive, all partners get 'client', admins get 'partner' & 'client'
-        clientRole.setId(1L);
-        clientRole.setName("client");
-        roles.add(clientRole);
-        if (isAphinity) {
-            Role partnerRole = new Role();
-            partnerRole.setId(2L);
-            partnerRole.setName("partner");
-            roles.add(partnerRole);
-        }
+        roles.add(requiredRole("client"));
         user.setRoles(roles);
         return user;
+    }
+
+    /**
+     * Loads a required role and fails fast when role seed data is missing.
+     */
+    private Role requiredRole(String roleName) {
+        return roleRepository.findByName(roleName)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Role configuration invalid"));
     }
 
     /**
@@ -440,6 +442,11 @@ public class AuthService {
         return Integer.toString(code);
     }
 
+    /**
+     * Validates recovery code format before database lookup.
+     *
+     * @return normalized code, or {@code null} when the format is invalid
+     */
     private String normalizeRecoveryCode(String code) {
         if (code == null
                 || code.isEmpty()

@@ -4,6 +4,9 @@ import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.csrf.InvalidCsrfTokenException;
+import org.springframework.security.web.csrf.MissingCsrfTokenException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -23,16 +26,38 @@ public class ApiExceptionHandler {
     private static final Map<String, ErrorDefinition> SAFE_REASONS = Map.ofEntries(
         Map.entry("Invalid credentials", new ErrorDefinition("invalid_credentials", "Invalid credentials")),
         Map.entry("Invalid refresh token", new ErrorDefinition("invalid_refresh_token", "Invalid refresh token")),
+        Map.entry("Invalid recovery code", new ErrorDefinition("invalid_recovery_code", "Invalid recovery code")),
+        Map.entry("Invalid authenticated user", new ErrorDefinition("invalid_authenticated_user", "Invalid authenticated user")),
         Map.entry("Missing refresh token", new ErrorDefinition("missing_refresh_token", "Missing refresh token")),
         Map.entry("Email already in use", new ErrorDefinition("email_in_use", "Email already in use")),
+        Map.entry("Role configuration invalid", new ErrorDefinition("role_configuration_invalid", "Role configuration invalid")),
         Map.entry("Must be at least 8 characters", new ErrorDefinition("password_too_short", "Must be at least 8 characters")),
         Map.entry("Must contain at least one digit", new ErrorDefinition("password_missing_digit", "Must contain at least one digit")),
         Map.entry("Must contain at least one letter", new ErrorDefinition("password_missing_letter", "Must contain at least one letter")),
         Map.entry("Must contain at least one special character", new ErrorDefinition("password_missing_special", "Must contain at least one special character")),
         Map.entry("Password must be at least 8 characters long", new ErrorDefinition("password_too_short", "Password must be at least 8 characters long")),
+        Map.entry("Current password is incorrect", new ErrorDefinition("password_incorrect", "Current password is incorrect")),
+        Map.entry("Password change unavailable for this account", new ErrorDefinition("password_change_unavailable", "Password change unavailable for this account")),
+        Map.entry("New password must be different from current password", new ErrorDefinition("password_reused", "New password must be different from current password")),
         Map.entry("Captcha required", new ErrorDefinition("captcha_required", "Captcha required")),
         Map.entry("Invalid captcha", new ErrorDefinition("captcha_invalid", "Invalid captcha")),
-        Map.entry("Captcha not configured", new ErrorDefinition("captcha_unavailable", "Captcha not configured"))
+        Map.entry("Invalid captcha token", new ErrorDefinition("captcha_invalid", "Invalid captcha token")),
+        Map.entry("Captcha not configured", new ErrorDefinition("captcha_unavailable", "Captcha not configured")),
+        Map.entry("Unable to send recovery email", new ErrorDefinition("recovery_email_unavailable", "Unable to send recovery email")),
+        Map.entry("Insufficient permissions", new ErrorDefinition("forbidden", "Insufficient permissions")),
+        Map.entry("Location not found", new ErrorDefinition("location_not_found", "Location not found")),
+        Map.entry("Target user not found", new ErrorDefinition("target_user_not_found", "Target user not found")),
+        Map.entry("Location name is required", new ErrorDefinition("location_name_required", "Location name is required")),
+        Map.entry("Location name already in use", new ErrorDefinition("location_name_in_use", "Location name already in use")),
+        Map.entry("Invite not found", new ErrorDefinition("invite_not_found", "Invite not found")),
+        Map.entry("Invite expired", new ErrorDefinition("invite_expired", "Invite expired")),
+        Map.entry("Invite is not pending", new ErrorDefinition("invite_not_pending", "Invite is not pending")),
+        Map.entry("Invite email does not match authenticated account", new ErrorDefinition("invite_email_mismatch", "Invite email does not match authenticated account")),
+        Map.entry("An active invite already exists", new ErrorDefinition("invite_already_exists", "An active invite already exists")),
+        Map.entry("Cannot invite your own account", new ErrorDefinition("self_invite_not_allowed", "Cannot invite your own account")),
+        Map.entry("User already has access to this location", new ErrorDefinition("location_access_exists", "User already has access to this location")),
+        Map.entry("Invited email is required", new ErrorDefinition("invited_email_required", "Invited email is required")),
+        Map.entry("Unable to issue invite", new ErrorDefinition("invite_issue_failed", "Unable to issue invite"))
     );
 
     public ApiExceptionHandler(AsyncLogService logService) {
@@ -95,6 +120,22 @@ public class ApiExceptionHandler {
             Map.of()
         );
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        boolean csrfError = ex instanceof MissingCsrfTokenException || ex instanceof InvalidCsrfTokenException;
+        String code = csrfError ? "csrf_invalid" : "forbidden";
+        String message = csrfError ? "Missing or invalid CSRF token" : "Insufficient permissions";
+        logService.log(formatHandledException("AccessDeniedException", ex, "code=" + code));
+        ApiErrorResponse response = new ApiErrorResponse(
+            code,
+            message,
+            HttpStatus.FORBIDDEN.value(),
+            Instant.now(),
+            Map.of()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     @ExceptionHandler(Exception.class)

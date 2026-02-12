@@ -6,9 +6,8 @@ import {ActionResult} from "../../types/Types";
 import {useApiHost} from "../../context/ApiHostContext";
 import { FieldError, parseSignupFormData } from "../../util/landingSchemas";
 
-const host = useApiHost();
-
 export const SignupPage = () => {
+    const host = useApiHost();
     const submitSignup = action(async (formData: FormData) => {
         const actionResult: ActionResult = {
             ok: false
@@ -28,7 +27,7 @@ export const SignupPage = () => {
             else {
                 const errorBody = await response.json().catch(() => null);
                 actionResult.ok = false;
-                actionResult.message = errorBody?.message ?? "Login failed";
+                actionResult.message = errorBody?.message ?? "Signup failed";
             }
         } catch (error) {
             actionResult.ok = false;

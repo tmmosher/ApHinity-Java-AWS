@@ -30,13 +30,20 @@ dependencies {
 	implementation 'com.digitalsanctuary:ds-spring-cf-turnstile:2.0.0'
 	implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	runtimeOnly 'org.postgresql:postgresql:42.7.8'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 }
 
-// TODO: THIS!!
-//  I'll get around to writing tests at some point
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.named('bootTestRun') {
+	def jwtSecret = System.getenv('JWT_SECRET')
+	if (jwtSecret == null || jwtSecret.getBytes('UTF-8').length < 32) {
+		environment 'JWT_SECRET', 'bootTestRunFallbackSecretValueAtLeast32Bytes' // this is a test run, having a hardcoded secret is fine as this will never be published.
+	}
+	systemProperty 'server.port', '0'
 }

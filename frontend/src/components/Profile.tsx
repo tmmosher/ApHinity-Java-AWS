@@ -7,6 +7,7 @@ import {
     setStoredThemePreference,
     ThemePreference
 } from "../util/themePreference";
+import {apiFetch} from "../util/apiFetch";
 
 const Profile = () => {
     const host = useApiHost();
@@ -42,9 +43,8 @@ const Profile = () => {
         }
         setIsSavingProfile(true);
         try {
-            const response = await fetch(host + "/api/core/profile", {
+            const response = await apiFetch(host + "/api/core/profile", {
                 method: "PUT",
-                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -59,9 +59,7 @@ const Profile = () => {
                 toast.error(errorBody?.message ?? "Unable to update profile.");
                 return;
             }
-
-            const updatedProfile = await response.json();
-            profileContext.setProfile(updatedProfile);
+            profileContext.refreshProfile();
             toast.success("Profile updated.");
         } catch {
             toast.error("Unable to update profile.");
@@ -77,9 +75,8 @@ const Profile = () => {
         }
         setIsSavingPassword(true);
         try {
-            const response = await fetch(host + "/api/core/profile/password", {
+            const response = await apiFetch(host + "/api/core/profile/password", {
                 method: "PUT",
-                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -138,6 +135,9 @@ const Profile = () => {
                     <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
                         <h2 class="text-lg font-semibold">Account details</h2>
                         <p class="mt-1 text-sm text-base-content/70">Update your display name and account email.</p>
+                        <p class="mt-1 text-xs text-base-content/60">
+                            Role: {profileContext.profile()?.role ?? "client"}
+                        </p>
                         <form class="mt-4 grid gap-4" onSubmit={updateProfile}>
                             <label class="form-control">
                                 <span class="label-text">Name</span>
