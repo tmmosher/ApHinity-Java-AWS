@@ -243,7 +243,9 @@ public class LocationService {
      * Loads the authenticated user or fails with a standard unauthorized error.
      */
     private AppUser requireUser(Long userId) {
-        return appUserRepository.findById(userId).orElseThrow(this::invalidAuthenticatedUser);
+        AppUser user = appUserRepository.findById(userId).orElseThrow(this::invalidAuthenticatedUser);
+        requireVerified(user);
+        return user;
     }
 
     /**
@@ -257,6 +259,12 @@ public class LocationService {
 
     private ResponseStatusException invalidAuthenticatedUser() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authenticated user");
+    }
+
+    private void requireVerified(AppUser user) {
+        if (user.getEmailVerifiedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account email is not verified");
+        }
     }
 
     private ResponseStatusException forbidden() {

@@ -1,8 +1,9 @@
 import {For, Show, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {ActiveInvite, parseActiveInviteList} from "../../../types/coreApi";
+import {parseActiveInviteList} from "../../../types/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
+import {ActiveInvite} from "../../../types/Types";
 
 export const DashboardInvitesPanel = () => {
   const host = useApiHost();

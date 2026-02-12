@@ -9,11 +9,13 @@ import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
+import com.aphinity.client_analytics_core.api.auth.services.MailSendingService;
 import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,11 +24,16 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.sql.Timestamp;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -37,6 +44,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -68,11 +77,24 @@ class AuthServiceTest {
     @Mock
     private AsyncLogService asyncLogService;
 
+    @Mock
+    private JdbcTemplate jdbcTemplate;
+
+    @Mock
+    private MailSendingService mailSendingService;
+
     @Spy
     private PasswordPolicyValidator passwordPolicyValidator;
 
     @InjectMocks
     private AuthService authService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(authService, "recoveryTokenTtlSeconds", 3600L);
+        ReflectionTestUtils.setField(authService, "verificationTokenTtlSeconds", 600L);
+        ReflectionTestUtils.setField(authService, "recoveryCodeLength", 6);
+    }
 
     @Test
     void signupRejectsExistingUser() {
@@ -116,6 +138,18 @@ class AuthServiceTest {
         Role role = saved.getRoles().iterator().next();
         assertEquals("client", role.getName());
         assertEquals(17L, role.getId());
+        verify(mailSendingService).sendVerificationEmail(eq("user@example.com"), any(), eq(600L));
+        verify(jdbcTemplate).update(
+            eq("update email_verification_token set consumed_at = ? where user_id = ? and consumed_at is null"),
+            any(Timestamp.class),
+            any()
+        );
+        verify(jdbcTemplate).update(
+            eq("insert into email_verification_token (user_id, token_hash, expires_at) values (?, ?, ?)"),
+            any(),
+            anyString(),
+            any(Timestamp.class)
+        );
     }
 
     @Test
@@ -135,6 +169,7 @@ class AuthServiceTest {
         assertEquals(Set.of("client"), saved.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toSet()));
         assertEquals(Set.of(17L), saved.getRoles().stream().map(Role::getId).collect(java.util.stream.Collectors.toSet()));
         verify(roleRepository, never()).findByName("partner");
+        verify(mailSendingService).sendVerificationEmail(eq("user@aphinitytech.com"), any(), eq(600L));
     }
 
     @Test
@@ -354,6 +389,102 @@ class AuthServiceTest {
         authService.logout(refreshToken);
 
         verify(authSessionRepository, never()).save(any(AuthSession.class));
+    }
+
+    @Test
+    void recoveryWritesPasswordResetTokenTable() {
+        AppUser user = buildUser("user@example.com");
+        when(turnstileValidationService.validateTurnstileResponse("captcha-token", "10.0.0.1"))
+            .thenReturn(true);
+        when(appUserRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+
+        authService.recovery("user@example.com", "captcha-token", "10.0.0.1");
+
+        verify(jdbcTemplate).update(
+            eq("update password_reset_token set consumed_at = ? where user_id = ? and consumed_at is null"),
+            any(Timestamp.class),
+            eq(user.getId())
+        );
+        verify(jdbcTemplate).update(
+            eq("insert into password_reset_token (user_id, token_hash, expires_at) values (?, ?, ?)"),
+            eq(user.getId()),
+            anyString(),
+            any(Timestamp.class)
+        );
+        verify(mailSendingService).sendRecoveryEmail(eq("user@example.com"), any(), eq(3600L));
+    }
+
+    @Test
+    void verifyMarksUserAsVerifiedAndIssuesTokens() {
+        AppUser user = buildUser("user@example.com");
+        user.setEmailVerifiedAt(null);
+
+        when(appUserRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(jdbcTemplate.queryForMap(contains("email_verification_token"), eq(42L), anyString())).thenReturn(Map.of(
+            "id", 5L,
+            "expires_at", Timestamp.from(Instant.now().plusSeconds(300))
+        ));
+        when(jdbcTemplate.update(contains("email_verification_token"), any(Timestamp.class), eq(5L))).thenReturn(1);
+        when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
+        when(jwtService.getRefreshTokenTtlSeconds()).thenReturn(3600L);
+        when(authSessionRepository.save(any(AuthSession.class))).thenAnswer(invocation -> {
+            AuthSession session = invocation.getArgument(0);
+            session.setId(88L);
+            return session;
+        });
+        when(jwtService.createAccessToken(user, 88L)).thenReturn("access-token");
+
+        IssuedTokens tokens = authService.verify("user@example.com", "123456", "10.0.0.1", "agent");
+
+        assertEquals("access-token", tokens.accessToken());
+        assertEquals("Bearer", tokens.tokenType());
+        assertEquals(900L, tokens.expiresIn());
+        assertEquals(3600L, tokens.refreshExpiresIn());
+        assertNotNull(user.getEmailVerifiedAt());
+        verify(appUserRepository).save(user);
+    }
+
+    @Test
+    void verifyFallsBackToPasswordResetTokenWhenVerificationTokenIsMissing() {
+        AppUser user = buildUser("user@example.com");
+        user.setEmailVerifiedAt(null);
+
+        when(appUserRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(jdbcTemplate.queryForMap(anyString(), eq(42L), anyString())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            if (sql.contains("email_verification_token")) {
+                throw new EmptyResultDataAccessException(1);
+            }
+            if (sql.contains("password_reset_token")) {
+                return Map.of(
+                    "id", 6L,
+                    "expires_at", Timestamp.from(Instant.now().plusSeconds(300))
+                );
+            }
+            throw new IllegalStateException("Unexpected token query SQL: " + sql);
+        });
+        when(jdbcTemplate.update(anyString(), any(Timestamp.class), anyLong())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            Long tokenId = invocation.getArgument(2, Long.class);
+            if (sql.contains("password_reset_token") && tokenId == 6L) {
+                return 1;
+            }
+            return 0;
+        });
+        when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
+        when(jwtService.getRefreshTokenTtlSeconds()).thenReturn(3600L);
+        when(authSessionRepository.save(any(AuthSession.class))).thenAnswer(invocation -> {
+            AuthSession session = invocation.getArgument(0);
+            session.setId(88L);
+            return session;
+        });
+        when(jwtService.createAccessToken(user, 88L)).thenReturn("access-token");
+
+        IssuedTokens tokens = authService.verify("user@example.com", "123456", "10.0.0.1", "agent");
+
+        assertEquals("access-token", tokens.accessToken());
+        assertNotNull(user.getEmailVerifiedAt());
+        verify(appUserRepository).save(user);
     }
 
     private AppUser buildUser(String email) {

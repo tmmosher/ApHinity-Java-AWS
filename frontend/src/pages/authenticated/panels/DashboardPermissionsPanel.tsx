@@ -2,13 +2,11 @@ import {For, Show, createEffect, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {
-  LocationMembership,
-  LocationMemberRole,
-  LocationSummary,
   parseLocationList,
   parseLocationMembershipList
 } from "../../../types/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
+import {LocationMemberRole, LocationMembership, LocationSummary} from "../../../types/Types";
 
 export const DashboardPermissionsPanel = () => {
   const host = useApiHost();

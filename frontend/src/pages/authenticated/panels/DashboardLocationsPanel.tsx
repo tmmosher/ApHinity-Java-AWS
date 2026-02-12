@@ -3,9 +3,10 @@ import {For, Show, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useProfile} from "../../../context/ProfileContext";
-import {LocationSummary, parseLocationList, parseLocationSummary} from "../../../types/coreApi";
+import {parseLocationList, parseLocationSummary} from "../../../types/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
-import {setFavoriteLocationName} from "../../../util/favoriteLocation";
+import {setFavoriteLocationId} from "../../../util/favoriteLocation";
+import {LocationSummary} from "../../../types/Types";
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();
@@ -91,8 +92,8 @@ export const DashboardLocationsPanel = () => {
     }
   };
 
-  const saveFavorite = (name: string) => {
-    setFavoriteLocationName(name);
+  const saveFavorite = (locationId: number) => {
+    setFavoriteLocationId(locationId);
     toast.success("Favorite location updated.");
   };
 
@@ -131,7 +132,7 @@ export const DashboardLocationsPanel = () => {
                       <button
                         type="button"
                         class="btn btn-sm btn-outline"
-                        onClick={() => saveFavorite(location.name)}
+                        onClick={() => saveFavorite(location.id)}
                       >
                         Favorite
                       </button>

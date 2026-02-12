@@ -9,15 +9,26 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import java.io.IOException;
 
 /**
- * This class is a part of the Spring security filter chain that redirects unauthenticated users back to the login page
+ * Authentication entry point that redirects unauthenticated browser requests.
  */
 public class RedirectAuthenticationEntryPoint implements AuthenticationEntryPoint {
     private final String redirectPath;
 
+    /**
+     * @param redirectPath target path for unauthenticated redirects
+     */
     public RedirectAuthenticationEntryPoint(String redirectPath) {
         this.redirectPath = redirectPath;
     }
 
+    /**
+     * Sends a redirect to the configured login path when possible.
+     *
+     * @param request incoming request
+     * @param response HTTP response
+     * @param authException authentication failure details
+     * @throws IOException when redirect cannot be written
+     */
     @Override
     public void commence(
             @NonNull HttpServletRequest request,

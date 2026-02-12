@@ -1,8 +1,9 @@
 import {A, useParams} from "@solidjs/router";
 import {Show, createResource} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {LocationSummary, parseLocationSummary} from "../../../types/coreApi";
+import {parseLocationSummary} from "../../../types/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
+import {LocationSummary} from "../../../types/Types";
 
 export const DashboardLocationDetailPanel = () => {
   const host = useApiHost();

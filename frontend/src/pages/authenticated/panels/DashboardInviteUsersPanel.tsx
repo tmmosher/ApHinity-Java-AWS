@@ -1,8 +1,9 @@
 import {Show, createEffect, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {LocationSummary, parseLocationList} from "../../../types/coreApi";
+import {parseLocationList} from "../../../types/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
+import {LocationSummary} from "../../../types/Types";
 
 export const DashboardInviteUsersPanel = () => {
   const host = useApiHost();

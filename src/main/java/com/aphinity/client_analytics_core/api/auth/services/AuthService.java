@@ -44,6 +44,8 @@ public class AuthService {
     // constants
     private static final String TOKEN_TYPE = "Bearer";
     private static final int REFRESH_TOKEN_BYTES = 32;
+    private static final String PASSWORD_RESET_TOKEN_TABLE = "password_reset_token";
+    private static final String EMAIL_VERIFICATION_TOKEN_TABLE = "email_verification_token";
 
     // services
     private final AppUserRepository appUserRepository;
@@ -61,6 +63,9 @@ public class AuthService {
 
     @Value("${app.recovery.token-ttl-seconds:3600}")
     private long recoveryTokenTtlSeconds;
+
+    @Value("${app.verification.token-ttl-seconds:600}")
+    private long verificationTokenTtlSeconds;
 
     @Value("${app.recovery.code-length:6}")
     private int recoveryCodeLength;
@@ -183,6 +188,20 @@ public class AuthService {
         }
         asyncLogService.log("User with email: '" + email + "' created at ipv4: '"
                 + ipAddress + "' from agent '" + userAgent + "'.");
+
+        String verificationCode = issueVerificationCode(user.getId());
+        Runnable sendEmail = () -> {
+            try {
+                mailSendingService.sendVerificationEmail(
+                    user.getEmail(),
+                    verificationCode,
+                    verificationTokenTtlSeconds
+                );
+            } catch (MailException ex) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send verification email", ex);
+            }
+        };
+        runAfterCommit(sendEmail);
     }
 
     /**
@@ -251,7 +270,6 @@ public class AuthService {
 
     /**
      * Creates a one-time recovery code and delivers it to the account email.
-     * <p>
      * The method is intentionally tolerant of unknown emails to avoid account enumeration.
      *
      * @param email normalized email address for the user
@@ -276,26 +294,8 @@ public class AuthService {
             return;
         }
 
-        Instant now = Instant.now();
-        // Invalidate prior unused tokens so only one active recovery code exists per user.
-        jdbcTemplate.update(
-            "update password_reset_token set consumed_at = ? where user_id = ? and consumed_at is null",
-            Timestamp.from(now),
-            user.getId()
-        );
-
-        String recoveryCode = generateRecoveryCode();
-        String resetTokenHash = TokenHasher.sha256(recoveryCode);
-        Instant expiresAt = now.plusSeconds(recoveryTokenTtlSeconds);
-
-        try {
-            jdbcTemplate.update(
-                "insert into password_reset_token (user_id, token_hash, expires_at) values (?, ?, ?)",
-                user.getId(),
-                resetTokenHash,
-                Timestamp.from(expiresAt)
-            );
-        } catch (DataIntegrityViolationException ex) {
+        String recoveryCode = issueRecoveryCode(user.getId());
+        if (recoveryCode == null) {
             // Keep endpoint response stable if a race created a token first.
             return;
         }
@@ -311,27 +311,17 @@ public class AuthService {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send recovery email", ex);
             }
         };
-        // Send only after commit so recipients never get a code that failed to persist.
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    sendEmail.run();
-                }
-            });
-        } else {
-            sendEmail.run();
-        }
+        runAfterCommit(sendEmail);
     }
 
     /**
-     * Verifies and consumes a recovery code, then issues a new authenticated session.
+     * Verifies and consumes a one-time code, then issues a new authenticated session.
      * <p>
      * Codes are single-use: token consumption happens with an update guard so concurrent
      * requests cannot both succeed.
      *
      * @param email normalized email address for the user
-     * @param recoveryCode stripped recovery code provided by the user
+     * @param recoveryCode stripped one-time code provided by the user
      * @param ipAddress IP address of the request
      * @param userAgent User agent of the request
      * @return new tokens authenticating the user for access
@@ -346,29 +336,17 @@ public class AuthService {
 
         String tokenHash = TokenHasher.sha256(normalizedCode);
         Instant now = Instant.now();
-        Long tokenId;
-        Instant expiresAt;
-        try {
-            Map<String, Object> row = jdbcTemplate.queryForMap(
-                "select id, expires_at from password_reset_token " +
-                    "where user_id = ? and token_hash = ? and consumed_at is null",
-                user.getId(),
-                tokenHash
-            );
-            tokenId = ((Number) row.get("id")).longValue();
-            expiresAt = ((Timestamp) row.get("expires_at")).toInstant();
-        } catch (EmptyResultDataAccessException ex) {
+        // Accept both verification and recovery channels for /verify while keeping each token
+        // table isolated for storage and auditing purposes.
+        boolean consumed = consumeOneTimeCode(user.getId(), tokenHash, now, EMAIL_VERIFICATION_TOKEN_TABLE)
+            || consumeOneTimeCode(user.getId(), tokenHash, now, PASSWORD_RESET_TOKEN_TABLE);
+        if (!consumed) {
             throw invalidRecoveryCode();
         }
 
-        // Consume-once semantics: only the first updater can mark the token as used.
-        int updated = jdbcTemplate.update(
-            "update password_reset_token set consumed_at = ? where id = ? and consumed_at is null",
-            Timestamp.from(now),
-            tokenId
-        );
-        if (updated == 0 || !expiresAt.isAfter(now)) {
-            throw invalidRecoveryCode();
+        if (user.getEmailVerifiedAt() == null) {
+            user.setEmailVerifiedAt(now);
+            appUserRepository.save(user);
         }
 
         String refreshToken = generateRefreshToken();
@@ -459,6 +437,122 @@ public class AuthService {
             }
         }
         return code;
+    }
+
+    /**
+     * Issues a verification code for signup flows.
+     */
+    private String issueVerificationCode(Long userId) {
+        return issueOneTimeCode(
+            userId,
+            verificationTokenTtlSeconds,
+            true,
+            EMAIL_VERIFICATION_TOKEN_TABLE,
+            "Unable to issue verification code"
+        );
+    }
+
+    /**
+     * Issues a password-recovery code.
+     */
+    private String issueRecoveryCode(Long userId) {
+        return issueOneTimeCode(
+            userId,
+            recoveryTokenTtlSeconds,
+            false,
+            PASSWORD_RESET_TOKEN_TABLE,
+            "Unable to issue recovery code"
+        );
+    }
+
+    /**
+     * Creates a single active one-time code record for a user and returns the raw code.
+     *
+     * @param userId user id owning the code
+     * @param ttlSeconds code time-to-live in seconds
+     * @param failOnCollision whether token insert collisions should fail the request
+     * @param tokenTable trusted internal table name for the token channel
+     * @param issueFailureReason error reason when collisions are treated as failures
+     * @return raw code, or {@code null} when a collision occurs and collisions are tolerated
+     */
+    private String issueOneTimeCode(
+            Long userId,
+            long ttlSeconds,
+            boolean failOnCollision,
+            String tokenTable,
+            String issueFailureReason
+    ) {
+        Instant now = Instant.now();
+        jdbcTemplate.update(
+            "update " + tokenTable + " set consumed_at = ? where user_id = ? and consumed_at is null",
+            Timestamp.from(now),
+            userId
+        );
+
+        String code = generateRecoveryCode();
+        String tokenHash = TokenHasher.sha256(code);
+        Instant expiresAt = now.plusSeconds(ttlSeconds);
+        try {
+            jdbcTemplate.update(
+                "insert into " + tokenTable + " (user_id, token_hash, expires_at) values (?, ?, ?)",
+                userId,
+                tokenHash,
+                Timestamp.from(expiresAt)
+            );
+        } catch (DataIntegrityViolationException ex) {
+            if (!failOnCollision) {
+                return null;
+            }
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, issueFailureReason, ex);
+        }
+        return code;
+    }
+
+    /**
+     * Tries to consume a one-time token from the provided table.
+     *
+     * @return {@code true} when a matching non-expired token was consumed
+     */
+    private boolean consumeOneTimeCode(Long userId, String tokenHash, Instant now, String tokenTable) {
+        Long tokenId;
+        Instant expiresAt;
+        try {
+            Map<String, Object> row = jdbcTemplate.queryForMap(
+                "select id, expires_at from " + tokenTable + " " +
+                    "where user_id = ? and token_hash = ? and consumed_at is null",
+                userId,
+                tokenHash
+            );
+            tokenId = ((Number) row.get("id")).longValue();
+            expiresAt = ((Timestamp) row.get("expires_at")).toInstant();
+        } catch (EmptyResultDataAccessException ex) {
+            return false;
+        }
+
+        // Consume-once semantics: only the first updater can mark the token as used.
+        int updated = jdbcTemplate.update(
+            "update " + tokenTable + " set consumed_at = ? where id = ? and consumed_at is null",
+            Timestamp.from(now),
+            tokenId
+        );
+        return updated != 0 && expiresAt.isAfter(now);
+    }
+
+    /**
+     * Runs side effects after commit when a transaction is active.
+     */
+    private void runAfterCommit(Runnable callback) {
+        // Send only after commit so recipients never get a code that failed to persist.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    callback.run();
+                }
+            });
+            return;
+        }
+        callback.run();
     }
 
     // exceptions helpers

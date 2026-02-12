@@ -1,34 +1,6 @@
-export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
-export type LocationMemberRole = "admin" | "partner" | "client";
+import {ActiveInvite, InviteStatus, LocationMemberRole, LocationMembership, LocationSummary} from "./Types";
 
-export interface LocationSummary {
-  id: number;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ActiveInvite {
-  id: number;
-  locationId: number;
-  locationName: string | null;
-  invitedEmail: string;
-  invitedByUserId: number | null;
-  status: InviteStatus;
-  expiresAt: string;
-  createdAt: string;
-  acceptedAt: string | null;
-  acceptedUserId: number | null;
-  revokedAt: string | null;
-}
-
-export interface LocationMembership {
-  locationId: number;
-  userId: number;
-  userEmail: string | null;
-  userRole: LocationMemberRole;
-  createdAt: string;
-}
+// Data verification helpers. Add any new data verification helpers here!
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object";

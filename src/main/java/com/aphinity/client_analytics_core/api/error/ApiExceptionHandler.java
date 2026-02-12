@@ -20,9 +20,17 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Centralized exception-to-response mapping for API endpoints.
+ * <p>
+ * The handler keeps client-facing messages intentionally safe while still logging
+ * detailed context for troubleshooting.
+ */
 @RestControllerAdvice
 public class ApiExceptionHandler {
     private final AsyncLogService logService;
+
+    // Only reasons explicitly listed here are surfaced directly to API clients.
     private static final Map<String, ErrorDefinition> SAFE_REASONS = Map.ofEntries(
         Map.entry("Invalid credentials", new ErrorDefinition("invalid_credentials", "Invalid credentials")),
         Map.entry("Invalid refresh token", new ErrorDefinition("invalid_refresh_token", "Invalid refresh token")),
@@ -44,6 +52,9 @@ public class ApiExceptionHandler {
         Map.entry("Invalid captcha token", new ErrorDefinition("captcha_invalid", "Invalid captcha token")),
         Map.entry("Captcha not configured", new ErrorDefinition("captcha_unavailable", "Captcha not configured")),
         Map.entry("Unable to send recovery email", new ErrorDefinition("recovery_email_unavailable", "Unable to send recovery email")),
+        Map.entry("Unable to send verification email", new ErrorDefinition("verification_email_unavailable", "Unable to send verification email")),
+        Map.entry("Unable to issue verification code", new ErrorDefinition("verification_code_issue_failed", "Unable to issue verification code")),
+        Map.entry("Account email is not verified", new ErrorDefinition("account_not_verified", "Account email is not verified")),
         Map.entry("Insufficient permissions", new ErrorDefinition("forbidden", "Insufficient permissions")),
         Map.entry("Location not found", new ErrorDefinition("location_not_found", "Location not found")),
         Map.entry("Target user not found", new ErrorDefinition("target_user_not_found", "Target user not found")),
@@ -60,10 +71,19 @@ public class ApiExceptionHandler {
         Map.entry("Unable to issue invite", new ErrorDefinition("invite_issue_failed", "Unable to issue invite"))
     );
 
+    /**
+     * @param logService asynchronous logging service for handled/unhandled exception diagnostics
+     */
     public ApiExceptionHandler(AsyncLogService logService) {
         this.logService = logService;
     }
 
+    /**
+     * Handles explicit {@link ResponseStatusException}s raised by application code.
+     *
+     * @param ex thrown exception
+     * @return normalized API error payload with the source status code
+     */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException ex) {
         ErrorDefinition definition = safeDefinition(ex.getReason());
@@ -84,11 +104,18 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(status).body(response);
     }
 
+    /**
+     * Handles bean validation failures and returns field-level error codes.
+     *
+     * @param ex validation exception
+     * @return validation error payload
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             String field = error.getField();
+            // Keep the first failure per field so responses remain deterministic.
             if (fieldErrors.containsKey(field)) {
                 continue;
             }
@@ -109,6 +136,12 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    /**
+     * Handles malformed JSON or invalid request bodies.
+     *
+     * @param ex parse/deserialize exception
+     * @return bad request payload
+     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidBody(HttpMessageNotReadableException ex) {
         logService.log(formatHandledException("HttpMessageNotReadableException", ex, null));
@@ -122,6 +155,12 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    /**
+     * Handles authorization failures, including CSRF token failures.
+     *
+     * @param ex access denied exception
+     * @return forbidden payload
+     */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         boolean csrfError = ex instanceof MissingCsrfTokenException || ex instanceof InvalidCsrfTokenException;
@@ -138,6 +177,12 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
+    /**
+     * Fallback handler for uncaught exceptions.
+     *
+     * @param ex unexpected exception
+     * @return internal server error payload
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex) {
         logService.log(formatUnhandledException(ex));
@@ -151,6 +196,12 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
+    /**
+     * Resolves a safe client-facing definition for a reason string.
+     *
+     * @param reason exception reason
+     * @return mapped safe definition or generic fallback
+     */
     private ErrorDefinition safeDefinition(String reason) {
         if (reason != null) {
             ErrorDefinition definition = SAFE_REASONS.get(reason);
@@ -161,6 +212,14 @@ public class ApiExceptionHandler {
         return new ErrorDefinition("request_failed", "Request failed");
     }
 
+    /**
+     * Builds a concise structured log line for handled exceptions.
+     *
+     * @param label exception category label
+     * @param ex handled exception
+     * @param detail optional contextual detail
+     * @return formatted log message
+     */
     private String formatHandledException(String label, Exception ex, String detail) {
         StringBuilder message = new StringBuilder("Handled exception: ");
         message.append(label);
@@ -177,6 +236,12 @@ public class ApiExceptionHandler {
         return message.toString();
     }
 
+    /**
+     * Builds a detailed log line for unexpected exceptions.
+     *
+     * @param ex unexpected exception
+     * @return formatted log message with stack trace
+     */
     private String formatUnhandledException(Exception ex) {
         StringBuilder message = new StringBuilder("Unhandled exception");
         if (ex != null) {
@@ -190,10 +255,22 @@ public class ApiExceptionHandler {
         return message.toString();
     }
 
+    /**
+     * Converts nullable exception messages into safe non-null strings.
+     *
+     * @param message nullable source message
+     * @return empty string when input is null
+     */
     private String safeMessage(String message) {
         return message == null ? "" : message;
     }
 
+    /**
+     * Captures a throwable stack trace as text for logging.
+     *
+     * @param throwable source throwable
+     * @return trimmed stack trace string
+     */
     private String stackTrace(Throwable throwable) {
         StringWriter writer = new StringWriter();
         try (PrintWriter printWriter = new PrintWriter(writer)) {
@@ -202,6 +279,12 @@ public class ApiExceptionHandler {
         return writer.toString().trim();
     }
 
+    /**
+     * Maps Bean Validation constraint codes to API field error codes.
+     *
+     * @param code bean validation code
+     * @return normalized field error code
+     */
     private String mapValidationCode(String code) {
         if (code == null || code.isBlank()) {
             return "invalid";
@@ -217,6 +300,12 @@ public class ApiExceptionHandler {
         };
     }
 
+    /**
+     * Immutable client-facing error metadata.
+     *
+     * @param code stable API error code
+     * @param message safe API error message
+     */
     private record ErrorDefinition(String code, String message) {
     }
 }

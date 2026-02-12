@@ -2,7 +2,7 @@ import {useLocation, useNavigate} from "@solidjs/router";
 import {Show, createEffect, type ParentProps} from "solid-js";
 import SidebarNav from "../../components/SidebarNav";
 import {useProfile} from "../../context/ProfileContext";
-import {dashboardNavByRole, isDashboardPathAllowed} from "./dashboardConfig";
+import {dashboardNavForAccount, isDashboardPathAllowed} from "./dashboardConfig";
 
 export const Dashboard = (props: ParentProps) => {
   const profileContext = useProfile();
@@ -19,7 +19,7 @@ export const Dashboard = (props: ParentProps) => {
       return;
     }
 
-    if (!isDashboardPathAllowed(profile.role, location.pathname)) {
+    if (!isDashboardPathAllowed(profile.role, location.pathname, profile.verified)) {
       void navigate("/dashboard", {
         replace: true
       });
@@ -34,7 +34,7 @@ export const Dashboard = (props: ParentProps) => {
     if (!profile) {
       return false;
     }
-    return isDashboardPathAllowed(profile.role, location.pathname);
+    return isDashboardPathAllowed(profile.role, location.pathname, profile.verified);
   };
 
   return (
@@ -48,7 +48,7 @@ export const Dashboard = (props: ParentProps) => {
                   Panels
                 </p>
                 <Show when={profileContext.profile()} fallback={<p class="mt-2 text-sm text-base-content/60">Loading...</p>}>
-                  {(profile) => <SidebarNav items={dashboardNavByRole[profile().role]}/>}
+                  {(profile) => <SidebarNav items={dashboardNavForAccount(profile().role, profile().verified)}/>}
                 </Show>
               </aside>
               <section class="p-6" aria-label="Dashboard panel">

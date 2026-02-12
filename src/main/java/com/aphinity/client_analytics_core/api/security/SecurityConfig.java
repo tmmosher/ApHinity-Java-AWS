@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.security;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,11 +33,26 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 
 
+/**
+ * Spring Security configuration for browser and API authentication flows.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
 @Import(TurnstileConfiguration.class)
 public class SecurityConfig {
+    /**
+     * Builds the application security filter chain.
+     *
+     * @param http security builder
+     * @param jwtAuthenticationConverter JWT authority converter
+     * @param bearerTokenResolver token resolver supporting header/cookie sources
+     * @param accessTokenRefreshFilter pre-auth token refresh filter
+     * @param csrfCookieFilter CSRF cookie materialization filter
+     * @param apiAuthenticationEntryPoint API 401 entry point
+     * @return configured security filter chain
+     * @throws Exception when configuration fails
+     */
     @Bean
     SecurityFilterChain securityFilterChain(
         HttpSecurity http,
@@ -46,20 +62,7 @@ public class SecurityConfig {
         CsrfCookieFilter csrfCookieFilter,
         ApiAuthenticationEntryPoint apiAuthenticationEntryPoint
     ) throws Exception {
-        RedirectAuthenticationEntryPoint redirectEntryPoint =
-            new RedirectAuthenticationEntryPoint("/login");
-        AuthenticationEntryPoint authEntryPoint = (request, response, authException) -> {
-            String path = request.getRequestURI();
-            boolean isApiPath = path.equals("/api")
-                || path.startsWith("/api/")
-                || path.equals("/core")
-                || path.startsWith("/core/");
-            if (isApiPath) {
-                apiAuthenticationEntryPoint.commence(request, response, authException);
-                return;
-            }
-            redirectEntryPoint.commence(request, response, authException);
-        };
+        AuthenticationEntryPoint authEntryPoint = getAuthenticationEntryPoint(apiAuthenticationEntryPoint);
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setCookiePath("/");
         http
@@ -72,6 +75,7 @@ public class SecurityConfig {
                     "/api/auth/verify"
                 )
             )
+            // APIs are stateless and rely on JWT/cookie tokens rather than server sessions.
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
@@ -102,11 +106,42 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Chooses API JSON 401 responses for API paths and redirect behavior for browser paths.
+     *
+     * @param apiAuthenticationEntryPoint API entry point
+     * @return composed authentication entry point
+     */
+    private static @NonNull AuthenticationEntryPoint getAuthenticationEntryPoint(ApiAuthenticationEntryPoint apiAuthenticationEntryPoint) {
+        RedirectAuthenticationEntryPoint redirectEntryPoint =
+            new RedirectAuthenticationEntryPoint("/login");
+        return (request, response, authException) -> {
+            String path = request.getRequestURI();
+            // API callers expect JSON responses while browser users should be redirected.
+            boolean isApiPath = path.equals("/api")
+                || path.startsWith("/api/")
+                || path.equals("/core")
+                || path.startsWith("/core/");
+            if (isApiPath) {
+                apiAuthenticationEntryPoint.commence(request, response, authException);
+                return;
+            }
+            redirectEntryPoint.commence(request, response, authException);
+        };
+    }
+
+    /**
+     * @return BCrypt password encoder
+     */
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * @param properties JWT configuration properties
+     * @return HS256 JWT encoder
+     */
     @Bean
     JwtEncoder jwtEncoder(JwtProperties properties) {
         SecretKey secretKey = new SecretKeySpec(
@@ -116,6 +151,10 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
     }
 
+    /**
+     * @param properties JWT configuration properties
+     * @return HS256 JWT decoder
+     */
     @Bean
     JwtDecoder jwtDecoder(JwtProperties properties) {
         SecretKey secretKey = new SecretKeySpec(
@@ -125,6 +164,9 @@ public class SecurityConfig {
         return NimbusJwtDecoder.withSecretKey(secretKey).macAlgorithm(MacAlgorithm.HS256).build();
     }
 
+    /**
+     * @return JWT authentication converter that maps roles claim to ROLE_* authorities
+     */
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
@@ -136,6 +178,9 @@ public class SecurityConfig {
         return converter;
     }
 
+    /**
+     * @return bearer token resolver that falls back to access-token cookies
+     */
     @Bean
     BearerTokenResolver bearerTokenResolver() {
         return new CookieBearerTokenResolver();

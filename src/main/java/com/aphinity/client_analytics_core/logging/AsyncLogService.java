@@ -26,6 +26,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Asynchronous file logger with bounded in-memory buffering and periodic flush.
+ */
 @Service
 public class AsyncLogService {
     private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -42,16 +45,30 @@ public class AsyncLogService {
     private volatile LocalDate currentDate;
     private BufferedWriter writer;
 
+    /**
+     * @param properties logging configuration properties
+     */
     public AsyncLogService(AppLoggingProperties properties) {
         this.properties = properties;
         this.queue = new ArrayBlockingQueue<>(properties.getQueueCapacity());
         this.scheduler = Executors.newSingleThreadScheduledExecutor(new LogThreadFactory());
     }
 
+    /**
+     * Enqueues a log line with the current timestamp.
+     *
+     * @param message log message
+     */
     public void log(String message) {
         log(Instant.now(), message);
     }
 
+    /**
+     * Enqueues a timestamped log entry.
+     *
+     * @param timestamp entry timestamp, defaults to now when null
+     * @param message entry message, defaults to empty when null
+     */
     public void log(Instant timestamp, String message) {
         if (!accepting.get()) {
             return;
@@ -64,6 +81,9 @@ public class AsyncLogService {
         }
     }
 
+    /**
+     * Starts periodic background flush scheduling.
+     */
     @PostConstruct
     void start() {
         scheduler.scheduleAtFixedRate(
@@ -74,6 +94,9 @@ public class AsyncLogService {
         );
     }
 
+    /**
+     * Stops scheduling, flushes remaining entries, and closes file resources.
+     */
     @PreDestroy
     void stop() {
         accepting.set(false);
@@ -90,6 +113,9 @@ public class AsyncLogService {
         closeWriter();
     }
 
+    /**
+     * Guards flush execution so only one flush runs at a time.
+     */
     private void flushSafely() {
         synchronized (flushLock) {
             try {
@@ -101,6 +127,11 @@ public class AsyncLogService {
         }
     }
 
+    /**
+     * Drains the queue and appends entries to the active daily log file.
+     *
+     * @throws IOException when writing fails
+     */
     private void flushOnce() throws IOException {
         LocalDate now = LocalDate.now(zoneId);
         updateDateIfNeeded(now);
@@ -116,6 +147,7 @@ public class AsyncLogService {
         }
 
         List<LogEntry> entries = new ArrayList<>();
+        // Drain first so producer threads stay minimally blocked during file I/O.
         queue.drainTo(entries);
         int index = 0;
         try {
@@ -135,12 +167,18 @@ public class AsyncLogService {
                 droppedCount.addAndGet(-droppedSnapshot);
             }
         } catch (IOException ex) {
+            // Preserve entries that were not written yet so they can be retried later.
             requeueRemaining(entries, index);
             closeWriter();
             throw ex;
         }
     }
 
+    /**
+     * Rotates the writer when the local date changes.
+     *
+     * @param now current local date
+     */
     private void updateDateIfNeeded(LocalDate now) {
         if (currentDate == null || !currentDate.equals(now)) {
             closeWriter();
@@ -148,12 +186,24 @@ public class AsyncLogService {
         }
     }
 
+    /**
+     * Lazily opens the active day log file writer.
+     *
+     * @param now current local date
+     * @throws IOException when opening fails
+     */
     private void ensureWriter(LocalDate now) throws IOException {
         if (writer == null) {
             writer = openWriter(now);
         }
     }
 
+    /**
+     * Requeues unwritten entries after a flush failure.
+     *
+     * @param entries drained entries
+     * @param startIndex first index that was not persisted
+     */
     private void requeueRemaining(List<LogEntry> entries, int startIndex) {
         for (int i = startIndex; i < entries.size(); i++) {
             if (!queue.offer(entries.get(i))) {
@@ -162,6 +212,13 @@ public class AsyncLogService {
         }
     }
 
+    /**
+     * Opens/creates the log file for the provided date.
+     *
+     * @param date log-file date
+     * @return append-mode writer
+     * @throws IOException when opening fails
+     */
     private BufferedWriter openWriter(LocalDate date) throws IOException {
         Path directory = Paths.get(properties.getDirectory());
         Files.createDirectories(directory);
@@ -176,6 +233,9 @@ public class AsyncLogService {
         );
     }
 
+    /**
+     * Flushes and closes the active writer if present.
+     */
     private void closeWriter() {
         if (writer == null) {
             return;
@@ -191,12 +251,24 @@ public class AsyncLogService {
         }
     }
 
+    /**
+     * Formats one log entry as a single line.
+     *
+     * @param entry log entry
+     * @return formatted line
+     */
     private String formatEntry(LogEntry entry) {
         Instant timestamp = entry.timestamp() != null ? entry.timestamp() : Instant.now();
         String time = LINE_DATE_FORMAT.format(timestamp.atZone(zoneId));
         return time + " " + sanitize(entry.message());
     }
 
+    /**
+     * Escapes line breaks to keep one logical entry per output line.
+     *
+     * @param message log message
+     * @return sanitized message
+     */
     private String sanitize(String message) {
         if (message == null) {
             return "";
@@ -204,7 +276,14 @@ public class AsyncLogService {
         return message.replace("\r", "\\r").replace("\n", "\\n");
     }
 
+    /**
+     * Creates the dedicated background thread used for flush scheduling.
+     */
     private static final class LogThreadFactory implements ThreadFactory {
+        /**
+         * @param runnable scheduled task
+         * @return daemon log writer thread
+         */
         @Override
         public Thread newThread(Runnable runnable) {
             Thread thread = new Thread(runnable, "app-log-writer");

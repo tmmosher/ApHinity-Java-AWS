@@ -61,6 +61,7 @@ public class ProfileService {
     public ProfileResponse updateProfile(Long userId, String name, String email) {
         AppUser user = appUserRepository.findById(userId)
             .orElseThrow(this::invalidAuthenticatedUser);
+        requireVerified(user);
 
         String normalizedName = normalizeName(name).strip();
         String normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
@@ -97,6 +98,7 @@ public class ProfileService {
     public void updatePassword(Long userId, String currentPassword, String newPassword) {
         AppUser user = appUserRepository.findById(userId)
             .orElseThrow(this::invalidAuthenticatedUser);
+        requireVerified(user);
 
         if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password change unavailable for this account");
@@ -142,5 +144,11 @@ public class ProfileService {
 
     private ResponseStatusException invalidAuthenticatedUser() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authenticated user");
+    }
+
+    private void requireVerified(AppUser user) {
+        if (user.getEmailVerifiedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account email is not verified");
+        }
     }
 }

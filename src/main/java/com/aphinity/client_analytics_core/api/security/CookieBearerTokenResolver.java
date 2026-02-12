@@ -6,9 +6,20 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 
+/**
+ * Resolves bearer tokens from either Authorization header or auth cookies.
+ */
 public class CookieBearerTokenResolver implements BearerTokenResolver {
     private final DefaultBearerTokenResolver defaultBearerTokenResolver = new DefaultBearerTokenResolver();
 
+    /**
+     * Extracts bearer token from request.
+     * <p>
+     * Header tokens take precedence so explicit API clients are unaffected by cookie state.
+     *
+     * @param request HTTP request
+     * @return bearer token or {@code null} when not present
+     */
     @Override
     public String resolve(HttpServletRequest request) {
         String headerToken = defaultBearerTokenResolver.resolve(request);

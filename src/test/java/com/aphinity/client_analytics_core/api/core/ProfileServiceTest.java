@@ -98,6 +98,7 @@ class ProfileServiceTest {
         user.setId(3L);
         user.setName("Original");
         user.setEmail("original@example.com");
+        user.setEmailVerifiedAt(Instant.now());
         user.setRoles(Set.of(role("client")));
         when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.CLIENT);
 
@@ -119,6 +120,7 @@ class ProfileServiceTest {
         AppUser user = new AppUser();
         user.setId(4L);
         user.setEmail("owner@example.com");
+        user.setEmailVerifiedAt(Instant.now());
 
         AppUser existing = new AppUser();
         existing.setId(99L);
@@ -140,6 +142,7 @@ class ProfileServiceTest {
         AppUser user = new AppUser();
         user.setId(5L);
         user.setPasswordHash("encoded");
+        user.setEmailVerifiedAt(Instant.now());
 
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("bad-current", "encoded")).thenReturn(false);
@@ -157,6 +160,7 @@ class ProfileServiceTest {
         AppUser user = new AppUser();
         user.setId(6L);
         user.setPasswordHash("encoded");
+        user.setEmailVerifiedAt(Instant.now());
 
         when(appUserRepository.findById(6L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("current-pass", "encoded")).thenReturn(true);
@@ -185,6 +189,40 @@ class ProfileServiceTest {
         ProfileResponse response = profileService.getProfile(9L);
 
         assertEquals(AccountRole.ADMIN, response.role());
+    }
+
+    @Test
+    void updateProfileRejectsUnverifiedUser() {
+        AppUser user = new AppUser();
+        user.setId(10L);
+        user.setEmail("unverified@example.com");
+        user.setEmailVerifiedAt(null);
+
+        when(appUserRepository.findById(10L)).thenReturn(Optional.of(user));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            profileService.updateProfile(10L, "Name", "next@example.com")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Account email is not verified", ex.getReason());
+    }
+
+    @Test
+    void updatePasswordRejectsUnverifiedUser() {
+        AppUser user = new AppUser();
+        user.setId(11L);
+        user.setPasswordHash("encoded");
+        user.setEmailVerifiedAt(null);
+
+        when(appUserRepository.findById(11L)).thenReturn(Optional.of(user));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            profileService.updatePassword(11L, "current-pass", "NewPass1!")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Account email is not verified", ex.getReason());
     }
 
     private Role role(String name) {

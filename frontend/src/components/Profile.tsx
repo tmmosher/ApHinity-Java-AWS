@@ -8,10 +8,12 @@ import {
     ThemePreference
 } from "../util/themePreference";
 import {apiFetch} from "../util/apiFetch";
+import {useNavigate} from "@solidjs/router";
 
 const Profile = () => {
     const host = useApiHost();
     const profileContext = useProfile();
+    const navigate = useNavigate();
 
     const [name, setName] = createSignal("");
     const [email, setEmail] = createSignal("");
@@ -104,6 +106,16 @@ const Profile = () => {
         }
     };
 
+    const logout = async () => {
+        const response = await apiFetch(host + "/api/auth/logout", {method: "POST"});
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => null);
+            toast.error(errorBody?.message ?? "Unable to logout.");
+        } else {
+            navigate("/login");
+        }
+    }
+
     return (
         <div class="space-y-6">
             <header class="space-y-1">
@@ -193,6 +205,11 @@ const Profile = () => {
                                 {isSavingPassword() ? "Saving..." : "Update password"}
                             </button>
                         </form>
+                    </section>
+                    <section>
+                        <button type="button" class="btn btn-outline" onClick={logout}>
+                            Logout
+                        </button>
                     </section>
                 </div>
             </Show>
