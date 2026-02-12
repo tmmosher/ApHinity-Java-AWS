@@ -59,9 +59,7 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
     title: "Oxidant Generation and Disinfection Programs",
     tagline: "Chlorine dioxide, Sulfur Dioxide",
     paragraphs: [
-      "ApHinity oxidant generation programs cover gas and liquid phase chlorine dioxide, mixed oxidants, hypochlorite generation, and high purity chloramine generation workflows.",
-      "Portal graphs can track setpoints, treatment efficacy, intervention timing, and verification results across water and process disinfection applications.",
-      "This gives client teams an auditable view of how treatment controls are being managed over time."
+      "ApHinity oxidant generation programs cover chlorine dioxide, mixed oxidants, hypochlorite generation, and high purity generation workflows.",
     ]
   },
   {
@@ -69,9 +67,7 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
     title: "Engineered Air Programs",
     tagline: "NOx/SOx abatement, odor mitigation, and airborne microbiological control.",
     paragraphs: [
-      "ApHinity Technologies engineered air solutions focus on environmentally regulated compounds, including nitrogen oxides, sulfur oxides, odors, and airborne microbiological concerns.",
-      "In ApHinityMS, partners can publish trend views and event notes that explain root causes, corrective actions, and performance stabilization windows.",
-      "This supports clear client communication on air-related risk and mitigation status."
+      "ApHinity Technologies engineered air solutions focus on efficient removal of environmentally regulated compounds, including nitrogen oxides, sulfur oxides, and odor concerns.",
     ]
   }
 ];
