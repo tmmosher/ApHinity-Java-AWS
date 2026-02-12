@@ -10,6 +10,7 @@ import {
 import {apiFetch} from "../util/apiFetch";
 import {useNavigate} from "@solidjs/router";
 import {canEditProfileEmail} from "../util/profileAccess";
+import {FieldError, parseVerifyFormData} from "../util/landingSchemas";
 
 const Profile = () => {
     const host = useApiHost();
@@ -22,8 +23,11 @@ const Profile = () => {
     const [newPassword, setNewPassword] = createSignal("");
     const [isSavingProfile, setIsSavingProfile] = createSignal(false);
     const [isSavingPassword, setIsSavingPassword] = createSignal(false);
+    const [verificationCode, setVerificationCode] = createSignal("");
+    const [isVerifyingEmail, setIsVerifyingEmail] = createSignal(false);
     const [themePreference, setThemePreference] = createSignal<ThemePreference>(getStoredThemePreference());
     const canEditEmail = () => canEditProfileEmail(profileContext.profile()?.role);
+    const isUnverified = () => profileContext.profile()?.verified === false;
 
     createEffect(() => {
         const profile = profileContext.profile();
@@ -110,6 +114,50 @@ const Profile = () => {
         }
     };
 
+    const verifyEmail = async (event: SubmitEvent) => {
+        event.preventDefault();
+        if (isVerifyingEmail()) {
+            return;
+        }
+
+        const profile = profileContext.profile();
+        if (!profile) {
+            toast.error("Unable to verify email right now.");
+            return;
+        }
+
+        setIsVerifyingEmail(true);
+        try {
+            const form = event.currentTarget as HTMLFormElement;
+            const payload = parseVerifyFormData(new FormData(form));
+            const response = await apiFetch(host + "/api/auth/verify", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => null);
+                toast.error(errorBody?.message ?? "Verification failed.");
+                return;
+            }
+
+            setVerificationCode("");
+            profileContext.refreshProfile();
+            toast.success("Email verified.");
+        } catch (error) {
+            if (error instanceof FieldError) {
+                toast.error(error.message);
+                return;
+            }
+            toast.error("Verification failed.");
+        } finally {
+            setIsVerifyingEmail(false);
+        }
+    };
+
     const logout = async () => {
         const response = await apiFetch(host + "/api/auth/logout", {method: "POST"});
         if (!response.ok) {
@@ -151,6 +199,38 @@ const Profile = () => {
                             </button>
                         </div>
                     </section>
+
+                    <Show when={isUnverified()}>
+                        <section class="rounded-xl border border-warning/40 bg-base-100 p-5 shadow-sm">
+                            <h2 class="text-lg font-semibold">Email verification</h2>
+                            <p class="mt-1 text-sm text-base-content/70">
+                                Enter the 6-digit verification code sent to {profileContext.profile()?.email}.
+                            </p>
+                            <form class="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]" onSubmit={verifyEmail}>
+                                <label class="form-control">
+                                    <span class="label-text">Verification code</span>
+                                    <input
+                                        id="verifyValue"
+                                        name="verifyValue"
+                                        type="text"
+                                        inputMode="numeric"
+                                        class="input input-bordered mt-1"
+                                        placeholder="123456"
+                                        value={verificationCode()}
+                                        onInput={(event) => setVerificationCode(event.currentTarget.value)}
+                                    />
+                                </label>
+                                <input
+                                    type="hidden"
+                                    name="email"
+                                    value={profileContext.profile()?.email ?? ""}
+                                />
+                                <button type="submit" class="btn btn-primary self-end" disabled={isVerifyingEmail()}>
+                                    {isVerifyingEmail() ? "Verifying..." : "Verify email"}
+                                </button>
+                            </form>
+                        </section>
+                    </Show>
 
                     <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
                         <h2 class="text-lg font-semibold">Account details</h2>
