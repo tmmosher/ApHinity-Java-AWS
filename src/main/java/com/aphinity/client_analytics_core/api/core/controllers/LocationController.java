@@ -20,7 +20,6 @@ import java.util.List;
 
 /**
  * Location and membership endpoints for authenticated users.
- * <p>
  * The controller resolves the authenticated user id from JWT and delegates all authorization
  * and business logic to {@link LocationService}.
  */

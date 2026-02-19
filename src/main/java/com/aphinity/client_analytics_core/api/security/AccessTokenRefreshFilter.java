@@ -34,7 +34,6 @@ import java.util.Set;
 
 /**
  * Refreshes access tokens transparently for authenticated API requests.
- * <p>
  * When an expired access token cookie is present and a valid refresh token exists,
  * the filter issues new tokens and injects the refreshed bearer token into the current
  * request so downstream authentication can proceed normally.

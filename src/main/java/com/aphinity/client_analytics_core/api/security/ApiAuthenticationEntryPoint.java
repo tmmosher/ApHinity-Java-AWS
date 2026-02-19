@@ -14,7 +14,6 @@ import java.time.Instant;
 
 /**
  * Authentication entry point for API requests.
- * <p>
  * Returns a consistent JSON 401 payload instead of redirecting to an HTML login page.
  */
 @Component

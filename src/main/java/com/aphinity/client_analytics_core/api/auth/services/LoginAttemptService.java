@@ -10,7 +10,6 @@ import java.util.Locale;
 
 /**
  * Tracks failed login attempts per normalized email within a rolling time window.
- * <p>
  * This data is intentionally in-memory and short-lived; it is used only to decide when to
  * require captcha for additional protection against credential stuffing.
  */

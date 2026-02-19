@@ -44,7 +44,6 @@ public class LocationService {
 
     /**
      * Returns all locations visible to the user.
-     * <p>
      * Partners/admins can view every location; client users only see locations where they
      * have membership.
      *

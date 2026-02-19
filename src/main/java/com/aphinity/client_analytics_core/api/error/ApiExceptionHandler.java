@@ -22,7 +22,6 @@ import java.util.Map;
 
 /**
  * Centralized exception-to-response mapping for API endpoints.
- * <p>
  * The handler keeps client-facing messages intentionally safe while still logging
  * detailed context for troubleshooting.
  */

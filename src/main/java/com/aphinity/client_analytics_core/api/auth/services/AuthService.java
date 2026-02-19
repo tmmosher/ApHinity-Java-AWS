@@ -328,7 +328,6 @@ public class AuthService {
 
     /**
      * Verifies and consumes a one-time code, then issues a new authenticated session.
-     * <p>
      * Codes are single-use: token consumption happens with an update guard so concurrent
      * requests cannot both succeed.
      *
