@@ -11,6 +11,11 @@ export const DashboardInviteUsersPanel = () => {
   const [selectedLocationId, setSelectedLocationId] = createSignal("");
   const [isSubmitting, setIsSubmitting] = createSignal(false);
 
+  /**
+   * Loads available locations for invite targeting.
+   *
+   * Endpoint: `GET /api/core/locations`
+   */
   const fetchLocations = async (): Promise<LocationSummary[]> => {
     const response = await apiFetch(host + "/api/core/locations", {
       method: "GET"
@@ -33,6 +38,14 @@ export const DashboardInviteUsersPanel = () => {
     }
   });
 
+  /**
+   * Creates a location invite for the selected location/email pair.
+   *
+   * Endpoint: `POST /api/core/location-invites`
+   * Body: `{ locationId, invitedEmail }`
+   *
+   * @param event Form submit event from the invite form.
+   */
   const submitInvite = async (event: SubmitEvent) => {
     event.preventDefault();
     if (isSubmitting()) {

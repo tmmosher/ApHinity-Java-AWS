@@ -9,6 +9,15 @@ export const DashboardLocationDetailPanel = () => {
   const host = useApiHost();
   const params = useParams<{ locationId: string }>();
 
+  /**
+   * Loads a single location by id from route params.
+   *
+   * Endpoint: `GET /api/core/locations/{locationId}`
+   *
+   * @param locationId Location id from route params.
+   * @returns Parsed location summary.
+   * @throws {Error} When id is invalid or request fails.
+   */
   const fetchLocation = async (locationId: string): Promise<LocationSummary> => {
     const parsedId = Number(locationId);
     if (!Number.isFinite(parsedId) || parsedId <= 0) {

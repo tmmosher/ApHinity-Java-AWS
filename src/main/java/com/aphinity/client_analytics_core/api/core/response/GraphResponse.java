@@ -7,7 +7,6 @@ import java.time.Instant;
 public record GraphResponse(
     Long id,
     String name,
-    Long ownerId,
     PlotlyGraphSpec data,
     Instant createdAt,
     Instant updatedAt

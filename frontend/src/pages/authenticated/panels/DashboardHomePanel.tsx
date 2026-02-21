@@ -24,6 +24,14 @@ export const DashboardHomePanel = () => {
   const [favoriteLocationId, setFavoriteLocationIdSignal] = createSignal(getFavoriteLocationId());
   const canAccessLocations = () => Boolean(profileContext.profile()?.verified);
 
+  /**
+   * Loads locations accessible by the authenticated user.
+   *
+   * Endpoint: `GET /api/core/locations`
+   *
+   * @returns Parsed location summaries for dashboard selection UI.
+   * @throws {Error} When the backend responds with non-OK status.
+   */
   const fetchLocations = async (): Promise<LocationSummary[]> => {
     const response = await apiFetch(host + "/api/core/locations", {
       method: "GET"

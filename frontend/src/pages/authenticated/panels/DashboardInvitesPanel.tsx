@@ -9,6 +9,11 @@ export const DashboardInvitesPanel = () => {
   const host = useApiHost();
   const [processingInviteId, setProcessingInviteId] = createSignal<number | null>(null);
 
+  /**
+   * Retrieves pending invites for the signed-in user.
+   *
+   * Endpoint: `GET /api/core/location-invites/active`
+   */
   const fetchInvites = async (): Promise<ActiveInvite[]> => {
     const response = await apiFetch(host + "/api/core/location-invites/active", {
       method: "GET"
@@ -21,6 +26,14 @@ export const DashboardInvitesPanel = () => {
 
   const [invites, {refetch}] = createResource(fetchInvites);
 
+  /**
+   * Accepts or declines a pending invite.
+   *
+   * Endpoint: `POST /api/core/location-invites/{inviteId}/{action}`
+   *
+   * @param inviteId Invite identifier.
+   * @param action Decision to apply (`accept` or `decline`).
+   */
   const processInvite = async (inviteId: number, action: "accept" | "decline") => {
     if (processingInviteId() !== null) {
       return;

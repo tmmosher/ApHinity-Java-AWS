@@ -8,6 +8,12 @@ import { FieldError, parseSignupFormData } from "../../util/landingSchemas";
 
 export const SignupPage = () => {
     const host = useApiHost();
+    /**
+     * Creates a new account from signup form data.
+     *
+     * Endpoint: `POST /api/auth/signup`
+     * Body: `{ name, email, password }`
+     */
     const submitSignup = action(async (formData: FormData) => {
         const actionResult: ActionResult = {
             ok: false

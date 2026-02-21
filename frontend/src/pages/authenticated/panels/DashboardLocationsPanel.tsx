@@ -17,6 +17,11 @@ export const DashboardLocationsPanel = () => {
     return role === "admin" || role === "partner";
   };
 
+  /**
+   * Loads location summaries for the current account.
+   *
+   * Endpoint: `GET /api/core/locations`
+   */
   const fetchLocations = async (): Promise<LocationSummary[]> => {
     const response = await apiFetch(host + "/api/core/locations", {
       method: "GET"
@@ -41,6 +46,14 @@ export const DashboardLocationsPanel = () => {
   const getDraftName = (location: LocationSummary) =>
     draftNames()[location.id] ?? location.name;
 
+  /**
+   * Renames a location with the current draft value.
+   *
+   * Endpoint: `PUT /api/core/locations/{locationId}`
+   * Body: `{ name }`
+   *
+   * @param locationId Location id to update.
+   */
   const renameLocation = async (locationId: number) => {
     if (!canEditLocations() || savingLocationId() !== null) {
       return;

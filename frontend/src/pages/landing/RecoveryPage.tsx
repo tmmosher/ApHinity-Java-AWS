@@ -22,6 +22,15 @@ export const RecoveryPage = () => {
     resetRecoveryCaptcha
   } = createRecoverySubmissionControl();
 
+  /**
+   * Requests a recovery code for a user email.
+   *
+   * Endpoint: `POST /api/auth/recovery`
+   * Body: `{ email, turnstileToken? }`
+   *
+   * Cooldown and Turnstile reset are applied immediately to avoid rapid
+   * repeated submissions while the request is in-flight.
+   */
   const submitRecovery = action(async (formData: FormData) => {
     const actionResult: ActionResult = {
       ok: false
@@ -31,6 +40,7 @@ export const RecoveryPage = () => {
     }
     try {
       const payload = parseRecoveryFormData(formData);
+      // Apply local cooldown before waiting on network response.
       startRecoveryCooldown();
       resetRecoveryCaptcha();
       const response = await fetch(host + "/api/auth/recovery", {
@@ -61,6 +71,12 @@ export const RecoveryPage = () => {
     return actionResult;
   }, "submitRecovery");
 
+  /**
+   * Verifies a recovery/verification code for a target email.
+   *
+   * Endpoint: `POST /api/auth/verify`
+   * Body: `{ email, verifyValue }`
+   */
   const submitVerification = action(async (formData: FormData) => {
         const actionResult: ActionResult = {
             ok: false

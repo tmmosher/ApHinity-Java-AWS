@@ -14,6 +14,11 @@ export const DashboardPermissionsPanel = () => {
   const [draftRoles, setDraftRoles] = createSignal<Record<string, LocationMemberRole>>({});
   const [savingUserId, setSavingUserId] = createSignal<number | null>(null);
 
+  /**
+   * Loads all locations that can be managed in the permissions panel.
+   *
+   * Endpoint: `GET /api/core/locations`
+   */
   const fetchLocations = async (): Promise<LocationSummary[]> => {
     const response = await apiFetch(host + "/api/core/locations", {
       method: "GET"
@@ -36,6 +41,14 @@ export const DashboardPermissionsPanel = () => {
     }
   });
 
+  /**
+   * Loads current memberships for a selected location.
+   *
+   * Endpoint: `GET /api/core/locations/{locationId}/memberships`
+   *
+   * @param locationId Selected location id as a string.
+   * @returns Membership list, or empty list when no location is selected.
+   */
   const fetchMemberships = async (locationId: string): Promise<LocationMembership[]> => {
     if (!locationId) {
       return [];
@@ -73,6 +86,14 @@ export const DashboardPermissionsPanel = () => {
     }));
   };
 
+  /**
+   * Persists an updated role for one location membership.
+   *
+   * Endpoint: `PUT /api/core/locations/{locationId}/memberships/{userId}`
+   * Body: `{ userRole }`
+   *
+   * @param membership Membership row currently being edited.
+   */
   const saveRole = async (membership: LocationMembership) => {
     if (savingUserId() !== null || !selectedLocationId()) {
       return;

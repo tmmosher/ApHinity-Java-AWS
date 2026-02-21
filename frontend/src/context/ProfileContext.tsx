@@ -12,6 +12,13 @@ type ProfileContextValue = {
     setProfile: (next: Profile) => void;
 };
 
+/**
+ * Validates and normalizes the profile payload returned by the API.
+ *
+ * @param toValidate Unknown response body from `/api/core/profile`.
+ * @returns Parsed `Profile` value.
+ * @throws {Error} When required fields are missing or invalid.
+ */
 const validateProfileStructure = (toValidate: unknown): Profile => {
     if (!toValidate || typeof toValidate !== "object") {
         throw new Error("Invalid response structure");
@@ -41,6 +48,14 @@ export const ProfileProvider = (props: ParentProps) => {
     const host = useApiHost();
     const navigate = useNavigate();
 
+    /**
+     * Loads the current authenticated user profile.
+     *
+     * Endpoint: `GET /api/core/profile`
+     *
+     * @returns The validated profile payload.
+     * @throws {Error} When the request fails or response payload is invalid.
+     */
     const profileRequest = async (): Promise<Profile> => {
         const response = await apiFetch(host + "/api/core/profile", {
             method: "GET"

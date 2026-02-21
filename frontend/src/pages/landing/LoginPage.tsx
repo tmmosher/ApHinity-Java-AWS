@@ -11,6 +11,14 @@ export const LoginPage = () => {
   const host = useApiHost();
   const [failCount, setFailCount] = createSignal(0);
 
+  /**
+   * Submits login credentials and optional Turnstile token.
+   *
+   * Endpoint: `POST /api/auth/login`
+   * Body: `{ email, password, turnstileToken? }`
+   *
+   * Turnstile is only required after repeated failures (`failCount > 3`).
+   */
   const submitLogin = action(async (formData: FormData) => {
     const actionResult: ActionResult = {
       ok: false
