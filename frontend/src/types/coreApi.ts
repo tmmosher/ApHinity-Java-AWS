@@ -1,15 +1,47 @@
-import {ActiveInvite, InviteStatus, LocationMemberRole, LocationMembership, LocationSummary} from "./Types";
+import {
+  ActiveInvite,
+  InviteStatus,
+  LocationGraph,
+  LocationGraphPayload,
+  LocationMembership,
+  LocationSectionLayout,
+  LocationSectionLayoutConfig,
+  LocationSummary
+} from "./Types";
 
 // Data verification helpers. Add any new data verification helpers here!
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === "object";
+  !!value && typeof value === "object" && !Array.isArray(value);
 
 const isInviteStatus = (value: unknown): value is InviteStatus =>
   value === "pending" || value === "accepted" || value === "revoked" || value === "expired";
 
-const isLocationMemberRole = (value: unknown): value is LocationMemberRole =>
-  value === "admin" || value === "partner" || value === "client";
+const parseLocationSection = (value: unknown): LocationSectionLayout => {
+  if (!isObject(value)) {
+    throw new Error("Invalid location section");
+  }
+  if (
+    typeof value.section_id !== "number" ||
+    !Array.isArray(value.graph_ids) ||
+    value.graph_ids.some((graphId) => typeof graphId !== "number")
+  ) {
+    throw new Error("Invalid location section shape");
+  }
+  return {
+    section_id: value.section_id,
+    graph_ids: value.graph_ids
+  };
+};
+
+const parseLocationSectionLayout = (value: unknown): LocationSectionLayoutConfig => {
+  if (!isObject(value) || !Array.isArray(value.sections)) {
+    throw new Error("Invalid location section layout");
+  }
+  return {
+    sections: value.sections.map(parseLocationSection)
+  };
+};
 
 export const parseLocationSummary = (value: unknown): LocationSummary => {
   if (!isObject(value)) {
@@ -27,7 +59,10 @@ export const parseLocationSummary = (value: unknown): LocationSummary => {
     id: value.id,
     name: value.name,
     createdAt: value.createdAt,
-    updatedAt: value.updatedAt
+    updatedAt: value.updatedAt,
+    sectionLayout: parseLocationSectionLayout(value.sectionLayout ?? {
+      sections: []
+    })
   };
 };
 
@@ -87,7 +122,6 @@ export const parseLocationMembership = (value: unknown): LocationMembership => {
     typeof value.locationId !== "number" ||
     typeof value.userId !== "number" ||
     (value.userEmail !== null && typeof value.userEmail !== "string") ||
-    !isLocationMemberRole(value.userRole) ||
     typeof value.createdAt !== "string"
   ) {
     throw new Error("Invalid membership shape");
@@ -96,7 +130,6 @@ export const parseLocationMembership = (value: unknown): LocationMembership => {
     locationId: value.locationId,
     userId: value.userId,
     userEmail: value.userEmail,
-    userRole: value.userRole,
     createdAt: value.createdAt
   };
 };
@@ -106,4 +139,61 @@ export const parseLocationMembershipList = (value: unknown): LocationMembership[
     throw new Error("Invalid membership list response");
   }
   return value.map(parseLocationMembership);
+};
+
+const parseLocationGraphPayload = (value: unknown): LocationGraphPayload => {
+  if (!isObject(value)) {
+    throw new Error("Invalid graph payload");
+  }
+
+  const payloadData = value.data;
+  if (!Array.isArray(payloadData) || payloadData.some((entry) => !isObject(entry))) {
+    throw new Error("Invalid graph data payload");
+  }
+
+  const layoutValue = value.layout;
+  if (layoutValue !== undefined && layoutValue !== null && !isObject(layoutValue)) {
+    throw new Error("Invalid graph layout payload");
+  }
+
+  const configValue = value.config;
+  if (configValue !== undefined && configValue !== null && !isObject(configValue)) {
+    throw new Error("Invalid graph config payload");
+  }
+
+  return {
+    data: payloadData,
+    layout: layoutValue === undefined ? undefined : layoutValue,
+    config: configValue === undefined ? undefined : configValue
+  };
+};
+
+export const parseLocationGraph = (value: unknown): LocationGraph => {
+  if (!isObject(value)) {
+    throw new Error("Invalid graph response");
+  }
+
+  if (
+    typeof value.id !== "number" ||
+    typeof value.name !== "string" ||
+    typeof value.createdAt !== "string" ||
+    typeof value.updatedAt !== "string"
+  ) {
+    throw new Error("Invalid graph shape");
+  }
+
+  return {
+    id: value.id,
+    name: value.name,
+    data: parseLocationGraphPayload(value.data),
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt
+  };
+};
+
+export const parseLocationGraphList = (value: unknown): LocationGraph[] => {
+  if (!Array.isArray(value)) {
+    throw new Error("Invalid graph list response");
+  }
+  return value.map(parseLocationGraph);
 };

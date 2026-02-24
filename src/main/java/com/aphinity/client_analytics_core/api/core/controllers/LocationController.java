@@ -1,7 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.controllers;
 
-import com.aphinity.client_analytics_core.api.core.requests.LocationMembershipRoleUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
+import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -9,12 +9,7 @@ import com.aphinity.client_analytics_core.api.core.services.LocationService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -60,6 +55,19 @@ public class LocationController {
     }
 
     /**
+     * Returns graphs assigned to a location if the authenticated user can access it.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @return assigned graph payloads
+     */
+    @GetMapping("/locations/{locationId}/graphs")
+    public List<GraphResponse> locationGraphs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationService.getAccessibleLocationGraphs(userId, locationId);
+    }
+
+    /**
      * Updates a location name.
      *
      * @param jwt authenticated principal JWT
@@ -94,27 +102,24 @@ public class LocationController {
     }
 
     /**
-     * Creates or updates a membership role for a user in a location.
+     * Ensures a user has membership in a location.
      *
      * @param jwt authenticated principal JWT
      * @param locationId location identifier
      * @param userId target user identifier
-     * @param request validated request containing desired role
      * @return updated membership payload
      */
     @PutMapping("/locations/{locationId}/memberships/{userId}")
     public LocationMembershipResponse updateMembership(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable Long locationId,
-        @PathVariable Long userId,
-        @Valid @RequestBody LocationMembershipRoleUpdateRequest request
+        @PathVariable Long userId
     ) {
         Long authenticatedUserId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
-        return locationService.upsertLocationMembershipRole(
+        return locationService.upsertLocationMembership(
             authenticatedUserId,
             locationId,
-            userId,
-            request.userRole()
+            userId
         );
     }
 }

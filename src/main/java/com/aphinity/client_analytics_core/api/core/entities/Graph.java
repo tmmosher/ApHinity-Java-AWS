@@ -1,18 +1,14 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
 import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Table(name = "graph")
@@ -33,6 +29,21 @@ public class Graph {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "layout")
+    private Map<String, Object> layout;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "config")
+    private Map<String, Object> config;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "style")
+    private Map<String, Object> style;
+
+    @OneToMany(mappedBy = "graph")
+    private Set<LocationGraph> locationGraphs = new LinkedHashSet<>();
 
     @PrePersist
     void prePersist() {
@@ -88,5 +99,37 @@ public class Graph {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Map<String, Object> getLayout() {
+        return layout;
+    }
+
+    public void setLayout(Map<String, Object> layout) {
+        this.layout = layout;
+    }
+
+    public Map<String, Object> getConfig() {
+        return config;
+    }
+
+    public void setConfig(Map<String, Object> config) {
+        this.config = config;
+    }
+
+    public Map<String, Object> getStyle() {
+        return style;
+    }
+
+    public void setStyle(Map<String, Object> style) {
+        this.style = style;
+    }
+
+    public Set<LocationGraph> getLocationGraphs() {
+        return locationGraphs;
+    }
+
+    public void setLocationGraphs(Set<LocationGraph> locationGraphs) {
+        this.locationGraphs = locationGraphs;
     }
 }

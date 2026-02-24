@@ -2,12 +2,15 @@ package com.aphinity.client_analytics_core.api.core.services;
 
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
+import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.Location;
-import com.aphinity.client_analytics_core.api.core.entities.LocationMemberRole;
+import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
+import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,17 +30,20 @@ import java.util.Map;
 public class LocationService {
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
+    private final LocationGraphRepository locationGraphRepository;
     private final LocationUserRepository locationUserRepository;
     private final AccountRoleService accountRoleService;
 
     public LocationService(
         AppUserRepository appUserRepository,
         LocationRepository locationRepository,
+        LocationGraphRepository locationGraphRepository,
         LocationUserRepository locationUserRepository,
         AccountRoleService accountRoleService
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
+        this.locationGraphRepository = locationGraphRepository;
         this.locationUserRepository = locationUserRepository;
         this.accountRoleService = accountRoleService;
     }
@@ -89,6 +95,29 @@ public class LocationService {
     }
 
     /**
+     * Returns graphs assigned to a location when the caller has access.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @return assigned graph payloads
+     */
+    @Transactional(readOnly = true)
+    public List<GraphResponse> getAccessibleLocationGraphs(Long userId, Long locationId) {
+        AppUser user = requireUser(userId);
+        if (!locationRepository.existsById(locationId)) {
+            throw locationNotFound();
+        }
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+
+        return locationGraphRepository.findByLocationIdWithGraph(locationId).stream()
+            .map(LocationGraph::getGraph)
+            .map(this::toGraphResponse)
+            .toList();
+    }
+
+    /**
      * Renames a location.
      *
      * @param userId authenticated user id
@@ -135,20 +164,18 @@ public class LocationService {
     }
 
     /**
-     * Creates or updates a location membership role for a target user.
+     * Ensures membership exists for a target user at a location.
      *
      * @param userId authenticated user id performing the change
      * @param locationId target location id
      * @param targetUserId target user id
-     * @param role desired membership role
      * @return persisted membership payload
      */
     @Transactional
-    public LocationMembershipResponse upsertLocationMembershipRole(
+    public LocationMembershipResponse upsertLocationMembership(
         Long userId,
         Long locationId,
-        Long targetUserId,
-        LocationMemberRole role
+        Long targetUserId
     ) {
         AppUser actingUser = requireUser(userId);
         requirePartnerOrAdmin(actingUser);
@@ -168,7 +195,6 @@ public class LocationService {
 
         membership.setLocation(location);
         membership.setUser(targetUser);
-        membership.setUserRole(role);
 
         LocationUser persisted = locationUserRepository.save(membership);
         return toLocationMembershipResponse(persisted);
@@ -207,7 +233,6 @@ public class LocationService {
             membership.getId().getLocationId(),
             membership.getId().getUserId(),
             userEmail,
-            membership.getUserRole(),
             membership.getCreatedAt()
         );
     }
@@ -220,7 +245,21 @@ public class LocationService {
             location.getId(),
             location.getName(),
             location.getCreatedAt(),
-            location.getUpdatedAt()
+            location.getUpdatedAt(),
+            location.getSectionLayout()
+        );
+    }
+
+    /**
+     * Maps graph entities into API response shape.
+     */
+    private GraphResponse toGraphResponse(Graph graph) {
+        return new GraphResponse(
+            graph.getId(),
+            graph.getName(),
+            graph.getData(),
+            graph.getCreatedAt(),
+            graph.getUpdatedAt()
         );
     }
 

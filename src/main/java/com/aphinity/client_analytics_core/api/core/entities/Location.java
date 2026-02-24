@@ -8,8 +8,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "location")
@@ -27,6 +31,10 @@ public class Location {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "section_layout", columnDefinition = "jsonb")
+    private Map<String, Object> sectionLayout;
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -35,6 +43,9 @@ public class Location {
         }
         if (updatedAt == null) {
             updatedAt = now;
+        }
+        if (sectionLayout == null) {
+            sectionLayout = defaultSectionLayout();
         }
     }
 
@@ -73,5 +84,20 @@ public class Location {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Map<String, Object> getSectionLayout() {
+        if (sectionLayout == null) {
+            return defaultSectionLayout();
+        }
+        return sectionLayout;
+    }
+
+    public void setSectionLayout(Map<String, Object> sectionLayout) {
+        this.sectionLayout = sectionLayout;
+    }
+
+    private Map<String, Object> defaultSectionLayout() {
+        return Map.of("sections", List.of());
     }
 }

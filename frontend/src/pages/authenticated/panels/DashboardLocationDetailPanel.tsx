@@ -1,39 +1,55 @@
 import {A, useParams} from "@solidjs/router";
-import {Show, createResource} from "solid-js";
+import PlotlyChart from "../../../components/Chart";
+import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../components/Chart";
+import {For, Show, createMemo, createResource} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {parseLocationSummary} from "../../../types/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
-import {LocationSummary} from "../../../types/Types";
+import {LocationGraph, LocationSectionLayout} from "../../../types/Types";
+import {fetchLocationById, fetchLocationGraphsById} from "./locationDetailApi";
 
 export const DashboardLocationDetailPanel = () => {
   const host = useApiHost();
   const params = useParams<{ locationId: string }>();
 
-  /**
-   * Loads a single location by id from route params.
-   *
-   * Endpoint: `GET /api/core/locations/{locationId}`
-   *
-   * @param locationId Location id from route params.
-   * @returns Parsed location summary.
-   * @throws {Error} When id is invalid or request fails.
-   */
-  const fetchLocation = async (locationId: string): Promise<LocationSummary> => {
-    const parsedId = Number(locationId);
-    if (!Number.isFinite(parsedId) || parsedId <= 0) {
-      throw new Error("Invalid location id");
-    }
+  const [location, {refetch: refetchLocation}] = createResource(
+    () => params.locationId,
+    (locationId) => fetchLocationById(host, locationId)
+  );
+  const [graphs, {refetch: refetchGraphs}] = createResource(
+    () => params.locationId,
+    (locationId) => fetchLocationGraphsById(host, locationId)
+  );
 
-    const response = await apiFetch(host + "/api/core/locations/" + parsedId, {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load location");
-    }
-    return parseLocationSummary(await response.json());
+  const retryAll = () => {
+    void refetchLocation();
+    void refetchGraphs();
   };
 
-  const [location, {refetch}] = createResource(() => params.locationId, fetchLocation);
+  const graphById = createMemo(() => {
+    const byId = new Map<number, LocationGraph>();
+    for (const graph of graphs() ?? []) {
+      byId.set(graph.id, graph);
+    }
+    return byId;
+  });
+
+  const orderedSections = createMemo(() => {
+    const currentLocation = location();
+    if (!currentLocation) {
+      return [] as LocationSectionLayout[];
+    }
+
+    return [...currentLocation.sectionLayout.sections].sort(
+      (left, right) => left.section_id - right.section_id
+    );
+  });
+
+  const sectionGraphs = (section: LocationSectionLayout): LocationGraph[] =>
+    section.graph_ids
+      .map((graphId) => graphById().get(graphId))
+      .filter((graph): graph is LocationGraph => graph !== undefined);
+
+  const missingGraphIds = (section: LocationSectionLayout): number[] =>
+    section.graph_ids.filter((graphId) => !graphById().has(graphId));
 
   const updatedAtLabel = () => {
     const current = location();
@@ -46,18 +62,18 @@ export const DashboardLocationDetailPanel = () => {
   return (
     <div class="space-y-6">
       <header class="space-y-1">
-        <h1 class="text-3xl font-semibold tracking-tight">Location</h1>
+        <h1 class="text-3xl font-semibold tracking-tight">Location dashboard</h1>
         <p class="text-base-content/70">
-          This page is wired for backend fetches and ready for graph/content panels.
+          Section ordering is based on location `section_layout.sections` sorted by `section_id`.
         </p>
       </header>
 
-      <Show when={!location.loading} fallback={<p class="text-base-content/70">Loading location...</p>}>
-        <Show when={!location.error} fallback={
+      <Show when={!location.loading && !graphs.loading} fallback={<p class="text-base-content/70">Loading location dashboard...</p>}>
+        <Show when={!location.error && !graphs.error} fallback={
           <div class="space-y-3">
-            <p class="text-error">Unable to load location details.</p>
+            <p class="text-error">Unable to load location dashboard.</p>
             <div class="flex gap-2">
-              <button type="button" class="btn btn-outline" onClick={() => void refetch()}>
+              <button type="button" class="btn btn-outline" onClick={retryAll}>
                 Retry
               </button>
               <A href="/dashboard/locations" class="btn btn-ghost">
@@ -66,15 +82,64 @@ export const DashboardLocationDetailPanel = () => {
             </div>
           </div>
         }>
-          <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-            <h2 class="text-xl font-semibold">{location()?.name}</h2>
-            <p class="mt-2 text-sm text-base-content/70">
-              Location-level analytics, graph rendering, and related data panels will be added here.
-            </p>
-            <p class="mt-2 text-xs text-base-content/60">
-              Last updated {updatedAtLabel()}
-            </p>
-          </section>
+          <div class="space-y-4">
+            <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
+              <h2 class="text-xl font-semibold">{location()?.name}</h2>
+              <p class="mt-2 text-sm text-base-content/70">
+                Last updated {updatedAtLabel()}
+              </p>
+            </section>
+
+            <Show when={orderedSections().length > 0} fallback={
+              <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
+                <p class="text-base-content/70">No dashboard sections are configured for this location.</p>
+              </section>
+            }>
+              <div class="space-y-4">
+                <For each={orderedSections()}>
+                  {(section) => (
+                    <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
+                      <div class="mb-4 flex items-center justify-between gap-2">
+                        <h3 class="text-lg font-semibold">Section {section.section_id}</h3>
+                        <span class="text-xs text-base-content/60">
+                          {section.graph_ids.length} graph{section.graph_ids.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+
+                      <Show when={sectionGraphs(section).length > 0} fallback={
+                        <p class="text-sm text-base-content/70">
+                          No available graph payloads for this section.
+                        </p>
+                      }>
+                        <div class="grid gap-4 lg:grid-cols-2">
+                          <For each={sectionGraphs(section)}>
+                            {(graph) => (
+                              <article class="rounded-lg border border-base-200 bg-base-200/40 p-3">
+                                <h4 class="mb-2 text-sm font-medium">{graph.name}</h4>
+                                <PlotlyChart
+                                  name={graph.name}
+                                  data={graph.data.data as PlotlyData[]}
+                                  layout={(graph.data.layout ?? undefined) as PlotlyLayout | undefined}
+                                  config={(graph.data.config ?? undefined) as PlotlyConfig | undefined}
+                                  class="h-72 w-full"
+                                />
+                              </article>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+
+                      <Show when={missingGraphIds(section).length > 0}>
+                        <p class="mt-3 text-xs text-warning">
+                          Missing graph IDs: {missingGraphIds(section).join(", ")}
+                        </p>
+                      </Show>
+                    </section>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
         </Show>
       </Show>
     </div>

@@ -1,18 +1,15 @@
 import {For, Show, createEffect, createResource, createSignal} from "solid-js";
-import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {
   parseLocationList,
   parseLocationMembershipList
 } from "../../../types/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
-import {LocationMemberRole, LocationMembership, LocationSummary} from "../../../types/Types";
+import {LocationMembership, LocationSummary} from "../../../types/Types";
 
 export const DashboardPermissionsPanel = () => {
   const host = useApiHost();
   const [selectedLocationId, setSelectedLocationId] = createSignal("");
-  const [draftRoles, setDraftRoles] = createSignal<Record<string, LocationMemberRole>>({});
-  const [savingUserId, setSavingUserId] = createSignal<number | null>(null);
 
   /**
    * Loads all locations that can be managed in the permissions panel.
@@ -63,96 +60,14 @@ export const DashboardPermissionsPanel = () => {
     return parseLocationMembershipList(await response.json());
   };
 
-  const [memberships, {mutate, refetch: refetchMemberships}] = createResource(selectedLocationId, fetchMemberships);
-
-  createEffect(() => {
-    selectedLocationId();
-    setDraftRoles({});
-  });
-
-  const toDraftRoleKey = (locationId: string, userId: number): string => locationId + ":" + userId;
-
-  const getDraftRole = (membership: LocationMembership): LocationMemberRole =>
-    draftRoles()[toDraftRoleKey(selectedLocationId(), membership.userId)] ?? membership.userRole;
-
-  const updateDraftRole = (userId: number, role: LocationMemberRole) => {
-    const locationId = selectedLocationId();
-    if (!locationId) {
-      return;
-    }
-    setDraftRoles((current) => ({
-      ...current,
-      [toDraftRoleKey(locationId, userId)]: role
-    }));
-  };
-
-  /**
-   * Persists an updated role for one location membership.
-   *
-   * Endpoint: `PUT /api/core/locations/{locationId}/memberships/{userId}`
-   * Body: `{ userRole }`
-   *
-   * @param membership Membership row currently being edited.
-   */
-  const saveRole = async (membership: LocationMembership) => {
-    if (savingUserId() !== null || !selectedLocationId()) {
-      return;
-    }
-
-    const nextRole = getDraftRole(membership);
-    if (nextRole === membership.userRole) {
-      return;
-    }
-
-    setSavingUserId(membership.userId);
-    try {
-      const response = await apiFetch(
-        host + "/api/core/locations/" + selectedLocationId() + "/memberships/" + membership.userId,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            userRole: nextRole
-          })
-        }
-      );
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        toast.error(errorBody?.message ?? "Unable to update membership role.");
-        return;
-      }
-
-      mutate((current) =>
-        current?.map((candidate) =>
-          candidate.userId === membership.userId ? {
-            ...candidate,
-            userRole: nextRole
-          } : candidate
-        )
-      );
-      setDraftRoles((current) => {
-        const next = {
-          ...current
-        };
-        delete next[toDraftRoleKey(selectedLocationId(), membership.userId)];
-        return next;
-      });
-      toast.success("Membership updated.");
-    } catch {
-      toast.error("Unable to update membership role.");
-    } finally {
-      setSavingUserId(null);
-    }
-  };
+  const [memberships, {refetch: refetchMemberships}] = createResource(selectedLocationId, fetchMemberships);
 
   return (
     <div class="space-y-6">
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Permissions</h1>
         <p class="text-base-content/70">
-          Manage user roles for each location.
+          View users assigned to each location.
         </p>
       </header>
 
@@ -202,25 +117,6 @@ export const DashboardPermissionsPanel = () => {
                                 <p class="text-xs text-base-content/60">
                                   User ID {membership.userId}
                                 </p>
-                              </div>
-                              <div class="flex items-center gap-2">
-                                <select
-                                  class="select select-bordered select-sm"
-                                  value={getDraftRole(membership)}
-                                  onChange={(event) => updateDraftRole(membership.userId, event.currentTarget.value as LocationMemberRole)}
-                                >
-                                  <option value="admin">Admin</option>
-                                  <option value="partner">Partner</option>
-                                  <option value="client">Client</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  class="btn btn-sm btn-primary"
-                                  disabled={savingUserId() !== null}
-                                  onClick={() => void saveRole(membership)}
-                                >
-                                  {savingUserId() === membership.userId ? "Saving..." : "Save"}
-                                </button>
                               </div>
                             </div>
                           </li>

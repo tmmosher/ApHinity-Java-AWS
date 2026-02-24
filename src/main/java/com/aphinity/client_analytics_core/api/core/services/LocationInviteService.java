@@ -5,7 +5,6 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.core.entities.Location;
 import com.aphinity.client_analytics_core.api.core.entities.LocationInvite;
 import com.aphinity.client_analytics_core.api.core.entities.LocationInviteStatus;
-import com.aphinity.client_analytics_core.api.core.entities.LocationMemberRole;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationInviteRepository;
@@ -210,7 +209,6 @@ public class LocationInviteService {
         membership.setId(new LocationUserId(locationId, userId));
         membership.setLocation(location);
         membership.setUser(user);
-        membership.setUserRole(LocationMemberRole.CLIENT);
         locationUserRepository.save(membership);
     }
 

@@ -14,13 +14,22 @@ export interface Profile {
 }
 
 export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
-export type LocationMemberRole = "admin" | "partner" | "client";
+
+export interface LocationSectionLayout {
+    section_id: number;
+    graph_ids: number[];
+}
+
+export interface LocationSectionLayoutConfig {
+    sections: LocationSectionLayout[];
+}
 
 export interface LocationSummary {
     id: number;
     name: string;
     createdAt: string;
     updatedAt: string;
+    sectionLayout: LocationSectionLayoutConfig;
 }
 
 export interface ActiveInvite {
@@ -41,6 +50,19 @@ export interface LocationMembership {
     locationId: number;
     userId: number;
     userEmail: string | null;
-    userRole: LocationMemberRole;
     createdAt: string;
+}
+
+export interface LocationGraphPayload {
+    data: Record<string, unknown>[];
+    layout?: Record<string, unknown> | null;
+    config?: Record<string, unknown> | null;
+}
+
+export interface LocationGraph {
+    id: number;
+    name: string;
+    data: LocationGraphPayload;
+    createdAt: string;
+    updatedAt: string;
 }
