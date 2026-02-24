@@ -2,7 +2,6 @@ import {
   ActiveInvite,
   InviteStatus,
   LocationGraph,
-  LocationGraphPayload,
   LocationMembership,
   LocationSectionLayout,
   LocationSectionLayoutConfig,
@@ -141,30 +140,74 @@ export const parseLocationMembershipList = (value: unknown): LocationMembership[
   return value.map(parseLocationMembership);
 };
 
-const parseLocationGraphPayload = (value: unknown): LocationGraphPayload => {
+const parseOptionalGraphObject = (
+  value: unknown,
+  errorMessage: string
+): Record<string, unknown> | null | undefined => {
+  if (value === undefined || value === null) {
+    return value;
+  }
   if (!isObject(value)) {
+    throw new Error(errorMessage);
+  }
+  return value;
+};
+
+const parseGraphDataEntries = (value: unknown): Record<string, unknown>[] => {
+  if (!Array.isArray(value) || value.some((entry) => !isObject(entry))) {
+    throw new Error("Invalid graph data payload");
+  }
+  return value;
+};
+
+const parseLocationGraphColumns = (value: Record<string, unknown>) => {
+  const topLevelLayout = parseOptionalGraphObject(
+    value.layout,
+    "Invalid graph layout payload"
+  );
+  const topLevelConfig = parseOptionalGraphObject(
+    value.config,
+    "Invalid graph config payload"
+  );
+  const topLevelStyle = parseOptionalGraphObject(
+    value.style,
+    "Invalid graph style payload"
+  );
+
+  // Preferred shape (DB-aligned): data/layout/config/style are independent fields.
+  if (Array.isArray(value.data)) {
+    return {
+      data: parseGraphDataEntries(value.data),
+      layout: topLevelLayout,
+      config: topLevelConfig,
+      style: topLevelStyle
+    };
+  }
+
+  // Backward-compatible shape: data contains { data, layout, config, style }.
+  if (!isObject(value.data)) {
     throw new Error("Invalid graph payload");
   }
 
-  const payloadData = value.data;
-  if (!Array.isArray(payloadData) || payloadData.some((entry) => !isObject(entry))) {
-    throw new Error("Invalid graph data payload");
-  }
-
-  const layoutValue = value.layout;
-  if (layoutValue !== undefined && layoutValue !== null && !isObject(layoutValue)) {
-    throw new Error("Invalid graph layout payload");
-  }
-
-  const configValue = value.config;
-  if (configValue !== undefined && configValue !== null && !isObject(configValue)) {
-    throw new Error("Invalid graph config payload");
-  }
+  const nestedData = parseGraphDataEntries(value.data.data);
+  const nestedLayout = parseOptionalGraphObject(
+    value.data.layout,
+    "Invalid graph layout payload"
+  );
+  const nestedConfig = parseOptionalGraphObject(
+    value.data.config,
+    "Invalid graph config payload"
+  );
+  const nestedStyle = parseOptionalGraphObject(
+    value.data.style,
+    "Invalid graph style payload"
+  );
 
   return {
-    data: payloadData,
-    layout: layoutValue === undefined ? undefined : layoutValue,
-    config: configValue === undefined ? undefined : configValue
+    data: nestedData,
+    layout: topLevelLayout === undefined ? nestedLayout : topLevelLayout,
+    config: topLevelConfig === undefined ? nestedConfig : topLevelConfig,
+    style: topLevelStyle === undefined ? nestedStyle : topLevelStyle
   };
 };
 
@@ -185,7 +228,7 @@ export const parseLocationGraph = (value: unknown): LocationGraph => {
   return {
     id: value.id,
     name: value.name,
-    data: parseLocationGraphPayload(value.data),
+    ...parseLocationGraphColumns(value),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };

@@ -1,9 +1,8 @@
 import {For, Show, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {parseActiveInviteList} from "../../../types/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
 import {ActiveInvite} from "../../../types/Types";
+import {fetchActiveInvites, processLocationInvite} from "../../../util/inviteApi";
 
 export const DashboardInvitesPanel = () => {
   const host = useApiHost();
@@ -14,15 +13,8 @@ export const DashboardInvitesPanel = () => {
    *
    * Endpoint: `GET /api/core/location-invites/active`
    */
-  const fetchInvites = async (): Promise<ActiveInvite[]> => {
-    const response = await apiFetch(host + "/api/core/location-invites/active", {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load invites");
-    }
-    return parseActiveInviteList(await response.json());
-  };
+  const fetchInvites = async (): Promise<ActiveInvite[]> =>
+    fetchActiveInvites(host);
 
   const [invites, {refetch}] = createResource(fetchInvites);
 
@@ -40,18 +32,11 @@ export const DashboardInvitesPanel = () => {
     }
     setProcessingInviteId(inviteId);
     try {
-      const response = await apiFetch(host + "/api/core/location-invites/" + inviteId + "/" + action, {
-        method: "POST",
-      });
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        toast.error(errorBody?.message ?? "Unable to update invite.");
-        return;
-      }
+      await processLocationInvite(host, inviteId, action);
       toast.success(action === "accept" ? "Invite accepted." : "Invite declined.");
       await refetch();
-    } catch {
-      toast.error("Unable to update invite.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update invite.");
     } finally {
       setProcessingInviteId(null);
     }

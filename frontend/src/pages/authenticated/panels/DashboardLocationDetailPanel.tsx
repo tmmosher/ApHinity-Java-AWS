@@ -118,9 +118,9 @@ export const DashboardLocationDetailPanel = () => {
                                 <h4 class="mb-2 text-sm font-medium">{graph.name}</h4>
                                 <PlotlyChart
                                   name={graph.name}
-                                  data={graph.data.data as PlotlyData[]}
-                                  layout={(graph.data.layout ?? undefined) as PlotlyLayout | undefined}
-                                  config={(graph.data.config ?? undefined) as PlotlyConfig | undefined}
+                                  data={graph.data as PlotlyData[]}
+                                  layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
+                                  config={(graph.config ?? undefined) as PlotlyConfig | undefined}
                                   class="h-72 w-full"
                                 />
                               </article>

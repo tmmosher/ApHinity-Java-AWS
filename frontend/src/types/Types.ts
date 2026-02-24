@@ -53,16 +53,13 @@ export interface LocationMembership {
     createdAt: string;
 }
 
-export interface LocationGraphPayload {
-    data: Record<string, unknown>[];
-    layout?: Record<string, unknown> | null;
-    config?: Record<string, unknown> | null;
-}
-
 export interface LocationGraph {
     id: number;
     name: string;
-    data: LocationGraphPayload;
+    data: Record<string, unknown>[];
+    layout?: Record<string, unknown> | null;
+    config?: Record<string, unknown> | null;
+    style?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
 }

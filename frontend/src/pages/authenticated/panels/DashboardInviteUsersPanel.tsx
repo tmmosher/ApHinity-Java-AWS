@@ -1,9 +1,8 @@
 import {Show, createEffect, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {parseLocationList} from "../../../types/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
 import {LocationSummary} from "../../../types/Types";
+import {createLocationInvite, fetchInviteableLocations} from "../../../util/inviteApi";
 
 export const DashboardInviteUsersPanel = () => {
   const host = useApiHost();
@@ -14,17 +13,10 @@ export const DashboardInviteUsersPanel = () => {
   /**
    * Loads available locations for invite targeting.
    *
-   * Endpoint: `GET /api/core/locations`
+   * Endpoint: `GET /api/core/location-invites/locations`
    */
-  const fetchLocations = async (): Promise<LocationSummary[]> => {
-    const response = await apiFetch(host + "/api/core/locations", {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load locations");
-    }
-    return parseLocationList(await response.json());
-  };
+  const fetchLocations = async (): Promise<LocationSummary[]> =>
+    fetchInviteableLocations(host);
 
   const [locations, {refetch}] = createResource(fetchLocations);
 
@@ -52,40 +44,13 @@ export const DashboardInviteUsersPanel = () => {
       return;
     }
 
-    const locationId = Number(selectedLocationId());
-    if (!Number.isFinite(locationId) || locationId <= 0) {
-      toast.error("Select a location first.");
-      return;
-    }
-
-    const normalizedEmail = invitedEmail().trim().toLowerCase();
-    if (!normalizedEmail) {
-      toast.error("Invite email is required.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const response = await apiFetch(host + "/api/core/location-invites", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          locationId,
-          invitedEmail: normalizedEmail
-        })
-      });
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        toast.error(errorBody?.message ?? "Unable to create invite.");
-        return;
-      }
-
+      await createLocationInvite(host, Number(selectedLocationId()), invitedEmail());
       setInvitedEmail("");
       toast.success("Invite created.");
-    } catch {
-      toast.error("Unable to create invite.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to create invite.");
     } finally {
       setIsSubmitting(false);
     }

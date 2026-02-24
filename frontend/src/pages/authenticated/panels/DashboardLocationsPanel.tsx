@@ -115,7 +115,7 @@ export const DashboardLocationsPanel = () => {
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Locations</h1>
         <p class="text-base-content/70">
-          Select a location to open its page. Data panels for each location will be added next.
+          Select a location to open its page.
         </p>
       </header>
 

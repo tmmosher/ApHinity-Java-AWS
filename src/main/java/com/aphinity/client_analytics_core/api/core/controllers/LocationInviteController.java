@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core.controllers;
 
 import com.aphinity.client_analytics_core.api.core.requests.LocationInviteRequest;
 import com.aphinity.client_analytics_core.api.core.response.LocationInviteResponse;
+import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.LocationInviteService;
 import jakarta.validation.Valid;
@@ -47,6 +48,18 @@ public class LocationInviteController {
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationInviteService.createInvite(userId, request.locationId(), request.invitedEmail());
+    }
+
+    /**
+     * Lists locations that the authenticated elevated user can invite into.
+     *
+     * @param jwt authenticated principal JWT
+     * @return inviteable locations
+     */
+    @GetMapping("/location-invites/locations")
+    public List<LocationResponse> inviteableLocations(@AuthenticationPrincipal Jwt jwt) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationInviteService.getInviteableLocations(userId);
     }
 
     /**
