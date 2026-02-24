@@ -60,9 +60,10 @@ public class LocationService {
     public List<LocationResponse> getAccessibleLocations(Long userId) {
         AppUser user = requireUser(userId);
         if (accountRoleService.isPartnerOrAdmin(user)) {
-            return locationRepository.findAllByOrderByNameAsc().stream()
-                .map(this::toLocationResponse)
-                .toList();
+            List<Location> response = locationRepository.findAllByOrderByNameAsc();
+            return response.stream()
+                    .map(this::toLocationResponse)
+                    .toList();
         }
 
         Map<Long, LocationResponse> uniqueLocations = new LinkedHashMap<>();

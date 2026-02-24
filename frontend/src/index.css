@@ -1,3 +1,97 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes graph-loading-slide {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -160% 0;
+  }
+}
+
+@keyframes graph-loading-grow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scaleY(0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.graph-loading-placeholder {
+  display: grid;
+  grid-template-rows: 12px 8px 1fr;
+  gap: 0.75rem;
+  align-content: start;
+  padding: 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--b3) / 0.9);
+  background: linear-gradient(
+    120deg,
+    hsl(var(--b2) / 0.85) 20%,
+    hsl(var(--b1) / 1) 50%,
+    hsl(var(--b2) / 0.85) 80%
+  );
+  background-size: 220% 100%;
+  animation: graph-loading-slide 1.7s ease-in-out infinite;
+}
+
+.graph-loading-line {
+  border-radius: 999px;
+  background: hsl(var(--bc) / 0.22);
+}
+
+.graph-loading-line-wide {
+  width: 72%;
+}
+
+.graph-loading-line-medium {
+  width: 48%;
+}
+
+.graph-loading-bars {
+  align-self: end;
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-end;
+  height: 58%;
+}
+
+.graph-loading-bar {
+  width: 0.65rem;
+  border-radius: 0.35rem;
+  background: hsl(var(--bc) / 0.38);
+  transform-origin: bottom center;
+  animation: graph-loading-grow 0.95s ease-in-out infinite;
+}
+
+.graph-loading-bar-1 {
+  height: 34%;
+  animation-delay: 0.05s;
+}
+
+.graph-loading-bar-2 {
+  height: 62%;
+  animation-delay: 0.17s;
+}
+
+.graph-loading-bar-3 {
+  height: 86%;
+  animation-delay: 0.29s;
+}
+
+.graph-loading-bar-4 {
+  height: 48%;
+  animation-delay: 0.41s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-loading-placeholder,
+  .graph-loading-bar {
+    animation: none;
+  }
+}

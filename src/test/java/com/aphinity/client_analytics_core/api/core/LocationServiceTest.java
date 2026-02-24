@@ -3,11 +3,13 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.core.entities.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.Location;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
 import com.aphinity.client_analytics_core.api.core.plotly.PlotlyTrace;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -22,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -102,6 +105,36 @@ class LocationServiceTest {
         assertSame(graphSpec, response.data());
         assertEquals("bar", response.data().getData().getFirst().getType());
         verify(locationGraphRepository).findByLocationIdWithGraph(11L);
+    }
+
+    @Test
+    void getAccessibleLocationsReturnsAllLocationsForPartnerOrAdmin() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location first = new Location();
+        first.setId(1L);
+        first.setName("Austin");
+        first.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        first.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        first.setSectionLayout(Map.of("sections", List.of()));
+
+        Location second = new Location();
+        second.setId(2L);
+        second.setName("Denver");
+        second.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+        second.setUpdatedAt(Instant.parse("2026-01-04T00:00:00Z"));
+        second.setSectionLayout(Map.of("sections", List.of()));
+
+        when(locationRepository.findAllByOrderByNameAsc()).thenReturn(List.of(first, second));
+
+        List<LocationResponse> responses = locationService.getAccessibleLocations(5L);
+
+        assertEquals(2, responses.size());
+        assertEquals(List.of("Austin", "Denver"), responses.stream().map(LocationResponse::name).toList());
+        verify(locationRepository).findAllByOrderByNameAsc();
+        verifyNoInteractions(locationUserRepository);
     }
 
     @Test

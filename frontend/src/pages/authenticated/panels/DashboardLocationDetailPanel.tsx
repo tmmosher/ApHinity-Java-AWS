@@ -1,7 +1,7 @@
 import {A, useParams} from "@solidjs/router";
-import PlotlyChart from "../../../components/Chart";
+import PlotlyChart, {loadPlotlyModule} from "../../../components/Chart";
 import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../components/Chart";
-import {For, Show, createMemo, createResource} from "solid-js";
+import {For, Show, Suspense, createMemo, createResource} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {LocationGraph, LocationSectionLayout} from "../../../types/Types";
 import {fetchLocationById, fetchLocationGraphsById} from "./locationDetailApi";
@@ -51,6 +51,18 @@ export const DashboardLocationDetailPanel = () => {
   const missingGraphIds = (section: LocationSectionLayout): number[] =>
     section.graph_ids.filter((graphId) => !graphById().has(graphId));
 
+  const [plotlyModule] = createResource(
+    () => {
+      const sections = orderedSections();
+      if (sections.length === 0) {
+        return false;
+      }
+      const byId = graphById();
+      return sections.some((section) => section.graph_ids.some((graphId) => byId.has(graphId)));
+    },
+    async (shouldLoad) => (shouldLoad ? loadPlotlyModule() : null)
+  );
+
   const updatedAtLabel = () => {
     const current = location();
     if (!current) {
@@ -59,10 +71,23 @@ export const DashboardLocationDetailPanel = () => {
     return new Date(current.updatedAt).toLocaleString();
   };
 
+  const graphLoadingFallback = (graphName: string) => (
+    <div class="graph-loading-placeholder h-72 w-full" role="status" aria-live="polite" aria-label={`Loading graph ${graphName}`}>
+      <div class="graph-loading-line graph-loading-line-wide" />
+      <div class="graph-loading-line graph-loading-line-medium" />
+      <div class="graph-loading-bars">
+        <span class="graph-loading-bar graph-loading-bar-1" />
+        <span class="graph-loading-bar graph-loading-bar-2" />
+        <span class="graph-loading-bar graph-loading-bar-3" />
+        <span class="graph-loading-bar graph-loading-bar-4" />
+      </div>
+    </div>
+  );
+
   return (
     <div class="space-y-6">
       <header class="space-y-1">
-        <h1 class="text-3xl font-semibold tracking-tight">Location dashboard</h1>
+        <h1 class="text-3xl font-semibold tracking-tight">Location</h1>
         <p class="text-base-content/70">
           Section ordering is based on location `section_layout.sections` sorted by `section_id`.
         </p>
@@ -100,7 +125,6 @@ export const DashboardLocationDetailPanel = () => {
                   {(section) => (
                     <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
                       <div class="mb-4 flex items-center justify-between gap-2">
-                        <h3 class="text-lg font-semibold">Section {section.section_id}</h3>
                         <span class="text-xs text-base-content/60">
                           {section.graph_ids.length} graph{section.graph_ids.length === 1 ? "" : "s"}
                         </span>
@@ -116,13 +140,22 @@ export const DashboardLocationDetailPanel = () => {
                             {(graph) => (
                               <article class="rounded-lg border border-base-200 bg-base-200/40 p-3">
                                 <h4 class="mb-2 text-sm font-medium">{graph.name}</h4>
-                                <PlotlyChart
-                                  name={graph.name}
-                                  data={graph.data as PlotlyData[]}
-                                  layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
-                                  config={(graph.config ?? undefined) as PlotlyConfig | undefined}
-                                  class="h-72 w-full"
-                                />
+                                <Show
+                                  when={!plotlyModule.error}
+                                  fallback={<p class="h-72 w-full rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">Unable to load graph renderer.</p>}
+                                >
+                                  <Suspense fallback={graphLoadingFallback(graph.name)}>
+                                    <Show when={plotlyModule()}>
+                                      <PlotlyChart
+                                        name={graph.name}
+                                        data={graph.data as PlotlyData[]}
+                                        layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
+                                        config={(graph.config ?? undefined) as PlotlyConfig | undefined}
+                                        class="h-72 w-full"
+                                      />
+                                    </Show>
+                                  </Suspense>
+                                </Show>
                               </article>
                             )}
                           </For>
