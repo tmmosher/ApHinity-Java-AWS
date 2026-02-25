@@ -3,7 +3,7 @@ import {For, Show, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useProfile} from "../../../context/ProfileContext";
-import {parseLocationList, parseLocationSummary} from "../../../types/coreApi";
+import {parseLocationList, parseLocationSummary} from "../../../util/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
 import {setFavoriteLocationId} from "../../../util/favoriteLocation";
 import {LocationSummary} from "../../../types/Types";

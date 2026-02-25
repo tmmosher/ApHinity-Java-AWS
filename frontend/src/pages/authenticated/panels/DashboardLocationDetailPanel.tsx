@@ -48,10 +48,6 @@ export const DashboardLocationDetailPanel = () => {
       .map((graphId) => graphById().get(graphId))
       .filter((graph): graph is LocationGraph => graph !== undefined);
 
-    createEffect(() => {
-        console.log(sectionGraphs)
-    })
-
   const missingGraphIds = (section: LocationSectionLayout): number[] =>
     section.graph_ids.filter((graphId) => !graphById().has(graphId));
 

@@ -11,6 +11,7 @@ import {
   setFavoriteLocationId
 } from "../../../util/favoriteLocation";
 import {LocationSummary} from "../../../types/Types";
+import {A} from "@solidjs/router";
 
 const roleLabel: Record<"admin" | "partner" | "client", string> = {
   admin: "Admin",
@@ -26,6 +27,7 @@ export const DashboardHomePanel = () => {
 
   /**
    * Loads locations accessible by the authenticated user.
+   * TODO memoize this as this is done frequently
    *
    * Endpoint: `GET /api/core/locations`
    *
@@ -71,25 +73,7 @@ export const DashboardHomePanel = () => {
     return `Signed in as ${roleLabel[profile.role]}.`;
   };
 
-  const saveFavoriteLocation = (event: SubmitEvent) => {
-    event.preventDefault();
-    const locationIdToSave = getFavoriteLocationIdForSave(favoriteLocationId(), locations());
-    if (locationIdToSave === null) {
-      toast.error("Select a location first.");
-      return;
-    }
-
-    setFavoriteLocationId(locationIdToSave);
-    toast.success("Favorite location updated.");
-  };
-
-  const clearFavoriteLocation = () => {
-    setFavoriteLocationIdSignal("");
-    setFavoriteLocationId("");
-    toast.success("Favorite location cleared.");
-  };
-
-  return (
+   return (
     <div class="space-y-6">
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Dashboard</h1>
@@ -106,10 +90,6 @@ export const DashboardHomePanel = () => {
             </p>
           }
         >
-          <p class="mt-1 text-sm text-base-content/70">
-            Select one of your locations for quick recall in your home dashboard.
-          </p>
-
           <Show when={!locations.loading} fallback={<p class="mt-4 text-sm text-base-content/70">Loading locations...</p>}>
             <Show when={!locations.error} fallback={
               <div class="mt-4 space-y-3">
@@ -122,24 +102,9 @@ export const DashboardHomePanel = () => {
               <Show when={(locations()?.length ?? 0) > 0} fallback={
                 <p class="mt-4 text-sm text-base-content/70">No locations available.</p>
               }>
-                <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]" onSubmit={saveFavoriteLocation}>
-                  <select
-                    class="select select-bordered w-full"
-                    value={favoriteLocationId()}
-                    onChange={(event) => setFavoriteLocationIdSignal(event.currentTarget.value)}
-                  >
-                    <option value="">Select a location</option>
-                    {locations()?.map((location) => (
-                      <option value={String(location.id)}>{location.name}</option>
-                    ))}
-                  </select>
-                  <button type="submit" class="btn btn-primary">
-                    Save
-                  </button>
-                  <button type="button" class="btn btn-outline" onClick={clearFavoriteLocation}>
-                    Clear
-                  </button>
-                </form>
+                  <A href={`/dashboard/locations/${location.id}`} class="link link-primary text-lg font-medium" preload>
+                      {location.name}
+                  </A>
               </Show>
             </Show>
           </Show>
