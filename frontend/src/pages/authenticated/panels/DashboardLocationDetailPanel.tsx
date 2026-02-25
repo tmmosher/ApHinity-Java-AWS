@@ -1,7 +1,7 @@
 import {A, useParams} from "@solidjs/router";
 import PlotlyChart, {loadPlotlyModule} from "../../../components/Chart";
 import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../components/Chart";
-import {For, Show, Suspense, createMemo, createResource} from "solid-js";
+import {For, Show, Suspense, createMemo, createResource, createEffect} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {LocationGraph, LocationSectionLayout} from "../../../types/Types";
 import {fetchLocationById, fetchLocationGraphsById} from "./locationDetailApi";
@@ -48,6 +48,10 @@ export const DashboardLocationDetailPanel = () => {
       .map((graphId) => graphById().get(graphId))
       .filter((graph): graph is LocationGraph => graph !== undefined);
 
+    createEffect(() => {
+        console.log(sectionGraphs)
+    })
+
   const missingGraphIds = (section: LocationSectionLayout): number[] =>
     section.graph_ids.filter((graphId) => !graphById().has(graphId));
 
@@ -88,9 +92,6 @@ export const DashboardLocationDetailPanel = () => {
     <div class="space-y-6">
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Location</h1>
-        <p class="text-base-content/70">
-          Section ordering is based on location `section_layout.sections` sorted by `section_id`.
-        </p>
       </header>
 
       <Show when={!location.loading && !graphs.loading} fallback={<p class="text-base-content/70">Loading location dashboard...</p>}>

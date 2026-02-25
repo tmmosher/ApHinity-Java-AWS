@@ -1,13 +1,16 @@
 package com.aphinity.client_analytics_core.api.core.response;
 
-import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
-
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 public record GraphResponse(
     Long id,
     String name,
-    PlotlyGraphSpec data,
+    List<Map<String, Object>> data,
+    Map<String, Object> layout,
+    Map<String, Object> config,
+    Map<String, Object> style,
     Instant createdAt,
     Instant updatedAt
 ) {

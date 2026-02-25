@@ -10,8 +10,6 @@ import com.aphinity.client_analytics_core.api.core.repositories.LocationReposito
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
-import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
-import com.aphinity.client_analytics_core.api.core.plotly.PlotlyTrace;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.LocationService;
 import org.junit.jupiter.api.Test;
@@ -23,12 +21,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -79,16 +78,18 @@ class LocationServiceTest {
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(11L, 7L)).thenReturn(true);
 
-        PlotlyTrace trace = new PlotlyTrace();
-        trace.setType("bar");
-        trace.setName("Sessions");
-        PlotlyGraphSpec graphSpec = new PlotlyGraphSpec();
-        graphSpec.setData(List.of(trace));
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("type", "bar");
+        trace.put("name", "Sessions");
+        trace.put("y", List.of(4, 9, 6));
 
         Graph graph = new Graph();
         graph.setId(19L);
         graph.setName("Daily sessions");
-        graph.setData(graphSpec);
+        graph.setData(trace);
+        graph.setLayout(Map.of("title", "Sessions"));
+        graph.setConfig(Map.of("displayModeBar", false));
+        graph.setStyle(Map.of("height", 320));
         graph.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
 
@@ -102,9 +103,152 @@ class LocationServiceTest {
         GraphResponse response = responses.getFirst();
         assertEquals(19L, response.id());
         assertEquals("Daily sessions", response.name());
-        assertSame(graphSpec, response.data());
-        assertEquals("bar", response.data().getData().getFirst().getType());
+        assertEquals(1, response.data().size());
+        assertEquals("bar", response.data().getFirst().get("type"));
+        assertEquals(Map.of("title", "Sessions"), response.layout());
+        assertEquals(Map.of("displayModeBar", false), response.config());
+        assertEquals(Map.of("height", 320), response.style());
         verify(locationGraphRepository).findByLocationIdWithGraph(11L);
+    }
+
+    @Test
+    void getAccessibleLocationGraphsNormalizesLegacyNestedGraphPayload() {
+        AppUser user = verifiedUser(17L);
+        when(appUserRepository.findById(17L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(44L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(44L, 17L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(41L);
+        graph.setName("Legacy graph");
+        setRawGraphData(graph, Map.of(
+            "data", List.of(
+                Map.of(
+                    "type", "pie",
+                    "labels", List.of("fill", "rest"),
+                    "values", List.of(65, 35)
+                )
+            ),
+            "layout", Map.of("showlegend", false),
+            "config", Map.of("displayModeBar", false),
+            "style", Map.of("height", 280)
+        ));
+        graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-01-04T00:00:00Z"));
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(44L)).thenReturn(List.of(locationGraph));
+
+        List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(17L, 44L);
+
+        assertEquals(1, responses.size());
+        GraphResponse response = responses.getFirst();
+        assertEquals(1, response.data().size());
+        assertEquals("pie", response.data().getFirst().get("type"));
+        assertEquals(Map.of("showlegend", false), response.layout());
+        assertEquals(Map.of("displayModeBar", false), response.config());
+        assertEquals(Map.of("height", 280), response.style());
+    }
+
+    @Test
+    void getAccessibleLocationGraphsSupportsStoredTraceArrays() {
+        AppUser user = verifiedUser(23L);
+        when(appUserRepository.findById(23L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(57L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(57L, 23L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(88L);
+        graph.setName("Two-trace graph");
+        graph.setData(List.of(
+            Map.of("type", "scatter", "name", "baseline"),
+            Map.of("type", "bar", "name", "actual")
+        ));
+        graph.setCreatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(57L)).thenReturn(List.of(locationGraph));
+
+        List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(23L, 57L);
+
+        assertEquals(1, responses.size());
+        GraphResponse response = responses.getFirst();
+        assertEquals(2, response.data().size());
+        assertEquals("scatter", response.data().get(0).get("type"));
+        assertEquals("bar", response.data().get(1).get("type"));
+        assertNull(response.layout());
+        assertNull(response.config());
+        assertNull(response.style());
+    }
+
+    @Test
+    void getAccessibleLocationGraphsParsesJsonTextPayloadsFromDatabase() {
+        AppUser user = verifiedUser(24L);
+        when(appUserRepository.findById(24L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(58L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(58L, 24L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(89L);
+        graph.setName("String payload graph");
+        setRawGraphData(
+            graph,
+            "{\"type\":\"pie\",\"labels\":[\"fill\",\"rest\"],\"values\":[65,35]}"
+        );
+        graph.setLayout(Map.of("showlegend", false));
+        graph.setConfig(Map.of());
+        graph.setStyle(Map.of());
+        graph.setCreatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(58L)).thenReturn(List.of(locationGraph));
+
+        List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(24L, 58L);
+
+        assertEquals(1, responses.size());
+        GraphResponse response = responses.getFirst();
+        assertEquals(1, response.data().size());
+        assertEquals("pie", response.data().getFirst().get("type"));
+        assertEquals(List.of("fill", "rest"), response.data().getFirst().get("labels"));
+        assertEquals(List.of(65L, 35L), response.data().getFirst().get("values"));
+        assertEquals(Map.of("showlegend", false), response.layout());
+        assertEquals(Map.of(), response.config());
+        assertEquals(Map.of(), response.style());
+    }
+
+    @Test
+    void getAccessibleLocationGraphsRejectsMalformedStoredGraphData() {
+        AppUser user = verifiedUser(31L);
+        when(appUserRepository.findById(31L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(66L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(66L, 31L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(101L);
+        graph.setName("Malformed graph");
+        setRawGraphData(graph, List.of(Map.of("type", "bar"), "bad-entry"));
+        graph.setCreatedAt(Instant.parse("2026-01-07T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-01-08T00:00:00Z"));
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(66L)).thenReturn(List.of(locationGraph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.getAccessibleLocationGraphs(31L, 66L)
+        );
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+        assertEquals("Graph payload is invalid", ex.getReason());
     }
 
     @Test
@@ -175,5 +319,15 @@ class LocationServiceTest {
         user.setEmail("verified@example.com");
         user.setEmailVerifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
         return user;
+    }
+
+    private void setRawGraphData(Graph graph, Object rawData) {
+        try {
+            var field = Graph.class.getDeclaredField("data");
+            field.setAccessible(true);
+            field.set(graph, rawData);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError("Unable to set raw graph data for legacy payload test", ex);
+        }
     }
 }

@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
-import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -47,7 +46,10 @@ class LocationControllerTest {
         GraphResponse graphResponse = new GraphResponse(
             31L,
             "Weekly conversion",
-            new PlotlyGraphSpec(),
+            List.of(Map.of("type", "bar", "name", "Conversion")),
+            Map.of("showlegend", false),
+            Map.of("displayModeBar", false),
+            Map.of("height", 260),
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-01-02T00:00:00Z")
         );

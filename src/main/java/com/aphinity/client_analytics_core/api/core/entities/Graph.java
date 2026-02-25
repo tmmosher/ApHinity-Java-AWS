@@ -1,12 +1,21 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
-import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
-import jakarta.persistence.*;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,7 +31,7 @@ public class Graph {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data", columnDefinition = "jsonb", nullable = false)
-    private PlotlyGraphSpec data;
+    private Object data;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -54,6 +63,9 @@ public class Graph {
         if (updatedAt == null) {
             updatedAt = now;
         }
+        if (data == null) {
+            data = List.of();
+        }
     }
 
     @PreUpdate
@@ -77,12 +89,21 @@ public class Graph {
         this.name = name;
     }
 
-    public PlotlyGraphSpec getData() {
+    public Object getData() {
         return data;
     }
 
-    public void setData(PlotlyGraphSpec data) {
-        this.data = data;
+    public void setData(Object data) {
+        GraphPayloadMapper.GraphPayload normalized = GraphPayloadMapper.normalize(
+            data,
+            layout,
+            config,
+            style
+        );
+        this.data = GraphPayloadMapper.toStoredData(normalized.data());
+        this.layout = normalized.layout();
+        this.config = normalized.config();
+        this.style = normalized.style();
     }
 
     public Instant getCreatedAt() {

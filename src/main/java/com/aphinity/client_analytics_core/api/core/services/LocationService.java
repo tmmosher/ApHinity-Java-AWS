@@ -7,12 +7,15 @@ import com.aphinity.client_analytics_core.api.core.entities.Location;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,8 @@ import java.util.Map;
  */
 @Service
 public class LocationService {
+    private static final Logger log = LoggerFactory.getLogger(LocationService.class);
+
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
     private final LocationGraphRepository locationGraphRepository;
@@ -255,10 +260,30 @@ public class LocationService {
      * Maps graph entities into API response shape.
      */
     private GraphResponse toGraphResponse(Graph graph) {
+        GraphPayloadMapper.GraphPayload payload;
+        try {
+            payload = GraphPayloadMapper.normalize(
+                graph.getData(),
+                graph.getLayout(),
+                graph.getConfig(),
+                graph.getStyle()
+            );
+        } catch (IllegalArgumentException ex) {
+            log.warn(
+                "Invalid graph payload for graphId={} during location graph response mapping",
+                graph.getId(),
+                ex
+            );
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Graph payload is invalid");
+        }
+
         return new GraphResponse(
             graph.getId(),
             graph.getName(),
-            graph.getData(),
+            payload.data(),
+            payload.layout(),
+            payload.config(),
+            payload.style(),
             graph.getCreatedAt(),
             graph.getUpdatedAt()
         );
