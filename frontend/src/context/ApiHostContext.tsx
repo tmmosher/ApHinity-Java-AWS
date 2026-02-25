@@ -15,5 +15,3 @@ export const ApiHostProvider = (props: ParentProps) => (
 );
 
 export const useApiHost = () => useContext(ApiHostContext);
-
-export { API_HOST };

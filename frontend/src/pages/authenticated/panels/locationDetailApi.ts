@@ -1,4 +1,4 @@
-import {parseLocationGraphList, parseLocationSummary} from "../../../types/coreApi";
+import {parseLocationGraphList, parseLocationSummary} from "../../../util/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
 import {LocationGraph, LocationSummary} from "../../../types/Types";
 

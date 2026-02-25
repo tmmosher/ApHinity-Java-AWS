@@ -6,13 +6,10 @@ import {useProfile} from "./ProfileContext";
 import {LocationSummary} from "../types/Types";
 
 const host = useApiHost();
-const profileContext = useProfile();
-const canAccessLocations = () => Boolean(profileContext.profile()?.verified);
-
 interface LocationContext {
     locations: Resource<LocationSummary[]>,
-    mutate:  Setter<LocationSummary[] | undefined>
-    refetch: (info?: unknown) => (LocationSummary[] | Promise<LocationSummary[] | undefined> | null | undefined)
+    mutate:  Setter<LocationSummary[] | undefined>,
+    refetch: (info?: unknown) => (LocationSummary[] | Promise<LocationSummary[] | undefined> | null | undefined),
 }
 
 /**
@@ -29,15 +26,16 @@ const fetchLocations = async (): Promise<LocationSummary[]> => {
 };
 
 const [locations, {mutate, refetch}] = createResource(
-    () => (canAccessLocations() ? "verified" : null),
     () => fetchLocations()
 );
 
 const locationInformation = {locations, mutate, refetch} as LocationContext;
-const LocationContext = createContext<LocationContext>();
+const LocationContext = createContext<LocationContext>(locationInformation);
 
 export const LocationProvider = (props: ParentProps) => (
     <LocationContext.Provider value={locationInformation}>
         {props.children}
     </LocationContext.Provider>
 )
+
+export const useLocation = () => useContext(LocationContext);
