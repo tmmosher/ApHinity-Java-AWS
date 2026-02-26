@@ -231,7 +231,9 @@ public class AuthService {
      * @return newly issued access and refresh tokens
      * @throws ResponseStatusException when the refresh token is invalid or revoked
      */
-    @Transactional
+    // Security state mutations (rotation/revocation) must persist even when the endpoint
+    // responds with 401, so refresh uses noRollbackFor on response-status exceptions.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public IssuedTokens refresh(String refreshToken, String ipAddress, String userAgent) {
         String tokenHash = TokenHasher.sha256(refreshToken);
         AuthSession session = authSessionRepository.findByRefreshTokenHash(tokenHash)
