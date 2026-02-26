@@ -45,6 +45,31 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsRejectsMissingAuthentication() throws Exception {
+        Location location = createLocation("Unauthenticated graph updates");
+        Graph graph = createGraph("Graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .with(csrf().asHeader())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("authentication_required"));
+    }
+
+    @Test
     void locationsReturnsMembershipScopedDataForClientUser() throws Exception {
         AppUser user = createUser("client-locations@example.com", PASSWORD, true, "client");
         Location location = createLocation("Austin");
@@ -208,6 +233,65 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsAcceptsDataOnlyPayloadFromFrontend() throws Exception {
+        AppUser partner = createUser("partner-graphs-minimal@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Huntington Beach");
+        Graph graph = createGraph("Data-only graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-minimal@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrf().asHeader())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [6, 6, 6]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isNoContent());
+
+        Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
+        assertEquals(List.of(6L, 6L, 6L), traces.getFirst().get("y"));
+    }
+
+    @Test
+    void updateLocationGraphsAllowsCookieAuthenticatedRequestWithoutExplicitCsrfHeader() throws Exception {
+        createUser("partner-graphs-missing-csrf@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Seal Beach");
+        Graph graph = createGraph("CSRF graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-missing-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
     void updateLocationGraphsRejectsClientUsers() throws Exception {
         createUser("client-graphs@example.com", PASSWORD, true, "client");
         Location location = createLocation("Irvine");
@@ -267,6 +351,33 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsRejectsUnknownLocation() throws Exception {
+        createUser("partner-unknown-location-graph@example.com", PASSWORD, true, "partner");
+        Graph graph = createGraph("Unknown location graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-unknown-location-graph@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", 999999L)
+                    .cookie(authCookies(authCookies))
+                    .with(csrf().asHeader())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("location_not_found"));
+    }
+
+    @Test
     void updateLocationGraphsRejectsInvalidGraphDataPayload() throws Exception {
         createUser("partner-invalid-graph@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Tustin");
@@ -293,6 +404,78 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("graph_data_invalid"));
+    }
+
+    @Test
+    void updateLocationGraphsRejectsDuplicateGraphIds() throws Exception {
+        createUser("partner-duplicate-graph@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Garden Grove");
+        Graph graph = createGraph("Duplicate graph test", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-duplicate-graph@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrf().asHeader())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            },
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [1, 1, 1]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId(), graph.getId()))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("graph_update_duplicates"));
+    }
+
+    @Test
+    void updateLocationGraphsIsTransactionalWhenBatchContainsInvalidGraph() throws Exception {
+        createUser("partner-transaction-graph@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Westminster");
+        Graph firstGraph = createGraph("First graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        Graph secondGraph = createGraph("Second graph", List.of(Map.of("type", "bar", "y", List.of(4, 5, 6))));
+        addLocationGraph(location, firstGraph);
+        // secondGraph intentionally left unassigned to fail the batch
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-transaction-graph@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrf().asHeader())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 9, 9]}]
+                            },
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [8, 8, 8]}]
+                            }
+                          ]
+                        }
+                        """.formatted(firstGraph.getId(), secondGraph.getId()))
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("location_graph_not_found"));
+
+        Graph persistedFirst = graphRepository.findById(firstGraph.getId()).orElseThrow();
+        List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedFirst.getData());
+        assertEquals(List.of(1L, 2L, 3L), persistedTraces.getFirst().get("y"));
     }
 
     @Test

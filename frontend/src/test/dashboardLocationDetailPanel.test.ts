@@ -150,6 +150,45 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     });
   });
 
+  it("saves minimal graph updates (graphId + data only)", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await saveLocationGraphsById(host, "55", [
+      {
+        graphId: 99,
+        data: [{type: "bar", y: [4, 5, 6]}]
+      }
+    ]);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        graphs: [
+          {
+            graphId: 99,
+            data: [{type: "bar", y: [4, 5, 6]}]
+          }
+        ]
+      })
+    });
+  });
+
+  it("rejects invalid route location ids before save request dispatch", async () => {
+    await expect(
+      saveLocationGraphsById(host, "0", [
+        {
+          graphId: 1,
+          data: [{type: "bar", y: [1]}]
+        }
+      ])
+    ).rejects.toThrowError("Invalid location id");
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
   it("throws when graph updates fail to save", async () => {
     apiFetchMock.mockResolvedValue(createMockResponse(false, {}));
 
