@@ -25,7 +25,6 @@ export type PlotlyChartProps = {
 
 export const buildPlotlyConfig = (config?: PlotlyConfig): PlotlyConfig => ({
     displayModeBar: false,
-    responsive: true,
     ...config,
 });
 
