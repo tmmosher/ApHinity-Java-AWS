@@ -122,11 +122,6 @@ export const DashboardLocationDetailPanel = () => {
                 <For each={orderedSections()}>
                   {(section) => (
                     <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-                      <div class="mb-4 flex items-center justify-between gap-2">
-                        <span class="text-xs text-base-content/60">
-                          {section.graph_ids.length} graph{section.graph_ids.length === 1 ? "" : "s"}
-                        </span>
-                      </div>
 
                       <Show when={sectionGraphs(section).length > 0} fallback={
                         <p class="text-sm text-base-content/70">

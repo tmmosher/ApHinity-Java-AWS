@@ -4,6 +4,9 @@ import com.aphinity.client_analytics_core.api.auth.AuthCookieNames;
 import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
+import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -20,17 +23,24 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Refreshes access tokens transparently for authenticated API requests.
@@ -40,10 +50,16 @@ import java.util.Set;
  */
 @Component
 public class AccessTokenRefreshFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(AccessTokenRefreshFilter.class);
+    private static final int REFRESH_RESULT_CACHE_MAX_SIZE = 10_000;
+    private static final Duration REFRESH_RESULT_CACHE_TTL = Duration.ofSeconds(10);
+
     private final AuthService authService;
     private final AuthCookieService authCookieService;
     private final ClientRequestMetadataResolver requestMetadataResolver;
     private final byte[] jwtSecret;
+    private final Cache<String, RefreshResult> refreshResultCache;
+    private final ConcurrentMap<String, CompletableFuture<RefreshResult>> inFlightRefreshes = new ConcurrentHashMap<>();
 
     /**
      * @param authService authentication service that performs refresh token exchange
@@ -61,6 +77,10 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
         this.authCookieService = authCookieService;
         this.requestMetadataResolver = requestMetadataResolver;
         this.jwtSecret = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
+        this.refreshResultCache = Caffeine.newBuilder()
+            .maximumSize(REFRESH_RESULT_CACHE_MAX_SIZE)
+            .expireAfterWrite(REFRESH_RESULT_CACHE_TTL)
+            .build();
     }
 
     /**
@@ -103,12 +123,10 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
             return;
         }
 
-        try {
-            IssuedTokens refreshedTokens = authService.refresh(
-                refreshToken,
-                requestMetadataResolver.resolveClientIp(request),
-                requestMetadataResolver.resolveUserAgent(request)
-            );
+        String refreshTokenHash = TokenHasher.sha256(refreshToken);
+        RefreshResult refreshResult = resolveRefreshResult(refreshToken, refreshTokenHash, request);
+        if (refreshResult.tokens() != null) {
+            IssuedTokens refreshedTokens = refreshResult.tokens();
             authCookieService.addAccessCookie(request, response, refreshedTokens.accessToken(), refreshedTokens.expiresIn());
             authCookieService.addRefreshCookie(request, response, refreshedTokens.refreshToken(), refreshedTokens.refreshExpiresIn());
 
@@ -117,16 +135,94 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
             wrappedRequest.putHeader(HttpHeaders.AUTHORIZATION, "Bearer " + refreshedTokens.accessToken());
             filterChain.doFilter(wrappedRequest, response);
             return;
+        }
+
+        // Refresh token is no longer valid; clear stale cookies and continue unauthenticated.
+        authCookieService.clearAccessCookie(request, response);
+        authCookieService.clearRefreshCookie(request, response);
+        filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Returns the most recent refresh result for a token hash or performs a single-flight refresh.
+     *
+     * Concurrent requests sharing the same refresh token wait on a single in-flight refresh
+     * to avoid duplicate rotation attempts.
+     */
+    private RefreshResult resolveRefreshResult(
+        String refreshToken,
+        String refreshTokenHash,
+        HttpServletRequest request
+    ) {
+        RefreshResult cachedResult = refreshResultCache.getIfPresent(refreshTokenHash);
+        if (cachedResult != null) {
+            log.debug("Using cached refresh result tokenHashPrefix={} outcome={}", tokenHashPrefix(refreshTokenHash), cachedResult.outcome());
+            return cachedResult;
+        }
+
+        CompletableFuture<RefreshResult> refreshFuture = inFlightRefreshes.get(refreshTokenHash);
+        if (refreshFuture == null) {
+            CompletableFuture<RefreshResult> createdFuture = new CompletableFuture<>();
+            CompletableFuture<RefreshResult> existingFuture = inFlightRefreshes.putIfAbsent(refreshTokenHash, createdFuture);
+            refreshFuture = existingFuture != null ? existingFuture : createdFuture;
+
+            if (existingFuture == null) {
+                try {
+                    RefreshResult result = refreshAccessToken(refreshToken, request, refreshTokenHash);
+                    refreshResultCache.put(refreshTokenHash, result);
+                    createdFuture.complete(result);
+                } catch (RuntimeException ex) {
+                    createdFuture.completeExceptionally(ex);
+                    throw ex;
+                } finally {
+                    inFlightRefreshes.remove(refreshTokenHash, createdFuture);
+                }
+                return createdFuture.join();
+            }
+        }
+
+        try {
+            return refreshFuture.join();
+        } catch (CompletionException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("Unexpected refresh execution failure", cause);
+        }
+    }
+
+    /**
+     * Executes refresh token exchange for a single token and maps unauthorized responses
+     * to a deterministic invalid-refresh result.
+     */
+    private RefreshResult refreshAccessToken(
+        String refreshToken,
+        HttpServletRequest request,
+        String refreshTokenHash
+    ) {
+        try {
+            IssuedTokens refreshedTokens = authService.refresh(
+                refreshToken,
+                requestMetadataResolver.resolveClientIp(request),
+                requestMetadataResolver.resolveUserAgent(request)
+            );
+            log.debug("Refreshed access token tokenHashPrefix={} outcome={}", tokenHashPrefix(refreshTokenHash), RefreshOutcome.REFRESHED);
+            return new RefreshResult(RefreshOutcome.REFRESHED, refreshedTokens);
         } catch (ResponseStatusException ex) {
             if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                // Refresh token is no longer valid; clear stale cookies and continue unauthenticated.
-                authCookieService.clearAccessCookie(request, response);
-                authCookieService.clearRefreshCookie(request, response);
-                filterChain.doFilter(request, response);
-                return;
+                log.info("Refresh token invalid tokenHashPrefix={} outcome={}", tokenHashPrefix(refreshTokenHash), RefreshOutcome.INVALID_REFRESH_TOKEN);
+                return new RefreshResult(RefreshOutcome.INVALID_REFRESH_TOKEN, null);
             }
             throw ex;
         }
+    }
+
+    /**
+     * Returns a non-sensitive hash prefix for diagnostics.
+     */
+    private String tokenHashPrefix(String refreshTokenHash) {
+        return refreshTokenHash.length() <= 12 ? refreshTokenHash : refreshTokenHash.substring(0, 12);
     }
 
     /**
@@ -259,5 +355,13 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
             }
             return Collections.enumeration(headerNames);
         }
+    }
+
+    private enum RefreshOutcome {
+        REFRESHED,
+        INVALID_REFRESH_TOKEN
+    }
+
+    private record RefreshResult(RefreshOutcome outcome, IssuedTokens tokens) {
     }
 }
