@@ -6,6 +6,7 @@ import {useProfile} from "./ProfileContext";
 import {LocationSummary} from "../types/Types";
 
 const host = useApiHost();
+
 interface LocationContext {
     locations: Resource<LocationSummary[]>,
     mutate:  Setter<LocationSummary[] | undefined>,
@@ -38,4 +39,12 @@ export const LocationProvider = (props: ParentProps) => (
     </LocationContext.Provider>
 )
 
-export const useLocation = () => useContext(LocationContext);
+export const useLocations = () => {
+    const ctx = useContext(LocationContext);
+    if (!ctx) {
+        throw new Error(
+            "Unable to load locations. Please login again."
+        )
+    }
+    return ctx;
+}

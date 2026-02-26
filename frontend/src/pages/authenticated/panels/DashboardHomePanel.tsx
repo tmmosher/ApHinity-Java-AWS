@@ -1,17 +1,14 @@
 import {Show, createEffect, createSignal, createResource} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useProfile} from "../../../context/ProfileContext";
-import {parseLocationList} from "../../../util/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
 import {
   getFavoriteLocationId,
   hasSelectableFavoriteLocation,
   setFavoriteLocationId
 } from "../../../util/favoriteLocation";
-import {LocationSummary} from "../../../types/Types";
 import {A} from "@solidjs/router";
-import {useLocation} from "../../../context/LocationContext";
-import {fetchLocationById} from "./locationDetailApi";
+import {useLocations} from "../../../context/LocationContext";
+import {fetchLocationById} from "../../../util/locationDetailApi";
 
 const roleLabel: Record<"admin" | "partner" | "client", string> = {
   admin: "Admin",
@@ -22,13 +19,13 @@ const roleLabel: Record<"admin" | "partner" | "client", string> = {
 export const DashboardHomePanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
-  const locationContext = useLocation();
+  const locationContext = useLocations();
   const locations = locationContext.locations();
   const [favoriteLocationId, setFavoriteLocationIdSignal] = createSignal(getFavoriteLocationId());
-  const canAccessLocations = () => Boolean(profileContext.profile()?.verified);
+  const canAccess = () => Boolean(profileContext.profile()?.verified);
 
-  createEffect(() => {
-    if (!canAccessLocations()) {
+    createEffect(() => {
+    if (!canAccess()) {
       return;
     }
     const locationList = locations;
@@ -65,7 +62,7 @@ export const DashboardHomePanel = () => {
       <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
         <h2 class="text-lg font-semibold">Favorite location</h2>
         <Show
-          when={canAccessLocations()}
+          when={canAccess()}
           fallback={
             <p class="mt-2 text-sm text-base-content/70">
               Verify your email to view and select locations.
@@ -81,7 +78,7 @@ export const DashboardHomePanel = () => {
                       </button>
                   </div>
               }>
-                  <Show when={location() !== undefined} fallback={
+                  <Show when={location()} fallback={
                       <p class="mt-4 text-sm text-base-content/70">No locations available.</p>
                   }>
                       <A href={`/dashboard/locations/${location()!.id}`} class="link link-primary text-lg font-medium"

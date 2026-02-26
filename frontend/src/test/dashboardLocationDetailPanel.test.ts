@@ -4,7 +4,7 @@ import {
   fetchLocationById,
   fetchLocationGraphsById,
   parseRouteLocationId
-} from "../pages/authenticated/panels/locationDetailApi";
+} from "../util/locationDetailApi";
 
 vi.mock("../util/apiFetch", () => ({
   apiFetch: vi.fn()

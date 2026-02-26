@@ -1,12 +1,12 @@
 import {
-  ActiveInvite,
-  InviteStatus,
-  LocationGraph,
-  LocationMembership,
-  LocationSectionLayout,
-  LocationSectionLayoutConfig,
-  LocationSummary
-} from "./Types";
+    ActiveInvite,
+    InviteStatus,
+    LocationGraph,
+    LocationMembership, LocationMembershipWithStatus,
+    LocationSectionLayout,
+    LocationSectionLayoutConfig,
+    LocationSummary
+} from "../types/Types";
 
 // Data verification helpers. Add any new data verification helpers here!
 
@@ -133,11 +133,16 @@ export const parseLocationMembership = (value: unknown): LocationMembership => {
   };
 };
 
-export const parseLocationMembershipList = (value: unknown): LocationMembership[] => {
+const membershipDeletionQueue = (membership: LocationMembership) => {
+    return ({membership, active: true}) as LocationMembershipWithStatus;
+}
+
+export const parseLocationMembershipList = (value: unknown): LocationMembershipWithStatus[] => {
   if (!Array.isArray(value)) {
     throw new Error("Invalid membership list response");
   }
-  return value.map(parseLocationMembership);
+  const locationMemberships = value.map(parseLocationMembership);
+  return locationMemberships.map(membershipDeletionQueue);
 };
 
 const parseOptionalGraphObject = (

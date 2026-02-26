@@ -7,6 +7,7 @@ import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.LocationService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -121,5 +122,23 @@ public class LocationController {
             locationId,
             userId
         );
+    }
+
+    /**
+     * Deletes a location membership for a target user.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param targetUserId target user identifier
+     */
+    @DeleteMapping("/locations/{locationId}/memberships/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMembership(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @PathVariable("userId") Long targetUserId
+    ) {
+        Long authenticatedUserId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        locationService.deleteLocationMembership(authenticatedUserId, locationId, targetUserId);
     }
 }

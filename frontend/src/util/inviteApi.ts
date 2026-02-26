@@ -1,4 +1,4 @@
-import {parseActiveInviteList, parseLocationList} from "../types/coreApi";
+import {parseActiveInviteList, parseLocationList} from "./coreApi";
 import {ActiveInvite, LocationSummary} from "../types/Types";
 import {apiFetch} from "./apiFetch";
 

@@ -1,10 +1,11 @@
 import {A, useParams} from "@solidjs/router";
 import PlotlyChart, {loadPlotlyModule} from "../../../components/Chart";
 import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../components/Chart";
-import {For, Show, Suspense, createMemo, createResource, createEffect} from "solid-js";
+import {For, Show, Suspense, createMemo, createResource} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {LocationGraph, LocationSectionLayout} from "../../../types/Types";
-import {fetchLocationById, fetchLocationGraphsById} from "./locationDetailApi";
+import {fetchLocationById, fetchLocationGraphsById} from "../../../util/locationDetailApi";
+import {resolveGraphHeight} from "../../../util/graphTheme";
 
 export const DashboardLocationDetailPanel = () => {
   const host = useApiHost();
@@ -143,13 +144,16 @@ export const DashboardLocationDetailPanel = () => {
                                 >
                                   <Suspense fallback={graphLoadingFallback(graph.name)}>
                                     <Show when={plotlyModule()}>
-                                      <PlotlyChart
-                                        name={graph.name}
-                                        data={graph.data as PlotlyData[]}
-                                        layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
-                                        config={(graph.config ?? undefined) as PlotlyConfig | undefined}
-                                        class="h-72 w-full"
-                                      />
+                                      <div class="w-full" style={{height: resolveGraphHeight(graph.style)}}>
+                                        <PlotlyChart
+                                          name={graph.name}
+                                          data={graph.data as PlotlyData[]}
+                                          layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
+                                          config={(graph.config ?? undefined) as PlotlyConfig | undefined}
+                                          style={graph.style ?? undefined}
+                                          class="h-full w-full"
+                                        />
+                                      </div>
                                     </Show>
                                   </Suspense>
                                 </Show>

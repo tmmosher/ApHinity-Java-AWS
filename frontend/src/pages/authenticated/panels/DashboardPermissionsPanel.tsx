@@ -1,32 +1,14 @@
-import {For, Show, createEffect, createResource, createSignal} from "solid-js";
+import {For, Show, createEffect, createMemo, createResource, createSignal} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {
-  parseLocationList,
-  parseLocationMembershipList
-} from "../../../types/coreApi";
+import {parseLocationMembershipList} from "../../../util/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
-import {LocationMembership, LocationSummary} from "../../../types/Types";
+import {LocationMembershipWithStatus} from "../../../types/Types";
+import {useLocations} from "../../../context/LocationContext";
 
 export const DashboardPermissionsPanel = () => {
   const host = useApiHost();
   const [selectedLocationId, setSelectedLocationId] = createSignal("");
-
-  /**
-   * Loads all locations that can be managed in the permissions panel.
-   *
-   * Endpoint: `GET /api/core/locations`
-   */
-  const fetchLocations = async (): Promise<LocationSummary[]> => {
-    const response = await apiFetch(host + "/api/core/locations", {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load locations");
-    }
-    return parseLocationList(await response.json());
-  };
-
-  const [locations, {refetch: refetchLocations}] = createResource(fetchLocations);
+  const {locations, refetch: refetchLocations} = useLocations();
 
   createEffect(() => {
     if (selectedLocationId()) {
@@ -46,7 +28,7 @@ export const DashboardPermissionsPanel = () => {
    * @param locationId Selected location id as a string.
    * @returns Membership list, or empty list when no location is selected.
    */
-  const fetchMemberships = async (locationId: string): Promise<LocationMembership[]> => {
+  const fetchMemberships = async (locationId: string): Promise<LocationMembershipWithStatus[]> => {
     if (!locationId) {
       return [];
     }
@@ -60,7 +42,77 @@ export const DashboardPermissionsPanel = () => {
     return parseLocationMembershipList(await response.json());
   };
 
-  const [memberships, {refetch: refetchMemberships}] = createResource(selectedLocationId, fetchMemberships);
+  const [memberships, {refetch: refetchMemberships, mutate: mutateMemberships}] = createResource(selectedLocationId, fetchMemberships);
+  const [isApplying, setIsApplying] = createSignal(false);
+  const [queueError, setQueueError] = createSignal("");
+
+  const removeMembership = async (locationId: string, userId: number) => {
+    const response = await apiFetch(host + "/api/core/locations/" + locationId + "/memberships/" + userId, {
+      method: "DELETE"
+    });
+    if (!response.ok) {
+      throw new Error("Unable to remove membership");
+    }
+  };
+
+  const deleteQueue = createMemo(() =>
+    memberships()?.filter((membership) => !membership.active) ?? []
+  );
+  const deleteQueueHasItems = createMemo(() => deleteQueue().length > 0);
+
+  const resetDeleteQueue = () => {
+    if (!deleteQueueHasItems()) {
+      return;
+    }
+    mutateMemberships((previousMemberships) =>
+      previousMemberships?.map((membership) => ({...membership, active: true}))
+    );
+    setQueueError("");
+  };
+
+  const applyDeleteQueue = async () => {
+    if (isApplying() || !deleteQueueHasItems()) {
+      return;
+    }
+
+    const locationId = selectedLocationId();
+    if (!locationId) {
+      return;
+    }
+
+    setIsApplying(true);
+    setQueueError("");
+    try {
+      await Promise.all(
+        deleteQueue().map((membership) =>
+          removeMembership(locationId, membership.membership.userId)
+        )
+      );
+      await refetchMemberships();
+    } catch {
+      setQueueError("Unable to apply membership removals.");
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const addMembershipToRemoveQueue = (membership: LocationMembershipWithStatus) => {
+      mutateMemberships((prev) => {
+        if (!prev) return;
+        const next = [...prev];
+        const index = next.findIndex((candidate) => candidate.membership.userId === membership.membership.userId);
+        if (index !== -1) {
+          next[index] = {...membership, active: false};
+        }
+        return next;
+      });
+  }
+
+  createEffect(() => {
+    selectedLocationId();
+    setQueueError("");
+    setIsApplying(false);
+  });
 
   return (
     <div class="space-y-6">
@@ -107,15 +159,43 @@ export const DashboardPermissionsPanel = () => {
                   <Show when={(memberships()?.length ?? 0) > 0} fallback={
                     <p class="text-base-content/70">No users are assigned to this location yet.</p>
                   }>
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        class={"btn btn-sm " + (deleteQueueHasItems() && !isApplying() ? "btn-error" : "btn-disabled")}
+                        disabled={!deleteQueueHasItems() || isApplying()}
+                        onClick={() => void applyDeleteQueue()}
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        class={"btn btn-sm " + (deleteQueueHasItems() && !isApplying() ? "btn-outline" : "btn-disabled")}
+                        disabled={!deleteQueueHasItems() || isApplying()}
+                        onClick={resetDeleteQueue}
+                      >
+                        Undo
+                      </button>
+                      <Show when={deleteQueueHasItems()}>
+                        <span class="text-xs text-base-content/70">
+                          {deleteQueue().length} pending removal{deleteQueue().length === 1 ? "" : "s"}
+                        </span>
+                      </Show>
+                    </div>
+
+                    <Show when={queueError()}>
+                      <p class="mb-3 text-sm text-error">{queueError()}</p>
+                    </Show>
+
                     <ul class="space-y-3">
-                      <For each={memberships()}>
+                      <For each={memberships()?.filter((membership) => membership.active)}>
                         {(membership) => (
                           <li class="rounded-lg border border-base-300 p-3">
                             <div class="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <p class="font-medium">{membership.userEmail ?? `User #${membership.userId}`}</p>
+                              <div class="hover:bg-red-500 transition duration-300 ease-in-out hover:cursor-pointer" onClick={() => void addMembershipToRemoveQueue(membership)}>
+                                <p class="font-medium">{membership.membership.userEmail ?? `User #${membership.membership.userId}`}</p>
                                 <p class="text-xs text-base-content/60">
-                                  User ID {membership.userId}
+                                  User ID {membership.membership.userId}
                                 </p>
                               </div>
                             </div>

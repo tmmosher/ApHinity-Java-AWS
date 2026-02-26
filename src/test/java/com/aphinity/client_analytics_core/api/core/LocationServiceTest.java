@@ -5,6 +5,7 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.Location;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +70,117 @@ class LocationServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("Account email is not verified", ex.getReason());
         verifyNoInteractions(locationRepository, locationUserRepository, accountRoleService);
+    }
+
+    @Test
+    void deleteLocationMembershipRejectsUnknownAuthenticatedUser() {
+        when(appUserRepository.findById(5L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationMembership(5L, 11L, 12L)
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertEquals("Invalid authenticated user", ex.getReason());
+        verifyNoInteractions(locationRepository, locationUserRepository, accountRoleService);
+    }
+
+    @Test
+    void deleteLocationMembershipRejectsUnverifiedAuthenticatedUser() {
+        AppUser user = unverifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationMembership(5L, 11L, 12L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Account email is not verified", ex.getReason());
+        verifyNoInteractions(locationRepository, locationUserRepository, accountRoleService);
+    }
+
+    @Test
+    void deleteLocationMembershipRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationMembership(5L, 11L, 12L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, locationUserRepository);
+    }
+
+    @Test
+    void deleteLocationMembershipRejectsMissingLocation() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationUserRepository.findByIdLocationIdAndIdUserId(99L, 12L)).thenReturn(Optional.empty());
+        when(locationRepository.existsById(99L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationMembership(5L, 99L, 12L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Location not found", ex.getReason());
+        verify(locationRepository).existsById(99L);
+        verify(appUserRepository, never()).existsById(12L);
+        verify(locationUserRepository).findByIdLocationIdAndIdUserId(99L, 12L);
+    }
+
+    @Test
+    void deleteLocationMembershipRejectsMissingTargetUser() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationUserRepository.findByIdLocationIdAndIdUserId(99L, 12L)).thenReturn(Optional.empty());
+        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(appUserRepository.existsById(12L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationMembership(5L, 99L, 12L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Target user not found", ex.getReason());
+        verify(locationUserRepository).findByIdLocationIdAndIdUserId(99L, 12L);
+    }
+
+    @Test
+    void deleteLocationMembershipRejectsMissingMembership() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(appUserRepository.existsById(12L)).thenReturn(true);
+        when(locationUserRepository.findByIdLocationIdAndIdUserId(99L, 12L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationMembership(5L, 99L, 12L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Location membership not found", ex.getReason());
+    }
+
+    @Test
+    void deleteLocationMembershipDeletesExistingMembership() {
+        AppUser user = verifiedUser(5L);
+        LocationUser membership = new LocationUser();
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationUserRepository.findByIdLocationIdAndIdUserId(99L, 12L)).thenReturn(Optional.of(membership));
+
+        locationService.deleteLocationMembership(5L, 99L, 12L);
+
+        verify(locationUserRepository).delete(membership);
+        verify(locationRepository, never()).existsById(99L);
+        verify(appUserRepository, never()).existsById(12L);
     }
 
     @Test
@@ -318,6 +431,14 @@ class LocationServiceTest {
         user.setId(userId);
         user.setEmail("verified@example.com");
         user.setEmailVerifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        return user;
+    }
+
+    private AppUser unverifiedUser(Long userId) {
+        AppUser user = new AppUser();
+        user.setId(userId);
+        user.setEmail("unverified@example.com");
+        user.setEmailVerifiedAt(null);
         return user;
     }
 

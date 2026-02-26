@@ -207,6 +207,46 @@ public class LocationService {
     }
 
     /**
+     * Deletes a membership for a target user at a location.
+     *
+     * @param authenticatedUserId authenticated user id performing the change
+     * @param locationId target location id
+     * @param targetUserId target user id
+     */
+    @Transactional
+    public void deleteLocationMembership(
+        Long authenticatedUserId,
+        Long locationId,
+        Long targetUserId
+    ) {
+        AppUser actingUser = requireUser(authenticatedUserId);
+        requirePartnerOrAdmin(actingUser);
+
+        // Fast path: a successful delete only needs membership lookup + delete.
+        LocationUser membership = locationUserRepository.findByIdLocationIdAndIdUserId(locationId, targetUserId)
+            .orElse(null);
+        if (membership != null) {
+            locationUserRepository.delete(membership);
+            log.info(
+                "Deleted location membership locationId={} targetUserId={} actorUserId={}",
+                locationId,
+                targetUserId,
+                authenticatedUserId
+            );
+            return;
+        }
+
+        // Preserve explicit 404 reasons for clients when membership is absent.
+        if (!locationRepository.existsById(locationId)) {
+            throw locationNotFound();
+        }
+        if (!appUserRepository.existsById(targetUserId)) {
+            throw targetUserNotFound();
+        }
+        throw locationMembershipNotFound();
+    }
+
+    /**
      * Indicates whether a user can access a location.
      *
      * @param userId authenticated user id
@@ -341,6 +381,10 @@ public class LocationService {
 
     private ResponseStatusException targetUserNotFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user not found");
+    }
+
+    private ResponseStatusException locationMembershipNotFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Location membership not found");
     }
 
     private ResponseStatusException invalidLocationName() {

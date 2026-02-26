@@ -3,7 +3,7 @@ import {toast} from "solid-toast";
 import {useApiHost} from "../context/ApiHostContext";
 import {useProfile} from "../context/ProfileContext";
 import {
-    getStoredThemePreference,
+    getDocumentThemePreference,
     setStoredThemePreference,
     ThemePreference
 } from "../util/themePreference";
@@ -25,7 +25,7 @@ const Profile = () => {
     const [isSavingPassword, setIsSavingPassword] = createSignal(false);
     const [verificationCode, setVerificationCode] = createSignal("");
     const [isVerifyingEmail, setIsVerifyingEmail] = createSignal(false);
-    const [themePreference, setThemePreference] = createSignal<ThemePreference>(getStoredThemePreference());
+    const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
     const canEditEmail = () => canEditProfileEmail(profileContext.profile()?.role);
     const isUnverified = () => profileContext.profile()?.verified === false;
 
@@ -41,10 +41,6 @@ const Profile = () => {
     const updateThemePreference = (next: ThemePreference) => {
         setThemePreference(next);
         setStoredThemePreference(next);
-        document.documentElement.setAttribute(
-            "data-theme",
-            next === "dark" ? "forest-corporate" : "corporate"
-        );
         toast.success(`Theme changed to ${next} mode.`);
     };
 

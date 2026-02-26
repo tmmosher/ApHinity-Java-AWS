@@ -1,6 +1,6 @@
-import {parseLocationGraphList, parseLocationSummary} from "../../../util/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
-import {LocationGraph, LocationSummary} from "../../../types/Types";
+import {parseLocationGraphList, parseLocationSummary} from "./coreApi";
+import {apiFetch} from "./apiFetch";
+import {LocationGraph, LocationSummary} from "../types/Types";
 
 export const parseRouteLocationId = (locationId: string): number => {
   const parsedId = Number(locationId);

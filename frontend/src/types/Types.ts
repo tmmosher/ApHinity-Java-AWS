@@ -53,6 +53,14 @@ export interface LocationMembership {
     createdAt: string;
 }
 
+/**
+ * This wraps the LocationMembership interface so I can make a queue for partners to delete.
+ */
+export interface LocationMembershipWithStatus {
+    membership: LocationMembership;
+    active: boolean; // whether a membership is queued to be deleted
+}
+
 export interface LocationGraph {
     id: number;
     name: string;

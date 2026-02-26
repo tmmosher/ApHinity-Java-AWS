@@ -1,12 +1,13 @@
 import {A} from "@solidjs/router";
-import {For, Show, createResource, createSignal} from "solid-js";
+import {For, Show, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useProfile} from "../../../context/ProfileContext";
-import {parseLocationList, parseLocationSummary} from "../../../util/coreApi";
+import {parseLocationSummary} from "../../../util/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
 import {setFavoriteLocationId} from "../../../util/favoriteLocation";
 import {LocationSummary} from "../../../types/Types";
+import {useLocations} from "../../../context/LocationContext";
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();
@@ -17,22 +18,8 @@ export const DashboardLocationsPanel = () => {
     return role === "admin" || role === "partner";
   };
 
-  /**
-   * Loads location summaries for the current account.
-   *
-   * Endpoint: `GET /api/core/locations`
-   */
-  const fetchLocations = async (): Promise<LocationSummary[]> => {
-    const response = await apiFetch(host + "/api/core/locations", {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load locations.");
-    }
-    return parseLocationList(await response.json());
-  };
-
-  const [locations, {mutate, refetch}] = createResource(fetchLocations);
+  const locationContext = useLocations();
+  const locations = locationContext.locations;
   const [draftNames, setDraftNames] = createSignal<Record<number, string>>({});
   const [savingLocationId, setSavingLocationId] = createSignal<number | null>(null);
 
@@ -87,7 +74,7 @@ export const DashboardLocationsPanel = () => {
       }
 
       const updated = parseLocationSummary(await response.json());
-      mutate((current) =>
+      locationContext.mutate((current) =>
         current?.map((candidate) => (candidate.id === updated.id ? updated : candidate))
       );
       setDraftNames((current) => {
@@ -123,7 +110,7 @@ export const DashboardLocationsPanel = () => {
         <Show when={!locations.error} fallback={
           <div class="space-y-3">
             <p class="text-error">Unable to load locations.</p>
-            <button type="button" class="btn btn-outline" onClick={() => void refetch()}>
+            <button type="button" class="btn btn-outline" onClick={() => void locationContext.refetch()}>
               Retry
             </button>
           </div>

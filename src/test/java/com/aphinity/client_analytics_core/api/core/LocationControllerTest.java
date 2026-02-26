@@ -90,6 +90,21 @@ class LocationControllerTest {
     }
 
     @Test
+    void deleteMembershipDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationController.deleteMembership(jwt, 8L, 13L);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).deleteLocationMembership(42L, 8L, 13L);
+    }
+
+    @Test
     void locationGraphsRejectsMissingJwt() {
         when(authenticatedUserService.resolveAuthenticatedUserId(null))
             .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authenticated user"));
