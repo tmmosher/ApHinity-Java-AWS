@@ -71,3 +71,11 @@ export interface LocationGraph {
     createdAt: string;
     updatedAt: string;
 }
+
+export interface LocationGraphUpdate {
+    graphId: number;
+    data: Record<string, unknown>[];
+    layout?: Record<string, unknown> | null;
+    config?: Record<string, unknown> | null;
+    style?: Record<string, unknown> | null;
+}

@@ -1,6 +1,6 @@
 import {parseLocationGraphList, parseLocationSummary} from "./coreApi";
 import {apiFetch} from "./apiFetch";
-import {LocationGraph, LocationSummary} from "../types/Types";
+import {LocationGraph, LocationGraphUpdate, LocationSummary} from "../types/Types";
 
 export const parseRouteLocationId = (locationId: string): number => {
   const parsedId = Number(locationId);
@@ -52,4 +52,37 @@ export const fetchLocationGraphsById = async (host: string, locationId: string):
     throw new Error("Unable to load location graphs");
   }
   return parseLocationGraphList(await response.json());
+};
+
+/**
+ * Persists edited graph payloads for a location.
+ *
+ * Endpoint: `PUT /api/core/locations/{locationId}/graphs`
+ * Body: `{ graphs: [{ graphId, data, layout, config, style }] }`
+ *
+ * @param host API host base URL.
+ * @param locationId Location id from route params.
+ * @param graphUpdates Graph payloads to persist.
+ * @throws {Error} When id is invalid or request fails.
+ */
+export const saveLocationGraphsById = async (
+  host: string,
+  locationId: string,
+  graphUpdates: LocationGraphUpdate[]
+): Promise<void> => {
+  const parsedId = parseRouteLocationId(locationId);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedId + "/graphs", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      graphs: graphUpdates
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to save location graphs");
+  }
 };

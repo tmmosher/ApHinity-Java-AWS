@@ -60,9 +60,16 @@ export const DashboardInvitesPanel = () => {
             </button>
           </div>
         }>
-          <Show when={(invites()?.length ?? 0) > 0} fallback={<p class="text-base-content/70">No active invites.</p>}>
-            <ul class="space-y-3">
-              <For each={invites()}>
+          <Show when={(invites()?.length ?? 0) > 0} fallback={
+              <div class="space-y-3">
+                  <p class="text-base-content/70">No active invites.</p>
+                  <button type="button" class="btn btn-outline" onClick={() => void refetch()}>
+                      Retry
+                  </button>
+              </div>
+          }>
+              <ul class="space-y-3">
+                  <For each={invites()}>
                 {(invite) => (
                   <li class="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
                     <div class="flex flex-wrap items-start justify-between gap-3">

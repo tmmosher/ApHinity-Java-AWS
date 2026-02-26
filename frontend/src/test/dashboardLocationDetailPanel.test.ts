@@ -3,7 +3,8 @@ import {apiFetch} from "../util/apiFetch";
 import {
   fetchLocationById,
   fetchLocationGraphsById,
-  parseRouteLocationId
+  parseRouteLocationId,
+  saveLocationGraphsById
 } from "../util/locationDetailApi";
 
 vi.mock("../util/apiFetch", () => ({
@@ -115,5 +116,45 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     await expect(fetchLocationGraphsById(host, "55"))
       .rejects
       .toThrowError("Unable to load location graphs");
+  });
+
+  it("saves location graph edits through the update endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await saveLocationGraphsById(host, "55", [
+      {
+        graphId: 12,
+        data: [{type: "pie", values: [1, 2, 3]}],
+        layout: {title: {text: "Demo"}},
+        config: {displayModeBar: false},
+        style: {height: 280}
+      }
+    ]);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        graphs: [
+          {
+            graphId: 12,
+            data: [{type: "pie", values: [1, 2, 3]}],
+            layout: {title: {text: "Demo"}},
+            config: {displayModeBar: false},
+            style: {height: 280}
+          }
+        ]
+      })
+    });
+  });
+
+  it("throws when graph updates fail to save", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {}));
+
+    await expect(
+      saveLocationGraphsById(host, "55", [])
+    ).rejects.toThrowError("Unable to save location graphs");
   });
 });

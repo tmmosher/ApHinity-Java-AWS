@@ -102,7 +102,7 @@ export const DashboardLocationsPanel = () => {
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Locations</h1>
         <p class="text-base-content/70">
-          Select a location to open its page.
+          Select a location.
         </p>
       </header>
 
@@ -115,12 +115,19 @@ export const DashboardLocationsPanel = () => {
             </button>
           </div>
         }>
-          <Show when={(locations()?.length ?? 0) > 0} fallback={<p class="text-base-content/70">No locations available.</p>}>
-            <ul class="space-y-3">
-              <For each={locations()}>
-                {(location) => (
-                  <li class="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
+          <Show when={(locations()?.length ?? 0) > 0} fallback={
+              <div class="space-y-3">
+                  <p class="text-base-content/70">No locations available.</p>
+                  <button type="button" class="btn btn-outline" onClick={() => void locationContext.refetch()}>
+                      Retry
+                  </button>
+              </div>
+          }>
+              <ul class="space-y-3">
+                  <For each={locations()}>
+                      {(location) => (
+                          <li class="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <A href={`/dashboard/locations/${location.id}`} class="link link-primary text-lg font-medium" preload>
                           {location.name}
