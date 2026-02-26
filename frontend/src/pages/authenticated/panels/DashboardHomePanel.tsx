@@ -40,7 +40,7 @@ export const DashboardHomePanel = () => {
     }
   });
 
-  const [location, {refetch}] = createResource(
+  const [location, {refetch}] = createResource(favoriteLocationId() || null,
     () => fetchLocationById(host, favoriteLocationId())
   );
 
