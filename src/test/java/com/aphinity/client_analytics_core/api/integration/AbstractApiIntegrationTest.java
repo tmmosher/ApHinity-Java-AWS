@@ -7,15 +7,22 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.auth.services.MailSendingService;
+import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.Location;
+import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
+import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.security.JwtProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import jakarta.servlet.http.Cookie;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,6 +72,12 @@ abstract class AbstractApiIntegrationTest {
 
     @Autowired
     protected LocationRepository locationRepository;
+
+    @Autowired
+    protected GraphRepository graphRepository;
+
+    @Autowired
+    protected LocationGraphRepository locationGraphRepository;
 
     @Autowired
     protected LocationUserRepository locationUserRepository;
@@ -130,6 +143,42 @@ abstract class AbstractApiIntegrationTest {
         membership.setLocation(location);
         membership.setUser(user);
         locationUserRepository.save(membership);
+    }
+
+    protected Graph createGraph(String name, Object data) {
+        Graph graph = new Graph();
+        graph.setName(name);
+        setRawGraphData(graph, asJsonString(data));
+        return graphRepository.save(graph);
+    }
+
+    protected void addLocationGraph(Location location, Graph graph) {
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setId(new LocationGraphId(location.getId(), graph.getId()));
+        locationGraph.setLocation(location);
+        locationGraph.setGraph(graph);
+        locationGraphRepository.save(locationGraph);
+    }
+
+    private String asJsonString(Object value) {
+        if (value instanceof String jsonText) {
+            return jsonText;
+        }
+        try (Jsonb jsonb = JsonbBuilder.create()) {
+            return jsonb.toJson(value);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Unable to serialize graph test payload as JSON", ex);
+        }
+    }
+
+    private void setRawGraphData(Graph graph, Object rawData) {
+        try {
+            var field = Graph.class.getDeclaredField("data");
+            field.setAccessible(true);
+            field.set(graph, rawData);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Unable to set raw graph test payload", ex);
+        }
     }
 
     protected AuthCookies loginAndCaptureCookies(String email, String password) throws Exception {

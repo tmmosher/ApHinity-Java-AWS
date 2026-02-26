@@ -1,6 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,7 +17,6 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -64,7 +65,7 @@ public class Graph {
             updatedAt = now;
         }
         if (data == null) {
-            data = List.of();
+            data = "[]";
         }
     }
 
@@ -100,7 +101,8 @@ public class Graph {
             config,
             style
         );
-        this.data = GraphPayloadMapper.toStoredData(normalized.data());
+        Object storedData = GraphPayloadMapper.toStoredData(normalized.data());
+        this.data = toJsonText(storedData);
         this.layout = normalized.layout();
         this.config = normalized.config();
         this.style = normalized.style();
@@ -152,5 +154,13 @@ public class Graph {
 
     public void setLocationGraphs(Set<LocationGraph> locationGraphs) {
         this.locationGraphs = locationGraphs;
+    }
+
+    private String toJsonText(Object value) {
+        try (Jsonb jsonb = JsonbBuilder.create()) {
+            return jsonb.toJson(value);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Graph data must be serializable JSON", ex);
+        }
     }
 }

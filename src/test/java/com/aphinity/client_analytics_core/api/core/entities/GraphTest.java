@@ -1,12 +1,12 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
+import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,9 +19,7 @@ class GraphTest {
             Map.of("type", "bar", "name", "actual")
         ));
 
-        Object storedData = graph.getData();
-        assertInstanceOf(List.class, storedData);
-        List<?> traces = (List<?>) storedData;
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(2, traces.size());
     }
 
@@ -30,9 +28,9 @@ class GraphTest {
         Graph graph = new Graph();
         graph.setData(List.of(Map.of("type", "pie", "name", "share")));
 
-        Object storedData = graph.getData();
-        assertInstanceOf(Map.class, storedData);
-        assertEquals("pie", ((Map<?, ?>) storedData).get("type"));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("pie", traces.getFirst().get("type"));
     }
 
     @Test
@@ -56,8 +54,9 @@ class GraphTest {
             "style", Map.of("height", 240)
         ));
 
-        assertInstanceOf(Map.class, graph.getData());
-        assertEquals("pie", ((Map<?, ?>) graph.getData()).get("type"));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("pie", traces.getFirst().get("type"));
         assertEquals(Map.of("showlegend", false), graph.getLayout());
         assertEquals(Map.of("displayModeBar", false), graph.getConfig());
         assertEquals(Map.of("height", 240), graph.getStyle());

@@ -8,6 +8,8 @@ import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
@@ -25,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Business logic for location visibility and membership administration.
@@ -35,6 +38,7 @@ public class LocationService {
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
+    private final GraphRepository graphRepository;
     private final LocationGraphRepository locationGraphRepository;
     private final LocationUserRepository locationUserRepository;
     private final AccountRoleService accountRoleService;
@@ -42,12 +46,14 @@ public class LocationService {
     public LocationService(
         AppUserRepository appUserRepository,
         LocationRepository locationRepository,
+        GraphRepository graphRepository,
         LocationGraphRepository locationGraphRepository,
         LocationUserRepository locationUserRepository,
         AccountRoleService accountRoleService
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
+        this.graphRepository = graphRepository;
         this.locationGraphRepository = locationGraphRepository;
         this.locationUserRepository = locationUserRepository;
         this.accountRoleService = accountRoleService;
@@ -121,6 +127,64 @@ public class LocationService {
             .map(LocationGraph::getGraph)
             .map(this::toGraphResponse)
             .toList();
+    }
+
+    /**
+     * Replaces graph trace data for one or more graphs linked to a location.
+     * Only partner/admin callers may mutate graph data.
+     *
+     * @param userId authenticated user id performing the update
+     * @param locationId target location id
+     * @param graphUpdates requested graph data replacements
+     */
+    @Transactional
+    public void updateLocationGraphData(
+        Long userId,
+        Long locationId,
+        List<LocationGraphDataUpdateRequest> graphUpdates
+    ) {
+        AppUser user = requireUser(userId);
+        requirePartnerOrAdmin(user);
+        if (!locationRepository.existsById(locationId)) {
+            throw locationNotFound();
+        }
+
+        if (graphUpdates == null || graphUpdates.isEmpty()) {
+            return;
+        }
+
+        Map<Long, Object> updateDataByGraphId = mapGraphUpdateDataById(graphUpdates);
+        List<Graph> graphs = graphRepository.findByLocationIdAndGraphIdInForUpdate(
+            locationId,
+            updateDataByGraphId.keySet()
+        );
+        if (graphs.size() != updateDataByGraphId.size()) {
+            throw locationGraphNotFound();
+        }
+
+        for (Graph graph : graphs) {
+            Object nextData = updateDataByGraphId.get(graph.getId());
+            try {
+                graph.setData(nextData);
+            } catch (IllegalArgumentException ex) {
+                log.warn(
+                    "Rejected invalid graph data update locationId={} graphId={} actorUserId={}",
+                    locationId,
+                    graph.getId(),
+                    userId,
+                    ex
+                );
+                throw invalidGraphData();
+            }
+        }
+
+        graphRepository.saveAll(graphs);
+        log.info(
+            "Updated graph data payloads locationId={} graphCount={} actorUserId={}",
+            locationId,
+            graphs.size(),
+            userId
+        );
     }
 
     /**
@@ -387,11 +451,39 @@ public class LocationService {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Location membership not found");
     }
 
+    private ResponseStatusException locationGraphNotFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Location graph not found");
+    }
+
     private ResponseStatusException invalidLocationName() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location name is required");
     }
 
     private ResponseStatusException locationNameInUse() {
         return new ResponseStatusException(HttpStatus.CONFLICT, "Location name already in use");
+    }
+
+    private ResponseStatusException invalidGraphData() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph data is invalid");
+    }
+
+    private ResponseStatusException duplicateGraphUpdates() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph update list contains duplicate graph ids");
+    }
+
+    private Map<Long, Object> mapGraphUpdateDataById(List<LocationGraphDataUpdateRequest> graphUpdates) {
+        Map<Long, Object> updatesById = new LinkedHashMap<>();
+        for (LocationGraphDataUpdateRequest update : graphUpdates) {
+            if (update == null || update.graphId() == null) {
+                throw invalidGraphData();
+            }
+            if (updatesById.putIfAbsent(update.graphId(), update.data()) != null) {
+                throw duplicateGraphUpdates();
+            }
+            if (Objects.isNull(update.data())) {
+                throw invalidGraphData();
+            }
+        }
+        return Map.copyOf(updatesById);
     }
 }

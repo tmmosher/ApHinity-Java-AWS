@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.controllers;
 
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
 import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
@@ -66,6 +67,25 @@ public class LocationController {
     public List<GraphResponse> locationGraphs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationService.getAccessibleLocationGraphs(userId, locationId);
+    }
+
+    /**
+     * Updates graph trace data for a location.
+     * Only partner/admin users are authorized to mutate graph payloads.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param request validated request containing graph ids and replacement data payloads
+     */
+    @PutMapping("/locations/{locationId}/graphs")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateLocationGraphData(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @Valid @RequestBody LocationGraphDataUpdateBatchRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        locationService.updateLocationGraphData(userId, locationId, request.graphs());
     }
 
     /**

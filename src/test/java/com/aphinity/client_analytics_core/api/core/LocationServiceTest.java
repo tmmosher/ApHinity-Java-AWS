@@ -6,6 +6,9 @@ import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.Location;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
@@ -30,6 +33,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -42,6 +48,9 @@ class LocationServiceTest {
 
     @Mock
     private LocationRepository locationRepository;
+
+    @Mock
+    private GraphRepository graphRepository;
 
     @Mock
     private LocationGraphRepository locationGraphRepository;
@@ -181,6 +190,180 @@ class LocationServiceTest {
         verify(locationUserRepository).delete(membership);
         verify(locationRepository, never()).existsById(99L);
         verify(appUserRepository, never()).existsById(12L);
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsUnknownAuthenticatedUser() {
+        when(appUserRepository.findById(5L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                11L,
+                List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar"))))
+            )
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertEquals("Invalid authenticated user", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                11L,
+                List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar"))))
+            )
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsMissingLocation() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar"))))
+            )
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Location not found", ex.getReason());
+        verifyNoInteractions(graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphDataAllowsEmptyUpdates() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        locationService.updateLocationGraphData(5L, 99L, List.of());
+
+        verifyNoInteractions(graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsDuplicateGraphIds() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(
+                    new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar"))),
+                    new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "scatter")))
+                )
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph update list contains duplicate graph ids", ex.getReason());
+        verifyNoInteractions(graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsUnknownLocationGraph() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar"))))
+            )
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Location graph not found", ex.getReason());
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsInvalidGraphPayload() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Invalid test graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar"), "bad")))
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph data is invalid", ex.getReason());
+        verify(graphRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void updateLocationGraphDataUpdatesTraceDataOnly() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setLayout(Map.of("title", "Original layout"));
+        graph.setConfig(Map.of("displayModeBar", false));
+        graph.setStyle(Map.of("height", 240));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar", "y", List.of(9, 8, 7)))))
+        );
+
+        verify(graphRepository).saveAll(List.of(graph));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("y"));
+        assertEquals(Map.of("title", "Original layout"), graph.getLayout());
+        assertEquals(Map.of("displayModeBar", false), graph.getConfig());
+        assertEquals(Map.of("height", 240), graph.getStyle());
     }
 
     @Test

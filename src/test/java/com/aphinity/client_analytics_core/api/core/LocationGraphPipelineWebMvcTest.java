@@ -6,6 +6,8 @@ import com.aphinity.client_analytics_core.api.security.AccessTokenRefreshFilter;
 import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
 import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
@@ -36,10 +38,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -64,6 +72,9 @@ class LocationGraphPipelineWebMvcTest {
 
     @MockitoBean
     private LocationRepository locationRepository;
+
+    @MockitoBean
+    private GraphRepository graphRepository;
 
     @MockitoBean
     private LocationGraphRepository locationGraphRepository;
@@ -205,6 +216,86 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.code").value("request_failed"))
             .andExpect(jsonPath("$.message").value("Request failed"));
+    }
+
+    @Test
+    void updateLocationGraphDataWritesOnlyTraceDataThroughPipeline() throws Exception {
+        Long userId = 41L;
+        Long locationId = 77L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(310L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setLayout(Map.of("title", "Original title"));
+        graph.setConfig(Map.of("displayModeBar", false));
+        graph.setStyle(Map.of("height", 240));
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": 310,
+                              "data": [
+                                {"type": "bar", "y": [9, 8, 7]}
+                              ],
+                              "layout": {"title": "Ignored by backend"}
+                            }
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isNoContent());
+
+        verify(graphRepository).saveAll(List.of(graph));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("y"));
+        assertEquals(Map.of("title", "Original title"), graph.getLayout());
+    }
+
+    @Test
+    void updateLocationGraphDataReturnsBadRequestForDuplicateGraphIds() throws Exception {
+        Long userId = 42L;
+        Long locationId = 78L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {"graphId": 310, "data": [{"type": "bar"}]},
+                            {"graphId": 310, "data": [{"type": "scatter"}]}
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("graph_update_duplicates"))
+            .andExpect(jsonPath("$.message").value("Graph update list contains duplicate graph ids"));
+
+        verifyNoInteractions(graphRepository);
     }
 
     private AppUser verifiedUser(Long userId) {

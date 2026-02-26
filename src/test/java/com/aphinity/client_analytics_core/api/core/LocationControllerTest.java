@@ -1,6 +1,8 @@
 package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -102,6 +104,23 @@ class LocationControllerTest {
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).deleteLocationMembership(42L, 8L, 13L);
+    }
+
+    @Test
+    void updateLocationGraphDataDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationGraphDataUpdateBatchRequest request = new LocationGraphDataUpdateBatchRequest(
+            List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar", "y", List.of(2, 4, 6)))))
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationController.updateLocationGraphData(jwt, 8L, request);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).updateLocationGraphData(42L, 8L, request.graphs());
     }
 
     @Test
