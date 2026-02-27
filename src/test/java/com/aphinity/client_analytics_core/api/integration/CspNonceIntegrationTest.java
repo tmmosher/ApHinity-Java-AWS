@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class CspNonceIntegrationTest extends AbstractApiIntegrationTest {
     private static final Pattern SCRIPT_NONCE_PATTERN = Pattern.compile(
-        "script-src 'self' 'nonce-([A-Za-z0-9_-]+)' https://challenges.cloudflare.com;"
+        "script-src 'self' 'nonce-([A-Za-z0-9_-]+)'[^;]*;"
     );
     private static final Pattern META_NONCE_PATTERN = Pattern.compile(
         "<meta property=\"csp-nonce\" nonce=\"([A-Za-z0-9_-]+)\""

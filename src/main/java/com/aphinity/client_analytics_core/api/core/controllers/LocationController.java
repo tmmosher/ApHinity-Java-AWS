@@ -8,10 +8,13 @@ import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.LocationService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -23,6 +26,8 @@ import java.util.List;
 @RestController
 @RequestMapping({"/core", "/api/core"})
 public class LocationController {
+    private static final Logger log = LoggerFactory.getLogger(LocationController.class);
+
     private final LocationService locationService;
     private final AuthenticatedUserService authenticatedUserService;
 
@@ -85,7 +90,41 @@ public class LocationController {
         @Valid @RequestBody LocationGraphDataUpdateBatchRequest request
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
-        locationService.updateLocationGraphData(userId, locationId, request.graphs());
+        int requestedGraphCount = request.graphs() == null ? 0 : request.graphs().size();
+        log.info(
+            "Received location graph update request actorUserId={} locationId={} graphCount={}",
+            userId,
+            locationId,
+            requestedGraphCount
+        );
+        try {
+            locationService.updateLocationGraphData(userId, locationId, request.graphs());
+            log.info(
+                "Completed location graph update request actorUserId={} locationId={} graphCount={}",
+                userId,
+                locationId,
+                requestedGraphCount
+            );
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location graph update request actorUserId={} locationId={} graphCount={} status={} reason={}",
+                userId,
+                locationId,
+                requestedGraphCount,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location graph update request actorUserId={} locationId={} graphCount={}",
+                userId,
+                locationId,
+                requestedGraphCount,
+                ex
+            );
+            throw ex;
+        }
     }
 
     /**
@@ -159,6 +198,39 @@ public class LocationController {
         @PathVariable("userId") Long targetUserId
     ) {
         Long authenticatedUserId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
-        locationService.deleteLocationMembership(authenticatedUserId, locationId, targetUserId);
+        log.info(
+            "Received location membership delete request actorUserId={} locationId={} targetUserId={}",
+            authenticatedUserId,
+            locationId,
+            targetUserId
+        );
+        try {
+            locationService.deleteLocationMembership(authenticatedUserId, locationId, targetUserId);
+            log.info(
+                "Completed location membership delete request actorUserId={} locationId={} targetUserId={}",
+                authenticatedUserId,
+                locationId,
+                targetUserId
+            );
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location membership delete request actorUserId={} locationId={} targetUserId={} status={} reason={}",
+                authenticatedUserId,
+                locationId,
+                targetUserId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location membership delete request actorUserId={} locationId={} targetUserId={}",
+                authenticatedUserId,
+                locationId,
+                targetUserId,
+                ex
+            );
+            throw ex;
+        }
     }
 }

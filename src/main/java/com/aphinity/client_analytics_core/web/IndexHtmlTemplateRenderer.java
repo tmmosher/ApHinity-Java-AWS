@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 @Component
 public class IndexHtmlTemplateRenderer {
     static final String NONCE_PLACEHOLDER = "__CSP_NONCE__";
+    private static final Path RUNTIME_STATIC_INDEX_HTML_PATH = Path.of("src", "main", "resources", "static", "index.html");
     private static final String CLASSPATH_INDEX_HTML_PATH = "static/index.html";
     private static final Path FALLBACK_FRONTEND_INDEX_PATH = Path.of("frontend", "index.html");
     private static final Pattern NONCELESS_SCRIPT_TAG_PATTERN = Pattern.compile("<script(?![^>]*\\bnonce=)");
@@ -63,6 +64,11 @@ public class IndexHtmlTemplateRenderer {
     }
 
     private String loadTemplate() {
+        String runtimeTemplate = readRuntimeStaticTemplate();
+        if (runtimeTemplate != null) {
+            return runtimeTemplate;
+        }
+
         String classpathTemplate = readClasspathTemplate();
         if (classpathTemplate != null) {
             return classpathTemplate;
@@ -74,10 +80,23 @@ public class IndexHtmlTemplateRenderer {
         }
         throw new IllegalStateException(
             "Unable to locate frontend index template at "
+                + RUNTIME_STATIC_INDEX_HTML_PATH
+                + " or "
                 + CLASSPATH_INDEX_HTML_PATH
                 + " or "
                 + FALLBACK_FRONTEND_INDEX_PATH
         );
+    }
+
+    private String readRuntimeStaticTemplate() {
+        if (!Files.exists(RUNTIME_STATIC_INDEX_HTML_PATH)) {
+            return null;
+        }
+        try {
+            return Files.readString(RUNTIME_STATIC_INDEX_HTML_PATH, StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to load runtime static index template", ex);
+        }
     }
 
     private String readClasspathTemplate() {

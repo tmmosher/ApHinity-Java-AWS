@@ -10,7 +10,12 @@ class ContentSecurityPolicyBuilderTest {
         String policy = ContentSecurityPolicyBuilder.buildPolicy("testNonce");
 
         assertThat(policy)
-            .contains("script-src 'self' 'nonce-testNonce' https://challenges.cloudflare.com;")
+            .contains(
+                "script-src 'self' 'nonce-testNonce' https://challenges.cloudflare.com https://static.cloudflareinsights.com;"
+            )
+            .contains(
+                "connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com;"
+            )
             .contains("style-src 'self';")
             .contains("style-src-elem 'self' 'unsafe-inline';")
             .contains("style-src-attr 'unsafe-inline';");

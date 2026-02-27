@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class SecurityConfigTest {
     private static final Pattern SCRIPT_NONCE_PATTERN = Pattern.compile(
-        "script-src 'self' 'nonce-([A-Za-z0-9_-]+)' https://challenges.cloudflare.com;"
+        "script-src 'self' 'nonce-([A-Za-z0-9_-]+)'[^;]*;"
     );
 
     @Autowired
@@ -76,7 +76,10 @@ class SecurityConfigTest {
         String cspHeader = result.getResponse().getHeader("Content-Security-Policy");
         org.assertj.core.api.Assertions.assertThat(cspHeader)
             .isNotBlank()
+            .contains("script-src 'self' ")
+            .contains("https://static.cloudflareinsights.com;")
             .contains("frame-src 'self' https://challenges.cloudflare.com;")
+            .contains("connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com;")
             .contains("style-src-elem 'self' 'unsafe-inline';")
             .contains("style-src-attr 'unsafe-inline';");
 

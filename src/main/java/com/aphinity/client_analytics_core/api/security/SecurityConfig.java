@@ -27,6 +27,7 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
 import com.digitalsanctuary.cf.turnstile.TurnstileConfiguration;
+import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.springframework.context.annotation.Import;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -132,8 +133,11 @@ public class SecurityConfig {
      * @return core API CSRF enforcement filter
      */
     @Bean
-    CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter(CookieCsrfTokenRepository csrfTokenRepository) {
-        return new CoreApiCsrfEnforcementFilter(csrfTokenRepository);
+    CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter(
+        CookieCsrfTokenRepository csrfTokenRepository,
+        AsyncLogService asyncLogService
+    ) {
+        return new CoreApiCsrfEnforcementFilter(csrfTokenRepository, asyncLogService);
     }
 
     /**

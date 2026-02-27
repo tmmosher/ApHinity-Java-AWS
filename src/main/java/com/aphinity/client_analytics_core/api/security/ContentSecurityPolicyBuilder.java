@@ -14,10 +14,10 @@ final class ContentSecurityPolicyBuilder {
     static String buildPolicy(String nonce) {
         return String.join(" ",
             "default-src 'self';",
-            "script-src 'self' 'nonce-" + nonce + "' https://challenges.cloudflare.com;",
+            "script-src 'self' 'nonce-" + nonce + "' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
             "script-src-attr 'none';",
             "frame-src 'self' https://challenges.cloudflare.com;",
-            "connect-src 'self' https://challenges.cloudflare.com;",
+            "connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com;",
             "img-src 'self' data:;",
             "style-src 'self';",
             "style-src-elem 'self' 'unsafe-inline';",

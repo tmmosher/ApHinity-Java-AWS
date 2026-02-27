@@ -1,10 +1,13 @@
 package com.aphinity.client_analytics_core.api.security;
 
+import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.http.HttpStatus;
@@ -23,12 +26,15 @@ import java.util.Set;
  * cookie-backed bearer tokens, core write endpoints still require CSRF protection.
  */
 public class CoreApiCsrfEnforcementFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(CoreApiCsrfEnforcementFilter.class);
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private final CsrfTokenRepository csrfTokenRepository;
+    private final AsyncLogService asyncLogService;
 
-    public CoreApiCsrfEnforcementFilter(CsrfTokenRepository csrfTokenRepository) {
+    public CoreApiCsrfEnforcementFilter(CsrfTokenRepository csrfTokenRepository, AsyncLogService asyncLogService) {
         this.csrfTokenRepository = csrfTokenRepository;
+        this.asyncLogService = asyncLogService;
     }
 
     @Override
@@ -51,7 +57,7 @@ public class CoreApiCsrfEnforcementFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         CsrfToken expectedToken = csrfTokenRepository.loadToken(request);
         if (expectedToken == null) {
-            rejectMissingOrInvalidToken(response);
+            rejectMissingOrInvalidToken(request, response, "missing_expected_token");
             return;
         }
 
@@ -63,21 +69,41 @@ public class CoreApiCsrfEnforcementFilter extends OncePerRequestFilter {
             actualToken = request.getParameter(expectedToken.getParameterName());
         }
         if (actualToken == null || actualToken.isBlank()) {
-            rejectMissingOrInvalidToken(response);
+            rejectMissingOrInvalidToken(request, response, "missing_request_token");
             return;
         }
         if (!expectedToken.getToken().equals(actualToken)) {
-            rejectMissingOrInvalidToken(response);
+            rejectMissingOrInvalidToken(request, response, "token_mismatch");
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void rejectMissingOrInvalidToken(HttpServletResponse response) throws IOException {
+    private void rejectMissingOrInvalidToken(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        String reason
+    ) throws IOException {
         if (response.isCommitted()) {
             return;
         }
+        String method = request.getMethod();
+        String path = request.getRequestURI();
+        log.warn(
+            "Rejected core API request due to CSRF validation failure method={} path={} reason={}",
+            method,
+            path,
+            reason
+        );
+        asyncLogService.log(
+            "CoreApiCsrfEnforcementFilter rejected request method="
+                + method
+                + " path="
+                + path
+                + " reason="
+                + reason
+        );
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");

@@ -144,21 +144,46 @@ public class LocationService {
         List<LocationGraphDataUpdateRequest> graphUpdates
     ) {
         AppUser user = requireUser(userId);
-        requirePartnerOrAdmin(user);
+        if (!accountRoleService.isPartnerOrAdmin(user)) {
+            log.warn(
+                "Rejected graph update due to insufficient permissions actorUserId={} locationId={}",
+                userId,
+                locationId
+            );
+            throw forbidden();
+        }
         if (!locationRepository.existsById(locationId)) {
+            log.warn(
+                "Rejected graph update because location was not found actorUserId={} locationId={}",
+                userId,
+                locationId
+            );
             throw locationNotFound();
         }
 
         if (graphUpdates == null || graphUpdates.isEmpty()) {
+            log.info(
+                "Skipping graph update because request payload was empty actorUserId={} locationId={}",
+                userId,
+                locationId
+            );
             return;
         }
 
-        Map<Long, Object> updateDataByGraphId = mapGraphUpdateDataById(graphUpdates);
+        Map<Long, Object> updateDataByGraphId = mapGraphUpdateDataById(graphUpdates, locationId, userId);
         List<Graph> graphs = graphRepository.findByLocationIdAndGraphIdInForUpdate(
             locationId,
             updateDataByGraphId.keySet()
         );
         if (graphs.size() != updateDataByGraphId.size()) {
+            List<Long> matchedGraphIds = graphs.stream().map(Graph::getId).sorted().toList();
+            log.warn(
+                "Rejected graph update because one or more graphs were not assigned to location actorUserId={} locationId={} requestedGraphIds={} matchedGraphIds={}",
+                userId,
+                locationId,
+                updateDataByGraphId.keySet(),
+                matchedGraphIds
+            );
             throw locationGraphNotFound();
         }
 
@@ -178,12 +203,24 @@ public class LocationService {
             }
         }
 
-        graphRepository.saveAll(graphs);
+        try {
+            graphRepository.saveAll(graphs);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Graph update persistence failed actorUserId={} locationId={} graphIds={}",
+                userId,
+                locationId,
+                updateDataByGraphId.keySet(),
+                ex
+            );
+            throw ex;
+        }
         log.info(
-            "Updated graph data payloads locationId={} graphCount={} actorUserId={}",
+            "Updated graph data payloads locationId={} graphCount={} actorUserId={} graphIds={}",
             locationId,
             graphs.size(),
-            userId
+            userId,
+            updateDataByGraphId.keySet()
         );
     }
 
@@ -284,13 +321,32 @@ public class LocationService {
         Long targetUserId
     ) {
         AppUser actingUser = requireUser(authenticatedUserId);
-        requirePartnerOrAdmin(actingUser);
+        if (!accountRoleService.isPartnerOrAdmin(actingUser)) {
+            log.warn(
+                "Rejected location membership delete due to insufficient permissions actorUserId={} locationId={} targetUserId={}",
+                authenticatedUserId,
+                locationId,
+                targetUserId
+            );
+            throw forbidden();
+        }
 
         // Fast path: a successful delete only needs membership lookup + delete.
         LocationUser membership = locationUserRepository.findByIdLocationIdAndIdUserId(locationId, targetUserId)
             .orElse(null);
         if (membership != null) {
-            locationUserRepository.delete(membership);
+            try {
+                locationUserRepository.delete(membership);
+            } catch (RuntimeException ex) {
+                log.error(
+                    "Location membership delete persistence failed actorUserId={} locationId={} targetUserId={}",
+                    authenticatedUserId,
+                    locationId,
+                    targetUserId,
+                    ex
+                );
+                throw ex;
+            }
             log.info(
                 "Deleted location membership locationId={} targetUserId={} actorUserId={}",
                 locationId,
@@ -302,11 +358,29 @@ public class LocationService {
 
         // Preserve explicit 404 reasons for clients when membership is absent.
         if (!locationRepository.existsById(locationId)) {
+            log.warn(
+                "Rejected location membership delete because location was not found actorUserId={} locationId={} targetUserId={}",
+                authenticatedUserId,
+                locationId,
+                targetUserId
+            );
             throw locationNotFound();
         }
         if (!appUserRepository.existsById(targetUserId)) {
+            log.warn(
+                "Rejected location membership delete because target user was not found actorUserId={} locationId={} targetUserId={}",
+                authenticatedUserId,
+                locationId,
+                targetUserId
+            );
             throw targetUserNotFound();
         }
+        log.warn(
+            "Rejected location membership delete because membership was not found actorUserId={} locationId={} targetUserId={}",
+            authenticatedUserId,
+            locationId,
+            targetUserId
+        );
         throw locationMembershipNotFound();
     }
 
@@ -471,16 +545,41 @@ public class LocationService {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph update list contains duplicate graph ids");
     }
 
-    private Map<Long, Object> mapGraphUpdateDataById(List<LocationGraphDataUpdateRequest> graphUpdates) {
+    private Map<Long, Object> mapGraphUpdateDataById(
+        List<LocationGraphDataUpdateRequest> graphUpdates,
+        Long locationId,
+        Long actorUserId
+    ) {
         Map<Long, Object> updatesById = new LinkedHashMap<>();
-        for (LocationGraphDataUpdateRequest update : graphUpdates) {
+        for (int index = 0; index < graphUpdates.size(); index++) {
+            LocationGraphDataUpdateRequest update = graphUpdates.get(index);
             if (update == null || update.graphId() == null) {
+                log.warn(
+                    "Rejected graph update row because graph id was missing actorUserId={} locationId={} rowIndex={}",
+                    actorUserId,
+                    locationId,
+                    index
+                );
                 throw invalidGraphData();
             }
             if (updatesById.putIfAbsent(update.graphId(), update.data()) != null) {
+                log.warn(
+                    "Rejected graph update payload due to duplicate graph id actorUserId={} locationId={} duplicateGraphId={} rowIndex={}",
+                    actorUserId,
+                    locationId,
+                    update.graphId(),
+                    index
+                );
                 throw duplicateGraphUpdates();
             }
             if (Objects.isNull(update.data())) {
+                log.warn(
+                    "Rejected graph update row because data payload was null actorUserId={} locationId={} graphId={} rowIndex={}",
+                    actorUserId,
+                    locationId,
+                    update.graphId(),
+                    index
+                );
                 throw invalidGraphData();
             }
         }
