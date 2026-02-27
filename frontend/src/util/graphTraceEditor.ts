@@ -110,6 +110,79 @@ export const buildTraceLabel = (trace: Record<string, unknown>, index: number): 
   return `${index + 1}. ${traceType}`;
 };
 
+const getTraceYAxisLayoutKey = (trace: Record<string, unknown>): string => {
+  const yAxisReference = typeof trace.yaxis === "string" ? trace.yaxis.trim().toLowerCase() : "y";
+  const match = /^y(\d+)?$/.exec(yAxisReference);
+  if (!match) {
+    return "yaxis";
+  }
+  const suffix = match[1];
+  if (!suffix || suffix === "1") {
+    return "yaxis";
+  }
+  return `yaxis${suffix}`;
+};
+
+const hasRangeBoundValue = (value: unknown): boolean =>
+  value !== null &&
+  value !== undefined &&
+  !(typeof value === "string" && value.length === 0);
+
+export const getTraceYAxisRange = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>
+): [unknown, unknown] => {
+  if (!isRecord(layout)) {
+    return ["", ""];
+  }
+
+  const axis = layout[getTraceYAxisLayoutKey(trace)];
+  if (!isRecord(axis) || !Array.isArray(axis.range)) {
+    return ["", ""];
+  }
+
+  return [axis.range[0] ?? "", axis.range[1] ?? ""];
+};
+
+export const updateTraceYAxisRange = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>,
+  boundIndex: 0 | 1,
+  rawValue: string
+): Record<string, unknown> | null => {
+  const axisKey = getTraceYAxisLayoutKey(trace);
+  const nextLayout = isRecord(layout) ? {...layout} : {};
+  const nextAxis = isRecord(nextLayout[axisKey]) ? {...nextLayout[axisKey]} : {};
+  const existingRange = Array.isArray(nextAxis.range)
+    ? [nextAxis.range[0], nextAxis.range[1]]
+    : [null, null];
+  const previousBound = existingRange[boundIndex];
+
+  if (rawValue.length === 0) {
+    existingRange[boundIndex] = null;
+  } else {
+    existingRange[boundIndex] = coerceInputValue(rawValue, previousBound, true);
+  }
+
+  const hasAnyRange = hasRangeBoundValue(existingRange[0]) || hasRangeBoundValue(existingRange[1]);
+  if (hasAnyRange) {
+    nextAxis.range = existingRange;
+    nextLayout[axisKey] = nextAxis;
+    return nextLayout;
+  }
+
+  if (isRecord(nextLayout[axisKey])) {
+    delete nextAxis.range;
+    if (Object.keys(nextAxis).length === 0) {
+      delete nextLayout[axisKey];
+    } else {
+      nextLayout[axisKey] = nextAxis;
+    }
+  }
+
+  return Object.keys(nextLayout).length > 0 ? nextLayout : null;
+};
+
 const syncPieMarkerColors = (
   trace: Record<string, unknown>,
   preferredColor?: string

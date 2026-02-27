@@ -1,15 +1,14 @@
 import Dialog from "corvu/dialog";
-import type { JSX } from "solid-js";
-import {Show, createEffect, createMemo, createSignal} from "solid-js";
-import {loadPlotlyModule} from "./Chart";
-import CartesianTraceEditor from "./graph-editor/CartesianTraceEditor";
-import PieTraceEditor from "./graph-editor/PieTraceEditor";
-import TraceControls from "./graph-editor/TraceControls";
-import type {LocationGraph} from "../types/Types";
+import {Match, Show, Switch, createEffect, createMemo, createSignal} from "solid-js";
+import {loadPlotlyModule} from "../Chart";
+import CartesianTraceEditor from "./CartesianTraceEditor";
+import PieTraceEditor from "./PieTraceEditor";
+import TraceControls from "./TraceControls";
+import type {LocationGraph} from "../../types/Types";
 import {
   type EditableGraphPayload,
   createEditableGraphPayload
-} from "../util/graphEditor";
+} from "../../util/graphEditor";
 import {
   TRACE_COLOR_OPTIONS,
   addCartesianRow,
@@ -18,17 +17,18 @@ import {
   getTraceArray,
   getTraceColor,
   getTraceType,
+  getTraceYAxisRange,
   isRecord,
   removeCartesianRow,
   removePieRow,
   removeTraceWithPlotly,
   setTraceColor,
+  updateTraceYAxisRange,
   updateCartesianX,
   updateCartesianY,
   updatePieLabel,
   updatePieValue
-} from "../util/graphTraceEditor";
-import type {TraceType} from "../util/graphTraceEditor";
+} from "../../util/graphTraceEditor";
 
 type GraphEditorModalProps = {
   isOpen: boolean;
@@ -98,6 +98,11 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     return trace ? getTraceType(trace) : null;
   });
 
+  const unsupportedTraceType = createMemo(() => {
+    const trace = selectedTrace();
+    return trace && typeof trace.type === "string" ? trace.type : "unknown";
+  });
+
   const selectedTraceColorValue = createMemo(() => {
     const trace = selectedTrace();
     if (!trace) {
@@ -150,6 +155,14 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     Array.from({length: Math.max(cartesianXValues().length, cartesianYValues().length)}, (_, index) => index)
   );
 
+  const selectedTraceYAxisRange = createMemo<[unknown, unknown]>(() => {
+    const trace = selectedTrace();
+    if (!trace) {
+      return ["", ""];
+    }
+    return getTraceYAxisRange(editablePayload().layout ?? null, trace);
+  });
+
   const updateSelectedTrace = (
     mutator: (trace: Record<string, unknown>) => Record<string, unknown>
   ) => {
@@ -164,6 +177,27 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       return {
         ...current,
         data: nextData
+      };
+    });
+    setOperationError("");
+  };
+
+  const updateSelectedTraceYRange = (boundIndex: 0 | 1, rawValue: string) => {
+    const index = selectedTraceIndex();
+    setEditablePayload((current) => {
+      const existingTrace = current.data[index];
+      if (!isRecord(existingTrace)) {
+        return current;
+      }
+      const nextLayout = updateTraceYAxisRange(
+        current.layout ?? null,
+        existingTrace,
+        boundIndex,
+        rawValue
+      );
+      return {
+        ...current,
+        layout: nextLayout
       };
     });
     setOperationError("");
@@ -205,65 +239,6 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     } finally {
       setIsRemovingTrace(false);
     }
-  };
-
-  const editorSectionByType: Record<TraceType, () => JSX.Element> = {
-    pie: () => (
-      <PieTraceEditor
-        rowIndexes={pieRowIndexes()}
-        labels={pieLabels()}
-        values={pieValues()}
-        isBusy={isBusy()}
-        onAddRow={() => updateSelectedTrace((trace) => addPieRow(trace))}
-        onUpdateLabel={(rowIndex, rawValue) =>
-          updateSelectedTrace((trace) => updatePieLabel(trace, rowIndex, rawValue))
-        }
-        onUpdateValue={(rowIndex, rawValue) =>
-          updateSelectedTrace((trace) => updatePieValue(trace, rowIndex, rawValue))
-        }
-        onRemoveRow={(rowIndex) =>
-          updateSelectedTrace((trace) => removePieRow(trace, rowIndex))
-        }
-      />
-    ),
-    bar: () => (
-      <CartesianTraceEditor
-        heading="Bar"
-        rowIndexes={cartesianRowIndexes()}
-        xValues={cartesianXValues()}
-        yValues={cartesianYValues()}
-        isBusy={isBusy()}
-        onAddRow={() => updateSelectedTrace((trace) => addCartesianRow(trace))}
-        onUpdateX={(rowIndex, rawValue) =>
-          updateSelectedTrace((trace) => updateCartesianX(trace, rowIndex, rawValue))
-        }
-        onUpdateY={(rowIndex, rawValue) =>
-          updateSelectedTrace((trace) => updateCartesianY(trace, rowIndex, rawValue))
-        }
-        onRemoveRow={(rowIndex) =>
-          updateSelectedTrace((trace) => removeCartesianRow(trace, rowIndex))
-        }
-      />
-    ),
-    scatter: () => (
-      <CartesianTraceEditor
-        heading="Scatter"
-        rowIndexes={cartesianRowIndexes()}
-        xValues={cartesianXValues()}
-        yValues={cartesianYValues()}
-        isBusy={isBusy()}
-        onAddRow={() => updateSelectedTrace((trace) => addCartesianRow(trace))}
-        onUpdateX={(rowIndex, rawValue) =>
-          updateSelectedTrace((trace) => updateCartesianX(trace, rowIndex, rawValue))
-        }
-        onUpdateY={(rowIndex, rawValue) =>
-          updateSelectedTrace((trace) => updateCartesianY(trace, rowIndex, rawValue))
-        }
-        onRemoveRow={(rowIndex) =>
-          updateSelectedTrace((trace) => removeCartesianRow(trace, rowIndex))
-        }
-      />
-    )
   };
 
   const close = () => {
@@ -335,28 +310,90 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
               onRemoveTrace={() => void removeSelectedTrace()}
             />
 
-            {(() => {
-              const trace = selectedTrace();
-              if (!trace) {
-                return (
-                  <p class="rounded-lg border border-base-300 bg-base-200/40 p-3 text-sm text-base-content/70">
-                    This graph has no traces to edit.
-                  </p>
-                );
+            <Show
+              when={selectedTrace()}
+              fallback={
+                <p class="rounded-lg border border-base-300 bg-base-200/40 p-3 text-sm text-base-content/70">
+                  This graph has no traces to edit.
+                </p>
               }
-
-              const traceType = selectedTraceType();
-              if (!traceType) {
-                const rawType = typeof trace.type === "string" ? trace.type : "unknown";
-                return (
+            >
+              <Show
+                when={selectedTraceType()}
+                fallback={
                   <p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                    Unsupported trace type "{rawType}". Supported editors: pie, bar, scatter.
+                    Unsupported trace type "{unsupportedTraceType()}". Supported editors: pie, bar, scatter.
                   </p>
-                );
-              }
-
-              return editorSectionByType[traceType]();
-            })()}
+                }
+              >
+                <Switch>
+                  <Match when={selectedTraceType() === "pie"}>
+                    <PieTraceEditor
+                      rowIndexes={pieRowIndexes()}
+                      labels={pieLabels()}
+                      values={pieValues()}
+                      isBusy={isBusy()}
+                      onAddRow={() => updateSelectedTrace((trace) => addPieRow(trace))}
+                      onUpdateLabel={(rowIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updatePieLabel(trace, rowIndex, rawValue))
+                      }
+                      onUpdateValue={(rowIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updatePieValue(trace, rowIndex, rawValue))
+                      }
+                      onRemoveRow={(rowIndex) =>
+                        updateSelectedTrace((trace) => removePieRow(trace, rowIndex))
+                      }
+                    />
+                  </Match>
+                  <Match when={selectedTraceType() === "bar"}>
+                    <CartesianTraceEditor
+                      heading="Bar"
+                      rowIndexes={cartesianRowIndexes()}
+                      xValues={cartesianXValues()}
+                      yValues={cartesianYValues()}
+                      yRangeMin={selectedTraceYAxisRange()[0]}
+                      yRangeMax={selectedTraceYAxisRange()[1]}
+                      isBusy={isBusy()}
+                      onAddRow={() => updateSelectedTrace((trace) => addCartesianRow(trace))}
+                      onUpdateX={(rowIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updateCartesianX(trace, rowIndex, rawValue))
+                      }
+                      onUpdateY={(rowIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updateCartesianY(trace, rowIndex, rawValue))
+                      }
+                      onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
+                      onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}
+                      onRemoveRow={(rowIndex) =>
+                        updateSelectedTrace((trace) => removeCartesianRow(trace, rowIndex))
+                      }
+                    />
+                  </Match>
+                  <Match when={selectedTraceType() === "scatter"}>
+                    <CartesianTraceEditor
+                      heading="Scatter"
+                      rowIndexes={cartesianRowIndexes()}
+                      xValues={cartesianXValues()}
+                      yValues={cartesianYValues()}
+                      yRangeMin={selectedTraceYAxisRange()[0]}
+                      yRangeMax={selectedTraceYAxisRange()[1]}
+                      isBusy={isBusy()}
+                      onAddRow={() => updateSelectedTrace((trace) => addCartesianRow(trace))}
+                      onUpdateX={(rowIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updateCartesianX(trace, rowIndex, rawValue))
+                      }
+                      onUpdateY={(rowIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updateCartesianY(trace, rowIndex, rawValue))
+                      }
+                      onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
+                      onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}
+                      onRemoveRow={(rowIndex) =>
+                        updateSelectedTrace((trace) => removeCartesianRow(trace, rowIndex))
+                      }
+                    />
+                  </Match>
+                </Switch>
+              </Show>
+            </Show>
           </div>
 
           <Show when={operationError()}>

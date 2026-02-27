@@ -6,10 +6,14 @@ type CartesianTraceEditorProps = {
   rowIndexes: number[];
   xValues: unknown[];
   yValues: unknown[];
+  yRangeMin: unknown;
+  yRangeMax: unknown;
   isBusy: boolean;
   onAddRow: () => void;
   onUpdateX: (rowIndex: number, rawValue: string) => void;
   onUpdateY: (rowIndex: number, rawValue: string) => void;
+  onUpdateYRangeMin: (rawValue: string) => void;
+  onUpdateYRangeMax: (rawValue: string) => void;
   onRemoveRow: (rowIndex: number) => void;
 };
 
@@ -25,6 +29,33 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => (
       >
         Add Row
       </button>
+    </div>
+
+    <div class="grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 md:grid-cols-2">
+      <label class="form-control">
+        <span class="label-text">Y range min</span>
+        <input
+          class="input input-bordered input-sm mt-1"
+          type="text"
+          inputmode="decimal"
+          placeholder="Auto"
+          value={toInputValue(props.yRangeMin)}
+          disabled={props.isBusy}
+          onInput={(event) => props.onUpdateYRangeMin(event.currentTarget.value)}
+        />
+      </label>
+      <label class="form-control">
+        <span class="label-text">Y range max</span>
+        <input
+          class="input input-bordered input-sm mt-1"
+          type="text"
+          inputmode="decimal"
+          placeholder="Auto"
+          value={toInputValue(props.yRangeMax)}
+          disabled={props.isBusy}
+          onInput={(event) => props.onUpdateYRangeMax(event.currentTarget.value)}
+        />
+      </label>
     </div>
 
     <Show when={props.rowIndexes.length > 0} fallback={<p class="text-sm text-base-content/70">No values in this trace.</p>}>

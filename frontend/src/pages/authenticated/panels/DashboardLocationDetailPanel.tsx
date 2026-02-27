@@ -1,7 +1,7 @@
 import {A, useParams} from "@solidjs/router";
 import PlotlyChart, {loadPlotlyModule} from "../../../components/Chart";
 import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../components/Chart";
-import GraphEditorModal from "../../../components/GraphEditorModal";
+import GraphEditorModal from "../../../components/graph-editor/GraphEditorModal";
 import {For, Show, Suspense, createEffect, createMemo, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";

@@ -2,8 +2,10 @@ import {describe, expect, it} from "vitest";
 import {
   addPieRow,
   coerceInputValue,
+  getTraceYAxisRange,
   removePieRow,
   setTraceColor,
+  updateTraceYAxisRange,
   updatePieValue
 } from "../util/graphTraceEditor";
 
@@ -55,5 +57,70 @@ describe("graphTraceEditor", () => {
 
     const nextTrace = updatePieValue(trace, 0, "-");
     expect((nextTrace.values as unknown[])[0]).toBe("-");
+  });
+
+  it("updates and reads y-axis range for default axis traces", () => {
+    const trace: Record<string, unknown> = {
+      type: "scatter",
+      y: [1, 2, 3]
+    };
+
+    const withMin = updateTraceYAxisRange(null, trace, 0, "10");
+    expect(withMin).toEqual({
+      yaxis: {
+        range: [10, null]
+      }
+    });
+
+    const withMinAndMax = updateTraceYAxisRange(withMin, trace, 1, "20");
+    expect(getTraceYAxisRange(withMinAndMax, trace)).toEqual([10, 20]);
+  });
+
+  it("targets the selected trace y-axis key and preserves axis settings", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      yaxis: "y2",
+      y: [4, 5]
+    };
+
+    const layout = updateTraceYAxisRange(
+      {
+        yaxis2: {
+          title: {text: "Secondary Axis"}
+        }
+      },
+      trace,
+      1,
+      "42"
+    );
+
+    expect(layout).toEqual({
+      yaxis2: {
+        title: {text: "Secondary Axis"},
+        range: [null, 42]
+      }
+    });
+  });
+
+  it("removes empty y-axis ranges while keeping unrelated layout entries", () => {
+    const trace: Record<string, unknown> = {
+      type: "scatter",
+      y: [1, 2]
+    };
+
+    const withRange = updateTraceYAxisRange(
+      {
+        title: {text: "Demo"}
+      },
+      trace,
+      0,
+      "5"
+    );
+    const clearedMin = updateTraceYAxisRange(withRange, trace, 0, "");
+    const clearedBoth = updateTraceYAxisRange(clearedMin, trace, 1, "");
+
+    expect(clearedBoth).toEqual({
+      title: {text: "Demo"}
+    });
   });
 });
