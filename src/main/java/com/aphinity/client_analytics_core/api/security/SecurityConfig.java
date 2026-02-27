@@ -41,6 +41,20 @@ import java.nio.charset.StandardCharsets;
 @EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
 @Import(TurnstileConfiguration.class)
 public class SecurityConfig {
+    private static final String CONTENT_SECURITY_POLICY = String.join(" ",
+        "default-src 'self';",
+        "script-src 'self' https://challenges.cloudflare.com;",
+        "frame-src 'self' https://challenges.cloudflare.com;",
+        "connect-src 'self' https://challenges.cloudflare.com;",
+        "img-src 'self' data:;",
+        "style-src 'self';",
+        "font-src 'self';",
+        "object-src 'none';",
+        "base-uri 'self';",
+        "form-action 'self';",
+        "frame-ancestors 'none';"
+    );
+
     /**
      * Builds the application security filter chain.
      *
@@ -59,22 +73,13 @@ public class SecurityConfig {
         JwtAuthenticationConverter jwtAuthenticationConverter,
         BearerTokenResolver bearerTokenResolver,
         AccessTokenRefreshFilter accessTokenRefreshFilter,
+        CookieCsrfTokenRepository csrfTokenRepository,
         CsrfCookieFilter csrfCookieFilter,
+        CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter,
         ApiAuthenticationEntryPoint apiAuthenticationEntryPoint
     ) throws Exception {
         AuthenticationEntryPoint authEntryPoint = getAuthenticationEntryPoint(apiAuthenticationEntryPoint);
-        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        csrfTokenRepository.setCookiePath("/");
         http
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(csrfTokenRepository)
-                .ignoringRequestMatchers(
-                    "/api/auth/login",
-                    "/api/auth/signup",
-                    "/api/auth/recovery",
-                    "/api/auth/verify"
-                )
-            )
             // APIs are stateless and rely on JWT/cookie tokens rather than server sessions.
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
@@ -101,9 +106,44 @@ public class SecurityConfig {
                 .bearerTokenResolver(bearerTokenResolver)
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
             )
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfTokenRepository)
+                .ignoringRequestMatchers(
+                    "/api/auth/login",
+                    "/api/auth/signup",
+                    "/api/auth/recovery",
+                    "/api/auth/verify"
+                )
+            )
+            .headers(headers ->
+                headers.contentSecurityPolicy(csp ->
+                    csp.policyDirectives(CONTENT_SECURITY_POLICY)
+                )
+            )
             .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
+            .addFilterAfter(coreApiCsrfEnforcementFilter, CsrfCookieFilter.class)
             .addFilterBefore(accessTokenRefreshFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * @return cookie-backed CSRF repository used by the frontend double-submit flow
+     */
+    @Bean
+    CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookiePath("/");
+        csrfTokenRepository.setCookieCustomizer(cookie -> cookie.sameSite("Strict"));
+        return csrfTokenRepository;
+    }
+
+    /**
+     * @param csrfTokenRepository shared CSRF token repository
+     * @return core API CSRF enforcement filter
+     */
+    @Bean
+    CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter(CookieCsrfTokenRepository csrfTokenRepository) {
+        return new CoreApiCsrfEnforcementFilter(csrfTokenRepository);
     }
 
     /**

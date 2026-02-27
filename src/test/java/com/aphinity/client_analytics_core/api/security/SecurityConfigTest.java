@@ -10,14 +10,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,6 +43,9 @@ class SecurityConfigTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private CookieCsrfTokenRepository csrfTokenRepository;
+
     @MockitoBean
     private AuthService authService;
 
@@ -55,7 +63,11 @@ class SecurityConfigTest {
         mockMvc.perform(get("/api/core/probe"))
             .andExpect(status().isUnauthorized())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"authentication_required\"")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"authentication_required\"")))
+            .andExpect(header().string("Content-Security-Policy", org.hamcrest.Matchers.allOf(
+                org.hamcrest.Matchers.containsString("script-src 'self' https://challenges.cloudflare.com;"),
+                org.hamcrest.Matchers.containsString("frame-src 'self' https://challenges.cloudflare.com;")
+            )));
     }
 
     @Test
@@ -63,6 +75,20 @@ class SecurityConfigTest {
         mockMvc.perform(get("/private"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void csrfCookieRepositoryUsesStrictSameSite() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setContextPath("");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        CsrfToken token = csrfTokenRepository.generateToken(request);
+        csrfTokenRepository.saveToken(token, request, response);
+
+        var csrfCookie = response.getCookie("XSRF-TOKEN");
+        org.assertj.core.api.Assertions.assertThat(csrfCookie).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(csrfCookie.getAttribute("SameSite")).isEqualTo("Strict");
     }
 
     @RestController

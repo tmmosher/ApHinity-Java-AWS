@@ -9,7 +9,6 @@ import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.ArrayList;
@@ -30,7 +29,6 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,7 +50,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -65,8 +63,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                         }
                         """.formatted(graph.getId()))
             )
-            .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("authentication_required"));
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -185,7 +182,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 delete("/api/core/locations/{locationId}/memberships/{userId}", location.getId(), target.getId())
                     .cookie(authCookies(authCookies))
-                    .with(SecurityMockMvcRequestPostProcessors.csrf().asHeader())
+                    .with(csrfDoubleSubmit())
             )
             .andExpect(status().isNoContent());
 
@@ -206,7 +203,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -244,7 +241,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -265,7 +262,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void updateLocationGraphsAllowsCookieAuthenticatedRequestWithoutExplicitCsrfHeader() throws Exception {
+    void updateLocationGraphsRejectsCookieAuthenticatedRequestWithoutExplicitCsrfHeader() throws Exception {
         createUser("partner-graphs-missing-csrf@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Seal Beach");
         Graph graph = createGraph("CSRF graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
@@ -288,7 +285,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                         }
                         """.formatted(graph.getId()))
             )
-            .andExpect(status().isNoContent());
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -303,7 +300,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -333,7 +330,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", targetLocation.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -360,7 +357,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", 999999L)
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -389,7 +386,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -418,7 +415,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -453,7 +450,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(authCookies))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -492,7 +489,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         MvcResult result = mockMvc.perform(
                 put("/api/core/locations/{locationId}/graphs", location.getId())
                     .cookie(authCookies(expiredAccessToken, loginCookies.refreshToken()))
-                    .with(csrf().asHeader())
+                    .with(csrfDoubleSubmit())
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
@@ -590,7 +587,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             return mockMvc.perform(
                     put("/api/core/locations/{locationId}/graphs", locationId)
                         .cookie(authCookies(authCookies))
-                        .with(csrf().asHeader())
+                        .with(csrfDoubleSubmit())
                         .contentType(APPLICATION_JSON)
                         .content("""
                             {

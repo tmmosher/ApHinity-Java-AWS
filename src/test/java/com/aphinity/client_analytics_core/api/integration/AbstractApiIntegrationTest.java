@@ -36,6 +36,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -48,6 +49,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -212,6 +214,25 @@ abstract class AbstractApiIntegrationTest {
         return new Cookie[]{
             new Cookie(AuthCookieNames.ACCESS_COOKIE_NAME, accessToken),
             new Cookie(AuthCookieNames.REFRESH_COOKIE_NAME, refreshToken)
+        };
+    }
+
+    protected RequestPostProcessor csrfDoubleSubmit() {
+        return request -> {
+            String token = UUID.randomUUID().toString();
+            Cookie csrfCookie = new Cookie("XSRF-TOKEN", token);
+            csrfCookie.setPath("/");
+
+            Cookie[] existingCookies = request.getCookies();
+            if (existingCookies == null || existingCookies.length == 0) {
+                request.setCookies(csrfCookie);
+            } else {
+                Cookie[] mergedCookies = Arrays.copyOf(existingCookies, existingCookies.length + 1);
+                mergedCookies[existingCookies.length] = csrfCookie;
+                request.setCookies(mergedCookies);
+            }
+            request.addHeader("X-XSRF-TOKEN", token);
+            return request;
         };
     }
 
