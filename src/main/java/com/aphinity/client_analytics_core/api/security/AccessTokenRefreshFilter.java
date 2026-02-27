@@ -84,19 +84,37 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Restricts refresh attempts to authenticated core API routes.
+     * Runs refresh logic for authenticated routes only.
+     *
+     * Public pages and auth endpoints are excluded because they are permit-all and
+     * should not trigger refresh rotation.
      *
      * @param request incoming request
      * @return {@code true} when refresh logic should be skipped
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return !(path.equals("/api/core") || path.startsWith("/api/core/") || path.equals("/core") || path.startsWith("/core/"));
+        String path = resolvePath(request);
+        if (path.equals("/")
+            || path.equals("/index.html")
+            || path.equals("/favicon.ico")
+            || path.equals("/error")
+            || path.equals("/login")
+            || path.equals("/signup")
+            || path.equals("/support")
+            || path.equals("/recovery")
+            || path.equals("/verify")
+            || path.startsWith("/assets/")
+        ) {
+            return true;
+        }
+
+        return path.equals("/api/auth") || path.startsWith("/api/auth/");
     }
 
     /**
-     * Attempts refresh only when the access token is present and already expired.
+     * Attempts refresh whenever a refresh cookie is present and the access token
+     * is missing, invalid, or expired.
      *
      * @param request HTTP request
      * @param response HTTP response
@@ -110,15 +128,14 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        String accessToken = extractCookieValue(request, AuthCookieNames.ACCESS_COOKIE_NAME);
-        // Continue untouched unless an expired access token is present.
-        if (accessToken == null || accessToken.isBlank() || !isExpiredAccessToken(accessToken)) {
+        String refreshToken = extractCookieValue(request, AuthCookieNames.REFRESH_COOKIE_NAME);
+        if (refreshToken == null || refreshToken.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String refreshToken = extractCookieValue(request, AuthCookieNames.REFRESH_COOKIE_NAME);
-        if (refreshToken == null || refreshToken.isBlank()) {
+        String accessToken = extractCookieValue(request, AuthCookieNames.ACCESS_COOKIE_NAME);
+        if (!shouldAttemptRefresh(accessToken)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -141,6 +158,40 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
         authCookieService.clearAccessCookie(request, response);
         authCookieService.clearRefreshCookie(request, response);
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Determines whether refresh should run based on current access token state.
+     *
+     * Missing tokens and parse/verification failures are treated as refresh candidates
+     * when a refresh cookie exists, so clients are not forced to re-login if the access
+     * cookie expired or became unreadable.
+     *
+     * @param accessToken raw JWT access token cookie value
+     * @return {@code true} when refresh should be attempted
+     */
+    private boolean shouldAttemptRefresh(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return true;
+        }
+
+        try {
+            Instant expiry = extractExpirationVerified(accessToken);
+            if (expiry == null) {
+                return true;
+            }
+            return !expiry.isAfter(Instant.now());
+        } catch (ParseException | JOSEException ex) {
+            return true;
+        }
+    }
+
+    private String resolvePath(HttpServletRequest request) {
+        String servletPath = request.getServletPath();
+        if (servletPath != null && !servletPath.isBlank()) {
+            return servletPath;
+        }
+        return request.getRequestURI();
     }
 
     /**
@@ -223,25 +274,6 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
      */
     private String tokenHashPrefix(String refreshTokenHash) {
         return refreshTokenHash.length() <= 12 ? refreshTokenHash : refreshTokenHash.substring(0, 12);
-    }
-
-    /**
-     * Validates and checks whether the supplied access token has expired.
-     *
-     * @param accessToken raw JWT access token
-     * @return {@code true} when token is expired and signature-valid
-     */
-    private boolean isExpiredAccessToken(String accessToken) {
-        try {
-            Instant expiry = extractExpirationVerified(accessToken);
-            if (expiry == null) {
-                return false;
-            }
-            Instant now = Instant.now();
-            return !expiry.isAfter(now);
-        } catch (ParseException | JOSEException ex) {
-            return false;
-        }
     }
 
     /**

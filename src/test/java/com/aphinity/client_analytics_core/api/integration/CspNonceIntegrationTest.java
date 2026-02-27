@@ -50,6 +50,20 @@ class CspNonceIntegrationTest extends AbstractApiIntegrationTest {
         assertThat(firstNonce).isNotEqualTo(secondNonce);
     }
 
+    @Test
+    void indexResponseDoesNotInjectBeaconScriptOrIntegrityAttributes() throws Exception {
+        MvcResult result = mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String responseBody = result.getResponse().getContentAsString();
+
+        assertThat(responseBody)
+            .doesNotContain("beacon.min.js")
+            .doesNotContain("data-cf-beacon")
+            .doesNotContain("integrity=");
+    }
+
     private String requestRootAndExtractCspNonce() throws Exception {
         MvcResult result = mockMvc.perform(get("/"))
             .andExpect(status().isOk())

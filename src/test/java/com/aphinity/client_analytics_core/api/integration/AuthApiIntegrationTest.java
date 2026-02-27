@@ -100,13 +100,13 @@ class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
     void refreshRejectsMissingRefreshCookie() throws Exception {
-        mockMvc.perform(post("/api/auth/refresh").with(csrf().asHeader()))
+        mockMvc.perform(post("/api/auth/refresh"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("missing_refresh_token"));
     }
 
     @Test
-    void refreshRejectsMissingCsrfToken() throws Exception {
+    void refreshDoesNotRequireCsrfToken() throws Exception {
         createUser("csrf@example.com", PASSWORD, true, "client");
         AuthCookies authCookies = loginAndCaptureCookies("csrf@example.com", PASSWORD);
 
@@ -114,7 +114,7 @@ class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
                 post("/api/auth/refresh")
                     .cookie(new Cookie(AuthCookieNames.REFRESH_COOKIE_NAME, authCookies.refreshToken()))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isNoContent());
     }
 
     @Test

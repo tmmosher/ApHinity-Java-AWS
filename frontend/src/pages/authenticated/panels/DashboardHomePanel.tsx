@@ -79,7 +79,7 @@ export const DashboardHomePanel = () => {
                   </div>
               }>
                   <Show when={location()} fallback={
-                      <p class="mt-4 text-sm text-base-content/70">No locations available.</p>
+                      <p class="mt-4 text-sm text-base-content/70">No favorite location!</p>
                   }>
                       <A href={`/dashboard/locations/${location()!.id}`} class="link link-primary text-lg font-medium"
                          preload>

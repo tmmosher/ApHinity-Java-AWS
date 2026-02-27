@@ -17,6 +17,8 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -114,7 +116,35 @@ class AccessTokenRefreshFilterTest {
     }
 
     @Test
-    void doesNotRefreshWhenAccessTokenPayloadCannotBeParsed() throws Exception {
+    void refreshesWhenAccessCookieMissing() throws Exception {
+        AccessTokenRefreshFilter filter = new AccessTokenRefreshFilter(
+            authService,
+            authCookieService,
+            requestMetadataResolver,
+            jwtProperties()
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/core/profile");
+        request.setRemoteAddr("127.0.0.1");
+        request.setCookies(new Cookie(AuthCookieNames.REFRESH_COOKIE_NAME, "refresh-token"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CapturingChain chain = new CapturingChain();
+
+        when(requestMetadataResolver.resolveClientIp(request)).thenReturn("127.0.0.1");
+        when(requestMetadataResolver.resolveUserAgent(request)).thenReturn(null);
+        when(authService.refresh("refresh-token", "127.0.0.1", null))
+            .thenReturn(new IssuedTokens("new-access", "new-refresh", "Bearer", 900L, 3600L));
+
+        filter.doFilter(request, response, chain);
+
+        assertTrue(chain.called);
+        verify(authService).refresh("refresh-token", "127.0.0.1", null);
+        verify(authCookieService).addAccessCookie(request, response, "new-access", 900L);
+        verify(authCookieService).addRefreshCookie(request, response, "new-refresh", 3600L);
+    }
+
+    @Test
+    void refreshesWhenAccessTokenPayloadCannotBeParsed() throws Exception {
         AccessTokenRefreshFilter filter = new AccessTokenRefreshFilter(
             authService,
             authCookieService,
@@ -130,10 +160,17 @@ class AccessTokenRefreshFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         CapturingChain chain = new CapturingChain();
 
+        when(requestMetadataResolver.resolveClientIp(request)).thenReturn("127.0.0.1");
+        when(requestMetadataResolver.resolveUserAgent(request)).thenReturn(null);
+        when(authService.refresh("refresh-token", "127.0.0.1", null))
+            .thenReturn(new IssuedTokens("new-access", "new-refresh", "Bearer", 900L, 3600L));
+
         filter.doFilter(request, response, chain);
 
         assertTrue(chain.called);
-        verify(authService, never()).refresh(anyString(), anyString(), anyString());
+        verify(authService).refresh("refresh-token", "127.0.0.1", null);
+        verify(authCookieService).addAccessCookie(request, response, "new-access", 900L);
+        verify(authCookieService).addRefreshCookie(request, response, "new-refresh", 3600L);
     }
 
     @Test
@@ -188,8 +225,14 @@ class AccessTokenRefreshFilterTest {
         verify(authCookieService).clearRefreshCookie(request, response);
     }
 
-    @Test
-    void doesNotRunOnNonCorePaths() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/api/core/profile",
+        "/core/profile",
+        "/api/secure/probe",
+        "/private"
+    })
+    void refreshesOnAllAuthenticatedPaths(String path) throws Exception {
         AccessTokenRefreshFilter filter = new AccessTokenRefreshFilter(
             authService,
             authCookieService,
@@ -197,7 +240,52 @@ class AccessTokenRefreshFilterTest {
             jwtProperties()
         );
 
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/login");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        request.setRemoteAddr("127.0.0.1");
+        request.setCookies(
+            new Cookie(AuthCookieNames.ACCESS_COOKIE_NAME, jwtWithExp(Instant.now().minusSeconds(60))),
+            new Cookie(AuthCookieNames.REFRESH_COOKIE_NAME, "refresh-token")
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CapturingChain chain = new CapturingChain();
+
+        when(requestMetadataResolver.resolveClientIp(request)).thenReturn("127.0.0.1");
+        when(requestMetadataResolver.resolveUserAgent(request)).thenReturn(null);
+        when(authService.refresh("refresh-token", "127.0.0.1", null))
+            .thenReturn(new IssuedTokens("new-access", "new-refresh", "Bearer", 900L, 3600L));
+
+        filter.doFilter(request, response, chain);
+
+        assertTrue(chain.called);
+        verify(authService).refresh("refresh-token", "127.0.0.1", null);
+        verify(authCookieService).addAccessCookie(request, response, "new-access", 900L);
+        verify(authCookieService).addRefreshCookie(request, response, "new-refresh", 3600L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/",
+        "/index.html",
+        "/assets/index.js",
+        "/favicon.ico",
+        "/error",
+        "/login",
+        "/signup",
+        "/support",
+        "/recovery",
+        "/verify",
+        "/api/auth/login",
+        "/api/auth/refresh"
+    })
+    void doesNotRunOnPublicOrAuthPaths(String path) throws Exception {
+        AccessTokenRefreshFilter filter = new AccessTokenRefreshFilter(
+            authService,
+            authCookieService,
+            requestMetadataResolver,
+            jwtProperties()
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         request.setCookies(
             new Cookie(AuthCookieNames.ACCESS_COOKIE_NAME, jwtWithExp(Instant.now().minusSeconds(60))),
             new Cookie(AuthCookieNames.REFRESH_COOKIE_NAME, "refresh-token")

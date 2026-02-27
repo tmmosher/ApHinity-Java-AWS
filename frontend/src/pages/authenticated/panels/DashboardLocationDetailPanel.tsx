@@ -186,7 +186,7 @@ export const DashboardLocationDetailPanel = () => {
 
     const saveLocationId = params.locationId;
     const saveSessionToken = locationSessionToken();
-    const graphUpdates = buildLocationGraphUpdates(cloneLocationGraphs(workingGraphs()));
+    const graphUpdates = buildLocationGraphUpdates(workingGraphs());
 
     setIsSavingGraphChanges(true);
     try {

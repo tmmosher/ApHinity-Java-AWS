@@ -40,7 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "security.jwt.issuer=test-issuer",
     "security.jwt.secret=0123456789abcdef0123456789abcdef",
     "security.jwt.access-token-ttl-seconds=900",
-    "security.jwt.refresh-token-ttl-seconds=3600"
+    "security.jwt.refresh-token-ttl-seconds=3600",
+    "app.security.csp.upgrade-insecure-requests=true"
 })
 class SecurityConfigTest {
     private static final Pattern SCRIPT_NONCE_PATTERN = Pattern.compile(
@@ -79,9 +80,17 @@ class SecurityConfigTest {
             .contains("script-src 'self' ")
             .contains("https://static.cloudflareinsights.com;")
             .contains("frame-src 'self' https://challenges.cloudflare.com;")
-            .contains("connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cloudflareinsights.com;")
+            .contains(
+                "connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com "
+                    + "https://cloudflareinsights.com https://*.cloudflareinsights.com;"
+            )
+            .contains(
+                "img-src 'self' data: https://challenges.cloudflare.com https://static.cloudflareinsights.com "
+                    + "https://cloudflareinsights.com https://*.cloudflareinsights.com;"
+            )
             .contains("style-src-elem 'self' 'unsafe-inline';")
-            .contains("style-src-attr 'unsafe-inline';");
+            .contains("style-src-attr 'unsafe-inline';")
+            .contains("upgrade-insecure-requests;");
 
         Matcher nonceMatcher = SCRIPT_NONCE_PATTERN.matcher(cspHeader);
         org.assertj.core.api.Assertions.assertThat(nonceMatcher.find()).isTrue();

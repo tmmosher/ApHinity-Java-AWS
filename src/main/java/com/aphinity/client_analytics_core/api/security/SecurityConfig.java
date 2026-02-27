@@ -4,6 +4,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -63,7 +64,8 @@ public class SecurityConfig {
         CookieCsrfTokenRepository csrfTokenRepository,
         CsrfCookieFilter csrfCookieFilter,
         CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter,
-        ApiAuthenticationEntryPoint apiAuthenticationEntryPoint
+        ApiAuthenticationEntryPoint apiAuthenticationEntryPoint,
+        @Value("${app.security.csp.upgrade-insecure-requests:false}") boolean upgradeInsecureRequests
     ) throws Exception {
         AuthenticationEntryPoint authEntryPoint = getAuthenticationEntryPoint(apiAuthenticationEntryPoint);
         http
@@ -99,7 +101,8 @@ public class SecurityConfig {
                     "/api/auth/login",
                     "/api/auth/signup",
                     "/api/auth/recovery",
-                    "/api/auth/verify"
+                    "/api/auth/verify",
+                    "/api/auth/refresh"
                 )
             )
             .headers(headers ->
@@ -107,7 +110,7 @@ public class SecurityConfig {
                     String nonce = CspNonceSupport.getOrCreateNonce(request);
                     response.setHeader(
                         "Content-Security-Policy",
-                        ContentSecurityPolicyBuilder.buildPolicy(nonce)
+                        ContentSecurityPolicyBuilder.buildPolicy(nonce, upgradeInsecureRequests)
                     );
                 })
             )
