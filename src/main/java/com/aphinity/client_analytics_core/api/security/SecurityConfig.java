@@ -41,20 +41,6 @@ import java.nio.charset.StandardCharsets;
 @EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
 @Import(TurnstileConfiguration.class)
 public class SecurityConfig {
-    private static final String CONTENT_SECURITY_POLICY = String.join(" ",
-        "default-src 'self';",
-        "script-src 'self' https://challenges.cloudflare.com;",
-        "frame-src 'self' https://challenges.cloudflare.com;",
-        "connect-src 'self' https://challenges.cloudflare.com;",
-        "img-src 'self' data:;",
-        "style-src 'self';",
-        "font-src 'self';",
-        "object-src 'none';",
-        "base-uri 'self';",
-        "form-action 'self';",
-        "frame-ancestors 'none';"
-    );
-
     /**
      * Builds the application security filter chain.
      *
@@ -116,9 +102,13 @@ public class SecurityConfig {
                 )
             )
             .headers(headers ->
-                headers.contentSecurityPolicy(csp ->
-                    csp.policyDirectives(CONTENT_SECURITY_POLICY)
-                )
+                headers.addHeaderWriter((request, response) -> {
+                    String nonce = CspNonceSupport.getOrCreateNonce(request);
+                    response.setHeader(
+                        "Content-Security-Policy",
+                        ContentSecurityPolicyBuilder.buildPolicy(nonce)
+                    );
+                })
             )
             .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
             .addFilterAfter(coreApiCsrfEnforcementFilter, CsrfCookieFilter.class)
