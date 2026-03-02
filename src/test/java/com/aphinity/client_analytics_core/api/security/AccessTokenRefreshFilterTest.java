@@ -263,6 +263,38 @@ class AccessTokenRefreshFilterTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"POST", "PUT"})
+    void refreshesOnCorePathsForMutatingMethods(String method) throws Exception {
+        AccessTokenRefreshFilter filter = new AccessTokenRefreshFilter(
+            authService,
+            authCookieService,
+            requestMetadataResolver,
+            jwtProperties()
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/core/profile");
+        request.setRemoteAddr("127.0.0.1");
+        request.setCookies(
+            new Cookie(AuthCookieNames.ACCESS_COOKIE_NAME, jwtWithExp(Instant.now().minusSeconds(60))),
+            new Cookie(AuthCookieNames.REFRESH_COOKIE_NAME, "refresh-token")
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CapturingChain chain = new CapturingChain();
+
+        when(requestMetadataResolver.resolveClientIp(request)).thenReturn("127.0.0.1");
+        when(requestMetadataResolver.resolveUserAgent(request)).thenReturn(null);
+        when(authService.refresh("refresh-token", "127.0.0.1", null))
+            .thenReturn(new IssuedTokens("new-access", "new-refresh", "Bearer", 900L, 3600L));
+
+        filter.doFilter(request, response, chain);
+
+        assertTrue(chain.called);
+        verify(authService).refresh("refresh-token", "127.0.0.1", null);
+        verify(authCookieService).addAccessCookie(request, response, "new-access", 900L);
+        verify(authCookieService).addRefreshCookie(request, response, "new-refresh", 3600L);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "/",
         "/index.html",
