@@ -1,44 +1,42 @@
 import {For, Show, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {parseActiveInviteList} from "../../../types/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
 import {ActiveInvite} from "../../../types/Types";
+import {fetchActiveInvites, processLocationInvite} from "../../../util/inviteApi";
 
 export const DashboardInvitesPanel = () => {
   const host = useApiHost();
   const [processingInviteId, setProcessingInviteId] = createSignal<number | null>(null);
 
-  const fetchInvites = async (): Promise<ActiveInvite[]> => {
-    const response = await apiFetch(host + "/api/core/location-invites/active", {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load invites");
-    }
-    return parseActiveInviteList(await response.json());
-  };
+  /**
+   * Retrieves pending invites for the signed-in user.
+   *
+   * Endpoint: `GET /api/core/location-invites/active`
+   */
+  const fetchInvites = async (): Promise<ActiveInvite[]> =>
+    fetchActiveInvites(host);
 
   const [invites, {refetch}] = createResource(fetchInvites);
 
+  /**
+   * Accepts or declines a pending invite.
+   *
+   * Endpoint: `POST /api/core/location-invites/{inviteId}/{action}`
+   *
+   * @param inviteId Invite identifier.
+   * @param action Decision to apply (`accept` or `decline`).
+   */
   const processInvite = async (inviteId: number, action: "accept" | "decline") => {
     if (processingInviteId() !== null) {
       return;
     }
     setProcessingInviteId(inviteId);
     try {
-      const response = await apiFetch(host + "/api/core/location-invites/" + inviteId + "/" + action, {
-        method: "POST",
-      });
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        toast.error(errorBody?.message ?? "Unable to update invite.");
-        return;
-      }
+      await processLocationInvite(host, inviteId, action);
       toast.success(action === "accept" ? "Invite accepted." : "Invite declined.");
       await refetch();
-    } catch {
-      toast.error("Unable to update invite.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update invite.");
     } finally {
       setProcessingInviteId(null);
     }
@@ -62,9 +60,16 @@ export const DashboardInvitesPanel = () => {
             </button>
           </div>
         }>
-          <Show when={(invites()?.length ?? 0) > 0} fallback={<p class="text-base-content/70">No active invites.</p>}>
-            <ul class="space-y-3">
-              <For each={invites()}>
+          <Show when={(invites()?.length ?? 0) > 0} fallback={
+              <div class="space-y-3">
+                  <p class="text-base-content/70">No active invites.</p>
+                  <button type="button" class="btn btn-outline" onClick={() => void refetch()}>
+                      Retry
+                  </button>
+              </div>
+          }>
+              <ul class="space-y-3">
+                  <For each={invites()}>
                 {(invite) => (
                   <li class="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
                     <div class="flex flex-wrap items-start justify-between gap-3">

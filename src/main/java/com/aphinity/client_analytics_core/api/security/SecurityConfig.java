@@ -4,6 +4,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -27,6 +28,7 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
 import com.digitalsanctuary.cf.turnstile.TurnstileConfiguration;
+import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.springframework.context.annotation.Import;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -59,22 +61,14 @@ public class SecurityConfig {
         JwtAuthenticationConverter jwtAuthenticationConverter,
         BearerTokenResolver bearerTokenResolver,
         AccessTokenRefreshFilter accessTokenRefreshFilter,
+        CookieCsrfTokenRepository csrfTokenRepository,
         CsrfCookieFilter csrfCookieFilter,
-        ApiAuthenticationEntryPoint apiAuthenticationEntryPoint
+        CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter,
+        ApiAuthenticationEntryPoint apiAuthenticationEntryPoint,
+        @Value("${app.security.csp.upgrade-insecure-requests:false}") boolean upgradeInsecureRequests
     ) throws Exception {
         AuthenticationEntryPoint authEntryPoint = getAuthenticationEntryPoint(apiAuthenticationEntryPoint);
-        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        csrfTokenRepository.setCookiePath("/");
         http
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(csrfTokenRepository)
-                .ignoringRequestMatchers(
-                    "/api/auth/login",
-                    "/api/auth/signup",
-                    "/api/auth/recovery",
-                    "/api/auth/verify"
-                )
-            )
             // APIs are stateless and rely on JWT/cookie tokens rather than server sessions.
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
@@ -101,9 +95,52 @@ public class SecurityConfig {
                 .bearerTokenResolver(bearerTokenResolver)
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
             )
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfTokenRepository)
+                .ignoringRequestMatchers(
+                    "/api/auth/login",
+                    "/api/auth/signup",
+                    "/api/auth/recovery",
+                    "/api/auth/verify",
+                    "/api/auth/refresh"
+                )
+            )
+            .headers(headers ->
+                headers.addHeaderWriter((request, response) -> {
+                    String nonce = CspNonceSupport.getOrCreateNonce(request);
+                    response.setHeader(
+                        "Content-Security-Policy",
+                        ContentSecurityPolicyBuilder.buildPolicy(nonce, upgradeInsecureRequests)
+                    );
+                })
+            )
             .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
+            .addFilterAfter(coreApiCsrfEnforcementFilter, CsrfCookieFilter.class)
             .addFilterBefore(accessTokenRefreshFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * @return cookie-backed CSRF repository used by the frontend double-submit flow
+     */
+    @Bean
+    CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookiePath("/");
+        csrfTokenRepository.setCookieCustomizer(cookie -> cookie.sameSite("Strict"));
+        return csrfTokenRepository;
+    }
+
+    /**
+     * @param csrfTokenRepository shared CSRF token repository
+     * @return core API CSRF enforcement filter
+     */
+    @Bean
+    CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter(
+        CookieCsrfTokenRepository csrfTokenRepository,
+        AsyncLogService asyncLogService
+    ) {
+        return new CoreApiCsrfEnforcementFilter(csrfTokenRepository, asyncLogService);
     }
 
     /**

@@ -1,12 +1,13 @@
 import {A} from "@solidjs/router";
-import {For, Show, createResource, createSignal} from "solid-js";
+import {For, Show, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useProfile} from "../../../context/ProfileContext";
-import {parseLocationList, parseLocationSummary} from "../../../types/coreApi";
+import {parseLocationSummary} from "../../../util/coreApi";
 import {apiFetch} from "../../../util/apiFetch";
 import {setFavoriteLocationId} from "../../../util/favoriteLocation";
 import {LocationSummary} from "../../../types/Types";
+import {useLocations} from "../../../context/LocationContext";
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();
@@ -17,17 +18,8 @@ export const DashboardLocationsPanel = () => {
     return role === "admin" || role === "partner";
   };
 
-  const fetchLocations = async (): Promise<LocationSummary[]> => {
-    const response = await apiFetch(host + "/api/core/locations", {
-      method: "GET"
-    });
-    if (!response.ok) {
-      throw new Error("Unable to load locations.");
-    }
-    return parseLocationList(await response.json());
-  };
-
-  const [locations, {mutate, refetch}] = createResource(fetchLocations);
+  const locationContext = useLocations();
+  const locations = locationContext.locations;
   const [draftNames, setDraftNames] = createSignal<Record<number, string>>({});
   const [savingLocationId, setSavingLocationId] = createSignal<number | null>(null);
 
@@ -41,6 +33,14 @@ export const DashboardLocationsPanel = () => {
   const getDraftName = (location: LocationSummary) =>
     draftNames()[location.id] ?? location.name;
 
+  /**
+   * Renames a location with the current draft value.
+   *
+   * Endpoint: `PUT /api/core/locations/{locationId}`
+   * Body: `{ name }`
+   *
+   * @param locationId Location id to update.
+   */
   const renameLocation = async (locationId: number) => {
     if (!canEditLocations() || savingLocationId() !== null) {
       return;
@@ -74,7 +74,7 @@ export const DashboardLocationsPanel = () => {
       }
 
       const updated = parseLocationSummary(await response.json());
-      mutate((current) =>
+      locationContext.mutate((current) =>
         current?.map((candidate) => (candidate.id === updated.id ? updated : candidate))
       );
       setDraftNames((current) => {
@@ -102,7 +102,7 @@ export const DashboardLocationsPanel = () => {
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Locations</h1>
         <p class="text-base-content/70">
-          Select a location to open its page. Data panels for each location will be added next.
+          Select a location.
         </p>
       </header>
 
@@ -110,17 +110,24 @@ export const DashboardLocationsPanel = () => {
         <Show when={!locations.error} fallback={
           <div class="space-y-3">
             <p class="text-error">Unable to load locations.</p>
-            <button type="button" class="btn btn-outline" onClick={() => void refetch()}>
+            <button type="button" class="btn btn-outline" onClick={() => void locationContext.refetch()}>
               Retry
             </button>
           </div>
         }>
-          <Show when={(locations()?.length ?? 0) > 0} fallback={<p class="text-base-content/70">No locations available.</p>}>
-            <ul class="space-y-3">
-              <For each={locations()}>
-                {(location) => (
-                  <li class="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
+          <Show when={(locations()?.length ?? 0) > 0} fallback={
+              <div class="space-y-3">
+                  <p class="text-base-content/70">No locations available.</p>
+                  <button type="button" class="btn btn-outline" onClick={() => void locationContext.refetch()}>
+                      Retry
+                  </button>
+              </div>
+          }>
+              <ul class="space-y-3">
+                  <For each={locations()}>
+                      {(location) => (
+                          <li class="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <A href={`/dashboard/locations/${location.id}`} class="link link-primary text-lg font-medium" preload>
                           {location.name}

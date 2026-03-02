@@ -14,7 +14,6 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
 
     /**
      * Extracts bearer token from request.
-     * <p>
      * Header tokens take precedence so explicit API clients are unaffected by cookie state.
      *
      * @param request HTTP request

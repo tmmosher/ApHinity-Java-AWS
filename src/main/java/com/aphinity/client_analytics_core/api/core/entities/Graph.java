@@ -1,15 +1,14 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
-import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
-import com.aphinity.client_analytics_core.api.core.plotly.PlotlyGraphSpec;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -17,6 +16,9 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Table(name = "graph")
@@ -30,17 +32,28 @@ public class Graph {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data", columnDefinition = "jsonb", nullable = false)
-    private PlotlyGraphSpec data;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id")
-    private AppUser owner;
+    private Object data;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "layout")
+    private Map<String, Object> layout;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "config")
+    private Map<String, Object> config;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "style")
+    private Map<String, Object> style;
+
+    @OneToMany(mappedBy = "graph")
+    private Set<LocationGraph> locationGraphs = new LinkedHashSet<>();
 
     @PrePersist
     void prePersist() {
@@ -50,6 +63,9 @@ public class Graph {
         }
         if (updatedAt == null) {
             updatedAt = now;
+        }
+        if (data == null) {
+            data = "[]";
         }
     }
 
@@ -74,20 +90,22 @@ public class Graph {
         this.name = name;
     }
 
-    public PlotlyGraphSpec getData() {
+    public Object getData() {
         return data;
     }
 
-    public void setData(PlotlyGraphSpec data) {
-        this.data = data;
-    }
-
-    public AppUser getOwner() {
-        return owner;
-    }
-
-    public void setOwner(AppUser owner) {
-        this.owner = owner;
+    public void setData(Object data) {
+        GraphPayloadMapper.GraphPayload normalized = GraphPayloadMapper.normalize(
+            data,
+            layout,
+            config,
+            style
+        );
+        Object storedData = GraphPayloadMapper.toStoredData(normalized.data());
+        this.data = toJsonText(storedData);
+        this.layout = normalized.layout();
+        this.config = normalized.config();
+        this.style = normalized.style();
     }
 
     public Instant getCreatedAt() {
@@ -104,5 +122,45 @@ public class Graph {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Map<String, Object> getLayout() {
+        return layout;
+    }
+
+    public void setLayout(Map<String, Object> layout) {
+        this.layout = layout;
+    }
+
+    public Map<String, Object> getConfig() {
+        return config;
+    }
+
+    public void setConfig(Map<String, Object> config) {
+        this.config = config;
+    }
+
+    public Map<String, Object> getStyle() {
+        return style;
+    }
+
+    public void setStyle(Map<String, Object> style) {
+        this.style = style;
+    }
+
+    public Set<LocationGraph> getLocationGraphs() {
+        return locationGraphs;
+    }
+
+    public void setLocationGraphs(Set<LocationGraph> locationGraphs) {
+        this.locationGraphs = locationGraphs;
+    }
+
+    private String toJsonText(Object value) {
+        try (Jsonb jsonb = JsonbBuilder.create()) {
+            return jsonb.toJson(value);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Graph data must be serializable JSON", ex);
+        }
     }
 }

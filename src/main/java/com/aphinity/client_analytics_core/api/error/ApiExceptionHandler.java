@@ -22,7 +22,6 @@ import java.util.Map;
 
 /**
  * Centralized exception-to-response mapping for API endpoints.
- * <p>
  * The handler keeps client-facing messages intentionally safe while still logging
  * detailed context for troubleshooting.
  */
@@ -56,10 +55,16 @@ public class ApiExceptionHandler {
         Map.entry("Unable to issue verification code", new ErrorDefinition("verification_code_issue_failed", "Unable to issue verification code")),
         Map.entry("Account email is not verified", new ErrorDefinition("account_not_verified", "Account email is not verified")),
         Map.entry("Insufficient permissions", new ErrorDefinition("forbidden", "Insufficient permissions")),
+        Map.entry("Insufficient permissions for location access", new ErrorDefinition("forbidden", "Insufficient permissions for location access")),
         Map.entry("Location not found", new ErrorDefinition("location_not_found", "Location not found")),
         Map.entry("Target user not found", new ErrorDefinition("target_user_not_found", "Target user not found")),
+        Map.entry("Location membership not found", new ErrorDefinition("location_membership_not_found", "Location membership not found")),
+        Map.entry("Location graph not found", new ErrorDefinition("location_graph_not_found", "Location graph not found")),
+        Map.entry("Invited user not found", new ErrorDefinition("invited_user_not_found", "Invited user not found")),
         Map.entry("Location name is required", new ErrorDefinition("location_name_required", "Location name is required")),
         Map.entry("Location name already in use", new ErrorDefinition("location_name_in_use", "Location name already in use")),
+        Map.entry("Graph data is invalid", new ErrorDefinition("graph_data_invalid", "Graph data is invalid")),
+        Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
         Map.entry("Invite not found", new ErrorDefinition("invite_not_found", "Invite not found")),
         Map.entry("Invite expired", new ErrorDefinition("invite_expired", "Invite expired")),
         Map.entry("Invite is not pending", new ErrorDefinition("invite_not_pending", "Invite is not pending")),
@@ -67,6 +72,7 @@ public class ApiExceptionHandler {
         Map.entry("An active invite already exists", new ErrorDefinition("invite_already_exists", "An active invite already exists")),
         Map.entry("Cannot invite your own account", new ErrorDefinition("self_invite_not_allowed", "Cannot invite your own account")),
         Map.entry("User already has access to this location", new ErrorDefinition("location_access_exists", "User already has access to this location")),
+        Map.entry("Invited account email is not verified", new ErrorDefinition("invited_account_not_verified", "Invited account email is not verified")),
         Map.entry("Invited email is required", new ErrorDefinition("invited_email_required", "Invited email is required")),
         Map.entry("Unable to issue invite", new ErrorDefinition("invite_issue_failed", "Unable to issue invite"))
     );

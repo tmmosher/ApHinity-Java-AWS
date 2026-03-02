@@ -11,6 +11,8 @@ import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -41,11 +43,14 @@ import java.util.Set;
  */
 @Service
 public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     // constants
     private static final String TOKEN_TYPE = "Bearer";
     private static final int REFRESH_TOKEN_BYTES = 32;
     private static final String PASSWORD_RESET_TOKEN_TABLE = "password_reset_token";
     private static final String EMAIL_VERIFICATION_TOKEN_TABLE = "email_verification_token";
+    private static final long ROTATED_TOKEN_REPLAY_GRACE_SECONDS = 5L;
 
     // services
     private final AppUserRepository appUserRepository;
@@ -226,17 +231,35 @@ public class AuthService {
      * @return newly issued access and refresh tokens
      * @throws ResponseStatusException when the refresh token is invalid or revoked
      */
-    @Transactional
+    // Security state mutations (rotation/revocation) must persist even when the endpoint
+    // responds with 401, so refresh uses noRollbackFor on response-status exceptions.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public IssuedTokens refresh(String refreshToken, String ipAddress, String userAgent) {
         String tokenHash = TokenHasher.sha256(refreshToken);
         AuthSession session = authSessionRepository.findByRefreshTokenHash(tokenHash)
             .orElseThrow(this::invalidRefreshToken);
 
         Instant now = Instant.now();
-        // If a rotated/revoked refresh token is reused, revoke all active sessions for this user.
-        // This mitigates replay after token theft.
+        // If a rotated/revoked refresh token is reused, decide whether this looks like a
+        // near-simultaneous refresh race (grace period) or a suspicious replay.
         if (session.getRevokedAt() != null || session.getReplacedBySessionId() != null) {
-            authSessionRepository.revokeAllActiveForUser(session.getUser().getId(), now);
+            boolean revokeAllActiveSessions = shouldRevokeAllSessionsOnReplay(session, now);
+            if (revokeAllActiveSessions) {
+                authSessionRepository.revokeAllActiveForUser(session.getUser().getId(), now);
+                log.warn(
+                    "Suspicious refresh token replay userId={} sessionId={} replacedBySessionId={} revokedAt={}",
+                    session.getUser().getId(),
+                    session.getId(),
+                    session.getReplacedBySessionId(),
+                    session.getRevokedAt()
+                );
+            } else {
+                log.info(
+                    "Suppressing global session revocation for near-simultaneous rotated-token replay userId={} sessionId={}",
+                    session.getUser().getId(),
+                    session.getId()
+                );
+            }
             throw invalidRefreshToken();
         }
 
@@ -263,6 +286,24 @@ public class AuthService {
             jwtService.getAccessTokenTtlSeconds(),
             jwtService.getRefreshTokenTtlSeconds()
         );
+    }
+
+    /**
+     * Determines whether a refresh token replay should revoke all active sessions.
+     *
+     * Recently rotated token replays are treated as probable client-side concurrency races.
+     * Outside the grace window, replays are treated as suspicious and trigger global revocation.
+     */
+    private boolean shouldRevokeAllSessionsOnReplay(AuthSession replayedSession, Instant now) {
+        if (replayedSession.getReplacedBySessionId() == null) {
+            return true;
+        }
+
+        Instant revokedAt = replayedSession.getRevokedAt();
+        if (revokedAt == null) {
+            return true;
+        }
+        return revokedAt.plusSeconds(ROTATED_TOKEN_REPLAY_GRACE_SECONDS).isBefore(now);
     }
 
     /**
@@ -328,7 +369,6 @@ public class AuthService {
 
     /**
      * Verifies and consumes a one-time code, then issues a new authenticated session.
-     * <p>
      * Codes are single-use: token consumption happens with an update guard so concurrent
      * requests cannot both succeed.
      *

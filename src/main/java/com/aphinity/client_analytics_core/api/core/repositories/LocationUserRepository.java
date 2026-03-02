@@ -2,7 +2,6 @@ package com.aphinity.client_analytics_core.api.core.repositories;
 
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
-import com.aphinity.client_analytics_core.api.core.entities.LocationMemberRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,8 +13,6 @@ public interface LocationUserRepository extends JpaRepository<LocationUser, Loca
     List<LocationUser> findByIdLocationId(Long locationId);
 
     List<LocationUser> findByIdUserId(Long userId);
-
-    List<LocationUser> findByIdLocationIdAndUserRole(Long locationId, LocationMemberRole userRole);
 
     boolean existsByIdLocationIdAndIdUserId(Long locationId, Long userId);
 

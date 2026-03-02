@@ -318,6 +318,46 @@ class AuthServiceTest {
     }
 
     @Test
+    void refreshRejectsRecentlyRotatedSessionWithoutRevokingAllActiveSessions() {
+        String refreshToken = "refresh-token";
+        AppUser user = buildUser("user@example.com");
+        AuthSession session = buildSession(user, Instant.now().plusSeconds(60));
+        session.setRevokedAt(Instant.now().minusSeconds(1));
+        session.setReplacedBySessionId(200L);
+
+        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
+            .thenReturn(Optional.of(session));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            authService.refresh(refreshToken, "10.0.0.1", "agent")
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        verify(authSessionRepository, never()).revokeAllActiveForUser(anyLong(), any(Instant.class));
+        verify(authSessionRepository, never()).save(any(AuthSession.class));
+    }
+
+    @Test
+    void refreshRejectsStaleRotatedSessionAndRevokesAllActiveSessions() {
+        String refreshToken = "refresh-token";
+        AppUser user = buildUser("user@example.com");
+        AuthSession session = buildSession(user, Instant.now().plusSeconds(60));
+        session.setRevokedAt(Instant.now().minusSeconds(30));
+        session.setReplacedBySessionId(200L);
+
+        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
+            .thenReturn(Optional.of(session));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            authService.refresh(refreshToken, "10.0.0.1", "agent")
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        verify(authSessionRepository).revokeAllActiveForUser(eq(user.getId()), any(Instant.class));
+        verify(authSessionRepository, never()).save(any(AuthSession.class));
+    }
+
+    @Test
     void refreshRejectsExpiredSession() {
         String refreshToken = "refresh-token";
         AppUser user = buildUser("user@example.com");

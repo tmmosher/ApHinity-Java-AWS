@@ -13,8 +13,13 @@
     "@nerimity/solid-turnstile": "^1.1.0",
     "@types/node": "^25.0.3",
     "corvu": "^0.7.2",
+    "plotly.js-dist-min": "^3.4.0",
     "solid-toast": "^0.5.0",
     "solid-turnstile": "^0.0.2",
     "theme-change": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/plotly.js": "^3.0.10",
+    "@types/plotly.js-dist-min": "^2.3.4"
   }
 }

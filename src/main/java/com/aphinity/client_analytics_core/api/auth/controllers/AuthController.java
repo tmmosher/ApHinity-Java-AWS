@@ -26,7 +26,6 @@ import java.util.Locale;
 
 /**
  * REST entry points for authentication and account recovery flows.
- * <p>
  * The controller is intentionally thin: it normalizes raw input, resolves request metadata,
  * delegates business decisions to {@link AuthService}, and writes auth cookies via
  * {@link AuthCookieService}.
@@ -76,7 +75,6 @@ public class AuthController {
 
     /**
      * Creates an account but does not create an authenticated session.
-     * <p>
      * Signup is intentionally separated from token issuance so verification policy can be enforced
      * independently.
      *

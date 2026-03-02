@@ -3,7 +3,7 @@ import {toast} from "solid-toast";
 import {useApiHost} from "../context/ApiHostContext";
 import {useProfile} from "../context/ProfileContext";
 import {
-    getStoredThemePreference,
+    getDocumentThemePreference,
     setStoredThemePreference,
     ThemePreference
 } from "../util/themePreference";
@@ -25,7 +25,7 @@ const Profile = () => {
     const [isSavingPassword, setIsSavingPassword] = createSignal(false);
     const [verificationCode, setVerificationCode] = createSignal("");
     const [isVerifyingEmail, setIsVerifyingEmail] = createSignal(false);
-    const [themePreference, setThemePreference] = createSignal<ThemePreference>(getStoredThemePreference());
+    const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
     const canEditEmail = () => canEditProfileEmail(profileContext.profile()?.role);
     const isUnverified = () => profileContext.profile()?.verified === false;
 
@@ -41,13 +41,17 @@ const Profile = () => {
     const updateThemePreference = (next: ThemePreference) => {
         setThemePreference(next);
         setStoredThemePreference(next);
-        document.documentElement.setAttribute(
-            "data-theme",
-            next === "dark" ? "forest-corporate" : "corporate"
-        );
         toast.success(`Theme changed to ${next} mode.`);
     };
 
+    /**
+     * Updates account profile fields.
+     *
+     * Endpoint: `PUT /api/core/profile`
+     * Body: `{ name, email }`
+     *
+     * @param event Form submit event from the profile form.
+     */
     const updateProfile = async (event: SubmitEvent) => {
         event.preventDefault();
         if (isSavingProfile()) {
@@ -82,6 +86,14 @@ const Profile = () => {
         }
     };
 
+    /**
+     * Changes the user's password.
+     *
+     * Endpoint: `PUT /api/core/profile/password`
+     * Body: `{ currentPassword, newPassword }`
+     *
+     * @param event Form submit event from the password form.
+     */
     const updatePassword = async (event: SubmitEvent) => {
         event.preventDefault();
         if (isSavingPassword()) {
@@ -114,6 +126,14 @@ const Profile = () => {
         }
     };
 
+    /**
+     * Verifies the current account email with a one-time code.
+     *
+     * Endpoint: `POST /api/auth/verify`
+     * Body: `{ email, verifyValue }`
+     *
+     * @param event Form submit event from the verification form.
+     */
     const verifyEmail = async (event: SubmitEvent) => {
         event.preventDefault();
         if (isVerifyingEmail()) {
@@ -158,6 +178,11 @@ const Profile = () => {
         }
     };
 
+    /**
+     * Ends the authenticated session and redirects to login on success.
+     *
+     * Endpoint: `POST /api/auth/logout`
+     */
     const logout = async () => {
         const response = await apiFetch(host + "/api/auth/logout", {method: "POST"});
         if (!response.ok) {

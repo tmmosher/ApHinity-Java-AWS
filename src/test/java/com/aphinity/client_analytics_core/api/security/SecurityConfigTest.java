@@ -10,11 +10,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -32,11 +40,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "security.jwt.issuer=test-issuer",
     "security.jwt.secret=0123456789abcdef0123456789abcdef",
     "security.jwt.access-token-ttl-seconds=900",
-    "security.jwt.refresh-token-ttl-seconds=3600"
+    "security.jwt.refresh-token-ttl-seconds=3600",
+    "app.security.csp.upgrade-insecure-requests=true"
 })
 class SecurityConfigTest {
+    private static final Pattern SCRIPT_NONCE_PATTERN = Pattern.compile(
+        "script-src 'self' 'nonce-([A-Za-z0-9_-]+)'[^;]*;"
+    );
+
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private CookieCsrfTokenRepository csrfTokenRepository;
 
     @MockitoBean
     private AuthService authService;
@@ -52,10 +68,33 @@ class SecurityConfigTest {
 
     @Test
     void usesApiAuthenticationEntryPointForApiRoutes() throws Exception {
-        mockMvc.perform(get("/api/core/probe"))
+        MvcResult result = mockMvc.perform(get("/api/core/probe"))
             .andExpect(status().isUnauthorized())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"authentication_required\"")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"authentication_required\"")))
+            .andReturn();
+
+        String cspHeader = result.getResponse().getHeader("Content-Security-Policy");
+        org.assertj.core.api.Assertions.assertThat(cspHeader)
+            .isNotBlank()
+            .contains("script-src 'self' ")
+            .contains("https://static.cloudflareinsights.com;")
+            .contains("frame-src 'self' https://challenges.cloudflare.com;")
+            .contains(
+                "connect-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com "
+                    + "https://cloudflareinsights.com https://*.cloudflareinsights.com;"
+            )
+            .contains(
+                "img-src 'self' data: https://challenges.cloudflare.com https://static.cloudflareinsights.com "
+                    + "https://cloudflareinsights.com https://*.cloudflareinsights.com;"
+            )
+            .contains("style-src-elem 'self' 'unsafe-inline';")
+            .contains("style-src-attr 'unsafe-inline';")
+            .contains("upgrade-insecure-requests;");
+
+        Matcher nonceMatcher = SCRIPT_NONCE_PATTERN.matcher(cspHeader);
+        org.assertj.core.api.Assertions.assertThat(nonceMatcher.find()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(nonceMatcher.group(1)).isNotBlank();
     }
 
     @Test
@@ -63,6 +102,40 @@ class SecurityConfigTest {
         mockMvc.perform(get("/private"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void csrfCookieRepositoryUsesStrictSameSite() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setContextPath("");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        CsrfToken token = csrfTokenRepository.generateToken(request);
+        csrfTokenRepository.saveToken(token, request, response);
+
+        var csrfCookie = response.getCookie("XSRF-TOKEN");
+        org.assertj.core.api.Assertions.assertThat(csrfCookie).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(csrfCookie.getAttribute("SameSite")).isEqualTo("Strict");
+    }
+
+    @Test
+    void cspNonceIsRotatedPerRequest() throws Exception {
+        String firstHeader = mockMvc.perform(get("/api/core/probe"))
+            .andExpect(status().isUnauthorized())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Security-Policy");
+
+        String secondHeader = mockMvc.perform(get("/api/core/probe"))
+            .andExpect(status().isUnauthorized())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Security-Policy");
+
+        String firstNonce = extractScriptNonce(firstHeader);
+        String secondNonce = extractScriptNonce(secondHeader);
+
+        org.assertj.core.api.Assertions.assertThat(firstNonce).isNotEqualTo(secondNonce);
     }
 
     @RestController
@@ -94,5 +167,11 @@ class SecurityConfigTest {
                 jwtProperties
             );
         }
+    }
+
+    private String extractScriptNonce(String cspHeader) {
+        Matcher nonceMatcher = SCRIPT_NONCE_PATTERN.matcher(cspHeader);
+        org.assertj.core.api.Assertions.assertThat(nonceMatcher.find()).isTrue();
+        return nonceMatcher.group(1);
     }
 }
