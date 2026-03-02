@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -122,6 +123,33 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         Map<String, String> clearedCookies = readSetCookies(result);
         assertThat(clearedCookies).containsEntry(AuthCookieNames.ACCESS_COOKIE_NAME, "");
         assertThat(clearedCookies).containsEntry(AuthCookieNames.REFRESH_COOKIE_NAME, "");
+    }
+
+    @Test
+    void createLocationInviteAutoRefreshesExpiredAccessTokenWhenRefreshTokenIsValid() throws Exception {
+        AppUser partner = createUser("partner-invite-refresh@example.com", PASSWORD, true, "partner");
+        AppUser invited = createUser("client-invite-refresh@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Irvine");
+
+        AuthCookies loginCookies = loginAndCaptureCookies("partner-invite-refresh@example.com", PASSWORD);
+        AuthSession initialSession = authSessionRepository.findAll().getFirst();
+        String expiredAccessToken = createExpiredAccessToken(partner, initialSession.getId());
+
+        MvcResult result = mockMvc.perform(
+                post("/api/core/location-invites")
+                    .cookie(authCookies(expiredAccessToken, loginCookies.refreshToken()))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"locationId": %d, "invitedEmail": "%s"}
+                        """.formatted(location.getId(), invited.getEmail()))
+            )
+            .andExpect(status().isOk())
+            .andReturn();
+
+        Map<String, String> rotatedCookies = readSetCookies(result);
+        assertNotNull(rotatedCookies.get(AuthCookieNames.ACCESS_COOKIE_NAME));
+        assertNotNull(rotatedCookies.get(AuthCookieNames.REFRESH_COOKIE_NAME));
     }
 
     @Test
