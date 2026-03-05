@@ -219,7 +219,7 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
-    void updateLocationGraphDataWritesOnlyTraceDataThroughPipeline() throws Exception {
+    void updateLocationGraphDataWritesTraceDataAndLayoutThroughPipeline() throws Exception {
         Long userId = 41L;
         Long locationId = 77L;
 
@@ -251,7 +251,7 @@ class LocationGraphPipelineWebMvcTest {
                               "data": [
                                 {"type": "bar", "y": [9, 8, 7]}
                               ],
-                              "layout": {"title": "Ignored by backend"}
+                              "layout": {"title": "Updated by backend"}
                             }
                           ]
                         }
@@ -264,7 +264,7 @@ class LocationGraphPipelineWebMvcTest {
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("y"));
-        assertEquals(Map.of("title", "Original title"), graph.getLayout());
+        assertEquals(Map.of("title", "Updated by backend"), graph.getLayout());
     }
 
     @Test

@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, Index } from "solid-js";
 
 export type TraceOption = {
   index: number;
@@ -33,11 +33,11 @@ const TraceControls = (props: TraceControlsProps) => (
             }
           }}
         >
-        <For each={props.traceOptions}>
-          {(option) => (
-            <option value={String(option.index)}>{option.label}</option>
+        <Index each={props.traceOptions}>
+          {(option, index) => (
+            <option value={String(index)}>{option().label}</option>
           )}
-        </For>
+        </Index>
       </select>
     </label>
 

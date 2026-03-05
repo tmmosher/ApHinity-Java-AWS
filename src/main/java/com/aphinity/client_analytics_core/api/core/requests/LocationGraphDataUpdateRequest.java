@@ -4,16 +4,21 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 /**
- * Request payload for updating a single graph's trace data.
+ * Request payload for updating a single graph's trace data and optional layout.
  *
  * @param graphId graph identifier associated with the target location
  * @param data raw Plotly trace array/object payload
+ * @param layout optional Plotly layout payload
  */
 public record LocationGraphDataUpdateRequest(
     @NotNull
     @Positive
     Long graphId,
     @NotNull
-    Object data
+    Object data,
+    Object layout
 ) {
+    public LocationGraphDataUpdateRequest(Long graphId, Object data) {
+        this(graphId, data, null);
+    }
 }

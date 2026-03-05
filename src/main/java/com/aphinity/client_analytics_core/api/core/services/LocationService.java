@@ -130,12 +130,12 @@ public class LocationService {
     }
 
     /**
-     * Replaces graph trace data for one or more graphs linked to a location.
-     * Only partner/admin callers may mutate graph data.
+     * Replaces graph trace data (and optional layout) for one or more graphs linked to a location.
+     * Only partner/admin callers may mutate graph payloads.
      *
      * @param userId authenticated user id performing the update
      * @param locationId target location id
-     * @param graphUpdates requested graph data replacements
+     * @param graphUpdates requested graph payload replacements
      */
     @Transactional
     public void updateLocationGraphData(
@@ -170,26 +170,34 @@ public class LocationService {
             return;
         }
 
-        Map<Long, Object> updateDataByGraphId = mapGraphUpdateDataById(graphUpdates, locationId, userId);
+        Map<Long, LocationGraphDataUpdateRequest> updatesByGraphId = mapGraphUpdatesById(
+            graphUpdates,
+            locationId,
+            userId
+        );
         List<Graph> graphs = graphRepository.findByLocationIdAndGraphIdInForUpdate(
             locationId,
-            updateDataByGraphId.keySet()
+            updatesByGraphId.keySet()
         );
-        if (graphs.size() != updateDataByGraphId.size()) {
+        if (graphs.size() != updatesByGraphId.size()) {
             List<Long> matchedGraphIds = graphs.stream().map(Graph::getId).sorted().toList();
             log.warn(
                 "Rejected graph update because one or more graphs were not assigned to location actorUserId={} locationId={} requestedGraphIds={} matchedGraphIds={}",
                 userId,
                 locationId,
-                updateDataByGraphId.keySet(),
+                updatesByGraphId.keySet(),
                 matchedGraphIds
             );
             throw locationGraphNotFound();
         }
 
         for (Graph graph : graphs) {
-            Object nextData = updateDataByGraphId.get(graph.getId());
+            LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
+            Object nextData = update.data();
             try {
+                if (update.layout() != null) {
+                    graph.setLayout(asObjectMap(update.layout()));
+                }
                 graph.setData(nextData);
             } catch (IllegalArgumentException ex) {
                 log.warn(
@@ -210,7 +218,7 @@ public class LocationService {
                 "Graph update persistence failed actorUserId={} locationId={} graphIds={}",
                 userId,
                 locationId,
-                updateDataByGraphId.keySet(),
+                updatesByGraphId.keySet(),
                 ex
             );
             throw ex;
@@ -220,7 +228,7 @@ public class LocationService {
             locationId,
             graphs.size(),
             userId,
-            updateDataByGraphId.keySet()
+            updatesByGraphId.keySet()
         );
     }
 
@@ -545,12 +553,12 @@ public class LocationService {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph update list contains duplicate graph ids");
     }
 
-    private Map<Long, Object> mapGraphUpdateDataById(
+    private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(
         List<LocationGraphDataUpdateRequest> graphUpdates,
         Long locationId,
         Long actorUserId
     ) {
-        Map<Long, Object> updatesById = new LinkedHashMap<>();
+        Map<Long, LocationGraphDataUpdateRequest> updatesById = new LinkedHashMap<>();
         for (int index = 0; index < graphUpdates.size(); index++) {
             LocationGraphDataUpdateRequest update = graphUpdates.get(index);
             if (update == null || update.graphId() == null) {
@@ -562,7 +570,7 @@ public class LocationService {
                 );
                 throw invalidGraphData();
             }
-            if (updatesById.putIfAbsent(update.graphId(), update.data()) != null) {
+            if (updatesById.putIfAbsent(update.graphId(), update) != null) {
                 log.warn(
                     "Rejected graph update payload due to duplicate graph id actorUserId={} locationId={} duplicateGraphId={} rowIndex={}",
                     actorUserId,
@@ -582,7 +590,30 @@ public class LocationService {
                 );
                 throw invalidGraphData();
             }
+            if (update.layout() != null && !(update.layout() instanceof Map<?, ?>)) {
+                log.warn(
+                    "Rejected graph update row because layout payload was not an object actorUserId={} locationId={} graphId={} rowIndex={}",
+                    actorUserId,
+                    locationId,
+                    update.graphId(),
+                    index
+                );
+                throw invalidGraphData();
+            }
         }
         return Map.copyOf(updatesById);
+    }
+
+    private Map<String, Object> asObjectMap(Object layoutPayload) {
+        if (!(layoutPayload instanceof Map<?, ?> map)) {
+            throw new IllegalArgumentException("Graph layout payload must be an object");
+        }
+        Map<String, Object> copy = new LinkedHashMap<>();
+        map.forEach((key, value) -> {
+            if (key != null) {
+                copy.put(String.valueOf(key), value);
+            }
+        });
+        return copy;
     }
 }

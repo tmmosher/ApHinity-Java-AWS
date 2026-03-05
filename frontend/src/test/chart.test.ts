@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import {
+  applyDonutCenterValueToLayout,
   attachPlotlyResizeListener,
   buildPlotlyConfig,
   buildPlotlyLayout,
@@ -61,6 +62,57 @@ describe("Chart helpers", () => {
     expect(calledConfig).toMatchObject({
       displayModeBar: true,
       responsive: true
+    });
+  });
+
+  it("uses first donut fill value for centered KPI annotation text", () => {
+    const layout = applyDonutCenterValueToLayout(
+      [
+        {
+          type: "pie",
+          hole: 0.72,
+          values: [60, 40]
+        }
+      ],
+      {
+        annotations: [
+          {
+            x: 0.5,
+            y: 0.5,
+            showarrow: false,
+            text: "<b>68%</b>"
+          }
+        ]
+      }
+    );
+
+    expect(layout?.annotations?.[0]).toMatchObject({
+      text: "<b>60%</b>"
+    });
+  });
+
+  it("preserves template number formatting for centered donut annotation text", () => {
+    const layout = applyDonutCenterValueToLayout(
+      [
+        {
+          type: "pie",
+          hole: 0.72,
+          values: [1234, 99]
+        }
+      ],
+      {
+        annotations: [
+          {
+            xref: "paper",
+            yref: "paper",
+            text: "<b>2,307</b>"
+          }
+        ]
+      }
+    );
+
+    expect(layout?.annotations?.[0]).toMatchObject({
+      text: "<b>1,234</b>"
     });
   });
 

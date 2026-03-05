@@ -333,7 +333,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void updateLocationGraphDataUpdatesTraceDataOnly() {
+    void updateLocationGraphDataUpdatesTraceDataAndLayout() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
@@ -353,7 +353,11 @@ class LocationServiceTest {
         locationService.updateLocationGraphData(
             5L,
             99L,
-            List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar", "y", List.of(9, 8, 7)))))
+            List.of(new LocationGraphDataUpdateRequest(
+                31L,
+                List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
+                Map.of("title", "Updated layout")
+            ))
         );
 
         verify(graphRepository).saveAll(List.of(graph));
@@ -361,7 +365,7 @@ class LocationServiceTest {
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("y"));
-        assertEquals(Map.of("title", "Original layout"), graph.getLayout());
+        assertEquals(Map.of("title", "Updated layout"), graph.getLayout());
         assertEquals(Map.of("displayModeBar", false), graph.getConfig());
         assertEquals(Map.of("height", 240), graph.getStyle());
     }

@@ -256,9 +256,23 @@ public class ApiExceptionHandler {
             if (!exMessage.isBlank()) {
                 message.append(" | message=").append(exMessage);
             }
-            message.append(" | stack=").append(stackTrace(ex));
+            if (!shouldSuppressStackTrace(ex)) {
+                message.append(" | stack=").append(stackTrace(ex));
+            }
         }
         return message.toString();
+    }
+
+    /**
+     * Suppresses stack traces for expected static-resource misses so high-volume
+     * 404-style noise does not overwhelm the primary application log.
+     *
+     * @param ex unexpected exception
+     * @return true when stack traces should be omitted from the main log
+     */
+    private boolean shouldSuppressStackTrace(Exception ex) {
+        return "org.springframework.web.servlet.resource.NoResourceFoundException"
+            .equals(ex.getClass().getName());
     }
 
     /**

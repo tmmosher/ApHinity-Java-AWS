@@ -218,7 +218,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void updateLocationGraphsAllowsPartnerAndOnlyMutatesData() throws Exception {
+    void updateLocationGraphsAllowsPartnerAndMutatesDataAndLayout() throws Exception {
         AppUser partner = createUser("partner-graphs@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Santa Ana");
         Graph graph = createGraph("Water quality", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
@@ -239,7 +239,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                             {
                               "graphId": %d,
                               "data": [{"type": "bar", "y": [9, 8, 7]}],
-                              "layout": {"title": "Ignored by backend"}
+                              "layout": {"title": "Updated by backend"}
                             }
                           ]
                         }
@@ -254,7 +254,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(graph.getId()))
             .andExpect(jsonPath("$[0].data[0].y[0]").value(9))
-            .andExpect(jsonPath("$[0].layout.title").value("Original layout"));
+            .andExpect(jsonPath("$[0].layout.title").value("Updated by backend"));
     }
 
     @Test

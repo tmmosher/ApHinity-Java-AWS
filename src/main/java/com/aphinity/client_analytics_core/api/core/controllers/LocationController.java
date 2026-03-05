@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Location and membership endpoints for authenticated users.
@@ -75,12 +76,12 @@ public class LocationController {
     }
 
     /**
-     * Updates graph trace data for a location.
+     * Updates graph payload data for a location.
      * Only partner/admin users are authorized to mutate graph payloads.
      *
      * @param jwt authenticated principal JWT
      * @param locationId location identifier
-     * @param request validated request containing graph ids and replacement data payloads
+     * @param request validated request containing graph ids and replacement data/layout payloads
      */
     @PutMapping("/locations/{locationId}/graphs")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -91,11 +92,13 @@ public class LocationController {
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         int requestedGraphCount = request.graphs() == null ? 0 : request.graphs().size();
+        String graphUpdateSummary = summarizeGraphUpdates(request);
         log.info(
-            "Received location graph update request actorUserId={} locationId={} graphCount={}",
+            "Received location graph update request actorUserId={} locationId={} graphCount={} graphUpdates={}",
             userId,
             locationId,
-            requestedGraphCount
+            requestedGraphCount,
+            graphUpdateSummary
         );
         try {
             locationService.updateLocationGraphData(userId, locationId, request.graphs());
@@ -107,20 +110,22 @@ public class LocationController {
             );
         } catch (ResponseStatusException ex) {
             log.warn(
-                "Rejected location graph update request actorUserId={} locationId={} graphCount={} status={} reason={}",
+                "Rejected location graph update request actorUserId={} locationId={} graphCount={} status={} reason={} graphUpdates={}",
                 userId,
                 locationId,
                 requestedGraphCount,
                 ex.getStatusCode().value(),
-                ex.getReason()
+                ex.getReason(),
+                graphUpdateSummary
             );
             throw ex;
         } catch (RuntimeException ex) {
             log.error(
-                "Failed location graph update request actorUserId={} locationId={} graphCount={}",
+                "Failed location graph update request actorUserId={} locationId={} graphCount={} graphUpdates={}",
                 userId,
                 locationId,
                 requestedGraphCount,
+                graphUpdateSummary,
                 ex
             );
             throw ex;
@@ -232,5 +237,62 @@ public class LocationController {
             );
             throw ex;
         }
+    }
+
+    private String summarizeGraphUpdates(LocationGraphDataUpdateBatchRequest request) {
+        if (request == null || request.graphs() == null || request.graphs().isEmpty()) {
+            return "[]";
+        }
+
+        int totalUpdates = request.graphs().size();
+        int limit = Math.min(totalUpdates, 10);
+        StringBuilder summary = new StringBuilder("[");
+        for (int index = 0; index < limit; index++) {
+            if (index > 0) {
+                summary.append(", ");
+            }
+            var update = request.graphs().get(index);
+            if (update == null) {
+                summary.append("{row=").append(index).append(", update=null}");
+                continue;
+            }
+            summary.append("{row=").append(index)
+                .append(", graphId=").append(update.graphId())
+                .append(", dataType=").append(describePayloadType(update.data()))
+                .append(", traceCount=").append(inferTraceCount(update.data()))
+                .append(", layoutType=").append(describePayloadType(update.layout()))
+                .append("}");
+        }
+        if (totalUpdates > limit) {
+            summary
+                .append(", ... ")
+                .append(totalUpdates - limit)
+                .append(" more");
+        }
+        summary.append("]");
+        return summary.toString();
+    }
+
+    private String describePayloadType(Object payload) {
+        if (payload == null) {
+            return "null";
+        }
+        if (payload instanceof List<?>) {
+            return "array";
+        }
+        if (payload instanceof Map<?, ?>) {
+            return "object";
+        }
+        return payload.getClass().getSimpleName();
+    }
+
+    private int inferTraceCount(Object payload) {
+        if (payload instanceof List<?> listPayload) {
+            return listPayload.size();
+        }
+        if (payload instanceof Map<?, ?>) {
+            return 1;
+        }
+        return 0;
     }
 }
