@@ -9,9 +9,11 @@ import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationInviteRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.response.LocationInviteResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.LocationInviteService;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,13 +27,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -267,6 +272,323 @@ class LocationInviteServiceTest {
         assertEquals("Denver", response.get(1).name());
         verify(locationRepository).findAllByOrderByNameAsc();
         verifyNoInteractions(locationUserRepository);
+    }
+
+    @Test
+    void createInviteExpiresExistingPendingInviteBeforeCreatingReplacement() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite expiredPendingInvite = pendingInvite(41L, location, inviter, "client@example.com");
+        expiredPendingInvite.setExpiresAt(Instant.now().minusSeconds(5));
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
+        when(locationRepository.findById(23L)).thenReturn(Optional.of(location));
+        when(appUserRepository.findByEmail("client@example.com")).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByLocationIdAndInvitedEmailAndStatus(
+            23L,
+            "client@example.com",
+            LocationInviteStatus.PENDING
+        )).thenReturn(Optional.of(expiredPendingInvite));
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(23L, 9L)).thenReturn(false);
+        when(locationInviteRepository.findByTokenHash(any(String.class))).thenReturn(Optional.empty());
+        when(locationInviteRepository.save(any(LocationInvite.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(locationInviteRepository.saveAndFlush(any(LocationInvite.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        locationInviteService.createInvite(7L, 23L, "client@example.com");
+
+        assertEquals(LocationInviteStatus.EXPIRED, expiredPendingInvite.getStatus());
+        verify(locationInviteRepository, times(1)).save(expiredPendingInvite);
+        verify(locationInviteRepository, times(1)).saveAndFlush(any(LocationInvite.class));
+    }
+
+    @Test
+    void createInviteRejectsInviteToOwnAccount() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        Location location = location(23L, "Austin");
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
+        when(locationRepository.findById(23L)).thenReturn(Optional.of(location));
+        when(appUserRepository.findByEmail("partner@example.com")).thenReturn(Optional.of(inviter));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.createInvite(7L, 23L, "  PARTNER@EXAMPLE.COM ")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Cannot invite your own account", ex.getReason());
+        verifyNoInteractions(locationInviteRepository, locationUserRepository);
+    }
+
+    @Test
+    void createInviteRejectsExistingUnexpiredPendingInvite() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite activePendingInvite = pendingInvite(44L, location, inviter, "client@example.com");
+        activePendingInvite.setExpiresAt(Instant.now().plusSeconds(60));
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
+        when(locationRepository.findById(23L)).thenReturn(Optional.of(location));
+        when(appUserRepository.findByEmail("client@example.com")).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByLocationIdAndInvitedEmailAndStatus(
+            23L,
+            "client@example.com",
+            LocationInviteStatus.PENDING
+        )).thenReturn(Optional.of(activePendingInvite));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.createInvite(7L, 23L, "client@example.com")
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("An active invite already exists", ex.getReason());
+        verify(locationInviteRepository, never()).saveAndFlush(any(LocationInvite.class));
+    }
+
+    @Test
+    void createInviteRejectsInvitedUserThatAlreadyHasMembership() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        Location location = location(23L, "Austin");
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
+        when(locationRepository.findById(23L)).thenReturn(Optional.of(location));
+        when(appUserRepository.findByEmail("client@example.com")).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByLocationIdAndInvitedEmailAndStatus(
+            23L,
+            "client@example.com",
+            LocationInviteStatus.PENDING
+        )).thenReturn(Optional.empty());
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(23L, 9L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.createInvite(7L, 23L, "client@example.com")
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("User already has access to this location", ex.getReason());
+        verify(locationInviteRepository, never()).saveAndFlush(any(LocationInvite.class));
+    }
+
+    @Test
+    void createInviteRejectsInviterWithoutRequiredRole() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.createInvite(7L, 23L, "client@example.com")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, locationInviteRepository, locationUserRepository);
+    }
+
+    @Test
+    void getInviteableLocationsRejectsInviterWithoutRequiredRole() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.getInviteableLocations(7L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, locationInviteRepository, locationUserRepository);
+    }
+
+    @Test
+    void getActiveInvitesRejectsBlankAuthenticatedEmail() {
+        AppUser user = verifiedUser(15L, "   ");
+        when(appUserRepository.findById(15L)).thenReturn(Optional.of(user));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.getActiveInvites(15L)
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertEquals("Invalid authenticated user", ex.getReason());
+        verifyNoInteractions(locationInviteRepository);
+    }
+
+    @Test
+    void acceptInviteRejectsNonPendingInvite() {
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite invite = pendingInvite(91L, location, inviter, "client@example.com");
+        invite.setStatus(LocationInviteStatus.ACCEPTED);
+
+        when(appUserRepository.findById(9L)).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByIdForUpdate(91L)).thenReturn(Optional.of(invite));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.acceptInvite(9L, 91L)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Invite is not pending", ex.getReason());
+        verify(locationInviteRepository, never()).save(any(LocationInvite.class));
+    }
+
+    @Test
+    void acceptInviteExpiresInviteAndRejectsWhenInviteExpired() {
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite invite = pendingInvite(91L, location, inviter, "client@example.com");
+        invite.setExpiresAt(Instant.now().minusSeconds(1));
+
+        when(appUserRepository.findById(9L)).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByIdForUpdate(91L)).thenReturn(Optional.of(invite));
+        when(locationInviteRepository.save(invite)).thenReturn(invite);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.acceptInvite(9L, 91L)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Invite expired", ex.getReason());
+        assertEquals(LocationInviteStatus.EXPIRED, invite.getStatus());
+        verify(locationInviteRepository).save(invite);
+        verify(locationUserRepository, never()).save(any(LocationUser.class));
+    }
+
+    @Test
+    void declineInviteTransitionsPendingInviteToRevoked() {
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite invite = pendingInvite(91L, location, inviter, "client@example.com");
+        invite.setAcceptedAt(Instant.now().minusSeconds(50));
+        invite.setAcceptedUser(inviter);
+
+        when(appUserRepository.findById(9L)).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByIdForUpdate(91L)).thenReturn(Optional.of(invite));
+        when(locationInviteRepository.save(invite)).thenReturn(invite);
+
+        LocationInviteResponse response = locationInviteService.declineInvite(9L, 91L);
+
+        assertEquals(LocationInviteStatus.REVOKED, invite.getStatus());
+        assertEquals(LocationInviteStatus.REVOKED, response.status());
+        assertNull(invite.getAcceptedAt());
+        assertNull(invite.getAcceptedUser());
+        verify(locationInviteRepository).save(invite);
+    }
+
+    @Test
+    void createInviteReturnsConflictWhenConstraintNameExistsInCauseChain() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        Location location = location(23L, "Austin");
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
+        when(locationRepository.findById(23L)).thenReturn(Optional.of(location));
+        when(appUserRepository.findByEmail("client@example.com")).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByLocationIdAndInvitedEmailAndStatus(
+            23L,
+            "client@example.com",
+            LocationInviteStatus.PENDING
+        )).thenReturn(Optional.empty());
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(23L, 9L)).thenReturn(false);
+        when(locationInviteRepository.findByTokenHash(any(String.class))).thenReturn(Optional.empty());
+
+        ConstraintViolationException cause = new ConstraintViolationException(
+            "duplicate",
+            new SQLException("duplicate"),
+            "location_invite_one_pending_per_email"
+        );
+        when(locationInviteRepository.saveAndFlush(any(LocationInvite.class)))
+            .thenThrow(new DataIntegrityViolationException("insert failed", cause));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.createInvite(7L, 23L, "client@example.com")
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("An active invite already exists", ex.getReason());
+    }
+
+    @Test
+    void createInviteFailsAfterTokenHashCollisionRetries() {
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite collidingInvite = pendingInvite(51L, location, inviter, "client@example.com");
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
+        when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
+        when(locationRepository.findById(23L)).thenReturn(Optional.of(location));
+        when(appUserRepository.findByEmail("client@example.com")).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByLocationIdAndInvitedEmailAndStatus(
+            23L,
+            "client@example.com",
+            LocationInviteStatus.PENDING
+        )).thenReturn(Optional.empty());
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(23L, 9L)).thenReturn(false);
+        when(locationInviteRepository.findByTokenHash(any(String.class))).thenReturn(Optional.of(collidingInvite));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationInviteService.createInvite(7L, 23L, "client@example.com")
+        );
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+        assertEquals("Unable to issue invite", ex.getReason());
+        verify(locationInviteRepository, never()).saveAndFlush(any(LocationInvite.class));
+    }
+
+    @Test
+    void getActiveInvitesExpiresExpiredEntriesAndReturnsOnlyActiveInvites() {
+        AppUser user = verifiedUser(15L, "client@example.com");
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        Location location = location(23L, "Austin");
+
+        LocationInvite expiredInvite = pendingInvite(51L, location, inviter, "client@example.com");
+        expiredInvite.setExpiresAt(Instant.now().minusSeconds(5));
+        LocationInvite activeInvite = pendingInvite(52L, location, inviter, "client@example.com");
+        activeInvite.setExpiresAt(Instant.now().plusSeconds(300));
+
+        when(appUserRepository.findById(15L)).thenReturn(Optional.of(user));
+        when(locationInviteRepository.findByInvitedEmailAndStatusWithLocation(
+            "client@example.com",
+            LocationInviteStatus.PENDING
+        )).thenReturn(List.of(expiredInvite, activeInvite));
+        when(locationInviteRepository.save(any(LocationInvite.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<LocationInviteResponse> responses = locationInviteService.getActiveInvites(15L);
+
+        assertEquals(1, responses.size());
+        assertEquals(activeInvite.getId(), responses.getFirst().id());
+        assertEquals(LocationInviteStatus.EXPIRED, expiredInvite.getStatus());
+        verify(locationInviteRepository).save(expiredInvite);
+    }
+
+    @Test
+    void acceptInviteSkipsMembershipCreationWhenMembershipAlreadyExists() {
+        AppUser invitedUser = verifiedUser(9L, "client@example.com");
+        AppUser inviter = verifiedUser(7L, "partner@example.com");
+        Location location = location(23L, "Austin");
+        LocationInvite invite = pendingInvite(91L, location, inviter, "client@example.com");
+        LocationUser existingMembership = new LocationUser();
+
+        when(appUserRepository.findById(9L)).thenReturn(Optional.of(invitedUser));
+        when(locationInviteRepository.findByIdForUpdate(91L)).thenReturn(Optional.of(invite));
+        when(locationInviteRepository.save(invite)).thenReturn(invite);
+        when(locationUserRepository.findByIdLocationIdAndIdUserId(23L, 9L)).thenReturn(Optional.of(existingMembership));
+
+        locationInviteService.acceptInvite(9L, 91L);
+
+        verify(locationUserRepository).findByIdLocationIdAndIdUserId(23L, 9L);
+        verify(locationUserRepository, never()).save(any(LocationUser.class));
     }
 
     private AppUser verifiedUser(Long id, String email) {
