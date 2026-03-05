@@ -235,4 +235,15 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       saveLocationGraphsById(host, "55", [])
     ).rejects.toThrowError("Graph update conflict");
   });
+
+  it("throws a csrf error when the server reports csrf_invalid", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "csrf_invalid",
+      message: "Missing or invalid CSRF token"
+    }));
+
+    await expect(
+      saveLocationGraphsById(host, "55", [])
+    ).rejects.toThrowError("CSRF invalid");
+  });
 });

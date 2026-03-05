@@ -239,6 +239,14 @@ export const DashboardLocationDetailPanel = () => {
         }
         return;
       }
+      if (error instanceof Error && error.message === "CSRF invalid") {
+        toast.error("Automatic security refresh failed. Please refresh the page and try saving again.");
+        return;
+      }
+      if (error instanceof Error && error.message === "Insufficient permissions") {
+        toast.error("You no longer have permission to edit these graphs.");
+        return;
+      }
       toast.error("Unable to save graph changes.");
     } finally {
       if (saveLocationId === params.locationId && saveSessionToken === locationSessionToken()) {

@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -218,6 +219,55 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void deleteMembershipRejectsMismatchedCsrfToken() throws Exception {
+        AppUser partner = createUser("partner-delete-stale-csrf@example.com", PASSWORD, true, "partner");
+        AppUser target = createUser("target-delete-stale-csrf@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Orange");
+        addMembership(location, target);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-delete-stale-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                delete("/api/core/locations/{locationId}/memberships/{userId}", location.getId(), target.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("csrf_invalid"));
+    }
+
+    @Test
+    void deleteMembershipSucceedsAfterRefreshingCsrfToken() throws Exception {
+        AppUser partner = createUser("partner-delete-refresh-csrf@example.com", PASSWORD, true, "partner");
+        AppUser target = createUser("target-delete-refresh-csrf@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Yorba Linda");
+        addMembership(location, target);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-delete-refresh-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                delete("/api/core/locations/{locationId}/memberships/{userId}", location.getId(), target.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("csrf_invalid"));
+
+        assertTrue(locationUserRepository.findByIdLocationIdAndIdUserId(location.getId(), target.getId()).isPresent());
+
+        String csrfToken = fetchCoreCsrfToken(authCookies);
+
+        mockMvc.perform(
+                delete("/api/core/locations/{locationId}/memberships/{userId}", location.getId(), target.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, csrfToken))
+                    .header("X-XSRF-TOKEN", csrfToken)
+            )
+            .andExpect(status().isNoContent());
+
+        assertTrue(locationUserRepository.findByIdLocationIdAndIdUserId(location.getId(), target.getId()).isEmpty());
+    }
+
+    @Test
     void updateLocationGraphsAllowsPartnerAndMutatesDataAndLayout() throws Exception {
         AppUser partner = createUser("partner-graphs@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Santa Ana");
@@ -358,6 +408,84 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsRejectsMismatchedCsrfToken() throws Exception {
+        createUser("partner-graphs-stale-csrf@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Brea");
+        Graph graph = createGraph("Stale CSRF graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-stale-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("csrf_invalid"));
+    }
+
+    @Test
+    void updateLocationGraphsSucceedsAfterRefreshingCsrfTokenFromProfile() throws Exception {
+        createUser("partner-graphs-refresh-csrf@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Lake Forest");
+        Graph graph = createGraph("Refresh CSRF graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-refresh-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("csrf_invalid"));
+
+        String csrfToken = fetchCoreCsrfToken(authCookies);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, csrfToken))
+                    .header("X-XSRF-TOKEN", csrfToken)
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [5, 5, 5]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
     void updateLocationGraphsRejectsClientUsers() throws Exception {
         createUser("client-graphs@example.com", PASSWORD, true, "client");
         Location location = createLocation("Irvine");
@@ -384,6 +512,26 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
+    void createLocationInviteRejectsMismatchedCsrfToken() throws Exception {
+        createUser("partner-invite-stale-csrf@example.com", PASSWORD, true, "partner");
+        AppUser invited = createUser("invite-target-stale-csrf@example.com", PASSWORD, true, "client");
+        Location location = createLocation("San Clemente");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-invite-stale-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/location-invites")
+                    .cookie(authCookiesWithCsrf(authCookies, "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"locationId": %d, "invitedEmail": "%s"}
+                        """.formatted(location.getId(), invited.getEmail()))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("csrf_invalid"));
     }
 
     @Test
@@ -704,5 +852,32 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                 )
                 .andReturn();
         };
+    }
+
+    private Cookie[] authCookiesWithCsrf(AuthCookies authCookies, String csrfToken) {
+        Cookie[] authPair = authCookies(authCookies);
+        Cookie csrfCookie = new Cookie("XSRF-TOKEN", csrfToken);
+        csrfCookie.setPath("/");
+        return new Cookie[]{
+            authPair[0],
+            authPair[1],
+            csrfCookie
+        };
+    }
+
+    private String fetchCoreCsrfToken(AuthCookies authCookies) throws Exception {
+        MvcResult profileResult = mockMvc.perform(
+                get("/api/core/profile")
+                    .cookie(authCookies(authCookies))
+                    .accept(APPLICATION_JSON)
+            )
+            .andExpect(status().isOk())
+            .andReturn();
+        String csrfToken = readSetCookies(profileResult).get("XSRF-TOKEN");
+        if (csrfToken != null && !csrfToken.isBlank()) {
+            return csrfToken;
+        }
+        // CookieCsrfTokenRepository validates by matching header and cookie values.
+        return UUID.randomUUID().toString();
     }
 }

@@ -88,11 +88,26 @@ export const saveLocationGraphsById = async (
   if (!response.ok) {
     try {
       const errorPayload = await response.json();
-      if (isRecord(errorPayload) && errorPayload.code === "graph_update_conflict") {
-        throw new Error("Graph update conflict");
+      if (isRecord(errorPayload) && typeof errorPayload.code === "string") {
+        if (errorPayload.code === "graph_update_conflict") {
+          throw new Error("Graph update conflict");
+        }
+        if (errorPayload.code === "csrf_invalid") {
+          throw new Error("CSRF invalid");
+        }
+        if (errorPayload.code === "forbidden") {
+          throw new Error("Insufficient permissions");
+        }
       }
     } catch (error) {
-      if (error instanceof Error && error.message === "Graph update conflict") {
+      if (
+        error instanceof Error &&
+        (
+          error.message === "Graph update conflict" ||
+          error.message === "CSRF invalid" ||
+          error.message === "Insufficient permissions"
+        )
+      ) {
         throw error;
       }
       // Continue to generic error when response body is not parseable.

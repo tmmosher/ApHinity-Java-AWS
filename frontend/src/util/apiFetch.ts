@@ -57,10 +57,10 @@ export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {})
   }
 
   const firstRequestHeaders = new Headers(baseHeaders);
-  const csrfToken = csrfProtectedMethod ? readCookie(CSRF_COOKIE_NAME) : null;
-  const hasInitialCsrfToken = csrfToken != null && csrfToken !== "";
+  const initialCsrfToken = csrfProtectedMethod ? readCookie(CSRF_COOKIE_NAME) : null;
+  const hasInitialCsrfToken = initialCsrfToken != null && initialCsrfToken !== "";
   if (csrfProtectedMethod && hasInitialCsrfToken) {
-    firstRequestHeaders.set(CSRF_HEADER_NAME, csrfToken);
+    firstRequestHeaders.set(CSRF_HEADER_NAME, initialCsrfToken);
   }
 
   const response = await fetch(input, {
@@ -68,12 +68,17 @@ export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {})
     headers: firstRequestHeaders
   });
 
-  if (!csrfProtectedMethod || hasInitialCsrfToken) {
+  if (!csrfProtectedMethod) {
     return response;
   }
 
   if (!await isCsrfInvalidResponse(response)) {
     return response;
+  }
+
+  // If an existing CSRF cookie was stale, re-prime once before retrying.
+  if (hasInitialCsrfToken) {
+    await primeCsrfTokenCookie(input, requestBase.credentials ?? "include");
   }
 
   const retryToken = readCookie(CSRF_COOKIE_NAME);

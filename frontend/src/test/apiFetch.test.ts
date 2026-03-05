@@ -110,6 +110,43 @@ describe("apiFetch", () => {
     expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-retry");
   });
 
+  it("re-primes and retries when an existing CSRF token becomes stale", async () => {
+    installDocumentCookie("XSRF-TOKEN=token-stale");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({code: "csrf_invalid"}),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      ))
+      .mockImplementationOnce(async () => {
+        ((globalThis as {document: {cookie: string}}).document).cookie = "XSRF-TOKEN=token-fresh";
+        return new Response(null, {status: 200});
+      })
+      .mockResolvedValueOnce(new Response(null, {status: 204}));
+
+    const response = await apiFetch("https://example.test/api/core/locations/42/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({graphs: []})
+    });
+
+    expect(response.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/core/profile");
+
+    const firstMutationHeaders = fetchMock.mock.calls[0][1]?.headers as Headers;
+    const retryMutationHeaders = fetchMock.mock.calls[2][1]?.headers as Headers;
+    expect(firstMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-stale");
+    expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-fresh");
+  });
+
   it("does not retry non-CSRF 403 responses", async () => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock
