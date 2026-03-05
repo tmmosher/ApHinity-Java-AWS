@@ -371,6 +371,78 @@ class LocationServiceTest {
     }
 
     @Test
+    void updateLocationGraphDataSupportsAddingAndRenamingTraces() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
+        graph.setLayout(Map.of("title", "Original layout"));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                31L,
+                List.of(
+                    Map.of("type", "bar", "name", "Actual", "x", List.of("Jan"), "y", List.of(9)),
+                    Map.of("type", "bar", "name", "Forecast", "x", List.of("Feb"), "y", List.of(12))
+                )
+            ))
+        );
+
+        verify(graphRepository).saveAll(List.of(graph));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(2, traces.size());
+        assertEquals("Actual", traces.get(0).get("name"));
+        assertEquals(List.of(9L), traces.get(0).get("y"));
+        assertEquals("Forecast", traces.get(1).get("name"));
+        assertEquals(List.of(12L), traces.get(1).get("y"));
+        assertEquals(Map.of("title", "Original layout"), graph.getLayout());
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsStaleExpectedUpdatedAt() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(
+                    31L,
+                    List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
+                    null,
+                    "2026-01-04T00:00:00Z"
+                ))
+            )
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Graph update conflict", ex.getReason());
+        verify(graphRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     void getAccessibleLocationGraphsReturnsMappedGraphsForAuthorizedUser() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));

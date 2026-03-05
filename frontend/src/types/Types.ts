@@ -78,4 +78,5 @@ export interface LocationGraphUpdate {
     layout?: Record<string, unknown> | null;
     config?: Record<string, unknown> | null;
     style?: Record<string, unknown> | null;
+    expectedUpdatedAt?: string | null;
 }

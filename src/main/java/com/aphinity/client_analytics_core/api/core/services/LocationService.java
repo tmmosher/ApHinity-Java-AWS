@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -195,6 +197,7 @@ public class LocationService {
             LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
             Object nextData = update.data();
             try {
+                validateExpectedGraphTimestamp(update, graph, locationId, userId);
                 if (update.layout() != null) {
                     graph.setLayout(asObjectMap(update.layout()));
                 }
@@ -553,6 +556,10 @@ public class LocationService {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph update list contains duplicate graph ids");
     }
 
+    private ResponseStatusException graphUpdateConflict() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "Graph update conflict");
+    }
+
     private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(
         List<LocationGraphDataUpdateRequest> graphUpdates,
         Long locationId,
@@ -602,6 +609,38 @@ public class LocationService {
             }
         }
         return Map.copyOf(updatesById);
+    }
+
+    private void validateExpectedGraphTimestamp(
+        LocationGraphDataUpdateRequest update,
+        Graph graph,
+        Long locationId,
+        Long actorUserId
+    ) {
+        String expectedUpdatedAt = update.expectedUpdatedAt();
+        if (expectedUpdatedAt == null) {
+            return;
+        }
+
+        Instant expectedTimestamp;
+        try {
+            expectedTimestamp = Instant.parse(expectedUpdatedAt);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Graph expectedUpdatedAt must be an ISO-8601 timestamp", ex);
+        }
+
+        Instant actualTimestamp = graph.getUpdatedAt();
+        if (!Objects.equals(actualTimestamp, expectedTimestamp)) {
+            log.warn(
+                "Rejected graph update due to stale graph version actorUserId={} locationId={} graphId={} expectedUpdatedAt={} actualUpdatedAt={}",
+                actorUserId,
+                locationId,
+                graph.getId(),
+                expectedUpdatedAt,
+                actualTimestamp
+            );
+            throw graphUpdateConflict();
+        }
     }
 
     private Map<String, Object> asObjectMap(Object layoutPayload) {

@@ -176,6 +176,34 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     });
   });
 
+  it("passes expectedUpdatedAt through the save payload", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await saveLocationGraphsById(host, "55", [
+      {
+        graphId: 99,
+        data: [{type: "bar", y: [4, 5, 6]}],
+        expectedUpdatedAt: "2026-01-04T00:00:00Z"
+      }
+    ]);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        graphs: [
+          {
+            graphId: 99,
+            data: [{type: "bar", y: [4, 5, 6]}],
+            expectedUpdatedAt: "2026-01-04T00:00:00Z"
+          }
+        ]
+      })
+    });
+  });
+
   it("rejects invalid route location ids before save request dispatch", async () => {
     await expect(
       saveLocationGraphsById(host, "0", [
@@ -195,5 +223,16 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     await expect(
       saveLocationGraphsById(host, "55", [])
     ).rejects.toThrowError("Unable to save location graphs");
+  });
+
+  it("throws a conflict error when the server reports graph update conflict", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "graph_update_conflict",
+      message: "Graph update conflict"
+    }));
+
+    await expect(
+      saveLocationGraphsById(host, "55", [])
+    ).rejects.toThrowError("Graph update conflict");
   });
 });

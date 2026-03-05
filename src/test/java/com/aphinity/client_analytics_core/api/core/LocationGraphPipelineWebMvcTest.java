@@ -268,6 +268,95 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void updateLocationGraphDataPersistsRenamedAndNewTracesThroughPipeline() throws Exception {
+        Long userId = 43L;
+        Long locationId = 79L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(311L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": 311,
+                              "data": [
+                                {"type": "bar", "name": "Actual", "x": ["Jan"], "y": [9]},
+                                {"type": "bar", "name": "Forecast", "x": ["Feb"], "y": [12]}
+                              ]
+                            }
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isNoContent());
+
+        verify(graphRepository).saveAll(List.of(graph));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(2, traces.size());
+        assertEquals("Actual", traces.get(0).get("name"));
+        assertEquals(List.of(9L), traces.get(0).get("y"));
+        assertEquals("Forecast", traces.get(1).get("name"));
+        assertEquals(List.of(12L), traces.get(1).get("y"));
+    }
+
+    @Test
+    void updateLocationGraphDataReturnsConflictWhenExpectedUpdatedAtIsStale() throws Exception {
+        Long userId = 45L;
+        Long locationId = 81L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(312L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-01-10T00:00:00Z"));
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": 312,
+                              "expectedUpdatedAt": "2026-01-09T00:00:00Z",
+                              "data": [
+                                {"type": "bar", "name": "Actual", "x": ["Jan"], "y": [9]}
+                              ]
+                            }
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("graph_update_conflict"))
+            .andExpect(jsonPath("$.message").value("Graph update conflict"));
+    }
+
+    @Test
     void updateLocationGraphDataReturnsBadRequestForDuplicateGraphIds() throws Exception {
         Long userId = 42L;
         Long locationId = 78L;

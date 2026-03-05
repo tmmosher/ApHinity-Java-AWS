@@ -2,6 +2,8 @@ import {describe, expect, it} from "vitest";
 import {LocationGraph} from "../types/Types";
 import {
   applyGraphPayloadEdit,
+  buildChangedLocationGraphUpdates,
+  buildGraphBaselineIndex,
   buildLocationGraphUpdates,
   createEditableGraphPayload,
   parseEditableGraphPayload,
@@ -105,6 +107,51 @@ describe("graphEditor", () => {
         layout: {showlegend: false},
         config: {displayModeBar: false},
         style: {height: 300}
+      }
+    ]);
+  });
+
+  it("builds save payloads only for changed graphs with expectedUpdatedAt values", () => {
+    const editedGraphs = applyGraphPayloadEdit(baseGraphs, [], 10, {
+      data: [{type: "bar", x: ["A"], y: [15]}],
+      layout: {title: {text: "Updated"}},
+      config: {displayModeBar: false},
+      style: {height: 360}
+    }).nextGraphs;
+
+    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphs)).toEqual([
+      {
+        graphId: 10,
+        data: [{type: "bar", x: ["A"], y: [15]}],
+        layout: {title: {text: "Updated"}},
+        config: {displayModeBar: false},
+        style: {height: 360},
+        expectedUpdatedAt: "2026-01-02T00:00:00Z"
+      }
+    ]);
+  });
+
+  it("returns no save payloads when there are no graph changes", () => {
+    expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
+  });
+
+  it("uses precomputed baseline signatures when building changed graph updates", () => {
+    const editedGraphs = applyGraphPayloadEdit(baseGraphs, [], 11, {
+      data: [{type: "pie", labels: ["Open"], values: [5]}],
+      layout: {showlegend: true},
+      config: {displayModeBar: false},
+      style: {height: 300}
+    }).nextGraphs;
+
+    const baseline = buildGraphBaselineIndex(baseGraphs);
+    expect(buildChangedLocationGraphUpdates(editedGraphs, baseline)).toEqual([
+      {
+        graphId: 11,
+        data: [{type: "pie", labels: ["Open"], values: [5]}],
+        layout: {showlegend: true},
+        config: {displayModeBar: false},
+        style: {height: 300},
+        expectedUpdatedAt: "2026-01-02T00:00:00Z"
       }
     ]);
   });

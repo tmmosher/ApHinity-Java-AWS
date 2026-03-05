@@ -9,8 +9,10 @@ import {useProfile} from "../../../context/ProfileContext";
 import {LocationGraph, LocationSectionLayout} from "../../../types/Types";
 import {
   applyGraphPayloadEdit,
-  buildLocationGraphUpdates,
+  buildChangedLocationGraphUpdates,
+  buildGraphBaselineIndex,
   cloneLocationGraphs,
+  type GraphBaselineEntry,
   undoGraphPayloadEdit,
   type EditableGraphPayload
 } from "../../../util/graphEditor";
@@ -32,6 +34,7 @@ export const DashboardLocationDetailPanel = () => {
     (locationId) => fetchLocationGraphsById(host, locationId)
   );
   const [workingGraphs, setWorkingGraphs] = createSignal<LocationGraph[]>([]);
+  const [graphBaselineIndex, setGraphBaselineIndex] = createSignal<Map<number, GraphBaselineEntry>>(new Map());
   const [locationUndoStack, setLocationUndoStack] = createSignal<LocationGraph[][]>([]);
   const [editingGraphId, setEditingGraphId] = createSignal<number | null>(null);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
@@ -48,6 +51,7 @@ export const DashboardLocationDetailPanel = () => {
       return;
     }
     setWorkingGraphs(cloneLocationGraphs(fetchedGraphs));
+    setGraphBaselineIndex(buildGraphBaselineIndex(fetchedGraphs));
     setLocationUndoStack([]);
   });
 
@@ -55,6 +59,8 @@ export const DashboardLocationDetailPanel = () => {
     params.locationId;
     setEditingGraphId(null);
     setIsSavingGraphChanges(false);
+    setGraphBaselineIndex(new Map());
+    setLocationUndoStack([]);
     setLocationSessionToken((token) => token + 1);
   });
 
@@ -186,7 +192,11 @@ export const DashboardLocationDetailPanel = () => {
 
     const saveLocationId = params.locationId;
     const saveSessionToken = locationSessionToken();
-    const graphUpdates = buildLocationGraphUpdates(workingGraphs());
+    const graphUpdates = buildChangedLocationGraphUpdates(workingGraphs(), graphBaselineIndex());
+    if (graphUpdates.length === 0) {
+      setLocationUndoStack([]);
+      return;
+    }
 
     setIsSavingGraphChanges(true);
     try {
@@ -200,8 +210,33 @@ export const DashboardLocationDetailPanel = () => {
       }
       setLocationUndoStack([]);
       toast.success("Graph changes saved.");
-    } catch {
+      try {
+        await refetchGraphs();
+        if (saveLocationId !== params.locationId || saveSessionToken !== locationSessionToken()) {
+          return;
+        }
+      } catch {
+        if (saveLocationId === params.locationId && saveSessionToken === locationSessionToken()) {
+          toast.error("Saved successfully, but automatic refresh failed. Please refresh the page.");
+        }
+      }
+    } catch (error) {
       if (saveLocationId !== params.locationId || saveSessionToken !== locationSessionToken()) {
+        return;
+      }
+      if (error instanceof Error && error.message === "Graph update conflict") {
+        setLocationUndoStack([]);
+        try {
+          await refetchGraphs();
+          if (saveLocationId !== params.locationId || saveSessionToken !== locationSessionToken()) {
+            return;
+          }
+          toast.error("A graph was updated by another user. Latest data was reloaded.");
+        } catch {
+          if (saveLocationId === params.locationId && saveSessionToken === locationSessionToken()) {
+            toast.error("A graph was updated by another user, and automatic refresh failed. Please refresh the page.");
+          }
+        }
         return;
       }
       toast.error("Unable to save graph changes.");

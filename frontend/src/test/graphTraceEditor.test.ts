@@ -1,9 +1,13 @@
 import {describe, expect, it} from "vitest";
 import {
+  AUTO_SIZE_TRACE_FLAG,
   addPieRow,
   coerceInputValue,
+  createTrace,
   getTraceYAxisRange,
+  isAutoSizingPieTrace,
   removePieRow,
+  renameTrace,
   setTraceColor,
   updateTraceYAxisRange,
   updatePieValue
@@ -57,6 +61,60 @@ describe("graphTraceEditor", () => {
 
     const nextTrace = updatePieValue(trace, 0, "-");
     expect((nextTrace.values as unknown[])[0]).toBe("-");
+  });
+
+  it("detects pie traces marked as auto-sizing", () => {
+    expect(isAutoSizingPieTrace({
+      type: "pie",
+      [AUTO_SIZE_TRACE_FLAG]: true
+    })).toBe(true);
+
+    expect(isAutoSizingPieTrace({
+      type: "pie",
+      [AUTO_SIZE_TRACE_FLAG]: false
+    })).toBe(false);
+  });
+
+  it("checks auto-sizing traces while keeping current pie value behavior", () => {
+    const trace: Record<string, unknown> = {
+      type: "pie",
+      [AUTO_SIZE_TRACE_FLAG]: true,
+      labels: ["fill", "rest"],
+      values: [60, 40]
+    };
+
+    const nextTrace = updatePieValue(trace, 0, "70");
+    expect((nextTrace.values as unknown[])[0]).toBe(70);
+    expect((nextTrace.values as unknown[])[1]).toBe(40);
+  });
+
+  it("creates a new trace using the selected trace type and default naming", () => {
+    const nextTrace = createTrace("scatter", 2);
+
+    expect(nextTrace).toEqual({
+      type: "scatter",
+      mode: "lines+markers",
+      name: "Trace 3",
+      x: [1],
+      y: [0],
+      marker: {color: "#2563eb"},
+      line: {color: "#2563eb"}
+    });
+  });
+
+  it("renames traces and clears names when blank input is provided", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      name: "Current Name",
+      x: ["Point 1"],
+      y: [1]
+    };
+
+    const renamed = renameTrace(trace, "  Throughput  ");
+    expect(renamed.name).toBe("Throughput");
+
+    const unnamed = renameTrace(renamed, "   ");
+    expect(unnamed.name).toBeUndefined();
   });
 
   it("updates and reads y-axis range for default axis traces", () => {

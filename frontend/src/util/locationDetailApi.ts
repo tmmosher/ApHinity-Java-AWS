@@ -2,6 +2,9 @@ import {parseLocationGraphList, parseLocationSummary} from "./coreApi";
 import {apiFetch} from "./apiFetch";
 import {LocationGraph, LocationGraphUpdate, LocationSummary} from "../types/Types";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
 export const parseRouteLocationId = (locationId: string): number => {
   const parsedId = Number(locationId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
@@ -58,7 +61,7 @@ export const fetchLocationGraphsById = async (host: string, locationId: string):
  * Persists edited graph payloads for a location.
  *
  * Endpoint: `PUT /api/core/locations/{locationId}/graphs`
- * Body: `{ graphs: [{ graphId, data, layout, config, style }] }`
+ * Body: `{ graphs: [{ graphId, data, layout, config, style, expectedUpdatedAt? }] }`
  *
  * @param host API host base URL.
  * @param locationId Location id from route params.
@@ -83,6 +86,17 @@ export const saveLocationGraphsById = async (
   });
 
   if (!response.ok) {
+    try {
+      const errorPayload = await response.json();
+      if (isRecord(errorPayload) && errorPayload.code === "graph_update_conflict") {
+        throw new Error("Graph update conflict");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "Graph update conflict") {
+        throw error;
+      }
+      // Continue to generic error when response body is not parseable.
+    }
     throw new Error("Unable to save location graphs");
   }
 };

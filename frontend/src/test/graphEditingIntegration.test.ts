@@ -7,7 +7,9 @@ import {
   type EditableGraphPayload
 } from "../util/graphEditor";
 import {
+  createTrace,
   removeTraceWithPlotly,
+  renameTrace,
   setTraceColor,
   updateCartesianX,
   updateCartesianY
@@ -215,5 +217,44 @@ describe("graph editing integration", () => {
 
     const [, renderedData] = react.mock.calls[0];
     expect(renderedData).toEqual([{ type: "bar", name: "Closed", x: ["Q1"], y: [5] }]);
+  });
+
+  it("applies trace creation and renaming before rendering updated output", async () => {
+    const graph: LocationGraph = {
+      id: 55,
+      name: "Monthly Trend",
+      data: [{ type: "bar", name: "Current", x: ["Jan"], y: [2] }],
+      layout: { title: { text: "Trend" } },
+      config: { displayModeBar: false },
+      style: { height: 260 },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(graph);
+    payload.data = [
+      renameTrace(payload.data[0], "Actual"),
+      createTrace("bar", payload.data.length)
+    ];
+
+    const editResult = applyGraphPayloadEdit([graph], [], graph.id, payload);
+    expect(editResult.changed).toBe(true);
+    expect(editResult.nextGraphs[0].data).toEqual([
+      { type: "bar", name: "Actual", x: ["Jan"], y: [2] },
+      { type: "bar", name: "Trace 2", x: ["Point 1"], y: [0], marker: { color: "#2563eb" } }
+    ]);
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      { react } as any,
+      { id: "chart-root" } as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any
+    );
+
+    const [, renderedData] = react.mock.calls[0];
+    expect(renderedData).toEqual([
+      { type: "bar", name: "Actual", x: ["Jan"], y: [2] },
+      { type: "bar", name: "Trace 2", x: ["Point 1"], y: [0], marker: { color: "#2563eb" } }
+    ]);
   });
 });

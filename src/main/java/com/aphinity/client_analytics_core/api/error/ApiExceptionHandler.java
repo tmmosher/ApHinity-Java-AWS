@@ -65,6 +65,7 @@ public class ApiExceptionHandler {
         Map.entry("Location name already in use", new ErrorDefinition("location_name_in_use", "Location name already in use")),
         Map.entry("Graph data is invalid", new ErrorDefinition("graph_data_invalid", "Graph data is invalid")),
         Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
+        Map.entry("Graph update conflict", new ErrorDefinition("graph_update_conflict", "Graph update conflict")),
         Map.entry("Invite not found", new ErrorDefinition("invite_not_found", "Invite not found")),
         Map.entry("Invite expired", new ErrorDefinition("invite_expired", "Invite expired")),
         Map.entry("Invite is not pending", new ErrorDefinition("invite_not_pending", "Invite is not pending")),

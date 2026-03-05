@@ -290,6 +290,47 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsCanUpdateOneGraphWithoutTouchingOtherGraphs() throws Exception {
+        AppUser partner = createUser("partner-graphs-partial@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Dana Point");
+        Graph firstGraph = createGraph("First graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        Graph secondGraph = createGraph("Second graph", List.of(Map.of("type", "bar", "y", List.of(4, 5, 6))));
+        addLocationGraph(location, firstGraph);
+        addLocationGraph(location, secondGraph);
+        Graph persistedFirst = graphRepository.findById(firstGraph.getId()).orElseThrow();
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-partial@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "expectedUpdatedAt": "%s",
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(firstGraph.getId(), persistedFirst.getUpdatedAt().toString()))
+            )
+            .andExpect(status().isNoContent());
+
+        Graph updatedFirst = graphRepository.findById(firstGraph.getId()).orElseThrow();
+        Graph unchangedSecond = graphRepository.findById(secondGraph.getId()).orElseThrow();
+
+        List<Map<String, Object>> firstTraces = GraphPayloadMapper.toTraceList(updatedFirst.getData());
+        List<Map<String, Object>> secondTraces = GraphPayloadMapper.toTraceList(unchangedSecond.getData());
+
+        assertEquals(List.of(9L, 8L, 7L), firstTraces.getFirst().get("y"));
+        assertEquals(List.of(4L, 5L, 6L), secondTraces.getFirst().get("y"));
+    }
+
+    @Test
     void updateLocationGraphsRejectsCookieAuthenticatedRequestWithoutExplicitCsrfHeader() throws Exception {
         createUser("partner-graphs-missing-csrf@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Seal Beach");
@@ -462,6 +503,39 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("graph_update_duplicates"));
+    }
+
+    @Test
+    void updateLocationGraphsRejectsStaleExpectedUpdatedAtWithConflict() throws Exception {
+        createUser("partner-graph-conflict@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Mission Viejo");
+        Graph graph = createGraph("Conflict graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+        Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
+        String staleTimestamp = persisted.getUpdatedAt().minusSeconds(60).toString();
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graph-conflict@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "expectedUpdatedAt": "%s",
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId(), staleTimestamp))
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("graph_update_conflict"))
+            .andExpect(jsonPath("$.message").value("Graph update conflict"));
     }
 
     @Test

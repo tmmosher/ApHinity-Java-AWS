@@ -2,6 +2,7 @@ import type * as Plotly from "plotly.js";
 import type { EditableGraphPayload } from "./graphEditor";
 
 export type TraceType = "pie" | "bar" | "scatter";
+export const AUTO_SIZE_TRACE_FLAG = "autoSize";
 
 export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
   pie: "pie",
@@ -79,6 +80,9 @@ export const getTraceType = (trace: Record<string, unknown>): TraceType | null =
   return TRACE_EDITOR_BY_TYPE[typeValue] ?? null;
 };
 
+export const isAutoSizingPieTrace = (trace: Record<string, unknown>): boolean =>
+  getTraceType(trace) === "pie" && trace[AUTO_SIZE_TRACE_FLAG] === true;
+
 export const getTraceColor = (trace: Record<string, unknown>): string | null => {
   const marker = isRecord(trace.marker) ? trace.marker : null;
   if (marker) {
@@ -108,6 +112,65 @@ export const buildTraceLabel = (trace: Record<string, unknown>, index: number): 
     return `${index + 1}. ${traceName} (${traceType})`;
   }
   return `${index + 1}. ${traceType}`;
+};
+
+const buildDefaultTraceName = (traceIndex: number): string => `Trace ${traceIndex + 1}`;
+
+export const createTrace = (
+  preferredType: TraceType | null,
+  existingTraceCount: number
+): Record<string, unknown> => {
+  const traceType = preferredType ?? "bar";
+  const defaultColor = Object.values(TRACE_COLOR_OPTIONS)[0];
+  const traceName = buildDefaultTraceName(existingTraceCount);
+
+  if (traceType === "pie") {
+    return syncPieMarkerColors(
+      {
+        type: "pie",
+        name: traceName,
+        labels: ["Slice 1"],
+        values: [0]
+      },
+      defaultColor
+    );
+  }
+
+  if (traceType === "scatter") {
+    return {
+      type: "scatter",
+      mode: "lines+markers",
+      name: traceName,
+      x: [1],
+      y: [0],
+      marker: {color: defaultColor},
+      line: {color: defaultColor}
+    };
+  }
+
+  return {
+    type: "bar",
+    name: traceName,
+    x: ["Point 1"],
+    y: [0],
+    marker: {color: defaultColor}
+  };
+};
+
+export const renameTrace = (
+  trace: Record<string, unknown>,
+  rawName: string
+): Record<string, unknown> => {
+  const nextName = rawName.trim();
+  if (nextName.length === 0) {
+    const {name: _, ...traceWithoutName} = trace;
+    return traceWithoutName;
+  }
+
+  return {
+    ...trace,
+    name: nextName
+  };
 };
 
 const getTraceYAxisLayoutKey = (trace: Record<string, unknown>): string => {
@@ -270,10 +333,27 @@ export const updatePieValue = (
 ): Record<string, unknown> => {
   const values = getTraceArray(trace, "values");
   values[rowIndex] = coerceInputValue(rawValue, values[rowIndex], true);
-  return syncPieMarkerColors({
+  const nextTrace = syncPieMarkerColors({
     ...trace,
     values
   });
+
+  return applyPieAutoSizingPlaceholder(nextTrace, rowIndex);
+};
+
+const applyPieAutoSizingPlaceholder = (
+  trace: Record<string, unknown>,
+  rowIndex: number
+): Record<string, unknown> => {
+  if (!isAutoSizingPieTrace(trace) || rowIndex !== 0) {
+    return trace;
+  }
+
+  // Planned behavior:
+  // - Treat values[0] as the numerator/fill.
+  // - Derive values[1] as max(0, 100 - fill) when an autosize target of 100 is used.
+  // - Keep additional slices untouched (or reject multi-slice autosize traces).
+  return trace;
 };
 
 export const removePieRow = (

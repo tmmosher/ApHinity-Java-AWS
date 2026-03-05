@@ -14,6 +14,7 @@ import {
   addCartesianRow,
   addPieRow,
   buildTraceLabel,
+  createTrace,
   getTraceArray,
   getTraceColor,
   getTraceType,
@@ -22,6 +23,7 @@ import {
   removeCartesianRow,
   removePieRow,
   removeTraceWithPlotly,
+  renameTrace,
   setTraceColor,
   updateTraceYAxisRange,
   updateCartesianX,
@@ -50,6 +52,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     style: null
   });
   const [selectedTraceIndex, setSelectedTraceIndex] = createSignal(0);
+  const [traceNameDraft, setTraceNameDraft] = createSignal("");
   const [operationError, setOperationError] = createSignal("");
   const [isRemovingTrace, setIsRemovingTrace] = createSignal(false);
 
@@ -62,6 +65,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
 
     setEditablePayload(createEditableGraphPayload(props.graph));
     setSelectedTraceIndex(0);
+    setTraceNameDraft("");
     setOperationError("");
   });
 
@@ -91,6 +95,12 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const selectedTrace = createMemo(() => {
     const trace = editablePayload().data[selectedTraceIndex()];
     return isRecord(trace) ? trace : undefined;
+  });
+
+  createEffect(() => {
+    const trace = selectedTrace();
+    const traceName = trace && typeof trace.name === "string" ? trace.name : "";
+    setTraceNameDraft(traceName);
   });
 
   const selectedTraceType = createMemo(() => {
@@ -212,6 +222,47 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     updateSelectedTrace((trace) => setTraceColor(trace, traceType, colorHex));
   };
 
+  const addNewTrace = () => {
+    if (isBusy()) {
+      return;
+    }
+
+    let nextTraceIndex = 0;
+    let nextTraceName = "";
+
+    setEditablePayload((current) => {
+      const selectedEntry = current.data[selectedTraceIndex()];
+      const preferredType = isRecord(selectedEntry) ? getTraceType(selectedEntry) : null;
+      const nextTrace = createTrace(preferredType, current.data.length);
+      const nextData = [...current.data, nextTrace];
+
+      nextTraceIndex = nextData.length - 1;
+      nextTraceName = typeof nextTrace.name === "string" ? nextTrace.name : "";
+
+      return {
+        ...current,
+        data: nextData
+      };
+    });
+
+    setSelectedTraceIndex(nextTraceIndex);
+    setTraceNameDraft(nextTraceName);
+    setOperationError("");
+  };
+
+  const renameSelectedTrace = () => {
+    if (isBusy()) {
+      return;
+    }
+
+    const currentTrace = selectedTrace();
+    if (!currentTrace) {
+      return;
+    }
+
+    updateSelectedTrace((trace) => renameTrace(trace, traceNameDraft()));
+  };
+
   const removeSelectedTrace = async () => {
     if (isBusy()) {
       return;
@@ -300,13 +351,20 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
             <TraceControls
               traceOptions={traceOptions()}
               selectedTraceIndex={selectedTraceIndex()}
+              traceNameDraft={traceNameDraft()}
               selectedTraceColor={selectedTraceColorValue()}
               colorOptions={TRACE_COLOR_OPTIONS}
+              disableAddTrace={isBusy()}
               disableTraceSelect={isBusy() || traceOptions().length === 0}
               disableColorSelect={isBusy() || !selectedTraceType()}
+              disableTraceNameInput={isBusy() || !selectedTrace()}
+              disableRenameTrace={isBusy() || !selectedTrace()}
               disableRemoveTrace={isBusy() || !selectedTrace()}
+              onAddTrace={addNewTrace}
               onSelectTrace={setSelectedTraceIndex}
+              onChangeTraceName={setTraceNameDraft}
               onApplyColor={applyTraceColor}
+              onRenameTrace={renameSelectedTrace}
               onRemoveTrace={() => void removeSelectedTrace()}
             />
 

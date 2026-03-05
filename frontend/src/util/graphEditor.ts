@@ -19,6 +19,11 @@ type GraphUndoResult = {
   undone: boolean;
 };
 
+export type GraphBaselineEntry = {
+  payloadSignature: string;
+  expectedUpdatedAt: string | null;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -109,6 +114,42 @@ export const buildLocationGraphUpdates = (graphs: LocationGraph[]): LocationGrap
     graphId: graph.id,
     ...createEditableGraphPayload(graph)
   }));
+
+export const buildGraphBaselineIndex = (graphs: LocationGraph[]): Map<number, GraphBaselineEntry> => {
+  const baselineById = new Map<number, GraphBaselineEntry>();
+  for (const graph of graphs) {
+    baselineById.set(graph.id, {
+      payloadSignature: graphPayloadSignature(createEditableGraphPayload(graph)),
+      expectedUpdatedAt: graph.updatedAt ?? null
+    });
+  }
+  return baselineById;
+};
+
+export const buildChangedLocationGraphUpdates = (
+  currentGraphs: LocationGraph[],
+  baselineSource: LocationGraph[] | Map<number, GraphBaselineEntry>
+): LocationGraphUpdate[] => {
+  const baselineById =
+    baselineSource instanceof Map ? baselineSource : buildGraphBaselineIndex(baselineSource);
+
+  const changedUpdates: LocationGraphUpdate[] = [];
+  for (const currentGraph of currentGraphs) {
+    const baseline = baselineById.get(currentGraph.id);
+    const currentSignature = graphPayloadSignature(createEditableGraphPayload(currentGraph));
+    if (baseline && baseline.payloadSignature === currentSignature) {
+      continue;
+    }
+
+    changedUpdates.push({
+      graphId: currentGraph.id,
+      ...createEditableGraphPayload(currentGraph),
+      expectedUpdatedAt: baseline?.expectedUpdatedAt ?? null
+    });
+  }
+
+  return changedUpdates;
+};
 
 export const applyGraphPayloadEdit = (
   currentGraphs: LocationGraph[],

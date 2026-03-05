@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Positive;
  * @param graphId graph identifier associated with the target location
  * @param data raw Plotly trace array/object payload
  * @param layout optional Plotly layout payload
+ * @param expectedUpdatedAt optional optimistic-concurrency timestamp for the target graph
  */
 public record LocationGraphDataUpdateRequest(
     @NotNull
@@ -16,9 +17,14 @@ public record LocationGraphDataUpdateRequest(
     Long graphId,
     @NotNull
     Object data,
-    Object layout
+    Object layout,
+    String expectedUpdatedAt
 ) {
     public LocationGraphDataUpdateRequest(Long graphId, Object data) {
-        this(graphId, data, null);
+        this(graphId, data, null, null);
+    }
+
+    public LocationGraphDataUpdateRequest(Long graphId, Object data, Object layout) {
+        this(graphId, data, layout, null);
     }
 }
