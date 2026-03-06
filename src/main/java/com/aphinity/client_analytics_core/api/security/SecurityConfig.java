@@ -19,7 +19,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
-import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -116,7 +115,8 @@ public class SecurityConfig {
             )
             .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
             .addFilterAfter(coreApiCsrfEnforcementFilter, CsrfCookieFilter.class)
-            .addFilterBefore(accessTokenRefreshFilter, BearerTokenAuthenticationFilter.class);
+            // Refresh cookies before CSRF runs so expired access tokens can rotate on mutating API calls.
+            .addFilterBefore(accessTokenRefreshFilter, CsrfFilter.class);
         return http.build();
     }
 

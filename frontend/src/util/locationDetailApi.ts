@@ -5,6 +5,27 @@ import {LocationGraph, LocationGraphUpdate, LocationSummary} from "../types/Type
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  error?: string;
+  status?: number;
+  path?: string;
+};
+
+const parseApiErrorPayload = (value: unknown): ApiErrorPayload | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    code: typeof value.code === "string" ? value.code : undefined,
+    message: typeof value.message === "string" ? value.message : undefined,
+    error: typeof value.error === "string" ? value.error : undefined,
+    status: typeof value.status === "number" ? value.status : undefined,
+    path: typeof value.path === "string" ? value.path : undefined
+  };
+};
+
 export const parseRouteLocationId = (locationId: string): number => {
   const parsedId = Number(locationId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
@@ -86,9 +107,17 @@ export const saveLocationGraphsById = async (
   });
 
   if (!response.ok) {
+    const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
+    console.warn("saveLocationGraphsById failed", {
+      status: response.status,
+      code: errorPayload?.code ?? null,
+      message: errorPayload?.message ?? null,
+      error: errorPayload?.error ?? null,
+      path: errorPayload?.path ?? null
+    });
+
     try {
-      const errorPayload = await response.json();
-      if (isRecord(errorPayload) && typeof errorPayload.code === "string") {
+      if (errorPayload?.code) {
         if (errorPayload.code === "graph_update_conflict") {
           throw new Error("Graph update conflict");
         }
@@ -98,6 +127,19 @@ export const saveLocationGraphsById = async (
         if (errorPayload.code === "forbidden") {
           throw new Error("Insufficient permissions");
         }
+        if (
+          errorPayload.code === "authentication_required"
+          || errorPayload.code === "invalid_refresh_token"
+          || errorPayload.code === "missing_refresh_token"
+        ) {
+          throw new Error("Authentication required");
+        }
+      }
+      if (
+        (response.status === 403 || errorPayload?.status === 403)
+        && errorPayload?.error === "Forbidden"
+      ) {
+        throw new Error("Security token rejected");
       }
     } catch (error) {
       if (
@@ -105,7 +147,9 @@ export const saveLocationGraphsById = async (
         (
           error.message === "Graph update conflict" ||
           error.message === "CSRF invalid" ||
-          error.message === "Insufficient permissions"
+          error.message === "Insufficient permissions" ||
+          error.message === "Authentication required" ||
+          error.message === "Security token rejected"
         )
       ) {
         throw error;

@@ -437,6 +437,41 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsRefreshesExpiredAccessTokenBeforeCsrfRejection() throws Exception {
+        AppUser partner = createUser("partner-graphs-expired-access-stale-csrf@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Placentia");
+        Graph graph = createGraph("Expired access stale csrf graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies loginCookies = loginAndCaptureCookies("partner-graphs-expired-access-stale-csrf@example.com", PASSWORD);
+        AuthSession initialSession = authSessionRepository.findAll().getFirst();
+        String expiredAccessToken = createExpiredAccessToken(partner, initialSession.getId());
+
+        MvcResult result = mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookiesWithCsrf(new AuthCookies(expiredAccessToken, loginCookies.refreshToken()), "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isForbidden())
+            .andReturn();
+
+        Map<String, String> rotatedCookies = readSetCookies(result);
+        assertNotNull(rotatedCookies.get(AuthCookieNames.ACCESS_COOKIE_NAME));
+        assertNotNull(rotatedCookies.get(AuthCookieNames.REFRESH_COOKIE_NAME));
+    }
+
+    @Test
     void updateLocationGraphsSucceedsAfterRefreshingCsrfTokenFromProfile() throws Exception {
         createUser("partner-graphs-refresh-csrf@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Lake Forest");

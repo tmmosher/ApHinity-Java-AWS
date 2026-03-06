@@ -240,7 +240,15 @@ export const DashboardLocationDetailPanel = () => {
         return;
       }
       if (error instanceof Error && error.message === "CSRF invalid") {
-        toast.error("Automatic security refresh failed. Please refresh the page and try saving again.");
+        toast.error("Security token refresh failed. Please retry Apply; your edits are still local.");
+        return;
+      }
+      if (error instanceof Error && error.message === "Security token rejected") {
+        toast.error("Security validation failed. Retrying Apply usually succeeds without losing local edits.");
+        return;
+      }
+      if (error instanceof Error && error.message === "Authentication required") {
+        toast.error("Session refresh failed. Please sign in again; your local edits are still on this page.");
         return;
       }
       if (error instanceof Error && error.message === "Insufficient permissions") {

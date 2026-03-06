@@ -246,4 +246,28 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       saveLocationGraphsById(host, "55", [])
     ).rejects.toThrowError("CSRF invalid");
   });
+
+  it("throws an authentication error when the server reports authentication_required", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "authentication_required",
+      message: "Authentication required"
+    }));
+
+    await expect(
+      saveLocationGraphsById(host, "55", [])
+    ).rejects.toThrowError("Authentication required");
+  });
+
+  it("throws a security-token error for generic Spring Security 403 payloads", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      timestamp: "2026-03-06T21:20:05.325Z",
+      status: 403,
+      error: "Forbidden",
+      path: "/api/core/locations/2/graphs"
+    }));
+
+    await expect(
+      saveLocationGraphsById(host, "55", [])
+    ).rejects.toThrowError("Security token rejected");
+  });
 });

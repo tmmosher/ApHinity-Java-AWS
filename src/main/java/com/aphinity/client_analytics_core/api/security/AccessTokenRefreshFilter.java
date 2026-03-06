@@ -262,7 +262,13 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
             return new RefreshResult(RefreshOutcome.REFRESHED, refreshedTokens);
         } catch (ResponseStatusException ex) {
             if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                log.info("Refresh token invalid tokenHashPrefix={} outcome={}", tokenHashPrefix(refreshTokenHash), RefreshOutcome.INVALID_REFRESH_TOKEN);
+                log.warn(
+                    "Refresh token invalid tokenHashPrefix={} method={} path={} outcome={}",
+                    tokenHashPrefix(refreshTokenHash),
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    RefreshOutcome.INVALID_REFRESH_TOKEN
+                );
                 return new RefreshResult(RefreshOutcome.INVALID_REFRESH_TOKEN, null);
             }
             throw ex;

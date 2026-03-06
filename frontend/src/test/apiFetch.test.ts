@@ -172,6 +172,85 @@ describe("apiFetch", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://example.test/api/core/profile");
   });
 
+  it("refreshes auth and retries once after a 401 on a mutating request", async () => {
+    installDocumentCookie("XSRF-TOKEN=token-old");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({code: "authentication_required"}),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      ))
+      .mockResolvedValueOnce(new Response(null, {status: 204}))
+      .mockImplementationOnce(async () => {
+        ((globalThis as {document: {cookie: string}}).document).cookie = "XSRF-TOKEN=token-new";
+        return new Response(null, {status: 200});
+      })
+      .mockResolvedValueOnce(new Response(null, {status: 204}));
+
+    const response = await apiFetch("https://example.test/api/core/locations/42/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({graphs: []})
+    });
+
+    expect(response.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/auth/refresh");
+    expect(fetchMock.mock.calls[2][0]).toBe("https://example.test/api/core/profile");
+    const firstMutationHeaders = fetchMock.mock.calls[0][1]?.headers as Headers;
+    const retryMutationHeaders = fetchMock.mock.calls[3][1]?.headers as Headers;
+    expect(firstMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-old");
+    expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-new");
+  });
+
+  it("refreshes auth and retries once after generic Spring Security 403 responses", async () => {
+    installDocumentCookie("XSRF-TOKEN=token-old");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          timestamp: "2026-03-06T21:20:05.325Z",
+          status: 403,
+          error: "Forbidden",
+          path: "/api/core/locations/2/graphs"
+        }),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      ))
+      .mockResolvedValueOnce(new Response(null, {status: 204}))
+      .mockImplementationOnce(async () => {
+        ((globalThis as {document: {cookie: string}}).document).cookie = "XSRF-TOKEN=token-new";
+        return new Response(null, {status: 200});
+      })
+      .mockResolvedValueOnce(new Response(null, {status: 204}));
+
+    const response = await apiFetch("https://example.test/api/core/locations/2/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({graphs: []})
+    });
+
+    expect(response.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/auth/refresh");
+    expect(fetchMock.mock.calls[2][0]).toBe("https://example.test/api/core/profile");
+    const retryMutationHeaders = fetchMock.mock.calls[3][1]?.headers as Headers;
+    expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-new");
+  });
+
   afterAll(() => {
     globalThis.fetch = originalFetch;
     if (originalDocument === undefined) {
