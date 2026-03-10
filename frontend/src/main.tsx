@@ -127,6 +127,10 @@ const DashboardPermissionsPanelRoute = withDashboardRouteBoundary(
   DashboardPermissionsPanel,
   "Permissions"
 );
+const DashboardManagementPanelRoute = withDashboardRouteBoundary(
+  DashboardManagementPanel,
+  "User role management"
+);
 const DashboardProfilePanelRoute = withDashboardRouteBoundary(
   DashboardProfilePanel,
   "Profile"
@@ -155,7 +159,7 @@ if (root) {
             <Route path="/invites" component={DashboardInvitesPanelRoute} />
             <Route path="/invite-users" component={DashboardInviteUsersPanelRoute} />
             <Route path="/permissions" component={DashboardPermissionsPanelRoute} />
-            <Route path="/management" component={DashboardManagementPanel} />
+            <Route path="/management" component={DashboardManagementPanelRoute} />
             <Route path="/profile" component={DashboardProfilePanelRoute} />
           </Route>
         </Route>

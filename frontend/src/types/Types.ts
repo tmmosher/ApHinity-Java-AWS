@@ -80,3 +80,18 @@ export interface LocationGraphUpdate {
     style?: Record<string, unknown> | null;
     expectedUpdatedAt?: string | null;
 }
+
+export interface ManagedUserRole {
+    id: number;
+    name: string;
+    email: string;
+    role: AccountRole;
+}
+
+export interface ManagedUserRolePage {
+    users: ManagedUserRole[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+}

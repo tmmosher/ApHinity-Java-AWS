@@ -7,7 +7,7 @@ export const dashboardNavByRole: Record<AccountRole, NavItem[]> = {
     {label: "Locations", href: "/dashboard/locations"},
     {label: "Invite users", href: "/dashboard/invite-users"},
     {label: "Permissions", href: "/dashboard/permissions"},
-    {label: "Management", href: "/dashboard/management"},
+    {label: "User roles", href: "/dashboard/management"},
     {label: "Profile", href: "/dashboard/profile"}
   ],
   partner: [
