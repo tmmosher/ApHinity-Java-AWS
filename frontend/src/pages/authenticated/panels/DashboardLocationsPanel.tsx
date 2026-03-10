@@ -1,13 +1,18 @@
-import {A} from "@solidjs/router";
-import {For, Show, createSignal} from "solid-js";
+import {A, action, useAction, useSubmission} from "@solidjs/router";
+import {For, Show, createEffect, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useProfile} from "../../../context/ProfileContext";
-import {parseLocationSummary} from "../../../util/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
-import {setFavoriteLocationId} from "../../../util/favoriteLocation";
-import {LocationSummary} from "../../../types/Types";
+import {parseLocationSummary} from "../../../util/common/coreApi";
+import {apiFetch} from "../../../util/common/apiFetch";
+import {setFavoriteLocationId} from "../../../util/common/favoriteLocation";
+import {ActionResult, LocationSummary} from "../../../types/Types";
 import {useLocations} from "../../../context/LocationContext";
+
+type RenameLocationActionResult = ActionResult & {
+  locationId: number;
+  updatedLocation?: LocationSummary;
+};
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();
@@ -21,7 +26,6 @@ export const DashboardLocationsPanel = () => {
   const locationContext = useLocations();
   const locations = locationContext.locations;
   const [draftNames, setDraftNames] = createSignal<Record<number, string>>({});
-  const [savingLocationId, setSavingLocationId] = createSignal<number | null>(null);
 
   const updateDraftName = (locationId: number, value: string) => {
     setDraftNames((current) => ({
@@ -33,6 +37,78 @@ export const DashboardLocationsPanel = () => {
   const getDraftName = (location: LocationSummary) =>
     draftNames()[location.id] ?? location.name;
 
+  const renameLocationAction = action(async (
+    locationId: number,
+    nextName: string
+  ): Promise<RenameLocationActionResult> => {
+    try {
+      const response = await apiFetch(host + "/api/core/locations/" + locationId, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: nextName
+        })
+      });
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null) as {message?: unknown} | null;
+        return {
+          ok: false,
+          locationId,
+          message: typeof errorBody?.message === "string" ? errorBody.message : "Unable to update location name."
+        };
+      }
+
+      return {
+        ok: true,
+        locationId,
+        updatedLocation: parseLocationSummary(await response.json())
+      };
+    } catch {
+      return {
+        ok: false,
+        locationId,
+        message: "Unable to update location name."
+      };
+    }
+  }, "renameLocation");
+
+  const submitRenameLocation = useAction(renameLocationAction);
+  const renameLocationSubmission = useSubmission(renameLocationAction);
+
+  createEffect(() => {
+    const result = renameLocationSubmission.result;
+    if (!result) {
+      return;
+    }
+
+    if (result.ok && result.updatedLocation) {
+      locationContext.mutate((current) =>
+        current?.map((candidate) => (
+          candidate.id === result.updatedLocation!.id ? result.updatedLocation! : candidate
+        ))
+      );
+      setDraftNames((current) => {
+        const next = {
+          ...current
+        };
+        delete next[result.locationId];
+        return next;
+      });
+      toast.success("Location updated.");
+    } else {
+      toast.error(result.message ?? "Unable to update location name.");
+    }
+
+    renameLocationSubmission.clear();
+  });
+
+  const savingLocationId = () =>
+    renameLocationSubmission.pending
+      ? renameLocationSubmission.input[0] as number
+      : null;
+
   /**
    * Renames a location with the current draft value.
    *
@@ -41,8 +117,8 @@ export const DashboardLocationsPanel = () => {
    *
    * @param locationId Location id to update.
    */
-  const renameLocation = async (locationId: number) => {
-    if (!canEditLocations() || savingLocationId() !== null) {
+  const renameLocation = (locationId: number) => {
+    if (!canEditLocations() || renameLocationSubmission.pending) {
       return;
     }
 
@@ -56,40 +132,7 @@ export const DashboardLocationsPanel = () => {
       return;
     }
 
-    setSavingLocationId(locationId);
-    try {
-      const response = await apiFetch(host + "/api/core/locations/" + locationId, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name: nextName
-        })
-      });
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        toast.error(errorBody?.message ?? "Unable to update location name.");
-        return;
-      }
-
-      const updated = parseLocationSummary(await response.json());
-      locationContext.mutate((current) =>
-        current?.map((candidate) => (candidate.id === updated.id ? updated : candidate))
-      );
-      setDraftNames((current) => {
-        const next = {
-          ...current
-        };
-        delete next[locationId];
-        return next;
-      });
-      toast.success("Location updated.");
-    } catch {
-      toast.error("Unable to update location name.");
-    } finally {
-      setSavingLocationId(null);
-    }
+    void submitRenameLocation(locationId, nextName);
   };
 
   const saveFavorite = (locationId: number) => {

@@ -6,12 +6,12 @@ import {createEffect, createSignal, Match, Show, Switch} from "solid-js";
 import {toast} from "solid-toast";
 import SendRecovery from "../../components/SendRecovery";
 import SendVerification from "../../components/SendVerification";
-import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../util/landingSchemas";
+import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../util/common/landingSchemas";
 import {
   createRecoverySubmissionControl,
   getRecoveryCooldownActionResult,
   isRecoverySubmitDisabled
-} from "../../util/recoverySubmissionControl";
+} from "../../util/common/recoverySubmissionControl";
 
 export const RecoveryPage = () => {
   const host = useApiHost();

@@ -6,11 +6,19 @@ import {
     getDocumentThemePreference,
     setStoredThemePreference,
     ThemePreference
-} from "../util/themePreference";
-import {apiFetch} from "../util/apiFetch";
-import {useNavigate} from "@solidjs/router";
-import {canEditProfileEmail} from "../util/profileAccess";
-import {FieldError, parseVerifyFormData} from "../util/landingSchemas";
+} from "../util/common/themePreference";
+import {apiFetch} from "../util/common/apiFetch";
+import {action, useNavigate, useSubmission} from "@solidjs/router";
+import {canEditProfileEmail} from "../util/common/profileAccess";
+import {FieldError, parseVerifyFormData} from "../util/common/landingSchemas";
+import {ActionResult} from "../types/Types";
+
+const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
+    const errorBody = await response.json().catch(() => null) as {message?: unknown} | null;
+    return typeof errorBody?.message === "string" && errorBody.message.trim()
+        ? errorBody.message
+        : fallback;
+};
 
 const Profile = () => {
     const host = useApiHost();
@@ -21,10 +29,7 @@ const Profile = () => {
     const [email, setEmail] = createSignal("");
     const [currentPassword, setCurrentPassword] = createSignal("");
     const [newPassword, setNewPassword] = createSignal("");
-    const [isSavingProfile, setIsSavingProfile] = createSignal(false);
-    const [isSavingPassword, setIsSavingPassword] = createSignal(false);
     const [verificationCode, setVerificationCode] = createSignal("");
-    const [isVerifyingEmail, setIsVerifyingEmail] = createSignal(false);
     const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
     const canEditEmail = () => canEditProfileEmail(profileContext.profile()?.role);
     const isUnverified = () => profileContext.profile()?.verified === false;
@@ -44,62 +49,40 @@ const Profile = () => {
         toast.success(`Theme changed to ${next} mode.`);
     };
 
-    /**
-     * Updates account profile fields.
-     *
-     * Endpoint: `PUT /api/core/profile`
-     * Body: `{ name, email }`
-     *
-     * @param event Form submit event from the profile form.
-     */
-    const updateProfile = async (event: SubmitEvent) => {
-        event.preventDefault();
-        if (isSavingProfile()) {
-            return;
-        }
-        setIsSavingProfile(true);
+    const updateProfileAction = action(async (formData: FormData): Promise<ActionResult> => {
         try {
+            const nextEmail = (formData.get("email")?.toString() ?? "").trim();
             const response = await apiFetch(host + "/api/core/profile", {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    name: name().trim(),
+                    name: (formData.get("name")?.toString() ?? "").trim(),
                     email: canEditEmail()
-                        ? email().trim()
-                        : (profileContext.profile()?.email ?? email()).trim()
+                        ? nextEmail
+                        : (profileContext.profile()?.email ?? nextEmail).trim()
                 })
             });
 
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => null);
-                toast.error(errorBody?.message ?? "Unable to update profile.");
-                return;
+                return {
+                    ok: false,
+                    message: await extractApiErrorMessage(response, "Unable to update profile.")
+                };
             }
-            profileContext.refreshProfile();
-            toast.success("Profile updated. If you changed emails, please verify your new email address.");
+            return {
+                ok: true
+            };
         } catch {
-            toast.error("Unable to update profile.");
-        } finally {
-            setIsSavingProfile(false);
+            return {
+                ok: false,
+                message: "Unable to update profile."
+            };
         }
-    };
+    }, "updateProfile");
 
-    /**
-     * Changes the user's password.
-     *
-     * Endpoint: `PUT /api/core/profile/password`
-     * Body: `{ currentPassword, newPassword }`
-     *
-     * @param event Form submit event from the password form.
-     */
-    const updatePassword = async (event: SubmitEvent) => {
-        event.preventDefault();
-        if (isSavingPassword()) {
-            return;
-        }
-        setIsSavingPassword(true);
+    const updatePasswordAction = action(async (formData: FormData): Promise<ActionResult> => {
         try {
             const response = await apiFetch(host + "/api/core/profile/password", {
                 method: "PUT",
@@ -107,49 +90,38 @@ const Profile = () => {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    currentPassword: currentPassword().trim(),
-                    newPassword: newPassword().trim()
+                    currentPassword: (formData.get("currentPassword")?.toString() ?? "").trim(),
+                    newPassword: (formData.get("newPassword")?.toString() ?? "").trim()
                 })
             });
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => null);
-                toast.error(errorBody?.message ?? "Unable to update password.");
-                return;
+                return {
+                    ok: false,
+                    message: await extractApiErrorMessage(response, "Unable to update password.")
+                };
             }
-            setCurrentPassword("");
-            setNewPassword("");
-            toast.success("Password updated.");
+            return {
+                ok: true
+            };
         } catch {
-            toast.error("Unable to update password.");
-        } finally {
-            setIsSavingPassword(false);
+            return {
+                ok: false,
+                message: "Unable to update password."
+            };
         }
-    };
+    }, "updatePassword");
 
-    /**
-     * Verifies the current account email with a one-time code.
-     *
-     * Endpoint: `POST /api/auth/verify`
-     * Body: `{ email, verifyValue }`
-     *
-     * @param event Form submit event from the verification form.
-     */
-    const verifyEmail = async (event: SubmitEvent) => {
-        event.preventDefault();
-        if (isVerifyingEmail()) {
-            return;
-        }
-
+    const verifyEmailAction = action(async (formData: FormData): Promise<ActionResult> => {
         const profile = profileContext.profile();
         if (!profile) {
-            toast.error("Unable to verify email right now.");
-            return;
+            return {
+                ok: false,
+                message: "Unable to verify email right now."
+            };
         }
 
-        setIsVerifyingEmail(true);
         try {
-            const form = event.currentTarget as HTMLFormElement;
-            const payload = parseVerifyFormData(new FormData(form));
+            const payload = parseVerifyFormData(formData);
             const response = await apiFetch(host + "/api/auth/verify", {
                 method: "POST",
                 headers: {
@@ -159,39 +131,115 @@ const Profile = () => {
             });
 
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => null);
-                toast.error(errorBody?.message ?? "Verification failed.");
-                return;
+                return {
+                    ok: false,
+                    message: await extractApiErrorMessage(response, "Verification failed.")
+                };
             }
+            return {
+                ok: true
+            };
+        } catch (error) {
+            if (error instanceof FieldError) {
+                return {
+                    ok: false,
+                    code: "validation_failed",
+                    message: error.message
+                };
+            }
+            return {
+                ok: false,
+                message: "Verification failed."
+            };
+        }
+    }, "verifyProfileEmail");
 
+    const logoutAction = action(async (): Promise<ActionResult> => {
+        try {
+            const response = await apiFetch(host + "/api/auth/logout", {method: "POST"});
+            if (!response.ok) {
+                return {
+                    ok: false,
+                    message: await extractApiErrorMessage(response, "Unable to logout.")
+                };
+            }
+            return {
+                ok: true
+            };
+        } catch {
+            return {
+                ok: false,
+                message: "Unable to logout."
+            };
+        }
+    }, "logout");
+
+    const profileUpdateSubmission = useSubmission(updateProfileAction);
+    const passwordUpdateSubmission = useSubmission(updatePasswordAction);
+    const verifyEmailSubmission = useSubmission(verifyEmailAction);
+    const logoutSubmission = useSubmission(logoutAction);
+
+    createEffect(() => {
+        const result = profileUpdateSubmission.result;
+        if (!result) {
+            return;
+        }
+        if (result.ok) {
+            profileContext.refreshProfile();
+            toast.success("Profile updated. If you changed emails, please verify your new email address.");
+        } else {
+            toast.error(result.message ?? "Unable to update profile.");
+        }
+        profileUpdateSubmission.clear();
+    });
+
+    createEffect(() => {
+        const result = passwordUpdateSubmission.result;
+        if (!result) {
+            return;
+        }
+        if (result.ok) {
+            setCurrentPassword("");
+            setNewPassword("");
+            toast.success("Password updated.");
+        } else {
+            toast.error(result.message ?? "Unable to update password.");
+        }
+        passwordUpdateSubmission.clear();
+    });
+
+    createEffect(() => {
+        const result = verifyEmailSubmission.result;
+        if (!result) {
+            return;
+        }
+        if (result.ok) {
             setVerificationCode("");
             profileContext.refreshProfile();
             toast.success("Email verified.");
-        } catch (error) {
-            if (error instanceof FieldError) {
-                toast.error(error.message);
-                return;
-            }
-            toast.error("Verification failed.");
-        } finally {
-            setIsVerifyingEmail(false);
-        }
-    };
-
-    /**
-     * Ends the authenticated session and redirects to login on success.
-     *
-     * Endpoint: `POST /api/auth/logout`
-     */
-    const logout = async () => {
-        const response = await apiFetch(host + "/api/auth/logout", {method: "POST"});
-        if (!response.ok) {
-            const errorBody = await response.json().catch(() => null);
-            toast.error(errorBody?.message ?? "Unable to logout.");
         } else {
-            navigate("/login");
+            toast.error(result.message ?? "Verification failed.");
         }
-    }
+        verifyEmailSubmission.clear();
+    });
+
+    createEffect(() => {
+        const result = logoutSubmission.result;
+        if (!result) {
+            return;
+        }
+        if (result.ok) {
+            navigate("/login");
+        } else {
+            toast.error(result.message ?? "Unable to logout.");
+        }
+        logoutSubmission.clear();
+    });
+
+    const isSavingProfile = () => profileUpdateSubmission.pending;
+    const isSavingPassword = () => passwordUpdateSubmission.pending;
+    const isVerifyingEmail = () => verifyEmailSubmission.pending;
+    const isLoggingOut = () => logoutSubmission.pending;
 
     return (
         <div class="space-y-6">
@@ -231,7 +279,7 @@ const Profile = () => {
                             <p class="mt-1 text-sm text-base-content/70">
                                 Enter the 6-digit verification code sent to {profileContext.profile()?.email}.
                             </p>
-                            <form class="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]" onSubmit={verifyEmail}>
+                            <form class="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]" method="post" action={verifyEmailAction}>
                                 <label class="form-control">
                                     <span class="label-text">Verification code</span>
                                     <input
@@ -267,11 +315,12 @@ const Profile = () => {
                         <p class="mt-1 text-xs text-base-content/60">
                             Role: {profileContext.profile()?.role ?? "client"}
                         </p>
-                        <form class="mt-4 grid gap-4" onSubmit={updateProfile}>
+                        <form class="mt-4 grid gap-4" method="post" action={updateProfileAction}>
                             <label class="form-control">
                                 <span class="label-text">Name</span>
                                 <input
                                     type="text"
+                                    name="name"
                                     class="input input-bordered mt-1"
                                     value={name()}
                                     onInput={(event) => setName(event.currentTarget.value)}
@@ -282,11 +331,15 @@ const Profile = () => {
                                     <span class="label-text">Email</span>
                                     <input
                                         type="email"
+                                        name="email"
                                         class="input input-bordered mt-1"
                                         value={email()}
                                         onInput={(event) => setEmail(event.currentTarget.value)}
                                     />
                                 </label>
+                            </Show>
+                            <Show when={!canEditEmail()}>
+                                <input type="hidden" name="email" value={profileContext.profile()?.email ?? email()} />
                             </Show>
                             <button type="submit" class="btn btn-primary w-fit" disabled={isSavingProfile()}>
                                 {isSavingProfile() ? "Saving..." : "Save profile"}
@@ -297,11 +350,12 @@ const Profile = () => {
                     <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
                         <h2 class="text-lg font-semibold">Password</h2>
                         <p class="mt-1 text-sm text-base-content/70">Set a new password for this account.</p>
-                        <form class="mt-4 grid gap-4" onSubmit={updatePassword}>
+                        <form class="mt-4 grid gap-4" method="post" action={updatePasswordAction}>
                             <label class="form-control">
                                 <span class="label-text">Current password</span>
                                 <input
                                     type="password"
+                                    name="currentPassword"
                                     class="input input-bordered mt-1"
                                     value={currentPassword()}
                                     onInput={(event) => setCurrentPassword(event.currentTarget.value)}
@@ -311,6 +365,7 @@ const Profile = () => {
                                 <span class="label-text">New password</span>
                                 <input
                                     type="password"
+                                    name="newPassword"
                                     class="input input-bordered mt-1"
                                     value={newPassword()}
                                     onInput={(event) => setNewPassword(event.currentTarget.value)}
@@ -322,9 +377,11 @@ const Profile = () => {
                         </form>
                     </section>
                     <section>
-                        <button type="button" class="btn btn-outline" onClick={logout}>
-                            Logout
-                        </button>
+                        <form method="post" action={logoutAction}>
+                            <button type="submit" class="btn btn-outline" disabled={isLoggingOut()}>
+                                {isLoggingOut() ? "Logging out..." : "Logout"}
+                            </button>
+                        </form>
                     </section>
                 </div>
             </Show>

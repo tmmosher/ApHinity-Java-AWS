@@ -5,10 +5,10 @@ import {
   getFavoriteLocationId,
   hasSelectableFavoriteLocation,
   setFavoriteLocationId
-} from "../../../util/favoriteLocation";
+} from "../../../util/common/favoriteLocation";
 import {A} from "@solidjs/router";
 import {useLocations} from "../../../context/LocationContext";
-import {fetchLocationById} from "../../../util/locationDetailApi";
+import {fetchLocationById} from "../../../util/graph/locationDetailApi";
 
 const roleLabel: Record<"admin" | "partner" | "client", string> = {
   admin: "Admin",

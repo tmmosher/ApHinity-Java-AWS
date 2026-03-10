@@ -1,9 +1,12 @@
+import {action, useAction, useSubmission} from "@solidjs/router";
 import {For, Show, createEffect, createMemo, createResource, createSignal} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {parseLocationMembershipList} from "../../../util/coreApi";
-import {apiFetch} from "../../../util/apiFetch";
-import {LocationMembershipWithStatus} from "../../../types/Types";
+import {parseLocationMembershipList} from "../../../util/common/coreApi";
+import {apiFetch} from "../../../util/common/apiFetch";
+import {ActionResult, LocationMembershipWithStatus} from "../../../types/Types";
 import {useLocations} from "../../../context/LocationContext";
+
+type ApplyDeleteQueueActionResult = ActionResult;
 
 export const DashboardPermissionsPanel = () => {
   const host = useApiHost();
@@ -43,7 +46,6 @@ export const DashboardPermissionsPanel = () => {
   };
 
   const [memberships, {refetch: refetchMemberships, mutate: mutateMemberships}] = createResource(selectedLocationId, fetchMemberships);
-  const [isApplying, setIsApplying] = createSignal(false);
   const [queueError, setQueueError] = createSignal("");
 
   const removeMembership = async (locationId: string, userId: number) => {
@@ -60,6 +62,43 @@ export const DashboardPermissionsPanel = () => {
   );
   const deleteQueueHasItems = createMemo(() => deleteQueue().length > 0);
 
+  const applyDeleteQueueAction = action(async (
+    locationId: string,
+    userIds: number[]
+  ): Promise<ApplyDeleteQueueActionResult> => {
+    try {
+      await Promise.all(
+        userIds.map((userId) => removeMembership(locationId, userId))
+      );
+      return {
+        ok: true
+      };
+    } catch {
+      return {
+        ok: false,
+        message: "Unable to apply membership removals."
+      };
+    }
+  }, "applyMembershipDeleteQueue");
+
+  const submitDeleteQueue = useAction(applyDeleteQueueAction);
+  const deleteQueueSubmission = useSubmission(applyDeleteQueueAction);
+
+  createEffect(() => {
+    const result = deleteQueueSubmission.result;
+    if (!result) {
+      return;
+    }
+
+    if (result.ok) {
+      void refetchMemberships();
+    } else {
+      setQueueError(result.message ?? "Unable to apply membership removals.");
+    }
+
+    deleteQueueSubmission.clear();
+  });
+
   const resetDeleteQueue = () => {
     if (!deleteQueueHasItems()) {
       return;
@@ -70,8 +109,8 @@ export const DashboardPermissionsPanel = () => {
     setQueueError("");
   };
 
-  const applyDeleteQueue = async () => {
-    if (isApplying() || !deleteQueueHasItems()) {
+  const applyDeleteQueue = () => {
+    if (deleteQueueSubmission.pending || !deleteQueueHasItems()) {
       return;
     }
 
@@ -80,20 +119,11 @@ export const DashboardPermissionsPanel = () => {
       return;
     }
 
-    setIsApplying(true);
     setQueueError("");
-    try {
-      await Promise.all(
-        deleteQueue().map((membership) =>
-          removeMembership(locationId, membership.membership.userId)
-        )
-      );
-      await refetchMemberships();
-    } catch {
-      setQueueError("Unable to apply membership removals.");
-    } finally {
-      setIsApplying(false);
-    }
+    void submitDeleteQueue(
+      locationId,
+      deleteQueue().map((membership) => membership.membership.userId)
+    );
   };
 
   const addMembershipToRemoveQueue = (membership: LocationMembershipWithStatus) => {
@@ -111,7 +141,6 @@ export const DashboardPermissionsPanel = () => {
   createEffect(() => {
     selectedLocationId();
     setQueueError("");
-    setIsApplying(false);
   });
 
   return (
@@ -162,16 +191,16 @@ export const DashboardPermissionsPanel = () => {
                     <div class="mb-3 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        class={"btn btn-sm " + (deleteQueueHasItems() && !isApplying() ? "btn-error" : "btn-disabled")}
-                        disabled={!deleteQueueHasItems() || isApplying()}
+                        class={"btn btn-sm " + (deleteQueueHasItems() && !deleteQueueSubmission.pending ? "btn-error" : "btn-disabled")}
+                        disabled={!deleteQueueHasItems() || deleteQueueSubmission.pending}
                         onClick={() => void applyDeleteQueue()}
                       >
-                        Apply
+                        {deleteQueueSubmission.pending ? "Applying..." : "Apply"}
                       </button>
                       <button
                         type="button"
-                        class={"btn btn-sm " + (deleteQueueHasItems() && !isApplying() ? "btn-outline" : "btn-disabled")}
-                        disabled={!deleteQueueHasItems() || isApplying()}
+                        class={"btn btn-sm " + (deleteQueueHasItems() && !deleteQueueSubmission.pending ? "btn-outline" : "btn-disabled")}
+                        disabled={!deleteQueueHasItems() || deleteQueueSubmission.pending}
                         onClick={resetDeleteQueue}
                       >
                         Undo

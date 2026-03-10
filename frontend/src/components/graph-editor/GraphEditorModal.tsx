@@ -8,7 +8,7 @@ import type {LocationGraph} from "../../types/Types";
 import {
   type EditableGraphPayload,
   createEditableGraphPayload
-} from "../../util/graphEditor";
+} from "../../util/graph/graphEditor";
 import {
   TRACE_COLOR_OPTIONS,
   addCartesianRow,
@@ -30,7 +30,7 @@ import {
   updateCartesianY,
   updatePieLabel,
   updatePieValue
-} from "../../util/graphTraceEditor";
+} from "../../util/graph/graphTraceEditor";
 
 type GraphEditorModalProps = {
   isOpen: boolean;

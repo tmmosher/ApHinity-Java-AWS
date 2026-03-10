@@ -15,10 +15,10 @@ import {
   type GraphBaselineEntry,
   undoGraphPayloadEdit,
   type EditableGraphPayload
-} from "../../../util/graphEditor";
-import {resolveGraphHeight} from "../../../util/graphTheme";
-import {fetchLocationById, fetchLocationGraphsById, saveLocationGraphsById} from "../../../util/locationDetailApi";
-import {canEditLocationGraphs} from "../../../util/profileAccess";
+} from "../../../util/graph/graphEditor";
+import {resolveGraphHeight} from "../../../util/graph/graphTheme";
+import {fetchLocationById, fetchLocationGraphsById, saveLocationGraphsById} from "../../../util/graph/locationDetailApi";
+import {canEditLocationGraphs} from "../../../util/common/profileAccess";
 
 export const DashboardLocationDetailPanel = () => {
   const host = useApiHost();
@@ -121,7 +121,7 @@ export const DashboardLocationDetailPanel = () => {
         return false;
       }
       const byId = graphById();
-      return sections.some((section) => section.graph_ids.some((graphId) => byId.has(graphId)));
+      return sections.some((section) => section.graph_ids.some((graphId:number) => byId.has(graphId)));
     },
     async (shouldLoad) => (shouldLoad ? loadPlotlyModule() : null)
   );

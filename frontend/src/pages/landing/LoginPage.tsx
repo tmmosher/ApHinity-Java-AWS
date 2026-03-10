@@ -5,7 +5,7 @@ import {toast} from "solid-toast";
 import {createEffect, createSignal, Show} from "solid-js";
 import TurnstileWidget from "../../components/TurnstileWidget";
 import {useApiHost} from "../../context/ApiHostContext";
-import { FieldError, parseLoginFormData } from "../../util/landingSchemas";
+import { FieldError, parseLoginFormData } from "../../util/common/landingSchemas";
 
 export const LoginPage = () => {
   const host = useApiHost();

@@ -1,7 +1,8 @@
-import { lazy } from "solid-js";
+import { lazy, type Component } from "solid-js";
 import { render } from "solid-js/web";
 import { Route, Router } from "@solidjs/router";
 import App from "./App";
+import {DashboardRouteBoundary} from "./components/DashboardRouteBoundary";
 import "./index.css";
 
 const root = document.getElementById("root");
@@ -92,6 +93,45 @@ const DashboardManagementPanel = lazy(() =>
   }))
 );
 
+const withDashboardRouteBoundary = (
+  Panel: Component,
+  title: string,
+  backHref = "/dashboard"
+): Component => {
+  const WrappedPanel = () => (
+    <DashboardRouteBoundary title={title} backHref={backHref}>
+      <Panel />
+    </DashboardRouteBoundary>
+  );
+  return WrappedPanel;
+};
+
+const DashboardLocationsPanelRoute = withDashboardRouteBoundary(
+  DashboardLocationsPanel,
+  "Locations"
+);
+const DashboardLocationDetailPanelRoute = withDashboardRouteBoundary(
+  DashboardLocationDetailPanel,
+  "Location",
+  "/dashboard/locations"
+);
+const DashboardInvitesPanelRoute = withDashboardRouteBoundary(
+  DashboardInvitesPanel,
+  "Invites"
+);
+const DashboardInviteUsersPanelRoute = withDashboardRouteBoundary(
+  DashboardInviteUsersPanel,
+  "Invite users"
+);
+const DashboardPermissionsPanelRoute = withDashboardRouteBoundary(
+  DashboardPermissionsPanel,
+  "Permissions"
+);
+const DashboardProfilePanelRoute = withDashboardRouteBoundary(
+  DashboardProfilePanel,
+  "Profile"
+);
+
 if (root) {
   render(
     () => (
@@ -110,13 +150,13 @@ if (root) {
         <Route path="/dashboard" component={AuthenticatedLayout}>
           <Route path="/" component={Dashboard}>
             <Route path="/" component={DashboardHomePanel} />
-            <Route path="/locations" component={DashboardLocationsPanel} />
-            <Route path="/locations/:locationId" component={DashboardLocationDetailPanel} />
-            <Route path="/invites" component={DashboardInvitesPanel} />
-            <Route path="/invite-users" component={DashboardInviteUsersPanel} />
-            <Route path="/permissions" component={DashboardPermissionsPanel} />
+            <Route path="/locations" component={DashboardLocationsPanelRoute} />
+            <Route path="/locations/:locationId" component={DashboardLocationDetailPanelRoute} />
+            <Route path="/invites" component={DashboardInvitesPanelRoute} />
+            <Route path="/invite-users" component={DashboardInviteUsersPanelRoute} />
+            <Route path="/permissions" component={DashboardPermissionsPanelRoute} />
             <Route path="/management" component={DashboardManagementPanel} />
-            <Route path="/profile" component={DashboardProfilePanel} />
+            <Route path="/profile" component={DashboardProfilePanelRoute} />
           </Route>
         </Route>
       </Router>

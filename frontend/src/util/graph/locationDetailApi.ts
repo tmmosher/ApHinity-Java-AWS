@@ -1,6 +1,6 @@
-import {parseLocationGraphList, parseLocationSummary} from "./coreApi";
-import {apiFetch} from "./apiFetch";
-import {LocationGraph, LocationGraphUpdate, LocationSummary} from "../types/Types";
+import {parseLocationGraphList, parseLocationSummary} from "../common/coreApi";
+import {apiFetch} from "../common/apiFetch";
+import {LocationGraph, LocationGraphUpdate, LocationSummary} from "../../types/Types";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);

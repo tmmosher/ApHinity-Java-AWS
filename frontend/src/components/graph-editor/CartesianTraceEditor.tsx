@@ -1,5 +1,5 @@
 import { Index, Show } from "solid-js";
-import { toInputValue } from "../../util/graphTraceEditor";
+import { toInputValue } from "../../util/graph/graphTraceEditor";
 
 type CartesianTraceEditorProps = {
   heading: string;

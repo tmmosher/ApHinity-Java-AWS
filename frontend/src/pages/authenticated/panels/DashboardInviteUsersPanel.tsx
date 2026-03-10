@@ -1,14 +1,14 @@
+import {action, useSubmission} from "@solidjs/router";
 import {Show, createEffect, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {LocationSummary} from "../../../types/Types";
-import {createLocationInvite, fetchInviteableLocations} from "../../../util/inviteApi";
+import {ActionResult, LocationSummary} from "../../../types/Types";
+import {createLocationInvite, fetchInviteableLocations} from "../../../util/common/inviteApi";
 
 export const DashboardInviteUsersPanel = () => {
   const host = useApiHost();
   const [invitedEmail, setInvitedEmail] = createSignal("");
   const [selectedLocationId, setSelectedLocationId] = createSignal("");
-  const [isSubmitting, setIsSubmitting] = createSignal(false);
 
   /**
    * Loads available locations for invite targeting.
@@ -30,32 +30,49 @@ export const DashboardInviteUsersPanel = () => {
     }
   });
 
+  const submitInviteAction = action(async (formData: FormData): Promise<ActionResult> => {
+    try {
+      await createLocationInvite(
+        host,
+        Number(formData.get("locationId")?.toString() ?? ""),
+        formData.get("invitedEmail")?.toString() ?? ""
+      );
+      return {
+        ok: true
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Unable to create invite."
+      };
+    }
+  }, "submitInvite");
+
+  const inviteSubmission = useSubmission(submitInviteAction);
+
+  createEffect(() => {
+    const result = inviteSubmission.result;
+    if (!result) {
+      return;
+    }
+
+    if (result.ok) {
+      setInvitedEmail("");
+      toast.success("Invite created.");
+    } else {
+      toast.error(result.message ?? "Unable to create invite.");
+    }
+
+    inviteSubmission.clear();
+  });
+
   /**
    * Creates a location invite for the selected location/email pair.
    *
    * Endpoint: `POST /api/core/location-invites`
    * Body: `{ locationId, invitedEmail }`
    *
-   * @param event Form submit event from the invite form.
    */
-  const submitInvite = async (event: SubmitEvent) => {
-    event.preventDefault();
-    if (isSubmitting()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await createLocationInvite(host, Number(selectedLocationId()), invitedEmail());
-      setInvitedEmail("");
-      toast.success("Invite created.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to create invite.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div class="space-y-6">
       <header class="space-y-1">
@@ -75,10 +92,15 @@ export const DashboardInviteUsersPanel = () => {
           </div>
         }>
           <Show when={(locations()?.length ?? 0) > 0} fallback={<p class="text-base-content/70">No locations available.</p>}>
-            <form class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm grid gap-4" onSubmit={submitInvite}>
+            <form
+              class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm grid gap-4"
+              method="post"
+              action={submitInviteAction}
+            >
               <label class="form-control">
                 <span class="label-text">Location</span>
                 <select
+                  name="locationId"
                   class="select select-bordered mt-1"
                   value={selectedLocationId()}
                   onChange={(event) => setSelectedLocationId(event.currentTarget.value)}
@@ -92,14 +114,15 @@ export const DashboardInviteUsersPanel = () => {
                 <span class="label-text">Invite email</span>
                 <input
                   type="email"
+                  name="invitedEmail"
                   class="input input-bordered mt-1"
                   value={invitedEmail()}
                   onInput={(event) => setInvitedEmail(event.currentTarget.value)}
                   placeholder="user@company.com"
                 />
               </label>
-              <button type="submit" class="btn btn-primary w-fit" disabled={isSubmitting()}>
-                {isSubmitting() ? "Sending..." : "Send invite"}
+              <button type="submit" class="btn btn-primary w-fit" disabled={inviteSubmission.pending}>
+                {inviteSubmission.pending ? "Sending..." : "Send invite"}
               </button>
             </form>
           </Show>

@@ -1,12 +1,17 @@
-import {For, Show, createResource, createSignal} from "solid-js";
+import {action, useAction, useSubmission} from "@solidjs/router";
+import {For, Show, createEffect, createResource} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
-import {ActiveInvite} from "../../../types/Types";
-import {fetchActiveInvites, processLocationInvite} from "../../../util/inviteApi";
+import {ActionResult, ActiveInvite} from "../../../types/Types";
+import {fetchActiveInvites, processLocationInvite} from "../../../util/common/inviteApi";
+
+type ProcessInviteActionResult = ActionResult & {
+  inviteId: number;
+  decision: "accept" | "decline";
+};
 
 export const DashboardInvitesPanel = () => {
   const host = useApiHost();
-  const [processingInviteId, setProcessingInviteId] = createSignal<number | null>(null);
 
   /**
    * Retrieves pending invites for the signed-in user.
@@ -18,6 +23,55 @@ export const DashboardInvitesPanel = () => {
 
   const [invites, {refetch}] = createResource(fetchInvites);
 
+  const processInviteAction = action(async (
+    inviteId: number,
+    decision: "accept" | "decline"
+  ): Promise<ProcessInviteActionResult> => {
+    try {
+      await processLocationInvite(host, inviteId, decision);
+      return {
+        ok: true,
+        inviteId,
+        decision
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        inviteId,
+        decision,
+        message: error instanceof Error ? error.message : "Unable to update invite."
+      };
+    }
+  }, "processInvite");
+
+  const submitInviteDecision = useAction(processInviteAction);
+  const inviteDecisionSubmission = useSubmission(processInviteAction);
+
+  createEffect(() => {
+    const result = inviteDecisionSubmission.result;
+    if (!result) {
+      return;
+    }
+
+    if (result.ok) {
+      toast.success(result.decision === "accept" ? "Invite accepted." : "Invite declined.");
+      void refetch();
+    } else {
+      toast.error(result.message ?? "Unable to update invite.");
+    }
+
+    inviteDecisionSubmission.clear();
+  });
+
+  const processingInviteId = () =>
+    inviteDecisionSubmission.pending
+      ? inviteDecisionSubmission.input[0] as number
+      : null;
+  const processingDecision = () =>
+    inviteDecisionSubmission.pending
+      ? inviteDecisionSubmission.input[1] as "accept" | "decline"
+      : null;
+
   /**
    * Accepts or declines a pending invite.
    *
@@ -26,20 +80,12 @@ export const DashboardInvitesPanel = () => {
    * @param inviteId Invite identifier.
    * @param action Decision to apply (`accept` or `decline`).
    */
-  const processInvite = async (inviteId: number, action: "accept" | "decline") => {
-    if (processingInviteId() !== null) {
+  const processInvite = (inviteId: number, action: "accept" | "decline") => {
+    if (inviteDecisionSubmission.pending) {
       return;
     }
-    setProcessingInviteId(inviteId);
-    try {
-      await processLocationInvite(host, inviteId, action);
-      toast.success(action === "accept" ? "Invite accepted." : "Invite declined.");
-      await refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to update invite.");
-    } finally {
-      setProcessingInviteId(null);
-    }
+
+    void submitInviteDecision(inviteId, action);
   };
 
   return (
@@ -85,18 +131,18 @@ export const DashboardInvitesPanel = () => {
                         <button
                           type="button"
                           class="btn btn-sm btn-primary"
-                          disabled={processingInviteId() !== null}
+                          disabled={inviteDecisionSubmission.pending}
                           onClick={() => void processInvite(invite.id, "accept")}
                         >
-                          {processingInviteId() === invite.id ? "Working..." : "Accept"}
+                          {processingInviteId() === invite.id && processingDecision() === "accept" ? "Working..." : "Accept"}
                         </button>
                         <button
                           type="button"
                           class="btn btn-sm btn-outline"
-                          disabled={processingInviteId() !== null}
+                          disabled={inviteDecisionSubmission.pending}
                           onClick={() => void processInvite(invite.id, "decline")}
                         >
-                          Decline
+                          {processingInviteId() === invite.id && processingDecision() === "decline" ? "Working..." : "Decline"}
                         </button>
                       </div>
                     </div>

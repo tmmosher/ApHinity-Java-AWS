@@ -3,7 +3,7 @@ import {Accessor, createContext, createEffect, createResource, ParentProps, useC
 import {AccountRole, Profile} from "../types/Types";
 import {useNavigate} from "@solidjs/router";
 import {toast} from "solid-toast";
-import {apiFetch} from "../util/apiFetch";
+import {apiFetch} from "../util/common/apiFetch";
 
 type ProfileContextValue = {
     profile: Accessor<Profile | undefined>;

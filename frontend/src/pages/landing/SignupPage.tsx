@@ -4,7 +4,7 @@ import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
 import {ActionResult} from "../../types/Types";
 import {useApiHost} from "../../context/ApiHostContext";
-import { FieldError, parseSignupFormData } from "../../util/landingSchemas";
+import { FieldError, parseSignupFormData } from "../../util/common/landingSchemas";
 
 export const SignupPage = () => {
     const host = useApiHost();

@@ -1,8 +1,7 @@
 import {createContext, createResource, ParentProps, Resource, Setter, useContext} from "solid-js";
 import {useApiHost} from "./ApiHostContext";
-import {apiFetch} from "../util/apiFetch";
-import {parseLocationList} from "../util/coreApi";
-import {useProfile} from "./ProfileContext";
+import {apiFetch} from "../util/common/apiFetch";
+import {parseLocationList} from "../util/common/coreApi";
 import {LocationSummary} from "../types/Types";
 
 const host = useApiHost();

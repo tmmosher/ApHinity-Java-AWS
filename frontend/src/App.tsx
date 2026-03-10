@@ -1,7 +1,7 @@
 import { onMount, type ParentProps } from "solid-js";
 import { Toaster } from "solid-toast";
 import {ApiHostProvider} from "./context/ApiHostContext";
-import {initializeThemePreference} from "./util/themePreference";
+import {initializeThemePreference} from "./util/common/themePreference";
 
 export default function App(props: ParentProps) {
   onMount(() => {

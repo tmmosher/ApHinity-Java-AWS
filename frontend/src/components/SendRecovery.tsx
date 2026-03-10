@@ -2,7 +2,7 @@ import TurnstileWidget from "./TurnstileWidget";
 import {Setter, Show} from "solid-js";
 import {Action} from "@solidjs/router";
 import { ActionResult } from "../types/Types";
-import { getRecoverySubmitButtonClass } from "../util/recoverySubmissionControl";
+import { getRecoverySubmitButtonClass } from "../util/common/recoverySubmissionControl";
 
 interface MailSendComponentProps {
     action: Action<[FormData], ActionResult>;
