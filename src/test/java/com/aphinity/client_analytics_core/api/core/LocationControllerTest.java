@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
 import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
 import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -89,6 +90,31 @@ class LocationControllerTest {
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).getAccessibleLocation(42L, 8L);
+    }
+
+    @Test
+    void createLocationDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationRequest request = new LocationRequest("Phoenix");
+        LocationResponse expected = new LocationResponse(
+            19L,
+            "Phoenix",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Map.of("sections", List.of())
+        );
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.createLocation(42L, "Phoenix")).thenReturn(expected);
+
+        LocationResponse actual = locationController.createLocation(jwt, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).createLocation(42L, "Phoenix");
     }
 
     @Test

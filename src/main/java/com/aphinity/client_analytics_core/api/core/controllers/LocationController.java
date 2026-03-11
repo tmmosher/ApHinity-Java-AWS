@@ -50,6 +50,23 @@ public class LocationController {
     }
 
     /**
+     * Creates a location.
+     *
+     * @param jwt authenticated principal JWT
+     * @param request validated request containing location name
+     * @return created location payload
+     */
+    @PostMapping("/locations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public LocationResponse createLocation(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody LocationRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationService.createLocation(userId, request.name());
+    }
+
+    /**
      * Returns a single location if the authenticated user is allowed to access it.
      *
      * @param jwt authenticated principal JWT

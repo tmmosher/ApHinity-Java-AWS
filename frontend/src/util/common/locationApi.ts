@@ -1,0 +1,60 @@
+import {LocationSummary} from "../../types/Types";
+import {parseLocationSummary} from "./coreApi";
+import {apiFetch} from "./apiFetch";
+
+const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
+  const payload = await response.json().catch(() => null) as {message?: unknown} | null;
+  if (payload && typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message;
+  }
+  return fallback;
+};
+
+const normalizeLocationName = (name: string): string => {
+  const normalized = name.trim();
+  if (!normalized) {
+    throw new Error("Location name is required");
+  }
+  return normalized;
+};
+
+export const createLocation = async (
+  host: string,
+  name: string
+): Promise<LocationSummary> => {
+  const normalizedName = normalizeLocationName(name);
+  const response = await apiFetch(host + "/api/core/locations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: normalizedName
+    })
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to create location."));
+  }
+  return parseLocationSummary(await response.json());
+};
+
+export const renameLocation = async (
+  host: string,
+  locationId: number,
+  name: string
+): Promise<LocationSummary> => {
+  const normalizedName = normalizeLocationName(name);
+  const response = await apiFetch(host + "/api/core/locations/" + locationId, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: normalizedName
+    })
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to update location name."));
+  }
+  return parseLocationSummary(await response.json());
+};

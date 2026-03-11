@@ -12,6 +12,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.response.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -63,6 +65,52 @@ class LocationServiceTest {
 
     @InjectMocks
     private LocationService locationService;
+
+    @Test
+    void createLocationRejectsPartnerUser() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.PARTNER);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.createLocation(5L, "Phoenix")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository);
+    }
+
+    @Test
+    void createLocationPersistsNormalizedLocationForAdmin() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.ADMIN);
+
+        LocationResponse response = locationService.createLocation(5L, "  Phoenix  ");
+
+        verify(locationRepository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(location ->
+            "Phoenix".equals(location.getName())
+        ));
+        assertEquals("Phoenix", response.name());
+    }
+
+    @Test
+    void createLocationRejectsDuplicateName() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.resolveAccountRole(user)).thenReturn(AccountRole.ADMIN);
+        org.mockito.Mockito.doThrow(new DataIntegrityViolationException("duplicate"))
+            .when(locationRepository)
+            .saveAndFlush(org.mockito.ArgumentMatchers.any(Location.class));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.createLocation(5L, "Phoenix")
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Location name already in use", ex.getReason());
+    }
 
     @Test
     void getAccessibleLocationsRejectsUnverifiedUser() {

@@ -13,6 +13,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.response.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
@@ -251,6 +252,30 @@ public class LocationService {
         String normalizedName = normalizeLocationName(name);
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
         location.setName(normalizedName);
+
+        try {
+            locationRepository.saveAndFlush(location);
+        } catch (DataIntegrityViolationException ex) {
+            throw locationNameInUse();
+        }
+
+        return toLocationResponse(location);
+    }
+
+    /**
+     * Creates a new location.
+     *
+     * @param userId authenticated user id
+     * @param name desired location name
+     * @return created location payload
+     */
+    @Transactional
+    public LocationResponse createLocation(Long userId, String name) {
+        AppUser user = requireUser(userId);
+        requireAdmin(user);
+
+        Location location = new Location();
+        location.setName(normalizeLocationName(name));
 
         try {
             locationRepository.saveAndFlush(location);
@@ -506,6 +531,12 @@ public class LocationService {
      */
     private void requirePartnerOrAdmin(AppUser user) {
         if (!accountRoleService.isPartnerOrAdmin(user)) {
+            throw forbidden();
+        }
+    }
+
+    private void requireAdmin(AppUser user) {
+        if (accountRoleService.resolveAccountRole(user) != AccountRole.ADMIN) {
             throw forbidden();
         }
     }

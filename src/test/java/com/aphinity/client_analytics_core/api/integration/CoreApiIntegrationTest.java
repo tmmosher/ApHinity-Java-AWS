@@ -86,6 +86,44 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void createLocationAllowsAdmins() throws Exception {
+        createUser("admin-locations@example.com", PASSWORD, true, "admin");
+        AuthCookies authCookies = loginAndCaptureCookies("admin-locations@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"Phoenix"}
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.name").value("Phoenix"));
+
+        assertTrue(locationRepository.findByName("Phoenix").isPresent());
+    }
+
+    @Test
+    void createLocationRejectsPartners() throws Exception {
+        createUser("partner-locations@example.com", PASSWORD, true, "partner");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-locations@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"Phoenix"}
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
     void locationsAutoRefreshesExpiredAccessTokenWhenRefreshTokenIsValid() throws Exception {
         AppUser user = createUser("refresh-core@example.com", PASSWORD, true, "client");
         Location location = createLocation("Denver");
