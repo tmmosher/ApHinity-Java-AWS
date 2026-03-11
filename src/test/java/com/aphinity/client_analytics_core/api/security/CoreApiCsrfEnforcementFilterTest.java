@@ -55,9 +55,11 @@ class CoreApiCsrfEnforcementFilterTest {
     @Test
     void shouldNotFilterEnforcesMutatingRequestsOnCorePaths() {
         MockHttpServletRequest apiCoreRequest = new MockHttpServletRequest("PUT", "/api/core/locations/1/graphs");
+        MockHttpServletRequest renameRequest = new MockHttpServletRequest("PUT", "/api/core/locations/1/graphs/2/name");
         MockHttpServletRequest coreRequest = new MockHttpServletRequest("DELETE", "/core/locations/1/memberships/2");
 
         assertFalse(filter.shouldNotFilter(apiCoreRequest));
+        assertFalse(filter.shouldNotFilter(renameRequest));
         assertFalse(filter.shouldNotFilter(coreRequest));
     }
 

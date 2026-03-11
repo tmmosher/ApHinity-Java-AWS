@@ -1,8 +1,10 @@
 package com.aphinity.client_analytics_core.api.core.controllers;
 
 import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -143,6 +145,66 @@ public class LocationController {
                 locationId,
                 requestedGraphCount,
                 graphUpdateSummary,
+                ex
+            );
+            throw ex;
+        }
+    }
+
+    /**
+     * Renames a single graph assigned to a location.
+     * Only partner/admin users are authorized to mutate graph names.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param graphId graph identifier
+     * @param request request containing the new graph name
+     * @return updated graph name metadata
+     */
+    @PutMapping("/locations/{locationId}/graphs/{graphId}/name")
+    public GraphNameUpdateResponse updateLocationGraphName(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @PathVariable Long graphId,
+        @RequestBody LocationGraphNameUpdateRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received location graph rename request actorUserId={} locationId={} graphId={}",
+            userId,
+            locationId,
+            graphId
+        );
+        try {
+            GraphNameUpdateResponse response = locationService.updateLocationGraphName(
+                userId,
+                locationId,
+                graphId,
+                request == null ? null : request.name()
+            );
+            log.info(
+                "Completed location graph rename request actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId
+            );
+            return response;
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location graph rename request actorUserId={} locationId={} graphId={} status={} reason={}",
+                userId,
+                locationId,
+                graphId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location graph rename request actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId,
                 ex
             );
             throw ex;

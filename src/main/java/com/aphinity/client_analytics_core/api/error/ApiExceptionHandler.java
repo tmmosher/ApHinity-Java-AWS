@@ -67,6 +67,7 @@ public class ApiExceptionHandler {
         Map.entry("You cannot change your own role", new ErrorDefinition("self_role_change_forbidden", "You cannot change your own role")),
         Map.entry("Location name is required", new ErrorDefinition("location_name_required", "Location name is required")),
         Map.entry("Location name already in use", new ErrorDefinition("location_name_in_use", "Location name already in use")),
+        Map.entry("Graph name is required", new ErrorDefinition("graph_name_required", "Graph name is required")),
         Map.entry("Graph data is invalid", new ErrorDefinition("graph_data_invalid", "Graph data is invalid")),
         Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
         Map.entry("Graph update conflict", new ErrorDefinition("graph_update_conflict", "Graph update conflict")),

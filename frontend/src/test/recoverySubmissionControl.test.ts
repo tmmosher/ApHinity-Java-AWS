@@ -7,7 +7,7 @@ import {
   isRecoverySubmitDisabled,
   RECOVERY_COOLDOWN_MESSAGE,
   RECOVERY_SUBMIT_COOLDOWN_MS
-} from "../util/recoverySubmissionControl";
+} from "../util/common/recoverySubmissionControl";
 
 describe("recoverySubmissionControl", () => {
   beforeEach(() => {

@@ -1,13 +1,13 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
-import {apiFetch} from "../util/apiFetch";
+import {apiFetch} from "../util/common/apiFetch";
 import {
   createLocationInvite,
   fetchActiveInvites,
   fetchInviteableLocations,
   processLocationInvite
-} from "../util/inviteApi";
+} from "../util/common/inviteApi";
 
-vi.mock("../util/apiFetch", () => ({
+vi.mock("../util/common/apiFetch", () => ({
   apiFetch: vi.fn()
 }));
 

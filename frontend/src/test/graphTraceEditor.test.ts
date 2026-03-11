@@ -11,7 +11,7 @@ import {
   setTraceColor,
   updateTraceYAxisRange,
   updatePieValue
-} from "../util/graphTraceEditor";
+} from "../util/graph/graphTraceEditor";
 
 describe("graphTraceEditor", () => {
   it("keeps intermediate numeric input instead of coercing to zero", () => {

@@ -14,6 +14,18 @@ vi.mock("corvu/dialog", () => {
   return { default: Dialog };
 });
 
+vi.mock("corvu/popover", () => {
+  const Popover = (props: { children: (api: { open: boolean; setOpen: (open: boolean) => void }) => unknown }) =>
+    props.children({ open: false, setOpen: () => undefined });
+  Popover.Trigger = (props: { children?: unknown }) => props.children ?? null;
+  Popover.Portal = (props: { children: unknown }) => props.children;
+  Popover.Content = (props: { children: unknown }) => props.children;
+  Popover.Label = (props: { children: unknown }) => props.children;
+  Popover.Description = (props: { children: unknown }) => props.children;
+  Popover.Close = (props: { children?: unknown }) => props.children ?? null;
+  return { default: Popover };
+});
+
 vi.mock("../components/Chart", () => ({
   loadPlotlyModule: vi.fn()
 }));
@@ -41,9 +53,11 @@ const renderModal = () =>
       GraphEditorModal({
         isOpen: true,
         graph: undefined,
+        canRenameGraph: false,
         canUndo: false,
         isSaving: false,
         onApply: vi.fn(),
+        onRenameGraph: vi.fn().mockResolvedValue(undefined),
         onUndo: vi.fn(),
         onClose: vi.fn()
       });

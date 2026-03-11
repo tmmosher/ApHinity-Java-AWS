@@ -4,7 +4,7 @@ import {
   getFavoriteLocationIdForSave,
   hasSelectableFavoriteLocation,
   setFavoriteLocationId
-} from "../util/favoriteLocation";
+} from "../util/common/favoriteLocation";
 
 const FAVORITE_LOCATION_KEY = "aphinity.favoriteLocationId";
 

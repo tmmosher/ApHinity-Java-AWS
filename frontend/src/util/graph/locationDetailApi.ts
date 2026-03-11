@@ -1,6 +1,11 @@
 import {parseLocationGraphList, parseLocationSummary} from "../common/coreApi";
 import {apiFetch} from "../common/apiFetch";
-import {LocationGraph, LocationGraphUpdate, LocationSummary} from "../../types/Types";
+import {
+  LocationGraph,
+  LocationGraphRenameResult,
+  LocationGraphUpdate,
+  LocationSummary
+} from "../../types/Types";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -32,6 +37,91 @@ export const parseRouteLocationId = (locationId: string): number => {
     throw new Error("Invalid location id");
   }
   return parsedId;
+};
+
+export const parseGraphId = (graphId: number): number => {
+  if (!Number.isFinite(graphId) || graphId <= 0) {
+    throw new Error("Invalid graph id");
+  }
+  return graphId;
+};
+
+const parseLocationGraphRenameResult = (value: unknown): LocationGraphRenameResult => {
+  if (!isRecord(value)) {
+    throw new Error("Invalid graph rename response");
+  }
+  if (
+    typeof value.graphId !== "number"
+    || typeof value.name !== "string"
+    || typeof value.updatedAt !== "string"
+  ) {
+    throw new Error("Invalid graph rename shape");
+  }
+  return {
+    graphId: value.graphId,
+    name: value.name,
+    updatedAt: value.updatedAt
+  };
+};
+
+const throwGraphMutationError = async (
+  response: Response,
+  operation: "save" | "rename"
+): Promise<never> => {
+  const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
+  console.warn(`${operation}LocationGraph failed`, {
+    status: response.status,
+    code: errorPayload?.code ?? null,
+    message: errorPayload?.message ?? null,
+    error: errorPayload?.error ?? null,
+    path: errorPayload?.path ?? null
+  });
+
+  try {
+    if (errorPayload?.code) {
+      if (errorPayload.code === "graph_update_conflict") {
+        throw new Error("Graph update conflict");
+      }
+      if (errorPayload.code === "graph_name_required") {
+        throw new Error("Graph name is required");
+      }
+      if (errorPayload.code === "csrf_invalid") {
+        throw new Error("CSRF invalid");
+      }
+      if (errorPayload.code === "forbidden") {
+        throw new Error("Insufficient permissions");
+      }
+      if (
+        errorPayload.code === "authentication_required"
+        || errorPayload.code === "invalid_refresh_token"
+        || errorPayload.code === "missing_refresh_token"
+      ) {
+        throw new Error("Authentication required");
+      }
+    }
+    if (
+      (response.status === 403 || errorPayload?.status === 403)
+      && errorPayload?.error === "Forbidden"
+    ) {
+      throw new Error("Security token rejected");
+    }
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (
+        error.message === "Graph update conflict"
+        || error.message === "Graph name is required"
+        || error.message === "CSRF invalid"
+        || error.message === "Insufficient permissions"
+        || error.message === "Authentication required"
+        || error.message === "Security token rejected"
+      )
+    ) {
+      throw error;
+    }
+  }
+
+  throw new Error(operation === "rename" ? "Unable to rename graph" : "Unable to save location graphs");
 };
 
 /**
@@ -107,55 +197,43 @@ export const saveLocationGraphsById = async (
   });
 
   if (!response.ok) {
-    const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
-    console.warn("saveLocationGraphsById failed", {
-      status: response.status,
-      code: errorPayload?.code ?? null,
-      message: errorPayload?.message ?? null,
-      error: errorPayload?.error ?? null,
-      path: errorPayload?.path ?? null
-    });
-
-    try {
-      if (errorPayload?.code) {
-        if (errorPayload.code === "graph_update_conflict") {
-          throw new Error("Graph update conflict");
-        }
-        if (errorPayload.code === "csrf_invalid") {
-          throw new Error("CSRF invalid");
-        }
-        if (errorPayload.code === "forbidden") {
-          throw new Error("Insufficient permissions");
-        }
-        if (
-          errorPayload.code === "authentication_required"
-          || errorPayload.code === "invalid_refresh_token"
-          || errorPayload.code === "missing_refresh_token"
-        ) {
-          throw new Error("Authentication required");
-        }
-      }
-      if (
-        (response.status === 403 || errorPayload?.status === 403)
-        && errorPayload?.error === "Forbidden"
-      ) {
-        throw new Error("Security token rejected");
-      }
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (
-          error.message === "Graph update conflict" ||
-          error.message === "CSRF invalid" ||
-          error.message === "Insufficient permissions" ||
-          error.message === "Authentication required" ||
-          error.message === "Security token rejected"
-        )
-      ) {
-        throw error;
-      }
-      // Continue to generic error when response body is not parseable.
-    }
-    throw new Error("Unable to save location graphs");
+    await throwGraphMutationError(response, "save");
   }
+};
+
+/**
+ * Persists a graph name change through the dedicated rename endpoint.
+ *
+ * Endpoint: `PUT /api/core/locations/{locationId}/graphs/{graphId}/name`
+ * Body: `{ name }`
+ *
+ * @param host API host base URL.
+ * @param locationId Location id from route params.
+ * @param graphId Graph id to rename.
+ * @param name Next graph display name.
+ * @returns Updated graph rename metadata.
+ * @throws {Error} When ids are invalid or the request fails.
+ */
+export const renameLocationGraphById = async (
+  host: string,
+  locationId: string,
+  graphId: number,
+  name: string
+): Promise<LocationGraphRenameResult> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedGraphId = parseGraphId(graphId);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/graphs/" + parsedGraphId + "/name", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({name})
+  });
+
+  if (!response.ok) {
+    await throwGraphMutationError(response, "rename");
+  }
+
+  return parseLocationGraphRenameResult(await response.json());
 };

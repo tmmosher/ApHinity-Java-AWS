@@ -346,6 +346,80 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphNameAllowsPartnerAndPersistsTrimmedName() throws Exception {
+        createUser("partner-graph-rename@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Casa Grande");
+        Graph graph = createGraph("Original graph title", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graph-rename@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs/{graphId}/name", location.getId(), graph.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"  Updated graph title  "}
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.graphId").value(graph.getId()))
+            .andExpect(jsonPath("$.name").value("Updated graph title"))
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+
+        Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
+        assertEquals("Updated graph title", persisted.getName());
+    }
+
+    @Test
+    void updateLocationGraphNameRejectsMismatchedCsrfToken() throws Exception {
+        createUser("partner-graph-rename-csrf@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Surprise");
+        Graph graph = createGraph("CSRF rename graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graph-rename-csrf@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs/{graphId}/name", location.getId(), graph.getId())
+                    .cookie(authCookiesWithCsrf(authCookies, "cookie-token-stale"))
+                    .header("X-XSRF-TOKEN", "header-token-stale")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"Updated graph title"}
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("csrf_invalid"));
+    }
+
+    @Test
+    void updateLocationGraphNameRejectsClientUsers() throws Exception {
+        createUser("client-graph-rename@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Goodyear");
+        Graph graph = createGraph("Client rename graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-graph-rename@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs/{graphId}/name", location.getId(), graph.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"Updated graph title"}
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+
+        Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
+        assertEquals("Client rename graph", persisted.getName());
+    }
+
+    @Test
     void updateLocationGraphsAcceptsDataOnlyPayloadFromFrontend() throws Exception {
         AppUser partner = createUser("partner-graphs-minimal@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Huntington Beach");

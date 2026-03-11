@@ -13,6 +13,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRep
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.response.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -255,6 +256,66 @@ class LocationServiceTest {
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
         assertEquals("Invalid authenticated user", ex.getReason());
         verifyNoInteractions(locationRepository, graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphNameRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphName(5L, 11L, 31L, "Renamed graph")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphNameRejectsBlankName() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(99L, 31L)).thenReturn(Optional.of(graph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphName(5L, 99L, 31L, "   ")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph name is required", ex.getReason());
+        verify(graphRepository, never()).saveAndFlush(graph);
+    }
+
+    @Test
+    void updateLocationGraphNamePersistsDedicatedRename() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(99L, 31L)).thenReturn(Optional.of(graph));
+        when(graphRepository.saveAndFlush(graph)).thenReturn(graph);
+
+        GraphNameUpdateResponse response = locationService.updateLocationGraphName(5L, 99L, 31L, "Renamed graph");
+
+        assertEquals(31L, response.graphId());
+        assertEquals("Renamed graph", response.name());
+        assertEquals("Renamed graph", graph.getName());
+        verify(graphRepository).saveAndFlush(graph);
     }
 
     @Test

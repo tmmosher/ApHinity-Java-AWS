@@ -15,6 +15,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.LocationReposito
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.response.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import org.slf4j.Logger;
@@ -234,6 +235,66 @@ public class LocationService {
             userId,
             updatesByGraphId.keySet()
         );
+    }
+
+    /**
+     * Renames a single graph assigned to a location.
+     * Only partner/admin callers may mutate graph names.
+     *
+     * @param userId authenticated user id performing the update
+     * @param locationId target location id
+     * @param graphId target graph id
+     * @param name desired graph display name
+     * @return persisted graph name metadata
+     */
+    @Transactional
+    public GraphNameUpdateResponse updateLocationGraphName(
+        Long userId,
+        Long locationId,
+        Long graphId,
+        String name
+    ) {
+        AppUser user = requireUser(userId);
+        if (!accountRoleService.isPartnerOrAdmin(user)) {
+            log.warn(
+                "Rejected graph rename due to insufficient permissions actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId
+            );
+            throw forbidden();
+        }
+        if (!locationRepository.existsById(locationId)) {
+            log.warn(
+                "Rejected graph rename because location was not found actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId
+            );
+            throw locationNotFound();
+        }
+
+        Graph graph = graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, graphId)
+            .orElseThrow(this::locationGraphNotFound);
+        graph.setName(normalizeGraphName(name));
+
+        try {
+            Graph savedGraph = graphRepository.saveAndFlush(graph);
+            return new GraphNameUpdateResponse(
+                savedGraph.getId(),
+                savedGraph.getName(),
+                savedGraph.getUpdatedAt()
+            );
+        } catch (RuntimeException ex) {
+            log.error(
+                "Graph rename persistence failed actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId,
+                ex
+            );
+            throw ex;
+        }
     }
 
     /**
@@ -517,6 +578,17 @@ public class LocationService {
         return normalized;
     }
 
+    private String normalizeGraphName(String value) {
+        if (value == null) {
+            throw invalidGraphName();
+        }
+        String normalized = value.strip();
+        if (normalized.isBlank()) {
+            throw invalidGraphName();
+        }
+        return normalized;
+    }
+
     /**
      * Loads the authenticated user or fails with a standard unauthorized error.
      */
@@ -581,6 +653,10 @@ public class LocationService {
 
     private ResponseStatusException invalidGraphData() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph data is invalid");
+    }
+
+    private ResponseStatusException invalidGraphName() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph name is required");
     }
 
     private ResponseStatusException duplicateGraphUpdates() {

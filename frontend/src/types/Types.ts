@@ -81,6 +81,12 @@ export interface LocationGraphUpdate {
     expectedUpdatedAt?: string | null;
 }
 
+export interface LocationGraphRenameResult {
+    graphId: number;
+    name: string;
+    updatedAt: string;
+}
+
 export interface ManagedUserRole {
     id: number;
     name: string;

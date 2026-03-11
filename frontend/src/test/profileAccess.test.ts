@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {canEditLocationGraphs, canEditProfileEmail} from "../util/profileAccess";
+import {canEditLocationGraphs, canEditProfileEmail} from "../util/common/profileAccess";
 
 describe("profileAccess", () => {
   it("disallows email editing for partner accounts", () => {

@@ -9,7 +9,7 @@ import {
   parseEditableGraphPayload,
   serializeEditableGraphPayload,
   undoGraphPayloadEdit
-} from "../util/graphEditor";
+} from "../util/graph/graphEditor";
 
 const baseGraphs: LocationGraph[] = [
   {
