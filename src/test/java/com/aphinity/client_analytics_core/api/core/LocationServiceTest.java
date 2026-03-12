@@ -36,6 +36,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -316,6 +317,7 @@ class LocationServiceTest {
         assertEquals("Renamed graph", response.name());
         assertEquals("Renamed graph", graph.getName());
         verify(graphRepository).saveAndFlush(graph);
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
     @Test
@@ -367,6 +369,7 @@ class LocationServiceTest {
         locationService.updateLocationGraphData(5L, 99L, List.of());
 
         verifyNoInteractions(graphRepository);
+        verify(locationRepository, never()).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
     @Test
@@ -470,6 +473,7 @@ class LocationServiceTest {
         );
 
         verify(graphRepository).saveAll(List.of(graph));
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));

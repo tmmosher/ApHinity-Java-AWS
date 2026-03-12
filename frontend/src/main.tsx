@@ -1,6 +1,6 @@
-import { lazy, type Component } from "solid-js";
-import { render } from "solid-js/web";
-import { Route, Router } from "@solidjs/router";
+import {type Component, lazy} from "solid-js";
+import {render} from "solid-js/web";
+import {Route, Router} from "@solidjs/router";
 import App from "./App";
 import {DashboardRouteBoundary} from "./components/DashboardRouteBoundary";
 import "./index.css";
@@ -98,12 +98,11 @@ const withDashboardRouteBoundary = (
   title: string,
   backHref = "/dashboard"
 ): Component => {
-  const WrappedPanel = () => (
-    <DashboardRouteBoundary title={title} backHref={backHref}>
-      <Panel />
-    </DashboardRouteBoundary>
+    return () => (
+      <DashboardRouteBoundary title={title} backHref={backHref}>
+          <Panel/>
+      </DashboardRouteBoundary>
   );
-  return WrappedPanel;
 };
 
 const DashboardLocationsPanelRoute = withDashboardRouteBoundary(
