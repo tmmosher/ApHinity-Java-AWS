@@ -76,28 +76,10 @@ const throwGraphMutationError = async (
     error: errorPayload?.error ?? null,
     path: errorPayload?.path ?? null
   });
-
+// using throw / catch for flow control here is pretty stupid imo but it works
   try {
     if (errorPayload?.code) {
-      if (errorPayload.code === "graph_update_conflict") {
-        throw new Error("Graph update conflict");
-      }
-      if (errorPayload.code === "graph_name_required") {
-        throw new Error("Graph name is required");
-      }
-      if (errorPayload.code === "csrf_invalid") {
-        throw new Error("CSRF invalid");
-      }
-      if (errorPayload.code === "forbidden") {
-        throw new Error("Insufficient permissions");
-      }
-      if (
-        errorPayload.code === "authentication_required"
-        || errorPayload.code === "invalid_refresh_token"
-        || errorPayload.code === "missing_refresh_token"
-      ) {
-        throw new Error("Authentication required");
-      }
+      errorCheck(errorPayload.code);
     }
     if (
       (response.status === 403 || errorPayload?.status === 403)
@@ -123,6 +105,28 @@ const throwGraphMutationError = async (
 
   throw new Error(operation === "rename" ? "Unable to rename graph" : "Unable to save location graphs");
 };
+
+const errorCheck = (code: string) => {
+    if (code === "graph_update_conflict") {
+        throw new Error("Graph update conflict");
+    }
+    if (code === "graph_name_required") {
+        throw new Error("Graph name is required");
+    }
+    if (code === "csrf_invalid") {
+        throw new Error("CSRF invalid");
+    }
+    if (code === "forbidden") {
+        throw new Error("Insufficient permissions");
+    }
+    if (
+        code === "authentication_required"
+        || code === "invalid_refresh_token"
+        || code === "missing_refresh_token"
+    ) {
+        throw new Error("Authentication required");
+    }
+}
 
 /**
  * Loads a single location by id.

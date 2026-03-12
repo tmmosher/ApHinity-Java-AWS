@@ -30,7 +30,8 @@ public class ApiExceptionHandler {
     private final AsyncLogService logService;
 
     // Only reasons explicitly listed here are surfaced directly to API clients.
-    private static final Map<String, ErrorDefinition> SAFE_REASONS = Map.ofEntries(
+    // I should probably write these in a file somewhere and read them in because this is getting huge.
+    private static final Map<String, ErrorDefinition> SAFE_REASONS = Map.<String, ErrorDefinition>ofEntries(
         Map.entry("Invalid credentials", new ErrorDefinition("invalid_credentials", "Invalid credentials")),
         Map.entry("Invalid refresh token", new ErrorDefinition("invalid_refresh_token", "Invalid refresh token")),
         Map.entry("Invalid recovery code", new ErrorDefinition("invalid_recovery_code", "Invalid recovery code")),
