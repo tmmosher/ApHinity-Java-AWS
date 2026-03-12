@@ -79,6 +79,7 @@ public class UserDeletionService {
 
     /**
      * Removes a user from the pending deletion queue.
+     * Return value is currently unused but might be nice for tests.
      */
     public boolean restoreUser(Long userId) {
         queueLock.lock();
