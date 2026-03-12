@@ -220,6 +220,12 @@ export const DashboardLocationDetailPanel = () => {
       }
       return nextIndex;
     });
+
+    try {
+      await refetchLocation();
+    } catch {
+      toast.error("Graph renamed, but location details could not refresh. Please refresh the page.");
+    }
   };
 
   const undoLastGraphEdit = () => {
@@ -260,7 +266,7 @@ export const DashboardLocationDetailPanel = () => {
       setLocationUndoStack([]);
       toast.success("Graph changes saved.");
       try {
-        await refetchGraphs();
+        await Promise.all([refetchGraphs(), refetchLocation()]);
         if (saveLocationId !== params.locationId || saveSessionToken !== locationSessionToken()) {
           return;
         }

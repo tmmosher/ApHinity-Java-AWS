@@ -218,6 +218,7 @@ public class LocationService {
 
         try {
             graphRepository.saveAll(graphs);
+            locationRepository.touchUpdatedAt(locationId, Instant.now());
         } catch (RuntimeException ex) {
             log.error(
                 "Graph update persistence failed actorUserId={} locationId={} graphIds={}",
@@ -280,6 +281,7 @@ public class LocationService {
 
         try {
             Graph savedGraph = graphRepository.saveAndFlush(graph);
+            locationRepository.touchUpdatedAt(locationId, Instant.now());
             return new GraphNameUpdateResponse(
                 savedGraph.getId(),
                 savedGraph.getName(),

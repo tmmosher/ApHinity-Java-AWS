@@ -309,6 +309,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     void updateLocationGraphsAllowsPartnerAndMutatesDataAndLayout() throws Exception {
         AppUser partner = createUser("partner-graphs@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Santa Ana");
+        location.setUpdatedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+        locationRepository.saveAndFlush(location);
         Graph graph = createGraph("Water quality", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         graph.setLayout(Map.of("title", "Original layout"));
         graphRepository.save(graph);
@@ -343,12 +345,17 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$[0].id").value(graph.getId()))
             .andExpect(jsonPath("$[0].data[0].y[0]").value(9))
             .andExpect(jsonPath("$[0].layout.title").value("Updated by backend"));
+
+        Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
+        assertTrue(updatedLocation.getUpdatedAt().isAfter(java.time.Instant.parse("2026-01-01T00:00:00Z")));
     }
 
     @Test
     void updateLocationGraphNameAllowsPartnerAndPersistsTrimmedName() throws Exception {
         createUser("partner-graph-rename@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Casa Grande");
+        location.setUpdatedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+        locationRepository.saveAndFlush(location);
         Graph graph = createGraph("Original graph title", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         addLocationGraph(location, graph);
 
@@ -370,6 +377,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
         assertEquals("Updated graph title", persisted.getName());
+        Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
+        assertTrue(updatedLocation.getUpdatedAt().isAfter(java.time.Instant.parse("2026-01-01T00:00:00Z")));
     }
 
     @Test
