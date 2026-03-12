@@ -1,4 +1,4 @@
-import {AccountRole, ManagedUserRole, ManagedUserRolePage} from "../../types/Types";
+import {AccountRole, ManagedUser, ManagedUserPage} from "../../types/Types";
 import {apiFetch} from "./apiFetch";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -11,11 +11,15 @@ const parseAccountRole = (value: unknown): AccountRole => {
   throw new Error("Invalid user role");
 };
 
-const parseManagedUserRole = (value: unknown): ManagedUserRole => {
+const parseManagedUser = (value: unknown): ManagedUser => {
   if (!isRecord(value)) {
     throw new Error("Invalid managed user response");
   }
-  if (typeof value.id !== "number" || typeof value.email !== "string") {
+  if (
+    typeof value.id !== "number"
+    || typeof value.email !== "string"
+    || typeof value.pendingDeletion !== "boolean"
+  ) {
     throw new Error("Invalid managed user shape");
   }
 
@@ -23,13 +27,14 @@ const parseManagedUserRole = (value: unknown): ManagedUserRole => {
     id: value.id,
     name: typeof value.name === "string" ? value.name : "",
     email: value.email,
-    role: parseAccountRole(value.role)
+    role: parseAccountRole(value.role),
+    pendingDeletion: value.pendingDeletion
   };
 };
 
-const parseManagedUserRolePage = (value: unknown): ManagedUserRolePage => {
+const parseManagedUserPage = (value: unknown): ManagedUserPage => {
   if (!isRecord(value) || !Array.isArray(value.users)) {
-    throw new Error("Invalid user role page response");
+    throw new Error("Invalid managed user page response");
   }
   if (
     typeof value.page !== "number"
@@ -41,7 +46,7 @@ const parseManagedUserRolePage = (value: unknown): ManagedUserRolePage => {
   }
 
   return {
-    users: value.users.map(parseManagedUserRole),
+    users: value.users.map(parseManagedUser),
     page: value.page,
     size: value.size,
     totalElements: value.totalElements,
@@ -60,22 +65,31 @@ const extractApiErrorMessage = async (response: Response, fallback: string): Pro
 export const fetchManagedUsers = async (
   host: string,
   page: number,
-  size: number
-): Promise<ManagedUserRolePage> => {
-  const response = await apiFetch(host + "/api/core/admin/users?page=" + page + "&size=" + size, {
+  size: number,
+  query = ""
+): Promise<ManagedUserPage> => {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size)
+  });
+  const normalizedQuery = query.trim();
+  if (normalizedQuery) {
+    params.set("query", normalizedQuery);
+  }
+  const response = await apiFetch(host + "/api/core/admin/users?" + params.toString(), {
     method: "GET"
   });
   if (!response.ok) {
     throw new Error(await extractApiErrorMessage(response, "Unable to load users"));
   }
-  return parseManagedUserRolePage(await response.json());
+  return parseManagedUserPage(await response.json());
 };
 
 export const updateManagedUserRole = async (
   host: string,
   userId: number,
   role: AccountRole
-): Promise<ManagedUserRole> => {
+): Promise<ManagedUser> => {
   const response = await apiFetch(host + "/api/core/admin/users/" + userId + "/role", {
     method: "PUT",
     headers: {
@@ -88,5 +102,31 @@ export const updateManagedUserRole = async (
   if (!response.ok) {
     throw new Error(await extractApiErrorMessage(response, "Unable to update user role."));
   }
-  return parseManagedUserRole(await response.json());
+  return parseManagedUser(await response.json());
+};
+
+export const markManagedUserForDeletion = async (
+  host: string,
+  userId: number
+): Promise<ManagedUser> => {
+  const response = await apiFetch(host + "/api/core/admin/users/" + userId + "/deletion", {
+    method: "PUT"
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to queue user deletion."));
+  }
+  return parseManagedUser(await response.json());
+};
+
+export const restoreManagedUserDeletion = async (
+  host: string,
+  userId: number
+): Promise<ManagedUser> => {
+  const response = await apiFetch(host + "/api/core/admin/users/" + userId + "/deletion", {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to restore user."));
+  }
+  return parseManagedUser(await response.json());
 };

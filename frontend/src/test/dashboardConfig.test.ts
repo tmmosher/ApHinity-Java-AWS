@@ -36,8 +36,11 @@ describe("dashboardConfig", () => {
     expect(hrefs).not.toContain("/dashboard/permissions");
   });
 
-  it("adds the user role management entry only for admins", () => {
-    expect(dashboardNavForAccount("admin", true).map((item) => item.href)).toContain("/dashboard/management");
+  it("adds the user management entry only for admins", () => {
+    const adminNav = dashboardNavForAccount("admin", true);
+
+    expect(adminNav.map((item) => item.href)).toContain("/dashboard/management");
+    expect(adminNav.find((item) => item.href === "/dashboard/management")?.label).toBe("User Management");
     expect(dashboardNavForAccount("partner", true).map((item) => item.href)).not.toContain("/dashboard/management");
     expect(dashboardNavForAccount("client", true).map((item) => item.href)).not.toContain("/dashboard/management");
   });

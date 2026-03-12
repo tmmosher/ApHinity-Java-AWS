@@ -87,17 +87,22 @@ export interface LocationGraphRenameResult {
     updatedAt: string;
 }
 
-export interface ManagedUserRole {
-    id: number;
-    name: string;
-    email: string;
-    role: AccountRole;
+export interface ManagedUser {
+  id: number;
+  name: string;
+  email: string;
+  role: AccountRole;
+  pendingDeletion: boolean;
 }
 
-export interface ManagedUserRolePage {
-    users: ManagedUserRole[];
+export interface ManagedUserPage {
+    users: ManagedUser[];
     page: number;
     size: number;
     totalElements: number;
     totalPages: number;
 }
+
+export type ManagedUserRole = ManagedUser;
+
+export type ManagedUserRolePage = ManagedUserPage;

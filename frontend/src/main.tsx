@@ -129,7 +129,7 @@ const DashboardPermissionsPanelRoute = withDashboardRouteBoundary(
 );
 const DashboardManagementPanelRoute = withDashboardRouteBoundary(
   DashboardManagementPanel,
-  "User role management"
+  "User Management"
 );
 const DashboardProfilePanelRoute = withDashboardRouteBoundary(
   DashboardProfilePanel,

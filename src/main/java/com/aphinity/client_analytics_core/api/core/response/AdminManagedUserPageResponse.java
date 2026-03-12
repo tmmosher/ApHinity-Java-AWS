@@ -3,7 +3,7 @@ package com.aphinity.client_analytics_core.api.core.response;
 import java.util.List;
 
 /**
- * Paginated admin-facing user role payload.
+ * Paginated admin-facing user management payload.
  *
  * @param users current page of users
  * @param page zero-based page index
@@ -11,8 +11,8 @@ import java.util.List;
  * @param totalElements total number of matching users
  * @param totalPages total page count
  */
-public record AdminUserRolePageResponse(
-    List<AdminUserRoleResponse> users,
+public record AdminManagedUserPageResponse(
+    List<AdminManagedUserResponse> users,
     int page,
     int size,
     long totalElements,

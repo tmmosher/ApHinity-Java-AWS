@@ -6,8 +6,8 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.core.response.AccountRole;
-import com.aphinity.client_analytics_core.api.core.response.AdminUserRolePageResponse;
-import com.aphinity.client_analytics_core.api.core.response.AdminUserRoleResponse;
+import com.aphinity.client_analytics_core.api.core.response.AdminManagedUserPageResponse;
+import com.aphinity.client_analytics_core.api.core.response.AdminManagedUserResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -24,50 +24,58 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Admin-only user role management operations.
+ * Admin-only user management operations.
  */
 @Service
 public class AdminUserManagementService {
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
+    private static final int DEFAULT_PAGE_SIZE = 12;
+    private static final int MAX_PAGE_SIZE = 12;
 
     private final AppUserRepository appUserRepository;
     private final AuthSessionRepository authSessionRepository;
     private final RoleRepository roleRepository;
     private final AccountRoleService accountRoleService;
+    private final UserDeletionService userDeletionService;
 
     public AdminUserManagementService(
         AppUserRepository appUserRepository,
         AuthSessionRepository authSessionRepository,
         RoleRepository roleRepository,
-        AccountRoleService accountRoleService
+        AccountRoleService accountRoleService,
+        UserDeletionService userDeletionService
     ) {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
         this.roleRepository = roleRepository;
         this.accountRoleService = accountRoleService;
+        this.userDeletionService = userDeletionService;
     }
 
     /**
-     * Returns a single page of users for admin role management.
+     * Returns a single page of users for admin user management.
      *
      * @param authenticatedUserId authenticated user id
      * @param page zero-based page index
      * @param size requested page size
-     * @return paginated user role payload
+     * @param query optional email search query
+     * @return paginated user payload
      */
     @Transactional(readOnly = true)
-    public AdminUserRolePageResponse getUsers(Long authenticatedUserId, int page, int size) {
+    public AdminManagedUserPageResponse getUsers(Long authenticatedUserId, int page, int size, String query) {
         AppUser actor = appUserRepository.findById(authenticatedUserId)
             .orElseThrow(this::invalidAuthenticatedUser);
         requireAdmin(actor);
 
         int normalizedPage = normalizePage(page);
         int normalizedSize = normalizePageSize(size);
-        Page<Long> userIds = appUserRepository.findPagedUserIds(PageRequest.of(normalizedPage, normalizedSize));
+        String normalizedQuery = normalizeSearchQuery(query);
+        Page<Long> userIds = normalizedQuery == null
+            ? appUserRepository.findManagedUserIds(PageRequest.of(normalizedPage, normalizedSize))
+            : appUserRepository.searchManagedUserIdsByEmail(normalizedQuery, PageRequest.of(normalizedPage, normalizedSize));
         List<Long> ids = userIds.getContent();
+        Set<Long> queuedUserIds = userDeletionService.findQueuedUserIds(ids);
 
-        List<AdminUserRoleResponse> users = List.of();
+        List<AdminManagedUserResponse> users = List.of();
         if (!ids.isEmpty()) {
             Map<Long, AppUser> usersById = new LinkedHashMap<>();
             for (AppUser user : appUserRepository.findByIdIn(ids)) {
@@ -76,11 +84,11 @@ public class AdminUserManagementService {
             users = ids.stream()
                 .map(usersById::get)
                 .filter(user -> user != null)
-                .map(this::toAdminUserRoleResponse)
+                .map(user -> toManagedUserResponse(user, queuedUserIds.contains(user.getId())))
                 .toList();
         }
 
-        return new AdminUserRolePageResponse(
+        return new AdminManagedUserPageResponse(
             users,
             normalizedPage,
             normalizedSize,
@@ -98,7 +106,7 @@ public class AdminUserManagementService {
      * @return updated user payload
      */
     @Transactional
-    public AdminUserRoleResponse updateUserRole(Long authenticatedUserId, Long targetUserId, String roleName) {
+    public AdminManagedUserResponse updateUserRole(Long authenticatedUserId, Long targetUserId, String roleName) {
         AppUser actor = appUserRepository.findById(authenticatedUserId)
             .orElseThrow(this::invalidAuthenticatedUser);
         requireAdmin(actor);
@@ -117,15 +125,66 @@ public class AdminUserManagementService {
         targetUser.setRoles(new HashSet<>(Set.of(targetRole)));
         AppUser savedUser = appUserRepository.saveAndFlush(targetUser);
         authSessionRepository.revokeAllActiveForUser(targetUserId, Instant.now());
-        return toAdminUserRoleResponse(savedUser);
+        if (accountRoleService.resolveAccountRole(savedUser) == AccountRole.ADMIN) {
+            userDeletionService.restoreUser(savedUser.getId());
+        }
+        return toManagedUserResponse(
+            savedUser,
+            userDeletionService.findQueuedUserIds(List.of(savedUser.getId())).contains(savedUser.getId())
+        );
     }
 
-    private AdminUserRoleResponse toAdminUserRoleResponse(AppUser user) {
-        return new AdminUserRoleResponse(
+    /**
+     * Queues a user for scheduled deletion.
+     */
+    @Transactional(readOnly = true)
+    public AdminManagedUserResponse markUserForDeletion(Long authenticatedUserId, Long targetUserId) {
+        AppUser actor = appUserRepository.findById(authenticatedUserId)
+            .orElseThrow(this::invalidAuthenticatedUser);
+        requireAdmin(actor);
+
+        AppUser targetUser = appUserRepository.findById(targetUserId)
+            .orElseThrow(this::targetUserNotFound);
+        AccountRole targetRole = accountRoleService.resolveAccountRole(targetUser);
+
+        if (authenticatedUserId.equals(targetUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot mark your own account for deletion");
+        }
+        if (targetRole == AccountRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin accounts cannot be deleted");
+        }
+
+        userDeletionService.queueUser(targetUser, targetRole);
+        return toManagedUserResponse(targetUser, true);
+    }
+
+    /**
+     * Restores a user from the scheduled deletion queue.
+     */
+    @Transactional(readOnly = true)
+    public AdminManagedUserResponse restoreUserDeletion(Long authenticatedUserId, Long targetUserId) {
+        AppUser actor = appUserRepository.findById(authenticatedUserId)
+            .orElseThrow(this::invalidAuthenticatedUser);
+        requireAdmin(actor);
+
+        AppUser targetUser = appUserRepository.findById(targetUserId)
+            .orElseThrow(this::targetUserNotFound);
+        AccountRole targetRole = accountRoleService.resolveAccountRole(targetUser);
+        if (targetRole == AccountRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin accounts cannot be deleted");
+        }
+
+        userDeletionService.restoreUser(targetUserId);
+        return toManagedUserResponse(targetUser, false);
+    }
+
+    private AdminManagedUserResponse toManagedUserResponse(AppUser user, boolean pendingDeletion) {
+        return new AdminManagedUserResponse(
             user.getId(),
             normalizeName(user.getName()),
             user.getEmail(),
-            accountRoleService.resolveAccountRole(user)
+            accountRoleService.resolveAccountRole(user),
+            pendingDeletion
         );
     }
 
@@ -151,6 +210,14 @@ public class AdminUserManagementService {
             throw invalidRole();
         }
         return roleName.strip().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeSearchQuery(String query) {
+        if (query == null) {
+            return null;
+        }
+        String normalized = query.strip();
+        return normalized.isBlank() ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
     private String normalizeName(String name) {

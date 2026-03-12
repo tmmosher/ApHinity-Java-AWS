@@ -1,6 +1,11 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
-import {fetchManagedUsers, updateManagedUserRole} from "../util/common/adminApi";
+import {
+  fetchManagedUsers,
+  markManagedUserForDeletion,
+  restoreManagedUserDeletion,
+  updateManagedUserRole
+} from "../util/common/adminApi";
 
 vi.mock("../util/common/apiFetch", () => ({
   apiFetch: vi.fn()
@@ -25,25 +30,44 @@ describe("adminApi", () => {
       users: [
         {
           id: 4,
-          name: "Admin User",
-          email: "admin@example.com",
-          role: "admin"
+          name: "Partner User",
+          email: "partner@example.com",
+          role: "partner",
+          pendingDeletion: false
         }
       ],
       page: 1,
-      size: 20,
-      totalElements: 41,
-      totalPages: 3
+      size: 12,
+      totalElements: 13,
+      totalPages: 2
     }));
 
-    const response = await fetchManagedUsers(host, 1, 20);
+    const response = await fetchManagedUsers(host, 1, 12);
 
-    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/admin/users?page=1&size=20", {
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/admin/users?page=1&size=12", {
       method: "GET"
     });
     expect(response.users).toHaveLength(1);
-    expect(response.users[0].email).toBe("admin@example.com");
-    expect(response.totalPages).toBe(3);
+    expect(response.users[0].email).toBe("partner@example.com");
+    expect(response.users[0].pendingDeletion).toBe(false);
+    expect(response.totalPages).toBe(2);
+  });
+
+  it("passes a trimmed search query through to the managed user request", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      users: [],
+      page: 0,
+      size: 12,
+      totalElements: 0,
+      totalPages: 0
+    }));
+
+    await fetchManagedUsers(host, 0, 12, "  ops-team  ");
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      host + "/api/core/admin/users?page=0&size=12&query=ops-team",
+      {method: "GET"}
+    );
   });
 
   it("uses API messages when managed user loading fails", async () => {
@@ -51,7 +75,7 @@ describe("adminApi", () => {
       message: "Insufficient permissions"
     }));
 
-    await expect(fetchManagedUsers(host, 0, 20))
+    await expect(fetchManagedUsers(host, 0, 12))
       .rejects
       .toThrowError("Insufficient permissions");
   });
@@ -61,19 +85,19 @@ describe("adminApi", () => {
       users: [
         {
           id: 4,
-          email: "admin@example.com",
-          role: "owner"
+          email: "partner@example.com",
+          role: "partner"
         }
       ],
       page: 0,
-      size: 20,
+      size: 12,
       totalElements: 1,
       totalPages: 1
     }));
 
-    await expect(fetchManagedUsers(host, 0, 20))
+    await expect(fetchManagedUsers(host, 0, 12))
       .rejects
-      .toThrowError("Invalid user role");
+      .toThrowError("Invalid managed user shape");
   });
 
   it("updates a managed user's role", async () => {
@@ -81,7 +105,8 @@ describe("adminApi", () => {
       id: 9,
       name: "Partner User",
       email: "partner@example.com",
-      role: "partner"
+      role: "partner",
+      pendingDeletion: false
     }));
 
     const updatedUser = await updateManagedUserRole(host, 9, "partner");
@@ -96,6 +121,40 @@ describe("adminApi", () => {
       })
     });
     expect(updatedUser.role).toBe("partner");
+  });
+
+  it("queues a managed user for deletion", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 9,
+      name: "Partner User",
+      email: "partner@example.com",
+      role: "partner",
+      pendingDeletion: true
+    }));
+
+    const updatedUser = await markManagedUserForDeletion(host, 9);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/admin/users/9/deletion", {
+      method: "PUT"
+    });
+    expect(updatedUser.pendingDeletion).toBe(true);
+  });
+
+  it("restores a managed user from deletion", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 9,
+      name: "Partner User",
+      email: "partner@example.com",
+      role: "partner",
+      pendingDeletion: false
+    }));
+
+    const updatedUser = await restoreManagedUserDeletion(host, 9);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/admin/users/9/deletion", {
+      method: "DELETE"
+    });
+    expect(updatedUser.pendingDeletion).toBe(false);
   });
 
   it("uses fallback message when role updates fail without API details", async () => {

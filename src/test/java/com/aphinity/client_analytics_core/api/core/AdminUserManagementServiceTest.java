@@ -6,10 +6,11 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.core.response.AccountRole;
-import com.aphinity.client_analytics_core.api.core.response.AdminUserRolePageResponse;
-import com.aphinity.client_analytics_core.api.core.response.AdminUserRoleResponse;
+import com.aphinity.client_analytics_core.api.core.response.AdminManagedUserPageResponse;
+import com.aphinity.client_analytics_core.api.core.response.AdminManagedUserResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AdminUserManagementService;
+import com.aphinity.client_analytics_core.api.core.services.UserDeletionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,7 +27,12 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,6 +50,9 @@ class AdminUserManagementServiceTest {
     @Mock
     private AccountRoleService accountRoleService;
 
+    @Mock
+    private UserDeletionService userDeletionService;
+
     @InjectMocks
     private AdminUserManagementService adminUserManagementService;
 
@@ -52,24 +61,45 @@ class AdminUserManagementServiceTest {
         AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
         AppUser partner = user(9L, "partner@example.com", "Partner", role("partner"));
         AppUser client = user(11L, "client@example.com", "Client", role("client"));
-        Page<Long> page = new PageImpl<>(List.of(9L, 11L), PageRequest.of(0, 20), 2);
+        Page<Long> page = new PageImpl<>(List.of(9L, 11L), PageRequest.of(0, 12), 2);
 
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
         when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
-        when(appUserRepository.findPagedUserIds(PageRequest.of(0, 20))).thenReturn(page);
+        when(appUserRepository.findManagedUserIds(PageRequest.of(0, 12))).thenReturn(page);
         when(appUserRepository.findByIdIn(List.of(9L, 11L))).thenReturn(List.of(client, partner));
         when(accountRoleService.resolveAccountRole(partner)).thenReturn(AccountRole.PARTNER);
         when(accountRoleService.resolveAccountRole(client)).thenReturn(AccountRole.CLIENT);
+        when(userDeletionService.findQueuedUserIds(List.of(9L, 11L))).thenReturn(Set.of(11L));
 
-        AdminUserRolePageResponse response = adminUserManagementService.getUsers(7L, 0, 20);
+        AdminManagedUserPageResponse response = adminUserManagementService.getUsers(7L, 0, 12, null);
 
         assertEquals(2, response.users().size());
         assertEquals(9L, response.users().get(0).id());
-        assertEquals(AccountRole.PARTNER, response.users().get(0).role());
+        assertFalse(response.users().get(0).pendingDeletion());
         assertEquals(11L, response.users().get(1).id());
-        assertEquals(AccountRole.CLIENT, response.users().get(1).role());
+        assertTrue(response.users().get(1).pendingDeletion());
         assertEquals(2L, response.totalElements());
         assertEquals(1, response.totalPages());
+    }
+
+    @Test
+    void getUsersUsesEmailSearchWhenQueryPresent() {
+        AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
+        AppUser client = user(11L, "client@example.com", "Client", role("client"));
+        Page<Long> page = new PageImpl<>(List.of(11L), PageRequest.of(0, 12), 1);
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+        when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
+        when(appUserRepository.searchManagedUserIdsByEmail("client", PageRequest.of(0, 12))).thenReturn(page);
+        when(appUserRepository.findByIdIn(List.of(11L))).thenReturn(List.of(client));
+        when(accountRoleService.resolveAccountRole(client)).thenReturn(AccountRole.CLIENT);
+        when(userDeletionService.findQueuedUserIds(List.of(11L))).thenReturn(Set.of());
+
+        AdminManagedUserPageResponse response = adminUserManagementService.getUsers(7L, 0, 12, " client ");
+
+        assertEquals(1, response.users().size());
+        assertEquals(11L, response.users().getFirst().id());
+        verify(appUserRepository, never()).findManagedUserIds(any());
     }
 
     @Test
@@ -81,7 +111,7 @@ class AdminUserManagementServiceTest {
 
         ResponseStatusException ex = assertThrows(
             ResponseStatusException.class,
-            () -> adminUserManagementService.getUsers(7L, 0, 20)
+            () -> adminUserManagementService.getUsers(7L, 0, 12, null)
         );
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
@@ -100,13 +130,37 @@ class AdminUserManagementServiceTest {
         when(roleRepository.findByName("partner")).thenReturn(Optional.of(partnerRole));
         when(appUserRepository.saveAndFlush(target)).thenReturn(target);
         when(accountRoleService.resolveAccountRole(target)).thenReturn(AccountRole.PARTNER);
+        when(userDeletionService.findQueuedUserIds(List.of(11L))).thenReturn(Set.of());
 
-        AdminUserRoleResponse response = adminUserManagementService.updateUserRole(7L, 11L, "partner");
+        AdminManagedUserResponse response = adminUserManagementService.updateUserRole(7L, 11L, "partner");
 
         assertEquals(AccountRole.PARTNER, response.role());
+        assertFalse(response.pendingDeletion());
         assertEquals(Set.of(partnerRole), target.getRoles());
         verify(appUserRepository).saveAndFlush(target);
-        verify(authSessionRepository).revokeAllActiveForUser(org.mockito.ArgumentMatchers.eq(11L), org.mockito.ArgumentMatchers.any());
+        verify(authSessionRepository).revokeAllActiveForUser(eq(11L), any());
+        verify(userDeletionService, never()).restoreUser(11L);
+    }
+
+    @Test
+    void updateUserRoleClearsPendingDeletionWhenPromotedToAdmin() {
+        AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
+        AppUser target = user(11L, "client@example.com", "Client", role("client"));
+        Role adminRole = role("admin");
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+        when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
+        when(appUserRepository.findById(11L)).thenReturn(Optional.of(target));
+        when(roleRepository.findByName("admin")).thenReturn(Optional.of(adminRole));
+        when(appUserRepository.saveAndFlush(target)).thenReturn(target);
+        when(accountRoleService.resolveAccountRole(target)).thenReturn(AccountRole.ADMIN);
+        when(userDeletionService.findQueuedUserIds(List.of(11L))).thenReturn(Set.of());
+
+        AdminManagedUserResponse response = adminUserManagementService.updateUserRole(7L, 11L, "admin");
+
+        assertEquals(AccountRole.ADMIN, response.role());
+        assertFalse(response.pendingDeletion());
+        verify(userDeletionService).restoreUser(11L);
     }
 
     @Test
@@ -142,6 +196,74 @@ class AdminUserManagementServiceTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Role is invalid", ex.getReason());
+    }
+
+    @Test
+    void markUserForDeletionQueuesNonAdminUsers() {
+        AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
+        AppUser target = user(11L, "client@example.com", "Client", role("client"));
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+        when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
+        when(appUserRepository.findById(11L)).thenReturn(Optional.of(target));
+        when(accountRoleService.resolveAccountRole(target)).thenReturn(AccountRole.CLIENT);
+
+        AdminManagedUserResponse response = adminUserManagementService.markUserForDeletion(7L, 11L);
+
+        assertTrue(response.pendingDeletion());
+        verify(userDeletionService).queueUser(target, AccountRole.CLIENT);
+    }
+
+    @Test
+    void markUserForDeletionRejectsSelfDeletion() {
+        AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+        when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+
+        ResponseStatusException ex = assertThrows(
+            ResponseStatusException.class,
+            () -> adminUserManagementService.markUserForDeletion(7L, 7L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("You cannot mark your own account for deletion", ex.getReason());
+    }
+
+    @Test
+    void markUserForDeletionRejectsAdminTarget() {
+        AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
+        AppUser target = user(11L, "target-admin@example.com", "Target Admin", role("admin"));
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+        when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
+        when(appUserRepository.findById(11L)).thenReturn(Optional.of(target));
+        when(accountRoleService.resolveAccountRole(target)).thenReturn(AccountRole.ADMIN);
+
+        ResponseStatusException ex = assertThrows(
+            ResponseStatusException.class,
+            () -> adminUserManagementService.markUserForDeletion(7L, 11L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Admin accounts cannot be deleted", ex.getReason());
+    }
+
+    @Test
+    void restoreUserDeletionClearsQueueState() {
+        AppUser admin = user(7L, "admin@example.com", "Admin", role("admin"));
+        AppUser target = user(11L, "client@example.com", "Client", role("client"));
+
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(admin));
+        when(accountRoleService.resolveAccountRole(admin)).thenReturn(AccountRole.ADMIN);
+        when(appUserRepository.findById(11L)).thenReturn(Optional.of(target));
+        when(accountRoleService.resolveAccountRole(target)).thenReturn(AccountRole.CLIENT);
+
+        AdminManagedUserResponse response = adminUserManagementService.restoreUserDeletion(7L, 11L);
+
+        assertFalse(response.pendingDeletion());
+        verify(userDeletionService).restoreUser(11L);
     }
 
     private AppUser user(Long id, String email, String name, Role role) {
