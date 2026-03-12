@@ -1,5 +1,5 @@
 import {afterAll, beforeEach, describe, expect, it, vi} from "vitest";
-import {saveLocationGraphsById} from "../util/locationDetailApi";
+import {saveLocationGraphsById} from "../util/graph/locationDetailApi";
 
 describe("locationDetailApi + apiFetch CSRF integration", () => {
   const originalFetch = globalThis.fetch;

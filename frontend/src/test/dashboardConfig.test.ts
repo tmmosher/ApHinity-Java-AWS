@@ -19,6 +19,12 @@ describe("dashboardConfig", () => {
     expect(isDashboardPathAllowed("admin", "/dashboard/management", false)).toBe(true);
   });
 
+  it("restricts the management path to admins", () => {
+    expect(isDashboardPathAllowed("admin", "/dashboard/management", true)).toBe(true);
+    expect(isDashboardPathAllowed("partner", "/dashboard/management", true)).toBe(false);
+    expect(isDashboardPathAllowed("client", "/dashboard/management", true)).toBe(false);
+  });
+
   it("removes location-scoped nav entries for unverified users", () => {
     const navItems = dashboardNavForAccount("partner", false);
     const hrefs = navItems.map((item) => item.href);
@@ -28,5 +34,14 @@ describe("dashboardConfig", () => {
     expect(hrefs).not.toContain("/dashboard/locations");
     expect(hrefs).not.toContain("/dashboard/invite-users");
     expect(hrefs).not.toContain("/dashboard/permissions");
+  });
+
+  it("adds the user management entry only for admins", () => {
+    const adminNav = dashboardNavForAccount("admin", true);
+
+    expect(adminNav.map((item) => item.href)).toContain("/dashboard/management");
+    expect(adminNav.find((item) => item.href === "/dashboard/management")?.label).toBe("User Management");
+    expect(dashboardNavForAccount("partner", true).map((item) => item.href)).not.toContain("/dashboard/management");
+    expect(dashboardNavForAccount("client", true).map((item) => item.href)).not.toContain("/dashboard/management");
   });
 });

@@ -315,6 +315,74 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void updateLocationGraphNameWritesNameThroughDedicatedEndpoint() throws Exception {
+        Long userId = 44L;
+        Long locationId = 80L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(410L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, 410L))
+            .thenReturn(Optional.of(graph));
+        when(graphRepository.saveAndFlush(graph)).thenReturn(graph);
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs/{graphId}/name", locationId, 410L)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {"name": "Renamed graph"}
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.graphId").value(410))
+            .andExpect(jsonPath("$.name").value("Renamed graph"))
+            .andExpect(jsonPath("$.updatedAt").value("2026-01-03T00:00:00Z"));
+
+        assertEquals("Renamed graph", graph.getName());
+        verify(graphRepository).saveAndFlush(graph);
+    }
+
+    @Test
+    void updateLocationGraphNameRejectsBlankGraphName() throws Exception {
+        Long userId = 46L;
+        Long locationId = 82L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(411L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, 411L))
+            .thenReturn(Optional.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs/{graphId}/name", locationId, 411L)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {"name": "   "}
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("graph_name_required"))
+            .andExpect(jsonPath("$.message").value("Graph name is required"));
+    }
+
+    @Test
     void updateLocationGraphDataReturnsConflictWhenExpectedUpdatedAtIsStale() throws Exception {
         Long userId = 45L;
         Long locationId = 81L;

@@ -1,13 +1,14 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
-import {apiFetch} from "../util/apiFetch";
+import {apiFetch} from "../util/common/apiFetch";
 import {
   fetchLocationById,
   fetchLocationGraphsById,
+  renameLocationGraphById,
   parseRouteLocationId,
   saveLocationGraphsById
-} from "../util/locationDetailApi";
+} from "../util/graph/locationDetailApi";
 
-vi.mock("../util/apiFetch", () => ({
+vi.mock("../util/common/apiFetch", () => ({
   apiFetch: vi.fn()
 }));
 
@@ -204,6 +205,31 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     });
   });
 
+  it("renames a graph through the dedicated name endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      graphId: 12,
+      name: "Updated graph title",
+      updatedAt: "2026-01-05T00:00:00Z"
+    }));
+
+    const result = await renameLocationGraphById(host, "55", 12, "Updated graph title");
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs/12/name", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: "Updated graph title"
+      })
+    });
+    expect(result).toEqual({
+      graphId: 12,
+      name: "Updated graph title",
+      updatedAt: "2026-01-05T00:00:00Z"
+    });
+  });
+
   it("rejects invalid route location ids before save request dispatch", async () => {
     await expect(
       saveLocationGraphsById(host, "0", [
@@ -269,5 +295,16 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     await expect(
       saveLocationGraphsById(host, "55", [])
     ).rejects.toThrowError("Security token rejected");
+  });
+
+  it("throws a graph-name error when rename validation fails", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "graph_name_required",
+      message: "Graph name is required"
+    }));
+
+    await expect(
+      renameLocationGraphById(host, "55", 12, "   ")
+    ).rejects.toThrowError("Graph name is required");
   });
 });

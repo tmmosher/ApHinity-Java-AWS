@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface GraphRepository extends JpaRepository<Graph, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -22,5 +23,17 @@ public interface GraphRepository extends JpaRepository<Graph, Long> {
     List<Graph> findByLocationIdAndGraphIdInForUpdate(
         @Param("locationId") Long locationId,
         @Param("graphIds") Collection<Long> graphIds
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select graph from Graph graph
+        join graph.locationGraphs locationGraph
+        where locationGraph.id.locationId = :locationId
+          and graph.id = :graphId
+        """)
+    Optional<Graph> findByLocationIdAndGraphIdForUpdate(
+        @Param("locationId") Long locationId,
+        @Param("graphId") Long graphId
     );
 }

@@ -3,7 +3,10 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
 import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
 import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.LocationGraphNameUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
 import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.LocationService;
@@ -92,6 +95,31 @@ class LocationControllerTest {
     }
 
     @Test
+    void createLocationDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationRequest request = new LocationRequest("Phoenix");
+        LocationResponse expected = new LocationResponse(
+            19L,
+            "Phoenix",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Map.of("sections", List.of())
+        );
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.createLocation(42L, "Phoenix")).thenReturn(expected);
+
+        LocationResponse actual = locationController.createLocation(jwt, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).createLocation(42L, "Phoenix");
+    }
+
+    @Test
     void deleteMembershipDelegatesToServiceForAuthenticatedUser() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")
@@ -121,6 +149,28 @@ class LocationControllerTest {
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).updateLocationGraphData(42L, 8L, request.graphs());
+    }
+
+    @Test
+    void updateLocationGraphNameDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationGraphNameUpdateRequest request = new LocationGraphNameUpdateRequest("Renamed graph");
+        GraphNameUpdateResponse expected = new GraphNameUpdateResponse(
+            31L,
+            "Renamed graph",
+            Instant.parse("2026-01-03T00:00:00Z")
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.updateLocationGraphName(42L, 8L, 31L, "Renamed graph")).thenReturn(expected);
+
+        GraphNameUpdateResponse actual = locationController.updateLocationGraphName(jwt, 8L, 31L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).updateLocationGraphName(42L, 8L, 31L, "Renamed graph");
     }
 
     @Test

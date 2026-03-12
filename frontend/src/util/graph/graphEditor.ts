@@ -1,4 +1,4 @@
-import {LocationGraph, LocationGraphUpdate} from "../types/Types";
+import {LocationGraph, LocationGraphUpdate} from "../../types/Types";
 
 export type EditableGraphPayload = {
   data: Record<string, unknown>[];

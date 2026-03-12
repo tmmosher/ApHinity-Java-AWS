@@ -3,7 +3,7 @@ import {
   resolveGraphHeight,
   resolveGraphThemeStyle,
   resolveThemedGraphLayout
-} from "../util/graphTheme";
+} from "../util/graph/graphTheme";
 
 describe("graphTheme", () => {
   it("uses default theme colors when graph style has no theme block", () => {

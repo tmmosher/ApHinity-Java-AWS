@@ -17,7 +17,12 @@ import {
   type EditableGraphPayload
 } from "../../../util/graph/graphEditor";
 import {resolveGraphHeight} from "../../../util/graph/graphTheme";
-import {fetchLocationById, fetchLocationGraphsById, saveLocationGraphsById} from "../../../util/graph/locationDetailApi";
+import {
+  fetchLocationById,
+  fetchLocationGraphsById,
+  renameLocationGraphById,
+  saveLocationGraphsById
+} from "../../../util/graph/locationDetailApi";
 import {canEditLocationGraphs} from "../../../util/common/profileAccess";
 
 export const DashboardLocationDetailPanel = () => {
@@ -171,6 +176,50 @@ export const DashboardLocationDetailPanel = () => {
     }
     setWorkingGraphs(result.nextGraphs);
     setLocationUndoStack(result.nextUndoStack);
+  };
+
+  const renameGraphFromModal = async (graphId: number, name: string): Promise<void> => {
+    if (isSavingGraphChanges() || !canEditGraphs()) {
+      throw new Error("Unable to rename graph.");
+    }
+
+    const result = await renameLocationGraphById(host, params.locationId, graphId, name);
+
+    setWorkingGraphs((currentGraphs) =>
+      currentGraphs.map((graph) =>
+        graph.id === graphId
+          ? {
+              ...graph,
+              name: result.name,
+              updatedAt: result.updatedAt
+            }
+          : graph
+      )
+    );
+    setLocationUndoStack((currentUndoStack) =>
+      currentUndoStack.map((snapshot) =>
+        snapshot.map((graph) =>
+          graph.id === graphId
+            ? {
+                ...graph,
+                name: result.name,
+                updatedAt: result.updatedAt
+              }
+            : graph
+        )
+      )
+    );
+    setGraphBaselineIndex((currentIndex) => {
+      const nextIndex = new Map(currentIndex);
+      const existingEntry = nextIndex.get(graphId);
+      if (existingEntry) {
+        nextIndex.set(graphId, {
+          ...existingEntry,
+          expectedUpdatedAt: result.updatedAt
+        });
+      }
+      return nextIndex;
+    });
   };
 
   const undoLastGraphEdit = () => {
@@ -391,9 +440,11 @@ export const DashboardLocationDetailPanel = () => {
         <GraphEditorModal
           isOpen={editingGraphId() !== null}
           graph={editingGraph()}
+          canRenameGraph={canEditGraphs()}
           canUndo={hasPendingGraphChanges() && !isSavingGraphChanges()}
           isSaving={isSavingGraphChanges()}
           onApply={applyLocalGraphEdit}
+          onRenameGraph={renameGraphFromModal}
           onUndo={undoLastGraphEdit}
           onClose={closeGraphEditor}
         />

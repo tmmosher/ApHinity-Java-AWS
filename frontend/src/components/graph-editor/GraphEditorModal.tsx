@@ -1,5 +1,6 @@
 import Dialog from "corvu/dialog";
-import {Match, Show, Switch, createEffect, createMemo, createSignal} from "solid-js";
+import Popover from "corvu/popover";
+import {Match, Show, Switch, createEffect, createMemo, createSignal, on} from "solid-js";
 import {loadPlotlyModule} from "../Chart";
 import CartesianTraceEditor from "./CartesianTraceEditor";
 import PieTraceEditor from "./PieTraceEditor";
@@ -35,9 +36,11 @@ import {
 type GraphEditorModalProps = {
   isOpen: boolean;
   graph: LocationGraph | undefined;
+  canRenameGraph: boolean;
   canUndo: boolean;
   isSaving: boolean;
   onApply: (graphId: number, payload: EditableGraphPayload) => void;
+  onRenameGraph: (graphId: number, name: string) => Promise<void>;
   onUndo: () => void;
   onClose: () => void;
 };
@@ -53,21 +56,28 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   });
   const [selectedTraceIndex, setSelectedTraceIndex] = createSignal(0);
   const [traceNameDraft, setTraceNameDraft] = createSignal("");
+  const [graphNameDraft, setGraphNameDraft] = createSignal("");
   const [operationError, setOperationError] = createSignal("");
+  const [renameError, setRenameError] = createSignal("");
   const [isRemovingTrace, setIsRemovingTrace] = createSignal(false);
+  const [isSavingRename, setIsSavingRename] = createSignal(false);
+  const [isRenamePopoverOpen, setIsRenamePopoverOpen] = createSignal(false);
 
-  const isBusy = () => props.isSaving || isRemovingTrace();
+  const isBusy = () => props.isSaving || isRemovingTrace() || isSavingRename();
 
-  createEffect(() => {
-    if (!props.isOpen || !props.graph) {
+  createEffect(on(() => [props.isOpen, props.graph?.id] as const, ([isOpen, graphId]) => {
+    if (!isOpen || graphId === undefined || !props.graph) {
       return;
     }
 
     setEditablePayload(createEditableGraphPayload(props.graph));
+    setGraphNameDraft(props.graph.name);
     setSelectedTraceIndex(0);
     setTraceNameDraft("");
     setOperationError("");
-  });
+    setRenameError("");
+    setIsRenamePopoverOpen(false);
+  }));
 
   createEffect(() => {
     const count = editablePayload().data.length;
@@ -319,6 +329,37 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     }
   };
 
+  const saveGraphRename = async (): Promise<boolean> => {
+    if (isBusy()) {
+      return false;
+    }
+
+    const graph = props.graph;
+    if (!graph) {
+      return false;
+    }
+
+    const normalizedName = graphNameDraft().trim();
+    if (!normalizedName) {
+      setRenameError("Graph name is required.");
+      return false;
+    }
+
+    setRenameError("");
+    setIsSavingRename(true);
+
+    try {
+      await props.onRenameGraph(graph.id, normalizedName);
+      setGraphNameDraft(normalizedName);
+      return true;
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : "Unable to save graph name.");
+      return false;
+    } finally {
+      setIsSavingRename(false);
+    }
+  };
+
   return (
     <Dialog
       open={props.isOpen}
@@ -344,7 +385,84 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                 Graph: {props.graph?.name ?? "-"}
               </Dialog.Description>
             </div>
-            <Dialog.Close class="btn btn-sm btn-ghost" disabled={isBusy()}>Close</Dialog.Close>
+            <div class="flex items-start gap-2">
+              <Show when={props.canRenameGraph}>
+                <Popover
+                  placement="bottom-end"
+                  open={isRenamePopoverOpen()}
+                  onOpenChange={(open) => {
+                    setIsRenamePopoverOpen(open);
+                    if (open) {
+                      setGraphNameDraft(props.graph?.name || "");
+                      setRenameError("");
+                    }
+                  }}
+                >
+                  {(popover) => (
+                    <>
+                      <Popover.Trigger
+                        class={"btn btn-sm " + (isBusy() ? "btn-disabled" : "btn-outline")}
+                        disabled={isBusy()}
+                      >
+                        Rename
+                      </Popover.Trigger>
+                      <Popover.Portal forceMount>
+                        <Popover.Content
+                          forceMount
+                          class="z-[80] w-[min(92vw,20rem)] rounded-xl border border-base-300 bg-base-100 p-4 shadow-xl"
+                          style={{"pointer-events": popover.open ? "auto" : "none"}}
+                        >
+                          <div class="space-y-3">
+                            <div class="space-y-1">
+                              <Popover.Label class="text-sm font-semibold">Rename Graph</Popover.Label>
+                              <Popover.Description class="text-xs text-base-content/70">
+                                Update the graph title and save it to the server.
+                              </Popover.Description>
+                            </div>
+                            <label class="form-control w-full">
+                              <span class="label-text text-xs">Graph name</span>
+                              <input
+                                type="text"
+                                class="input input-bordered input-sm w-full"
+                                value={graphNameDraft()}
+                                disabled={isBusy()}
+                                onInput={(event) => {
+                                  setGraphNameDraft(event.currentTarget.value);
+                                  if (renameError()) {
+                                    setRenameError("");
+                                  }
+                                }}
+                              />
+                            </label>
+                            <Show when={renameError()}>
+                              <p class="text-xs text-error">{renameError()}</p>
+                            </Show>
+                            <div class="flex items-center justify-end gap-2">
+                              <Popover.Close class="btn btn-ghost btn-sm" disabled={isBusy()}>
+                                Cancel
+                              </Popover.Close>
+                              <button
+                                type="button"
+                                class={"btn btn-sm " + (isBusy() ? "btn-disabled" : "btn-primary")}
+                                disabled={isBusy()}
+                                onClick={() => void saveGraphRename().then((saved) => {
+                                  if (saved) {
+                                    setIsRenamePopoverOpen(false);
+                                  }
+                                })}
+                              >
+                                {isSavingRename() ? "Saving..." : "Save"}
+                              </button>
+                            </div>
+                          </div>
+                        </Popover.Content>
+                      </Popover.Portal>
+                    </>
+                  )}
+                </Popover>
+              </Show>
+              <Dialog.Close class="btn btn-sm btn-ghost" disabled={isBusy()}>Close</Dialog.Close>
+            </div>
           </div>
 
           <div class="space-y-4 overflow-y-auto">

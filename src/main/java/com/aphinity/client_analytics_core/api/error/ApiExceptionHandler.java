@@ -30,7 +30,8 @@ public class ApiExceptionHandler {
     private final AsyncLogService logService;
 
     // Only reasons explicitly listed here are surfaced directly to API clients.
-    private static final Map<String, ErrorDefinition> SAFE_REASONS = Map.ofEntries(
+    // I should probably write these in a file somewhere and read them in because this is getting huge.
+    private static final Map<String, ErrorDefinition> SAFE_REASONS = Map.<String, ErrorDefinition>ofEntries(
         Map.entry("Invalid credentials", new ErrorDefinition("invalid_credentials", "Invalid credentials")),
         Map.entry("Invalid refresh token", new ErrorDefinition("invalid_refresh_token", "Invalid refresh token")),
         Map.entry("Invalid recovery code", new ErrorDefinition("invalid_recovery_code", "Invalid recovery code")),
@@ -61,8 +62,16 @@ public class ApiExceptionHandler {
         Map.entry("Location membership not found", new ErrorDefinition("location_membership_not_found", "Location membership not found")),
         Map.entry("Location graph not found", new ErrorDefinition("location_graph_not_found", "Location graph not found")),
         Map.entry("Invited user not found", new ErrorDefinition("invited_user_not_found", "Invited user not found")),
+        Map.entry("Role is invalid", new ErrorDefinition("role_invalid", "Role is invalid")),
+        Map.entry("Page index is invalid", new ErrorDefinition("page_invalid", "Page index is invalid")),
+        Map.entry("Page size is invalid", new ErrorDefinition("page_size_invalid", "Page size is invalid")),
+        Map.entry("You cannot change your own role", new ErrorDefinition("self_role_change_forbidden", "You cannot change your own role")),
+        Map.entry("You cannot mark your own account for deletion", new ErrorDefinition("self_user_deletion_forbidden", "You cannot mark your own account for deletion")),
         Map.entry("Location name is required", new ErrorDefinition("location_name_required", "Location name is required")),
         Map.entry("Location name already in use", new ErrorDefinition("location_name_in_use", "Location name already in use")),
+        Map.entry("Admin accounts cannot be deleted", new ErrorDefinition("admin_user_deletion_forbidden", "Admin accounts cannot be deleted")),
+        Map.entry("User deletion queue is full", new ErrorDefinition("user_deletion_queue_full", "User deletion queue is full")),
+        Map.entry("Graph name is required", new ErrorDefinition("graph_name_required", "Graph name is required")),
         Map.entry("Graph data is invalid", new ErrorDefinition("graph_data_invalid", "Graph data is invalid")),
         Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
         Map.entry("Graph update conflict", new ErrorDefinition("graph_update_conflict", "Graph update conflict")),

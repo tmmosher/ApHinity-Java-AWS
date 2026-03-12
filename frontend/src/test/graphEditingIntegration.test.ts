@@ -5,7 +5,7 @@ import {
   applyGraphPayloadEdit,
   createEditableGraphPayload,
   type EditableGraphPayload
-} from "../util/graphEditor";
+} from "../util/graph/graphEditor";
 import {
   createTrace,
   removeTraceWithPlotly,
@@ -13,7 +13,7 @@ import {
   setTraceColor,
   updateCartesianX,
   updateCartesianY
-} from "../util/graphTraceEditor";
+} from "../util/graph/graphTraceEditor";
 
 type MinimalDiv = {
   style: Record<string, string>;

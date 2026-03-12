@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface AuthSessionRepository extends JpaRepository<AuthSession, Long> {
@@ -14,5 +15,9 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, Long> 
 
     @Modifying
     @Query("update AuthSession s set s.revokedAt = :revokedAt where s.user.id = :userId and s.revokedAt is null")
-    int revokeAllActiveForUser(@Param("userId") Long userId, @Param("revokedAt") Instant revokedAt);
+    void revokeAllActiveForUser(@Param("userId") Long userId, @Param("revokedAt") Instant revokedAt);
+
+    @Modifying
+    @Query("delete from AuthSession s where s.user.id in :userIds")
+    void deleteAllByUserIdIn(@Param("userIds") Collection<Long> userIds);
 }
