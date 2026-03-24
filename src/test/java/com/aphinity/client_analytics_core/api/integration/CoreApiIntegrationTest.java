@@ -5,12 +5,18 @@ import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
 import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.Location;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +92,36 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void locationEventsReturnsMembershipScopedDataForClientUser() throws Exception {
+        AppUser user = createUser("client-events@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Mesa");
+        addMembership(location, user);
+        createServiceEvent(
+            location,
+            "Water meter inspection",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-03"),
+            LocalTime.parse("09:30:00"),
+            "Inspect the primary water meter",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events@example.com", PASSWORD);
+
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .accept(APPLICATION_JSON)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].title").value("Water meter inspection"))
+            .andExpect(jsonPath("$[0].responsibility").value("partner"))
+            .andExpect(jsonPath("$[0].date").value("2026-04-03"))
+            .andExpect(jsonPath("$[0].time").value("09:30:00"))
+            .andExpect(jsonPath("$[0].status").value("upcoming"));
+    }
+
+    @Test
     void createLocationAllowsAdmins() throws Exception {
         createUser("admin-locations@example.com", PASSWORD, true, "admin");
         AuthCookies authCookies = loginAndCaptureCookies("admin-locations@example.com", PASSWORD);
@@ -121,6 +157,313 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
+    void createLocationEventAllowsPartnerAndPersistsTrimmedFields() throws Exception {
+        createUser("partner-events@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Gilbert");
+        location.setUpdatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        locationRepository.saveAndFlush(location);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "  Pump station visit  ",
+                          "responsibility": "partner",
+                          "date": "2026-04-10",
+                          "time": "08:45:00",
+                          "description": "  Check the north pump station  ",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.title").value("Pump station visit"))
+            .andExpect(jsonPath("$.responsibility").value("partner"))
+            .andExpect(jsonPath("$.date").value("2026-04-10"))
+            .andExpect(jsonPath("$.time").value("08:45:00"))
+            .andExpect(jsonPath("$.description").value("Check the north pump station"))
+            .andExpect(jsonPath("$.status").value("upcoming"))
+            .andReturn();
+
+        ServiceEvent persisted = serviceEventRepository.findAll().getFirst();
+        assertEquals("Pump station visit", persisted.getTitle());
+        assertEquals("Check the north pump station", persisted.getDescription());
+
+        Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
+        assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
+        assertThat(result.getResponse().getContentAsString()).contains("Pump station visit");
+    }
+
+    @Test
+    void createLocationEventAllowsClientWhenResponsibilityIsClient() throws Exception {
+        AppUser client = createUser("client-events-write@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Tempe");
+        addMembership(location, client);
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-write@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Client can create this",
+                          "responsibility": "client",
+                          "date": "2026-04-12",
+                          "time": "10:15:00",
+                          "description": "Client-owned schedule item",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.title").value("Client can create this"))
+            .andExpect(jsonPath("$.responsibility").value("client"))
+            .andExpect(jsonPath("$.description").value("Client-owned schedule item"));
+
+        ServiceEvent persisted = serviceEventRepository.findAll().getFirst();
+        assertEquals("Client can create this", persisted.getTitle());
+        assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
+    }
+
+    @Test
+    void createLocationEventRejectsClientWhenResponsibilityIsPartner() throws Exception {
+        AppUser client = createUser("client-events-write-partner@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Tempe West");
+        addMembership(location, client);
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-write-partner@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Client should not create this",
+                          "responsibility": "partner",
+                          "date": "2026-04-12",
+                          "time": "10:15:00",
+                          "description": "Attempted unauthorized mutation",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
+    void updateLocationEventAllowsPartnerAndPersistsChanges() throws Exception {
+        createUser("partner-events-update@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Peoria");
+        location.setUpdatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        locationRepository.saveAndFlush(location);
+        ServiceEvent serviceEvent = createServiceEvent(
+            location,
+            "Original event",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-05"),
+            LocalTime.parse("07:30:00"),
+            "Original description",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-update@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/events/{eventId}", location.getId(), serviceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Updated event",
+                          "responsibility": "client",
+                          "date": "2026-04-06",
+                          "time": "11:00:00",
+                          "description": "Updated description",
+                          "status": "current"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.title").value("Updated event"))
+            .andExpect(jsonPath("$.responsibility").value("client"))
+            .andExpect(jsonPath("$.date").value("2026-04-06"))
+            .andExpect(jsonPath("$.time").value("11:00:00"))
+            .andExpect(jsonPath("$.description").value("Updated description"))
+            .andExpect(jsonPath("$.status").value("current"));
+
+        ServiceEvent persisted = serviceEventRepository.findById(serviceEvent.getId()).orElseThrow();
+        assertEquals("Updated event", persisted.getTitle());
+        assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
+        assertEquals(ServiceEventStatus.CURRENT, persisted.getStatus());
+
+        Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
+        assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
+    }
+
+    @Test
+    void updateLocationEventAllowsClientWhenEventRemainsClientResponsibility() throws Exception {
+        AppUser client = createUser("client-events-update@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Chandler");
+        addMembership(location, client);
+        ServiceEvent serviceEvent = createServiceEvent(
+            location,
+            "Client event",
+            ServiceEventResponsibility.CLIENT,
+            LocalDate.parse("2026-04-09"),
+            LocalTime.parse("13:00:00"),
+            "Original client description",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-update@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/events/{eventId}", location.getId(), serviceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Client event updated",
+                          "responsibility": "client",
+                          "date": "2026-04-10",
+                          "time": "14:30:00",
+                          "description": "Updated client description",
+                          "status": "current"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.title").value("Client event updated"))
+            .andExpect(jsonPath("$.responsibility").value("client"))
+            .andExpect(jsonPath("$.date").value("2026-04-10"))
+            .andExpect(jsonPath("$.time").value("14:30:00"))
+            .andExpect(jsonPath("$.description").value("Updated client description"))
+            .andExpect(jsonPath("$.status").value("current"));
+
+        ServiceEvent persisted = serviceEventRepository.findById(serviceEvent.getId()).orElseThrow();
+        assertEquals("Client event updated", persisted.getTitle());
+        assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
+        assertEquals(ServiceEventStatus.CURRENT, persisted.getStatus());
+    }
+
+    @Test
+    void updateLocationEventRejectsClientWhenChangingResponsibilityToPartner() throws Exception {
+        AppUser client = createUser("client-events-update-partner@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Chandler West");
+        addMembership(location, client);
+        ServiceEvent serviceEvent = createServiceEvent(
+            location,
+            "Client event",
+            ServiceEventResponsibility.CLIENT,
+            LocalDate.parse("2026-04-09"),
+            LocalTime.parse("13:00:00"),
+            "Original client description",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-update-partner@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/events/{eventId}", location.getId(), serviceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Partner takeover",
+                          "responsibility": "partner",
+                          "date": "2026-04-10",
+                          "time": "14:30:00",
+                          "description": "Updated client description",
+                          "status": "current"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
+    void updateLocationEventRejectsClientForPartnerOwnedEvent() throws Exception {
+        AppUser client = createUser("client-events-update-owned@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Chandler North");
+        addMembership(location, client);
+        ServiceEvent serviceEvent = createServiceEvent(
+            location,
+            "Partner event",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-09"),
+            LocalTime.parse("13:00:00"),
+            "Original partner description",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-update-owned@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/events/{eventId}", location.getId(), serviceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Client attempt",
+                          "responsibility": "client",
+                          "date": "2026-04-10",
+                          "time": "14:30:00",
+                          "description": "Updated client description",
+                          "status": "current"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
+    void deleteLocationEventRemovesPersistedEvent() throws Exception {
+        createUser("partner-events-delete@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Scottsdale");
+        location.setUpdatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        locationRepository.saveAndFlush(location);
+        ServiceEvent serviceEvent = createServiceEvent(
+            location,
+            "Delete event",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-08"),
+            LocalTime.parse("12:15:00"),
+            "Delete me",
+            ServiceEventStatus.OVERDUE
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-delete@example.com", PASSWORD);
+
+        mockMvc.perform(
+                delete("/api/core/locations/{locationId}/events/{eventId}", location.getId(), serviceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isNoContent());
+
+        assertTrue(serviceEventRepository.findById(serviceEvent.getId()).isEmpty());
+        Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
+        assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
     }
 
     @Test

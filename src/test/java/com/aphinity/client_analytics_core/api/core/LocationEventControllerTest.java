@@ -1,0 +1,132 @@
+package com.aphinity.client_analytics_core.api.core;
+
+import com.aphinity.client_analytics_core.api.core.controllers.LocationEventController;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEventStatus;
+import com.aphinity.client_analytics_core.api.core.requests.LocationEventRequest;
+import com.aphinity.client_analytics_core.api.core.response.ServiceEventResponse;
+import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
+import com.aphinity.client_analytics_core.api.core.services.LocationEventService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class LocationEventControllerTest {
+    @Mock
+    private LocationEventService locationEventService;
+
+    @Mock
+    private AuthenticatedUserService authenticatedUserService;
+
+    @InjectMocks
+    private LocationEventController locationEventController;
+
+    @Test
+    void locationEventsDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("7")
+            .build();
+
+        List<ServiceEventResponse> expected = List.of(response(31L, "Pump inspection"));
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(7L);
+        when(locationEventService.getAccessibleLocationEvents(7L, 14L)).thenReturn(expected);
+
+        List<ServiceEventResponse> actual = locationEventController.locationEvents(jwt, 14L);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).getAccessibleLocationEvents(7L, 14L);
+    }
+
+    @Test
+    void createLocationEventDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationEventRequest request = request("Service visit");
+        ServiceEventResponse expected = response(19L, "Service visit");
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationEventService.createLocationEvent(42L, 8L, request)).thenReturn(expected);
+
+        ServiceEventResponse actual = locationEventController.createLocationEvent(jwt, 8L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).createLocationEvent(42L, 8L, request);
+    }
+
+    @Test
+    void updateLocationEventDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationEventRequest request = request("Updated visit");
+        ServiceEventResponse expected = response(19L, "Updated visit");
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationEventService.updateLocationEvent(42L, 8L, 19L, request)).thenReturn(expected);
+
+        ServiceEventResponse actual = locationEventController.updateLocationEvent(jwt, 8L, 19L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).updateLocationEvent(42L, 8L, 19L, request);
+    }
+
+    @Test
+    void deleteLocationEventDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationEventController.deleteLocationEvent(jwt, 8L, 19L);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).deleteLocationEvent(42L, 8L, 19L);
+    }
+
+    private LocationEventRequest request(String title) {
+        return new LocationEventRequest(
+            title,
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("09:30:00"),
+            "Inspect service line",
+            ServiceEventStatus.UPCOMING
+        );
+    }
+
+    private ServiceEventResponse response(Long id, String title) {
+        return new ServiceEventResponse(
+            id,
+            title,
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("09:30:00"),
+            "Inspect service line",
+            ServiceEventStatus.UPCOMING,
+            Instant.parse("2026-03-01T00:00:00Z"),
+            Instant.parse("2026-03-02T00:00:00Z")
+        );
+    }
+}

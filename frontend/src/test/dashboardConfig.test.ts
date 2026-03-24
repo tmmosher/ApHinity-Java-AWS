@@ -5,10 +5,14 @@ describe("dashboardConfig", () => {
   it("allows location paths for verified users with role access", () => {
     expect(isDashboardPathAllowed("admin", "/dashboard/locations", true)).toBe(true);
     expect(isDashboardPathAllowed("client", "/dashboard/locations/42", true)).toBe(true);
+    expect(isDashboardPathAllowed("client", "/dashboard/locations/42/service-schedule", true)).toBe(true);
+    expect(isDashboardPathAllowed("client", "/dashboard/locations/42/gantt-chart", true)).toBe(true);
+    expect(isDashboardPathAllowed("client", "/dashboard/locations/42/dashboard", true)).toBe(true);
   });
 
   it("blocks location-scoped paths for unverified users", () => {
     expect(isDashboardPathAllowed("admin", "/dashboard/locations", false)).toBe(false);
+    expect(isDashboardPathAllowed("admin", "/dashboard/locations/42/gantt-chart", false)).toBe(false);
     expect(isDashboardPathAllowed("partner", "/dashboard/invite-users", false)).toBe(false);
     expect(isDashboardPathAllowed("client", "/dashboard/invites", false)).toBe(false);
   });
