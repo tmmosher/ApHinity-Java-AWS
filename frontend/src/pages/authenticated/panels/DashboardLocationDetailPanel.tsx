@@ -1,11 +1,13 @@
 import {A, useLocation, useParams} from "@solidjs/router";
-import {For, Show, createMemo, createResource, type ParentProps} from "solid-js";
+import {For, Show, createEffect, createMemo, createResource, createSignal, type ParentProps} from "solid-js";
 import {useApiHost} from "../../../context/ApiHostContext";
-import type {LocationSummary} from "../../../types/Types";
-import {fetchLocationById} from "../../../util/graph/locationDetailApi";
+import type {LocationGraph, LocationSummary} from "../../../types/Types";
+import {fetchLocationById, fetchLocationGraphsById} from "../../../util/graph/locationDetailApi";
 import {LocationDetailProvider} from "./location/LocationDetailContext";
 import {
+  createLocationViewActive,
   dashboardLocationViews,
+  getNextLocationGraphRequestId,
   getFreshLocationScopedValue,
   getLocationViewFromPathname,
   getLocationViewHref,
@@ -13,10 +15,10 @@ import {
 } from "./location/locationView";
 
 const locationViewButtonClass = (active: boolean): string =>
-  "flex min-h-11 items-center justify-center px-3 py-2 text-center text-xs font-semibold tracking-tight transition-colors duration-150 sm:text-sm " +
+  "flex min-h-11 items-center justify-center px-3 py-2 text-center text-xs font-semibold tracking-tight transform-gpu transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:text-sm " +
   (active
     ? "bg-primary text-primary-content shadow-sm"
-    : "bg-transparent text-base-content/70 hover:bg-base-100/70");
+    : "bg-transparent text-base-content/70 hover:-translate-y-px hover:bg-base-100/70 hover:shadow-sm active:translate-y-px active:scale-[0.98]");
 
 export const DashboardLocationDetailPanel = (props: ParentProps) => {
   const host = useApiHost();
@@ -33,9 +35,37 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
       value: await fetchLocationById(host, locationId)
     })
   );
+  const [requestedGraphLocationId, setRequestedGraphLocationId] = createSignal<string | undefined>();
+  createEffect(() => {
+    const locationId = params.locationId;
+    const view = currentView();
+
+    setRequestedGraphLocationId((currentRequestedLocationId) =>
+      getNextLocationGraphRequestId(currentRequestedLocationId, locationId, view)
+    );
+  });
+  const [graphResource, {refetch: refetchGraphResource}] = createResource(
+    requestedGraphLocationId,
+    async (locationId): Promise<LocationScopedResource<LocationGraph[]>> => ({
+      locationId,
+      value: await fetchLocationGraphsById(host, locationId)
+    })
+  );
   const location = createMemo(() => getFreshLocationScopedValue(params.locationId, locationResource()));
+  const graphs = createMemo(() => getFreshLocationScopedValue(params.locationId, graphResource()));
+  const graphsError = createMemo(() =>
+    requestedGraphLocationId() === params.locationId && !graphResource.loading
+      ? graphResource.error
+      : undefined
+  );
   const refetchLocationDetail = async (): Promise<void> => {
     await refetchLocation();
+  };
+  const refetchLocationGraphs = async (): Promise<void> => {
+    if (requestedGraphLocationId() !== params.locationId) {
+      return;
+    }
+    await refetchGraphResource();
   };
 
   const retryLocation = () => {
@@ -66,10 +96,16 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
               when={location()}
               fallback={<p class="text-base-content/70">Loading location...</p>}
             >
-              <LocationDetailProvider location={location} refetchLocation={refetchLocationDetail}>
+              <LocationDetailProvider
+                location={location}
+                graphs={graphs}
+                graphsError={graphsError}
+                refetchLocation={refetchLocationDetail}
+                refetchGraphs={refetchLocationGraphs}
+              >
                 <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <div class="min-w-0 space-y-1">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                    <p class="text-xs font-semibold uppercase tracking-3wide text-base-content/60">
                       Location
                     </p>
                     <h1 class="text-3xl font-semibold tracking-tight">
@@ -78,24 +114,28 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
                   </div>
 
                   <nav
-                    class="w-fit max-w-full overflow-hidden rounded-2xl border border-base-300 bg-base-200/40 shadow-sm"
+                    class="w-fit max-w-full overflow-hidden rounded-2xl border border-base-300 bg-base-200/40 shadow-sm sm:ml-auto"
                     aria-label="Location view selector"
                   >
                     <div class="inline-grid grid-cols-3 divide-x divide-base-300">
                       <For each={dashboardLocationViews}>
                         {(view) => {
-                          const active = currentView() === view.view;
+                          const active = createLocationViewActive(currentView, view.view);
                           return (
                             <A
                               href={getLocationViewHref(params.locationId, view.view)}
                               preload
-                              class={locationViewButtonClass(active)}
+                              class={locationViewButtonClass(active())}
                               classList={{
-                                "cursor-default": active
+                                "cursor-default": active()
                               }}
-                              aria-current={active ? "page" : undefined}
+                              aria-current={active() ? "page" : undefined}
+                              aria-label={view.name}
+                              title={view.name}
+                              data-view={view.view}
                             >
-                              {view.label}
+                              <span aria-hidden="true">{view.label}</span>
+                              <span class="sr-only">{view.name}</span>
                             </A>
                           );
                         }}

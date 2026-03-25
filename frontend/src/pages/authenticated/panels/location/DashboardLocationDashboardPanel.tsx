@@ -18,28 +18,17 @@ import {
 } from "../../../../util/graph/graphEditor";
 import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {
-  fetchLocationGraphsById,
   renameLocationGraphById,
   saveLocationGraphsById
 } from "../../../../util/graph/locationDetailApi";
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "./LocationDetailContext";
-import {getFreshLocationScopedValue, type LocationScopedResource} from "./locationView";
 
 export const DashboardLocationDashboardPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
-  const {location, refetchLocation} = useLocationDetail();
-
-  const [graphResource, {refetch: refetchGraphs}] = createResource(
-    () => params.locationId,
-    async (locationId): Promise<LocationScopedResource<LocationGraph[]>> => ({
-      locationId,
-      value: await fetchLocationGraphsById(host, locationId)
-    })
-  );
-  const graphs = createMemo(() => getFreshLocationScopedValue(params.locationId, graphResource()));
+  const {location, graphs, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
   const [workingGraphs, setWorkingGraphs] = createSignal<LocationGraph[]>([]);
   const [graphBaselineIndex, setGraphBaselineIndex] = createSignal<Map<number, GraphBaselineEntry>>(new Map());
   const [locationUndoStack, setLocationUndoStack] = createSignal<LocationGraph[][]>([]);
@@ -355,7 +344,7 @@ export const DashboardLocationDashboardPanel = () => {
       </section>
 
       <Show
-        when={!graphResource.error}
+        when={!graphsError()}
         fallback={
           <div class="space-y-3">
             <p class="text-error">Unable to load location graphs.</p>

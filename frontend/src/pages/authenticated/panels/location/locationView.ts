@@ -1,3 +1,6 @@
+import {Accessor, JSX} from "solid-js";
+import {dashboard_icon, gantt_icon, service_icon} from "./LocationIcons";
+
 export type DashboardLocationView = "service-schedule" | "gantt-chart" | "dashboard";
 
 export type LocationScopedResource<T> = {
@@ -7,12 +10,28 @@ export type LocationScopedResource<T> = {
 
 export const dashboardLocationViews: Array<{
   view: DashboardLocationView;
-  label: string;
+  name: string;
+  label: JSX.Element;
 }> = [
-  {view: "service-schedule", label: "Service Schedule"},
-  {view: "gantt-chart", label: "Gantt Chart"},
-  {view: "dashboard", label: "Dashboard"}
+  {view: "service-schedule", name: "Service Schedule", label: service_icon},
+  {view: "gantt-chart", name: "Gantt Chart", label: gantt_icon},
+  {view: "dashboard", name: "Dashboard", label: dashboard_icon}
 ];
+
+export const createLocationViewActive = (
+  currentView: Accessor<DashboardLocationView>,
+  view: DashboardLocationView
+): Accessor<boolean> => () => currentView() === view;
+
+export const getNextLocationGraphRequestId = (
+  currentRequestedLocationId: string | undefined,
+  currentLocationId: string,
+  currentView: DashboardLocationView
+): string | undefined => (
+  currentView === "dashboard"
+    ? currentLocationId
+    : currentRequestedLocationId
+);
 
 export const normalizeLocationPathname = (pathname: string): string => pathname.replace(/\/+$/, "") || "/";
 
