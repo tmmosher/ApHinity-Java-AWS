@@ -11,12 +11,16 @@ import com.aphinity.client_analytics_core.api.core.entities.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.Location;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.LocationGraphId;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.security.JwtProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
@@ -43,6 +47,8 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.net.HttpCookie;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -83,6 +89,9 @@ abstract class AbstractApiIntegrationTest {
 
     @Autowired
     protected LocationUserRepository locationUserRepository;
+
+    @Autowired
+    protected ServiceEventRepository serviceEventRepository;
 
     @Autowired
     protected PasswordEncoder passwordEncoder;
@@ -160,6 +169,26 @@ abstract class AbstractApiIntegrationTest {
         locationGraph.setLocation(location);
         locationGraph.setGraph(graph);
         locationGraphRepository.save(locationGraph);
+    }
+
+    protected ServiceEvent createServiceEvent(
+        Location location,
+        String title,
+        ServiceEventResponsibility responsibility,
+        LocalDate date,
+        LocalTime time,
+        String description,
+        ServiceEventStatus status
+    ) {
+        ServiceEvent serviceEvent = new ServiceEvent();
+        serviceEvent.setLocation(location);
+        serviceEvent.setTitle(title);
+        serviceEvent.setResponsibility(responsibility);
+        serviceEvent.setEventDate(date);
+        serviceEvent.setEventTime(time);
+        serviceEvent.setDescription(description);
+        serviceEvent.setStatus(status);
+        return serviceEventRepository.save(serviceEvent);
     }
 
     private String asJsonString(Object value) {
@@ -273,6 +302,7 @@ abstract class AbstractApiIntegrationTest {
         jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
         List<String> tables = List.of(
             "location_invite",
+            "service_event",
             "location_graph",
             "location_user",
             "graph",

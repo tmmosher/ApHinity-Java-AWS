@@ -1,8 +1,8 @@
-import {type Component, lazy} from "solid-js";
+import {lazy} from "solid-js";
 import {render} from "solid-js/web";
 import {Route, Router} from "@solidjs/router";
 import App from "./App";
-import {DashboardRouteBoundary} from "./components/DashboardRouteBoundary";
+import {withDashboardRouteBoundary} from "./components/withDashboardRouteBoundary";
 import "./index.css";
 
 const root = document.getElementById("root");
@@ -72,6 +72,21 @@ const DashboardLocationDetailPanel = lazy(() =>
     default: module.DashboardLocationDetailPanel
   }))
 );
+const DashboardLocationDashboardPanel = lazy(() =>
+  import("./pages/authenticated/panels/location/DashboardLocationDashboardPanel").then((module) => ({
+    default: module.DashboardLocationDashboardPanel
+  }))
+);
+const DashboardLocationServiceSchedulePanel = lazy(() =>
+  import("./pages/authenticated/panels/location/DashboardLocationServiceSchedulePanel").then((module) => ({
+    default: module.DashboardLocationServiceSchedulePanel
+  }))
+);
+const DashboardLocationGanttChartPanel = lazy(() =>
+  import("./pages/authenticated/panels/location/DashboardLocationGanttChartPanel").then((module) => ({
+    default: module.DashboardLocationGanttChartPanel
+  }))
+);
 const DashboardInvitesPanel = lazy(() =>
   import("./pages/authenticated/panels/DashboardInvitesPanel").then((module) => ({
     default: module.DashboardInvitesPanel
@@ -93,25 +108,18 @@ const DashboardManagementPanel = lazy(() =>
   }))
 );
 
-const withDashboardRouteBoundary = (
-  Panel: Component,
-  title: string,
-  backHref = "/dashboard"
-): Component => {
-    return () => (
-      <DashboardRouteBoundary title={title} backHref={backHref}>
-          <Panel/>
-      </DashboardRouteBoundary>
-  );
-};
-
 const DashboardLocationsPanelRoute = withDashboardRouteBoundary(
   DashboardLocationsPanel,
   "Locations"
 );
 const DashboardLocationDetailPanelRoute = withDashboardRouteBoundary(
   DashboardLocationDetailPanel,
-  "Location",
+  "Location Dashboard",
+  "/dashboard/locations"
+);
+const DashboardLocationDashboardPanelRoute = withDashboardRouteBoundary(
+  DashboardLocationDashboardPanel,
+  "Location Dashboard",
   "/dashboard/locations"
 );
 const DashboardInvitesPanelRoute = withDashboardRouteBoundary(
@@ -154,7 +162,12 @@ if (root) {
           <Route path="/" component={Dashboard}>
             <Route path="/" component={DashboardHomePanel} />
             <Route path="/locations" component={DashboardLocationsPanelRoute} />
-            <Route path="/locations/:locationId" component={DashboardLocationDetailPanelRoute} />
+            <Route path="/locations/:locationId" component={DashboardLocationDetailPanelRoute}>
+              <Route path="/" component={DashboardLocationServiceSchedulePanel} />
+              <Route path="/service-schedule" component={DashboardLocationServiceSchedulePanel} />
+              <Route path="/gantt-chart" component={DashboardLocationGanttChartPanel} />
+              <Route path="/dashboard" component={DashboardLocationDashboardPanelRoute} />
+            </Route>
             <Route path="/invites" component={DashboardInvitesPanelRoute} />
             <Route path="/invite-users" component={DashboardInviteUsersPanelRoute} />
             <Route path="/permissions" component={DashboardPermissionsPanelRoute} />

@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -12,8 +13,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Table(name = "location")
@@ -34,6 +37,9 @@ public class Location {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "section_layout", columnDefinition = "jsonb")
     private Map<String, Object> sectionLayout;
+
+    @OneToMany(mappedBy = "location")
+    private Set<ServiceEvent> serviceEvents = new LinkedHashSet<>();
 
     @PrePersist
     void prePersist() {
@@ -95,6 +101,14 @@ public class Location {
 
     public void setSectionLayout(Map<String, Object> sectionLayout) {
         this.sectionLayout = sectionLayout;
+    }
+
+    public Set<ServiceEvent> getServiceEvents() {
+        return serviceEvents;
+    }
+
+    public void setServiceEvents(Set<ServiceEvent> serviceEvents) {
+        this.serviceEvents = serviceEvents;
     }
 
     private Map<String, Object> defaultSectionLayout() {
