@@ -21,6 +21,10 @@ public record LocationEventRequest(
     @NotNull(message = "Event time is required")
     LocalTime time,
 
+    LocalDate endDate,
+
+    LocalTime endTime,
+
     String description,
 
     @NotNull(message = "Event status is required")

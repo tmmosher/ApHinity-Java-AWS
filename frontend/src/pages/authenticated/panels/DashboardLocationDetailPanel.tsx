@@ -35,7 +35,9 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
       value: await fetchLocationById(host, locationId)
     })
   );
+
   const [requestedGraphLocationId, setRequestedGraphLocationId] = createSignal<string | undefined>();
+
   createEffect(() => {
     const locationId = params.locationId;
     const view = currentView();
@@ -44,6 +46,7 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
       getNextLocationGraphRequestId(currentRequestedLocationId, locationId, view)
     );
   });
+
   const [graphResource, {refetch: refetchGraphResource}] = createResource(
     requestedGraphLocationId,
     async (locationId): Promise<LocationScopedResource<LocationGraph[]>> => ({
@@ -51,6 +54,7 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
       value: await fetchLocationGraphsById(host, locationId)
     })
   );
+
   const location = createMemo(() => getFreshLocationScopedValue(params.locationId, locationResource()));
   const graphs = createMemo(() => getFreshLocationScopedValue(params.locationId, graphResource()));
   const graphsError = createMemo(() =>
@@ -58,9 +62,11 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
       ? graphResource.error
       : undefined
   );
+
   const refetchLocationDetail = async (): Promise<void> => {
     await refetchLocation();
   };
+
   const refetchLocationGraphs = async (): Promise<void> => {
     if (requestedGraphLocationId() !== params.locationId) {
       return;

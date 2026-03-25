@@ -180,12 +180,38 @@ abstract class AbstractApiIntegrationTest {
         String description,
         ServiceEventStatus status
     ) {
+        return createServiceEvent(
+            location,
+            title,
+            responsibility,
+            date,
+            time,
+            date,
+            time,
+            description,
+            status
+        );
+    }
+
+    protected ServiceEvent createServiceEvent(
+        Location location,
+        String title,
+        ServiceEventResponsibility responsibility,
+        LocalDate date,
+        LocalTime time,
+        LocalDate endDate,
+        LocalTime endTime,
+        String description,
+        ServiceEventStatus status
+    ) {
         ServiceEvent serviceEvent = new ServiceEvent();
         serviceEvent.setLocation(location);
         serviceEvent.setTitle(title);
         serviceEvent.setResponsibility(responsibility);
         serviceEvent.setEventDate(date);
         serviceEvent.setEventTime(time);
+        serviceEvent.setEndEventDate(endDate);
+        serviceEvent.setEndEventTime(endTime);
         serviceEvent.setDescription(description);
         serviceEvent.setStatus(status);
         return serviceEventRepository.save(serviceEvent);

@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -57,7 +58,7 @@ public class LocationEventService {
             throw forbidden();
         }
 
-        return serviceEventRepository.findByLocation_IdOrderByEventDateAscEventTimeAscIdAsc(locationId).stream()
+        return serviceEventRepository.findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(locationId).stream()
             .map(this::toResponse)
             .toList();
     }
@@ -153,10 +154,18 @@ public class LocationEventService {
     }
 
     private void applyRequest(ServiceEvent serviceEvent, LocationEventRequest request) {
+        LocalDate eventDate = normalizeDate(request == null ? null : request.date());
+        LocalTime eventTime = normalizeTime(request == null ? null : request.time());
+        LocalDate endEventDate = normalizeEndDate(eventDate, request == null ? null : request.endDate());
+        LocalTime endEventTime = normalizeEndTime(eventTime, request == null ? null : request.endTime());
+        validateEventRange(eventDate, eventTime, endEventDate, endEventTime);
+
         serviceEvent.setTitle(normalizeTitle(request == null ? null : request.title()));
         serviceEvent.setResponsibility(normalizeResponsibility(request == null ? null : request.responsibility()));
-        serviceEvent.setEventDate(normalizeDate(request == null ? null : request.date()));
-        serviceEvent.setEventTime(normalizeTime(request == null ? null : request.time()));
+        serviceEvent.setEventDate(eventDate);
+        serviceEvent.setEventTime(eventTime);
+        serviceEvent.setEndEventDate(endEventDate);
+        serviceEvent.setEndEventTime(endEventTime);
         serviceEvent.setDescription(normalizeDescription(request == null ? null : request.description()));
         serviceEvent.setStatus(normalizeStatus(request == null ? null : request.status()));
     }
@@ -168,6 +177,8 @@ public class LocationEventService {
             serviceEvent.getResponsibility(),
             serviceEvent.getEventDate(),
             serviceEvent.getEventTime(),
+            serviceEvent.getEndEventDate(),
+            serviceEvent.getEndEventTime(),
             serviceEvent.getDescription(),
             serviceEvent.getStatus(),
             serviceEvent.getCreatedAt(),
@@ -213,6 +224,33 @@ public class LocationEventService {
             throw invalidEventTime();
         }
         return time;
+    }
+
+    private LocalDate normalizeEndDate(LocalDate eventDate, LocalDate endDate) {
+        if (endDate == null) {
+            return eventDate;
+        }
+        return endDate;
+    }
+
+    private LocalTime normalizeEndTime(LocalTime eventTime, LocalTime endTime) {
+        if (endTime == null) {
+            return eventTime;
+        }
+        return endTime;
+    }
+
+    private void validateEventRange(
+        LocalDate eventDate,
+        LocalTime eventTime,
+        LocalDate endEventDate,
+        LocalTime endEventTime
+    ) {
+        LocalDateTime startDateTime = LocalDateTime.of(eventDate, eventTime);
+        LocalDateTime endDateTime = LocalDateTime.of(endEventDate, endEventTime);
+        if (endDateTime.isBefore(startDateTime)) {
+            throw invalidEventRange();
+        }
     }
 
     private ServiceEventStatus normalizeStatus(ServiceEventStatus status) {
@@ -313,5 +351,12 @@ public class LocationEventService {
 
     private ResponseStatusException invalidEventStatus() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event status is required");
+    }
+
+    private ResponseStatusException invalidEventRange() {
+        return new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "Event end must be on or after the start date and time"
+        );
     }
 }

@@ -23,6 +23,18 @@ export const createLocationViewActive = (
   view: DashboardLocationView
 ): Accessor<boolean> => () => currentView() === view;
 
+export const createDashboardLocationResetGuard = (initialLocationId: string) => {
+  let previousLocationId = initialLocationId;
+
+  return (nextLocationId: string): boolean => {
+    if (nextLocationId === previousLocationId) {
+      return false;
+    }
+    previousLocationId = nextLocationId;
+    return true;
+  };
+};
+
 export const getNextLocationGraphRequestId = (
   currentRequestedLocationId: string | undefined,
   currentLocationId: string,

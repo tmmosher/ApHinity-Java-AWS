@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ServiceEventRepository extends JpaRepository<ServiceEvent, Long> {
-    List<ServiceEvent> findByLocation_IdOrderByEventDateAscEventTimeAscIdAsc(Long locationId);
+    List<ServiceEvent> findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(Long locationId);
 
     Optional<ServiceEvent> findByIdAndLocation_Id(Long eventId, Long locationId);
 }

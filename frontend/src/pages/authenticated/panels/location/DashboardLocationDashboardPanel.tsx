@@ -23,6 +23,7 @@ import {
 } from "../../../../util/graph/locationDetailApi";
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "./LocationDetailContext";
+import {createDashboardLocationResetGuard} from "./locationView";
 
 export const DashboardLocationDashboardPanel = () => {
   const host = useApiHost();
@@ -35,6 +36,7 @@ export const DashboardLocationDashboardPanel = () => {
   const [editingGraphId, setEditingGraphId] = createSignal<number | null>(null);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
+  const shouldResetDashboardState = createDashboardLocationResetGuard(params.locationId);
 
   const canEditGraphs = createMemo(() =>
     canEditLocationGraphs(profileContext.profile()?.role)
@@ -52,7 +54,9 @@ export const DashboardLocationDashboardPanel = () => {
   });
 
   createEffect(() => {
-    params.locationId;
+    if (!shouldResetDashboardState(params.locationId)) {
+      return;
+    }
     setEditingGraphId(null);
     setIsSavingGraphChanges(false);
     setWorkingGraphs([]);

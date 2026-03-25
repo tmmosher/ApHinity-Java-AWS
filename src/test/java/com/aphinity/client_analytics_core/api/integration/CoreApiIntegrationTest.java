@@ -102,6 +102,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             ServiceEventResponsibility.PARTNER,
             LocalDate.parse("2026-04-03"),
             LocalTime.parse("09:30:00"),
+            LocalDate.parse("2026-04-04"),
+            LocalTime.parse("11:15:00"),
             "Inspect the primary water meter",
             ServiceEventStatus.UPCOMING
         );
@@ -118,6 +120,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$[0].responsibility").value("partner"))
             .andExpect(jsonPath("$[0].date").value("2026-04-03"))
             .andExpect(jsonPath("$[0].time").value("09:30:00"))
+            .andExpect(jsonPath("$[0].endDate").value("2026-04-04"))
+            .andExpect(jsonPath("$[0].endTime").value("11:15:00"))
             .andExpect(jsonPath("$[0].status").value("upcoming"));
     }
 
@@ -179,6 +183,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "partner",
                           "date": "2026-04-10",
                           "time": "08:45:00",
+                          "endDate": "2026-04-12",
+                          "endTime": "17:15:00",
                           "description": "  Check the north pump station  ",
                           "status": "upcoming"
                         }
@@ -189,6 +195,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.responsibility").value("partner"))
             .andExpect(jsonPath("$.date").value("2026-04-10"))
             .andExpect(jsonPath("$.time").value("08:45:00"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-12"))
+            .andExpect(jsonPath("$.endTime").value("17:15:00"))
             .andExpect(jsonPath("$.description").value("Check the north pump station"))
             .andExpect(jsonPath("$.status").value("upcoming"))
             .andReturn();
@@ -196,10 +204,42 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         ServiceEvent persisted = serviceEventRepository.findAll().getFirst();
         assertEquals("Pump station visit", persisted.getTitle());
         assertEquals("Check the north pump station", persisted.getDescription());
+        assertEquals(LocalDate.parse("2026-04-12"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("17:15:00"), persisted.getEndEventTime());
 
         Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
         assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
         assertThat(result.getResponse().getContentAsString()).contains("Pump station visit");
+    }
+
+    @Test
+    void createLocationEventRejectsEndBeforeStart() throws Exception {
+        createUser("partner-events-invalid-range@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Glendale");
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-invalid-range@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Invalid event range",
+                          "responsibility": "partner",
+                          "date": "2026-04-10",
+                          "time": "08:45:00",
+                          "endDate": "2026-04-09",
+                          "endTime": "17:15:00",
+                          "description": "Should fail validation",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("event_range_invalid"))
+            .andExpect(jsonPath("$.message").value("Event end must be on or after the start date and time"));
     }
 
     @Test
@@ -221,6 +261,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-12",
                           "time": "10:15:00",
+                          "endDate": "2026-04-12",
+                          "endTime": "12:00:00",
                           "description": "Client-owned schedule item",
                           "status": "upcoming"
                         }
@@ -229,11 +271,15 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.title").value("Client can create this"))
             .andExpect(jsonPath("$.responsibility").value("client"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-12"))
+            .andExpect(jsonPath("$.endTime").value("12:00:00"))
             .andExpect(jsonPath("$.description").value("Client-owned schedule item"));
 
         ServiceEvent persisted = serviceEventRepository.findAll().getFirst();
         assertEquals("Client can create this", persisted.getTitle());
         assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
+        assertEquals(LocalDate.parse("2026-04-12"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("12:00:00"), persisted.getEndEventTime());
     }
 
     @Test
@@ -255,6 +301,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "partner",
                           "date": "2026-04-12",
                           "time": "10:15:00",
+                          "endDate": "2026-04-12",
+                          "endTime": "12:00:00",
                           "description": "Attempted unauthorized mutation",
                           "status": "upcoming"
                         }
@@ -293,6 +341,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-06",
                           "time": "11:00:00",
+                          "endDate": "2026-04-08",
+                          "endTime": "16:30:00",
                           "description": "Updated description",
                           "status": "current"
                         }
@@ -303,6 +353,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.responsibility").value("client"))
             .andExpect(jsonPath("$.date").value("2026-04-06"))
             .andExpect(jsonPath("$.time").value("11:00:00"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-08"))
+            .andExpect(jsonPath("$.endTime").value("16:30:00"))
             .andExpect(jsonPath("$.description").value("Updated description"))
             .andExpect(jsonPath("$.status").value("current"));
 
@@ -310,6 +362,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals("Updated event", persisted.getTitle());
         assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
         assertEquals(ServiceEventStatus.CURRENT, persisted.getStatus());
+        assertEquals(LocalDate.parse("2026-04-08"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("16:30:00"), persisted.getEndEventTime());
 
         Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
         assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
@@ -343,6 +397,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-10",
                           "time": "14:30:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "15:45:00",
                           "description": "Updated client description",
                           "status": "current"
                         }
@@ -353,6 +409,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.responsibility").value("client"))
             .andExpect(jsonPath("$.date").value("2026-04-10"))
             .andExpect(jsonPath("$.time").value("14:30:00"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-10"))
+            .andExpect(jsonPath("$.endTime").value("15:45:00"))
             .andExpect(jsonPath("$.description").value("Updated client description"))
             .andExpect(jsonPath("$.status").value("current"));
 
@@ -360,6 +418,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals("Client event updated", persisted.getTitle());
         assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
         assertEquals(ServiceEventStatus.CURRENT, persisted.getStatus());
+        assertEquals(LocalDate.parse("2026-04-10"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("15:45:00"), persisted.getEndEventTime());
     }
 
     @Test
@@ -390,6 +450,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "partner",
                           "date": "2026-04-10",
                           "time": "14:30:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "15:45:00",
                           "description": "Updated client description",
                           "status": "current"
                         }
@@ -427,6 +489,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-10",
                           "time": "14:30:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "15:45:00",
                           "description": "Updated client description",
                           "status": "current"
                         }

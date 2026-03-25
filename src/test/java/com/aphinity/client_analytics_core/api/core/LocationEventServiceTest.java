@@ -66,13 +66,13 @@ class LocationEventServiceTest {
         when(locationRepository.existsById(99L)).thenReturn(true);
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
-        when(serviceEventRepository.findByLocation_IdOrderByEventDateAscEventTimeAscIdAsc(99L))
+        when(serviceEventRepository.findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(99L))
             .thenReturn(List.of(first, second));
 
         List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(5L, 99L);
 
         assertEquals(List.of("A visit", "B visit"), response.stream().map(ServiceEventResponse::title).toList());
-        verify(serviceEventRepository).findByLocation_IdOrderByEventDateAscEventTimeAscIdAsc(99L);
+        verify(serviceEventRepository).findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(99L);
     }
 
     @Test
@@ -119,6 +119,8 @@ class LocationEventServiceTest {
         assertEquals(55L, response.id());
         assertEquals("Client visit", response.title());
         assertEquals(ServiceEventResponsibility.CLIENT, response.responsibility());
+        assertEquals(LocalDate.parse("2026-04-01"), response.endDate());
+        assertEquals(LocalTime.parse("11:00:00"), response.endTime());
         verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
     }
 
@@ -171,8 +173,68 @@ class LocationEventServiceTest {
         assertEquals(44L, response.id());
         assertEquals("Service visit", response.title());
         assertEquals("Inspect line pressure", response.description());
+        assertEquals(LocalDate.parse("2026-04-01"), response.endDate());
+        assertEquals(LocalTime.parse("11:00:00"), response.endTime());
         verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void createLocationEventDefaultsMissingEndDateAndTimeToStartRange() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+        when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
+            ServiceEvent event = invocation.getArgument(0);
+            event.setId(45L);
+            event.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            event.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return event;
+        });
+
+        ServiceEventResponse response = locationEventService.createLocationEvent(
+            5L,
+            99L,
+            request("Single-point visit", "Inspect line pressure", ServiceEventResponsibility.PARTNER, null, null)
+        );
+
+        assertEquals(LocalDate.parse("2026-04-01"), response.date());
+        assertEquals(LocalTime.parse("09:30:00"), response.time());
+        assertEquals(LocalDate.parse("2026-04-01"), response.endDate());
+        assertEquals(LocalTime.parse("09:30:00"), response.endTime());
+    }
+
+    @Test
+    void createLocationEventRejectsEndBeforeStart() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationEventService.createLocationEvent(
+                5L,
+                99L,
+                request(
+                    "Backwards event",
+                    "Inspect line pressure",
+                    ServiceEventResponsibility.PARTNER,
+                    LocalDate.parse("2026-03-31"),
+                    LocalTime.parse("08:30:00")
+                )
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Event end must be on or after the start date and time", ex.getReason());
+        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
     }
 
     @Test
@@ -226,11 +288,19 @@ class LocationEventServiceTest {
             5L,
             99L,
             44L,
-            request("Updated client event", "Updated description", ServiceEventResponsibility.CLIENT)
+            request(
+                "Updated client event",
+                "Updated description",
+                ServiceEventResponsibility.CLIENT,
+                LocalDate.parse("2026-04-02"),
+                LocalTime.parse("12:00:00")
+            )
         );
 
         assertEquals("Updated client event", response.title());
         assertEquals(ServiceEventResponsibility.CLIENT, response.responsibility());
+        assertEquals(LocalDate.parse("2026-04-02"), response.endDate());
+        assertEquals(LocalTime.parse("12:00:00"), response.endTime());
         verify(serviceEventRepository).saveAndFlush(serviceEvent);
     }
 
@@ -309,11 +379,29 @@ class LocationEventServiceTest {
         String description,
         ServiceEventResponsibility responsibility
     ) {
+        return request(
+            title,
+            description,
+            responsibility,
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("11:00:00")
+        );
+    }
+
+    private LocationEventRequest request(
+        String title,
+        String description,
+        ServiceEventResponsibility responsibility,
+        LocalDate endDate,
+        LocalTime endTime
+    ) {
         return new LocationEventRequest(
             title,
             responsibility,
             LocalDate.parse("2026-04-01"),
             LocalTime.parse("09:30:00"),
+            endDate,
+            endTime,
             description,
             ServiceEventStatus.UPCOMING
         );
@@ -326,6 +414,8 @@ class LocationEventServiceTest {
         serviceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
         serviceEvent.setEventDate(LocalDate.parse("2026-04-01"));
         serviceEvent.setEventTime(LocalTime.parse("09:30:00"));
+        serviceEvent.setEndEventDate(LocalDate.parse("2026-04-01"));
+        serviceEvent.setEndEventTime(LocalTime.parse("11:00:00"));
         serviceEvent.setDescription("Inspect line");
         serviceEvent.setStatus(ServiceEventStatus.UPCOMING);
         serviceEvent.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));

@@ -41,6 +41,12 @@ public class ServiceEvent {
     @Column(name = "event_time", nullable = false)
     private LocalTime eventTime;
 
+    @Column(name = "end_event_date", nullable = false)
+    private LocalDate endEventDate;
+
+    @Column(name = "end_event_time", nullable = false)
+    private LocalTime endEventTime;
+
     @Column(name = "description")
     private String description;
 
@@ -78,6 +84,12 @@ public class ServiceEvent {
     private void normalizeTextFields() {
         if (title != null) {
             title = title.strip();
+        }
+        if (endEventDate == null) {
+            endEventDate = eventDate;
+        }
+        if (endEventTime == null) {
+            endEventTime = eventTime;
         }
         if (description != null) {
             description = description.strip();
@@ -133,6 +145,22 @@ public class ServiceEvent {
 
     public void setEventTime(LocalTime eventTime) {
         this.eventTime = eventTime;
+    }
+
+    public LocalDate getEndEventDate() {
+        return endEventDate;
+    }
+
+    public void setEndEventDate(LocalDate endEventDate) {
+        this.endEventDate = endEventDate;
+    }
+
+    public LocalTime getEndEventTime() {
+        return endEventTime;
+    }
+
+    public void setEndEventTime(LocalTime endEventTime) {
+        this.endEventTime = endEventTime;
     }
 
     public String getDescription() {

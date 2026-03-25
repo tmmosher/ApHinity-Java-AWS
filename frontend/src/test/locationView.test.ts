@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
 import type {DashboardLocationView} from "../pages/authenticated/panels/location/locationView";
 import {
+  createDashboardLocationResetGuard,
   createLocationViewActive,
   dashboardLocationViews,
   getFreshLocationScopedValue,
@@ -35,6 +36,16 @@ describe("locationView helpers", () => {
 
     expect(serviceScheduleActive()).toBe(false);
     expect(dashboardActive()).toBe(true);
+  });
+
+  it("only resets dashboard graph state when the mounted dashboard sees a different location id", () => {
+    const shouldResetDashboardState = createDashboardLocationResetGuard("42");
+
+    expect(shouldResetDashboardState("42")).toBe(false);
+    expect(shouldResetDashboardState("42")).toBe(false);
+    expect(shouldResetDashboardState("7")).toBe(true);
+    expect(shouldResetDashboardState("7")).toBe(false);
+    expect(shouldResetDashboardState("9")).toBe(true);
   });
 
   it("normalizes trailing slashes while preserving the root path", () => {

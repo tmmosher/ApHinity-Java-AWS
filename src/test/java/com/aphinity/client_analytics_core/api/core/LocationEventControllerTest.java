@@ -111,6 +111,8 @@ class LocationEventControllerTest {
             ServiceEventResponsibility.PARTNER,
             LocalDate.parse("2026-04-01"),
             LocalTime.parse("09:30:00"),
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("11:00:00"),
             "Inspect service line",
             ServiceEventStatus.UPCOMING
         );
@@ -123,6 +125,8 @@ class LocationEventControllerTest {
             ServiceEventResponsibility.PARTNER,
             LocalDate.parse("2026-04-01"),
             LocalTime.parse("09:30:00"),
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("11:00:00"),
             "Inspect service line",
             ServiceEventStatus.UPCOMING,
             Instant.parse("2026-03-01T00:00:00Z"),

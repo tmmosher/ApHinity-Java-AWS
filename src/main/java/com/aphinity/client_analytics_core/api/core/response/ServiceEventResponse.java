@@ -13,6 +13,8 @@ public record ServiceEventResponse(
     ServiceEventResponsibility responsibility,
     LocalDate date,
     LocalTime time,
+    LocalDate endDate,
+    LocalTime endTime,
     String description,
     ServiceEventStatus status,
     Instant createdAt,
