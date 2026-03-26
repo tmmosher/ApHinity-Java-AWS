@@ -6,6 +6,7 @@ import {useProfile} from "../../../../context/ProfileContext";
 import {createLocationEventById} from "../../../../util/location/locationEventApi";
 import type {CreateLocationServiceEventRequest} from "../../../../types/Types";
 import ServiceEventCreateModal from "./ServiceEventCreateModal";
+import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 
 export const DashboardLocationServiceSchedulePanel = () => {
   const host = useApiHost();
@@ -19,14 +20,14 @@ export const DashboardLocationServiceSchedulePanel = () => {
   };
 
   return (
-    <div class="space-y-4">
+    <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="space-y-2">
             <h2 class="text-xl font-semibold tracking-tight">Service Schedule</h2>
             <p class="text-sm text-base-content/70">
-              This page is currently under development. Calendar rendering is next, but you can
-              already create service events from here.
+              The calendar shell is in place. Event bars, detail popovers, and live server data are
+              still under development.
             </p>
           </div>
 
@@ -38,6 +39,10 @@ export const DashboardLocationServiceSchedulePanel = () => {
             New Service Event
           </button>
         </div>
+      </section>
+
+      <section class="flex min-h-[44rem] flex-1 flex-col rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">
+        <ServiceScheduleCalendar />
       </section>
 
       <ServiceEventCreateModal
