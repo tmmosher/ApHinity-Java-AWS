@@ -1,11 +1,11 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.AdminUserManagementController;
-import com.aphinity.client_analytics_core.api.core.requests.AdminUserRoleUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.response.AccountRole;
-import com.aphinity.client_analytics_core.api.core.response.AdminManagedUserPageResponse;
-import com.aphinity.client_analytics_core.api.core.response.AdminManagedUserResponse;
-import com.aphinity.client_analytics_core.api.core.services.AdminUserManagementService;
+import com.aphinity.client_analytics_core.api.core.controllers.dashboard.AdminUserManagementController;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.AdminUserRoleUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AdminManagedUserPageResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AdminManagedUserResponse;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.AdminUserManagementService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

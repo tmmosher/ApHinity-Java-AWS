@@ -23,11 +23,11 @@ vi.mock("../pages/authenticated/panels/location/ServiceEventCreateModal", () => 
   default: () => null
 }));
 
-import {DashboardLocationServiceSchedulePanel} from "../pages/authenticated/panels/location/DashboardLocationServiceSchedulePanel";
+import {DashboardLocationServiceCalendarPanel} from "../pages/authenticated/panels/location/DashboardLocationServiceCalendarPanel";
 
 describe("DashboardLocationServiceSchedulePanel", () => {
   it("renders the event button above the service calendar", () => {
-    const html = renderToString(DashboardLocationServiceSchedulePanel);
+    const html = renderToString(DashboardLocationServiceCalendarPanel);
 
     expect(html).toContain("Service Schedule");
     expect(html).toContain("New Service Event");

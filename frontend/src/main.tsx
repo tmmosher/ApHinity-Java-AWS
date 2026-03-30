@@ -78,8 +78,8 @@ const DashboardLocationDashboardPanel = lazy(() =>
   }))
 );
 const DashboardLocationServiceSchedulePanel = lazy(() =>
-  import("./pages/authenticated/panels/location/DashboardLocationServiceSchedulePanel").then((module) => ({
-    default: module.DashboardLocationServiceSchedulePanel
+  import("./pages/authenticated/panels/location/DashboardLocationServiceCalendarPanel").then((module) => ({
+    default: module.DashboardLocationServiceCalendarPanel
   }))
 );
 const DashboardLocationGanttChartPanel = lazy(() =>

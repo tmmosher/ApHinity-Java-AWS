@@ -3,7 +3,7 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
-import com.aphinity.client_analytics_core.api.core.response.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.UserDeletionService;
 import org.junit.jupiter.api.BeforeEach;

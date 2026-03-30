@@ -1,15 +1,15 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphNameUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
-import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
-import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
-import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateBatchRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.location.LocationRequest;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
+import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

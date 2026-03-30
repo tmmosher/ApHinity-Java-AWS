@@ -1,12 +1,12 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.LocationEventController;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEventResponsibility;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEventStatus;
-import com.aphinity.client_analytics_core.api.core.requests.LocationEventRequest;
-import com.aphinity.client_analytics_core.api.core.response.ServiceEventResponse;
+import com.aphinity.client_analytics_core.api.core.controllers.servicecalendar.LocationEventController;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
+import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
+import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.LocationEventService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

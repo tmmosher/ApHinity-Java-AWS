@@ -1,7 +1,7 @@
 import {Accessor, JSX} from "solid-js";
 import {dashboard_icon, gantt_icon, service_icon} from "./LocationIcons";
 
-export type DashboardLocationView = "service-schedule" | "gantt-chart" | "dashboard";
+export type DashboardLocationView = "service-calendar" | "gantt-chart" | "dashboard";
 
 export type LocationScopedResource<T> = {
   locationId: string;
@@ -13,7 +13,7 @@ export const dashboardLocationViews: Array<{
   name: string;
   label: JSX.Element;
 }> = [
-  {view: "service-schedule", name: "Service Schedule", label: service_icon},
+  {view: "service-calendar", name: "Service Calendar", label: service_icon},
   {view: "gantt-chart", name: "Gantt Chart", label: gantt_icon},
   {view: "dashboard", name: "Dashboard", label: dashboard_icon}
 ];
@@ -52,7 +52,7 @@ export const getLocationViewFromPathname = (pathname: string, locationId: string
   const basePath = `/dashboard/locations/${locationId}`;
 
   if (normalizedPathname === basePath || normalizedPathname === `${basePath}/service-schedule`) {
-    return "service-schedule";
+    return "service-calendar";
   }
   if (normalizedPathname === `${basePath}/gantt-chart`) {
     return "gantt-chart";
@@ -60,11 +60,11 @@ export const getLocationViewFromPathname = (pathname: string, locationId: string
   if (normalizedPathname === `${basePath}/dashboard`) {
     return "dashboard";
   }
-  return "service-schedule";
+  return "service-calendar";
 };
 
 export const getLocationViewHref = (locationId: string, view: DashboardLocationView): string => {
-  if (view === "service-schedule") {
+  if (view === "service-calendar") {
     return `/dashboard/locations/${locationId}`;
   }
   return `/dashboard/locations/${locationId}/${view}`;

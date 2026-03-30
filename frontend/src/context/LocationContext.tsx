@@ -40,7 +40,7 @@ export const useLocations = () => {
     const ctx = useContext(LocationContext);
     if (!ctx) {
         throw new Error(
-            "Unable to load locations. Please login again."
+            "Unable to load locations. Please try again."
         )
     }
     return ctx;

@@ -2,7 +2,7 @@ package com.aphinity.client_analytics_core.api.core.services;
 
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.Role;
-import com.aphinity.client_analytics_core.api.core.response.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
