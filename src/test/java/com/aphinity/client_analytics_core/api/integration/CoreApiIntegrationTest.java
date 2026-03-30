@@ -98,6 +98,17 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         addMembership(location, user);
         createServiceEvent(
             location,
+            "Archived inspection",
+            ServiceEventResponsibility.CLIENT,
+            LocalDate.parse("2025-12-15"),
+            LocalTime.parse("10:00:00"),
+            LocalDate.parse("2025-12-15"),
+            LocalTime.parse("11:00:00"),
+            "Outside the requested three-month window",
+            ServiceEventStatus.COMPLETED
+        );
+        createServiceEvent(
+            location,
             "Water meter inspection",
             ServiceEventResponsibility.PARTNER,
             LocalDate.parse("2026-04-03"),
@@ -112,10 +123,12 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         mockMvc.perform(
                 get("/api/core/locations/{locationId}/events", location.getId())
+                    .param("month", "2026-04")
                     .cookie(authCookies(authCookies))
                     .accept(APPLICATION_JSON)
             )
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].title").value("Water meter inspection"))
             .andExpect(jsonPath("$[0].responsibility").value("partner"))
             .andExpect(jsonPath("$[0].date").value("2026-04-03"))

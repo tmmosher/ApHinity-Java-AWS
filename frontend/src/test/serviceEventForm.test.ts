@@ -2,9 +2,9 @@ import {describe, expect, it} from "vitest";
 import {
   canChooseServiceEventResponsibility,
   createDefaultServiceEventDraft,
-  createLocationServiceEventRequestFromDraft,
-  formatDateInputValue
+  createLocationServiceEventRequestFromDraft
 } from "../util/location/serviceEventForm";
+import {formatDateInputValue} from "../util/location/dateUtility";
 
 describe("serviceEventForm helpers", () => {
   it("formats date values for date inputs using local year-month-day", () => {

@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,13 +67,21 @@ class LocationEventServiceTest {
         when(locationRepository.existsById(99L)).thenReturn(true);
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
-        when(serviceEventRepository.findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(99L))
+        when(serviceEventRepository.findVisibleByLocationIdAndDateWindow(
+            99L,
+            LocalDate.parse("2026-03-01"),
+            LocalDate.parse("2026-05-31")
+        ))
             .thenReturn(List.of(first, second));
 
-        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(5L, 99L);
+        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(5L, 99L, YearMonth.of(2026, 4));
 
         assertEquals(List.of("A visit", "B visit"), response.stream().map(ServiceEventResponse::title).toList());
-        verify(serviceEventRepository).findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(99L);
+        verify(serviceEventRepository).findVisibleByLocationIdAndDateWindow(
+            99L,
+            LocalDate.parse("2026-03-01"),
+            LocalDate.parse("2026-05-31")
+        );
     }
 
     @Test
@@ -84,12 +93,38 @@ class LocationEventServiceTest {
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.getAccessibleLocationEvents(5L, 99L)
+            locationEventService.getAccessibleLocationEvents(5L, 99L, YearMonth.of(2026, 4))
         );
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("Insufficient permissions", ex.getReason());
         verifyNoInteractions(serviceEventRepository);
+    }
+
+    @Test
+    void getAccessibleLocationEventsUsesRollingThreeMonthWindowForViewedMonth() {
+        AppUser user = verifiedUser(5L);
+        ServiceEvent spanningEvent = serviceEvent(77L, "Cross-month event");
+        spanningEvent.setEventDate(LocalDate.parse("2026-02-28"));
+        spanningEvent.setEndEventDate(LocalDate.parse("2026-03-02"));
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(serviceEventRepository.findVisibleByLocationIdAndDateWindow(
+            99L,
+            LocalDate.parse("2026-02-01"),
+            LocalDate.parse("2026-04-30")
+        )).thenReturn(List.of(spanningEvent));
+
+        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(5L, 99L, YearMonth.of(2026, 3));
+
+        assertEquals(List.of("Cross-month event"), response.stream().map(ServiceEventResponse::title).toList());
+        verify(serviceEventRepository).findVisibleByLocationIdAndDateWindow(
+            99L,
+            LocalDate.parse("2026-02-01"),
+            LocalDate.parse("2026-04-30")
+        );
     }
 
     @Test

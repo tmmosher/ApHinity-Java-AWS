@@ -16,7 +16,8 @@ vi.mock("../context/ProfileContext", () => ({
 }));
 
 vi.mock("../util/location/locationEventApi", () => ({
-  createLocationEventById: vi.fn()
+  createLocationEventById: vi.fn(),
+  fetchLocationEventsById: vi.fn(async () => [])
 }));
 
 vi.mock("../pages/authenticated/panels/location/ServiceEventCreateModal", () => ({
@@ -29,7 +30,7 @@ describe("DashboardLocationServiceSchedulePanel", () => {
   it("renders the event button above the service calendar", () => {
     const html = renderToString(DashboardLocationServiceCalendarPanel);
 
-    expect(html).toContain("Service Schedule");
+    expect(html).toContain("Service Calendar");
     expect(html).toContain("New Service Event");
     expect(html).toContain("data-corvu-calendar-table");
     expect(html.indexOf("New Service Event")).toBeLessThan(html.indexOf("data-corvu-calendar-table"));

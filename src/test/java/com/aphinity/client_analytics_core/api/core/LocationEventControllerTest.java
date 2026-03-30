@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -43,13 +44,13 @@ class LocationEventControllerTest {
 
         List<ServiceEventResponse> expected = List.of(response(31L, "Pump inspection"));
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(7L);
-        when(locationEventService.getAccessibleLocationEvents(7L, 14L)).thenReturn(expected);
+        when(locationEventService.getAccessibleLocationEvents(7L, 14L, YearMonth.of(2026, 4))).thenReturn(expected);
 
-        List<ServiceEventResponse> actual = locationEventController.locationEvents(jwt, 14L);
+        List<ServiceEventResponse> actual = locationEventController.locationEvents(jwt, 14L, "2026-04");
 
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
-        verify(locationEventService).getAccessibleLocationEvents(7L, 14L);
+        verify(locationEventService).getAccessibleLocationEvents(7L, 14L, YearMonth.of(2026, 4));
     }
 
     @Test

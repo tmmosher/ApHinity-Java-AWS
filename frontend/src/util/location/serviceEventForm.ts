@@ -3,6 +3,12 @@ import type {
   CreateLocationServiceEventRequest,
   ServiceEventResponsibility
 } from "../../types/Types";
+import {
+  compareDates,
+  formatDateInputValue,
+  parseDateTimeValue,
+  parseDateValue
+} from "./dateUtility";
 
 export type ServiceEventScheduleMode = "timed" | "all-day";
 
@@ -23,12 +29,6 @@ const DEFAULT_START_TIME = "09:00";
 const DEFAULT_END_TIME = "10:00";
 const ALL_DAY_START_TIME = "00:00";
 const ALL_DAY_END_TIME = "23:59:59";
-
-const padNumber = (value: number): string => value.toString().padStart(2, "0");
-
-export const formatDateInputValue = (date: Date): string => (
-  `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`
-);
 
 export const canChooseServiceEventResponsibility = (role: AccountRole | undefined): boolean =>
   role === "admin" || role === "partner";
@@ -59,22 +59,6 @@ export const createDefaultServiceEventDraft = (
   };
 };
 
-const parseTimedDate = (date: string, time: string): number => {
-  const parsed = Date.parse(`${date}T${time}:00`);
-  if (Number.isNaN(parsed)) {
-    throw new Error("Enter a valid start and end date/time.");
-  }
-  return parsed;
-};
-
-const parseDateOnly = (date: string): number => {
-  const parsed = Date.parse(`${date}T00:00:00`);
-  if (Number.isNaN(parsed)) {
-    throw new Error("Enter a valid start and end date.");
-  }
-  return parsed;
-};
-
 export const createLocationServiceEventRequestFromDraft = (
   draft: ServiceEventDraft,
   role: AccountRole | undefined
@@ -88,7 +72,12 @@ export const createLocationServiceEventRequestFromDraft = (
     if (!draft.startDate || !draft.startTime || !draft.endDate || !draft.endTime) {
       throw new Error("Start and end date/time are required.");
     }
-    if (parseTimedDate(draft.endDate, draft.endTime) < parseTimedDate(draft.startDate, draft.startTime)) {
+    if (
+      compareDates(
+        parseDateTimeValue(draft.endDate, draft.endTime, "Enter a valid start and end date/time."),
+        parseDateTimeValue(draft.startDate, draft.startTime, "Enter a valid start and end date/time.")
+      ) < 0
+    ) {
       throw new Error("End date and time must be after the start date and time.");
     }
 
@@ -107,7 +96,12 @@ export const createLocationServiceEventRequestFromDraft = (
   if (!draft.allDayStartDate || !draft.allDayEndDate) {
     throw new Error("Start and end dates are required for all-day events.");
   }
-  if (parseDateOnly(draft.allDayEndDate) < parseDateOnly(draft.allDayStartDate)) {
+  if (
+    compareDates(
+      parseDateValue(draft.allDayEndDate, "Enter a valid start and end date."),
+      parseDateValue(draft.allDayStartDate, "Enter a valid start and end date.")
+    ) < 0
+  ) {
     throw new Error("End date must be on or after the start date.");
   }
 

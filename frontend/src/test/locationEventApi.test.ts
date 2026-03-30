@@ -1,6 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
-import {createLocationEventById} from "../util/location/locationEventApi";
+import {createLocationEventById, fetchLocationEventsById} from "../util/location/locationEventApi";
+import {formatLocationEventMonth} from "../util/location/dateUtility";
 
 vi.mock("../util/common/apiFetch", () => ({
   apiFetch: vi.fn()
@@ -19,6 +20,55 @@ describe("locationEventApi", () => {
 
   beforeEach(() => {
     apiFetchMock.mockReset();
+  });
+
+  it("formats calendar months for the event query", () => {
+    expect(formatLocationEventMonth(new Date("2026-04-18T14:00:00"))).toBe("2026-04");
+  });
+
+  it("loads service events for a requested calendar month", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, [
+      {
+        id: 8,
+        title: "Client kickoff",
+        responsibility: "client",
+        date: "2026-03-28",
+        time: "09:00",
+        endDate: "2026-03-28",
+        endTime: "11:30",
+        description: "Initial kickoff meeting",
+        status: "upcoming",
+        createdAt: "2026-03-25T00:00:00Z",
+        updatedAt: "2026-03-25T00:00:00Z"
+      }
+    ]));
+
+    const events = await fetchLocationEventsById(host, "42", "2026-04");
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/42/events?month=2026-04", {
+      method: "GET"
+    });
+    expect(events).toEqual([
+      {
+        id: 8,
+        title: "Client kickoff",
+        responsibility: "client",
+        date: "2026-03-28",
+        time: "09:00",
+        endDate: "2026-03-28",
+        endTime: "11:30",
+        description: "Initial kickoff meeting",
+        status: "upcoming",
+        createdAt: "2026-03-25T00:00:00Z",
+        updatedAt: "2026-03-25T00:00:00Z"
+      }
+    ]);
+  });
+
+  it("rejects invalid service event months before dispatch", async () => {
+    await expect(fetchLocationEventsById(host, "42", "2026/04")).rejects.toThrowError("Invalid service event month");
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
   });
 
   it("posts a service-event create request and parses the response", async () => {

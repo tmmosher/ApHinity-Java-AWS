@@ -17,10 +17,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @RestController
@@ -42,10 +45,11 @@ public class LocationEventController {
     @GetMapping("/locations/{locationId}/events")
     public List<ServiceEventResponse> locationEvents(
         @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long locationId
+        @PathVariable Long locationId,
+        @RequestParam(required = false) String month
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
-        return locationEventService.getAccessibleLocationEvents(userId, locationId);
+        return locationEventService.getAccessibleLocationEvents(userId, locationId, resolveViewedMonth(month));
     }
 
     @PostMapping("/locations/{locationId}/events")
@@ -172,6 +176,17 @@ public class LocationEventController {
                 ex
             );
             throw ex;
+        }
+    }
+
+    private YearMonth resolveViewedMonth(String month) {
+        if (month == null || month.isBlank()) {
+            return YearMonth.now();
+        }
+        try {
+            return YearMonth.parse(month.strip());
+        } catch (DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Month must use yyyy-MM format");
         }
     }
 }

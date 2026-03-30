@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 
 @Service
@@ -50,7 +51,7 @@ public class LocationEventService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceEventResponse> getAccessibleLocationEvents(Long userId, Long locationId) {
+    public List<ServiceEventResponse> getAccessibleLocationEvents(Long userId, Long locationId, YearMonth viewedMonth) {
         AppUser user = requireUser(userId);
         if (!locationRepository.existsById(locationId)) {
             throw locationNotFound();
@@ -59,7 +60,11 @@ public class LocationEventService {
             throw forbidden();
         }
 
-        return serviceEventRepository.findByLocation_IdOrderByEventDateAscEventTimeAscEndEventDateAscEndEventTimeAscIdAsc(locationId).stream()
+        YearMonth normalizedViewedMonth = requireViewedMonth(viewedMonth);
+        LocalDate windowStart = normalizedViewedMonth.minusMonths(1).atDay(1);
+        LocalDate windowEnd = normalizedViewedMonth.plusMonths(1).atEndOfMonth();
+
+        return serviceEventRepository.findVisibleByLocationIdAndDateWindow(locationId, windowStart, windowEnd).stream()
             .map(this::toResponse)
             .toList();
     }
@@ -261,6 +266,13 @@ public class LocationEventService {
         return status;
     }
 
+    private YearMonth requireViewedMonth(YearMonth viewedMonth) {
+        if (viewedMonth == null) {
+            throw invalidViewedMonth();
+        }
+        return viewedMonth;
+    }
+
     private AppUser requireUser(Long userId) {
         AppUser user = appUserRepository.findById(userId).orElseThrow(this::invalidAuthenticatedUser);
         requireVerified(user);
@@ -352,6 +364,10 @@ public class LocationEventService {
 
     private ResponseStatusException invalidEventStatus() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event status is required");
+    }
+
+    private ResponseStatusException invalidViewedMonth() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Viewed month is required");
     }
 
     private ResponseStatusException invalidEventRange() {

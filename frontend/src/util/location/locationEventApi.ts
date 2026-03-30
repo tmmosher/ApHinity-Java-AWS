@@ -1,4 +1,5 @@
 import {apiFetch} from "../common/apiFetch";
+import {normalizeYearMonth} from "./dateUtility";
 import type {
   CreateLocationServiceEventRequest,
   LocationServiceEvent,
@@ -78,6 +79,22 @@ const parseLocationServiceEvent = (value: unknown): LocationServiceEvent => {
   };
 };
 
+const parseLocationServiceEventList = (value: unknown): LocationServiceEvent[] => {
+  if (!Array.isArray(value)) {
+    throw new Error("Invalid service event response");
+  }
+  return value.map(parseLocationServiceEvent);
+};
+
+const throwLocationEventLoadError = async (response: Response): Promise<never> => {
+  const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
+
+  if (errorPayload?.message) {
+    throw new Error(errorPayload.message);
+  }
+  throw new Error("Unable to load service events");
+};
+
 const throwLocationEventMutationError = async (response: Response): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
   console.warn("createLocationEvent failed", {
@@ -114,6 +131,28 @@ const throwLocationEventMutationError = async (response: Response): Promise<neve
     throw new Error("Insufficient permissions");
   }
   throw new Error("Unable to create service event");
+};
+
+export const fetchLocationEventsById = async (
+  host: string,
+  locationId: string,
+  month: string
+): Promise<LocationServiceEvent[]> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const normalizedMonth = normalizeYearMonth(month);
+
+  const response = await apiFetch(
+    host + "/api/core/locations/" + parsedLocationId + "/events?month=" + encodeURIComponent(normalizedMonth),
+    {
+      method: "GET"
+    }
+  );
+
+  if (!response.ok) {
+    await throwLocationEventLoadError(response);
+  }
+
+  return parseLocationServiceEventList(await response.json());
 };
 
 export const createLocationEventById = async (
