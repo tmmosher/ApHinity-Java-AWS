@@ -1,8 +1,10 @@
 import {describe, expect, it} from "vitest";
 import {
+  canEditLocationServiceEvent,
   canChooseServiceEventResponsibility,
   createDefaultServiceEventDraft,
-  createLocationServiceEventRequestFromDraft
+  createLocationServiceEventRequestFromDraft,
+  createServiceEventDraftFromEvent
 } from "../util/location/serviceEventForm";
 import {formatDateInputValue} from "../util/location/dateUtility";
 
@@ -19,6 +21,7 @@ describe("serviceEventForm helpers", () => {
     expect(draft.endDate).toBe("2026-03-25");
     expect(draft.startTime).toBe("09:00");
     expect(draft.endTime).toBe("10:00");
+    expect(draft.status).toBe("upcoming");
   });
 
   it("allows partners and admins to choose responsibility", () => {
@@ -26,6 +29,43 @@ describe("serviceEventForm helpers", () => {
     expect(canChooseServiceEventResponsibility("admin")).toBe(true);
     expect(canChooseServiceEventResponsibility("client")).toBe(false);
     expect(canChooseServiceEventResponsibility(undefined)).toBe(false);
+  });
+
+  it("matches the backend edit permission rules for service events", () => {
+    expect(canEditLocationServiceEvent("partner", "partner")).toBe(true);
+    expect(canEditLocationServiceEvent("admin", "partner")).toBe(true);
+    expect(canEditLocationServiceEvent("client", "client")).toBe(true);
+    expect(canEditLocationServiceEvent("client", "partner")).toBe(false);
+  });
+
+  it("creates an editable draft from an existing service event", () => {
+    const draft = createServiceEventDraftFromEvent({
+      id: 12,
+      title: "Partner inspection",
+      responsibility: "partner",
+      date: "2026-04-07",
+      time: "13:00:00",
+      endDate: "2026-04-08",
+      endTime: "15:30:00",
+      description: "Review site conditions",
+      status: "current",
+      createdAt: "2026-04-01T00:00:00Z",
+      updatedAt: "2026-04-02T00:00:00Z"
+    });
+
+    expect(draft).toEqual({
+      title: "Partner inspection",
+      description: "Review site conditions",
+      responsibility: "partner",
+      scheduleMode: "timed",
+      startDate: "2026-04-07",
+      startTime: "13:00",
+      endDate: "2026-04-08",
+      endTime: "15:30",
+      allDayStartDate: "2026-04-07",
+      allDayEndDate: "2026-04-08",
+      status: "current"
+    });
   });
 
   it("builds a timed create request from the start date and time", () => {
@@ -39,7 +79,8 @@ describe("serviceEventForm helpers", () => {
       endDate: "2026-03-27",
       endTime: "11:00",
       allDayStartDate: "2026-03-28",
-      allDayEndDate: "2026-03-29"
+      allDayEndDate: "2026-03-29",
+      status: "upcoming"
     }, "partner");
 
     expect(request).toEqual({
@@ -65,7 +106,8 @@ describe("serviceEventForm helpers", () => {
       endDate: "2026-03-27",
       endTime: "11:00",
       allDayStartDate: "2026-04-01",
-      allDayEndDate: "2026-04-02"
+      allDayEndDate: "2026-04-02",
+      status: "upcoming"
     }, "client");
 
     expect(request).toEqual({
@@ -91,7 +133,8 @@ describe("serviceEventForm helpers", () => {
       endDate: "2026-03-27",
       endTime: "11:00",
       allDayStartDate: "2026-04-01",
-      allDayEndDate: "2026-04-02"
+      allDayEndDate: "2026-04-02",
+      status: "upcoming"
     }, "client")).toThrowError("Event title is required.");
   });
 
@@ -106,7 +149,8 @@ describe("serviceEventForm helpers", () => {
       endDate: "2026-03-27",
       endTime: "10:00",
       allDayStartDate: "2026-04-01",
-      allDayEndDate: "2026-04-02"
+      allDayEndDate: "2026-04-02",
+      status: "upcoming"
     }, "client")).toThrowError("End date and time must be after the start date and time.");
   });
 
@@ -121,7 +165,8 @@ describe("serviceEventForm helpers", () => {
       endDate: "2026-03-27",
       endTime: "10:00",
       allDayStartDate: "2026-04-03",
-      allDayEndDate: "2026-04-02"
+      allDayEndDate: "2026-04-02",
+      status: "upcoming"
     }, "client")).toThrowError("End date must be on or after the start date.");
   });
 });

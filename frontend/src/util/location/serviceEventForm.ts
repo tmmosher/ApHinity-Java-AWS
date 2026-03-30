@@ -1,11 +1,15 @@
 import type {
   AccountRole,
   CreateLocationServiceEventRequest,
-  ServiceEventResponsibility
+  LocationServiceEvent,
+  ServiceEventResponsibility,
+  ServiceEventStatus
 } from "../../types/Types";
 import {
   compareDates,
   formatDateInputValue,
+  formatTimeInputValue,
+  isAllDayTimeRange,
   parseDateTimeValue,
   parseDateValue
 } from "./dateUtility";
@@ -23,6 +27,7 @@ export type ServiceEventDraft = {
   endTime: string;
   allDayStartDate: string;
   allDayEndDate: string;
+  status: ServiceEventStatus;
 };
 
 const DEFAULT_START_TIME = "09:00";
@@ -32,6 +37,13 @@ const ALL_DAY_END_TIME = "23:59:59";
 
 export const canChooseServiceEventResponsibility = (role: AccountRole | undefined): boolean =>
   role === "admin" || role === "partner";
+
+export const canEditLocationServiceEvent = (
+  role: AccountRole | undefined,
+  responsibility: ServiceEventResponsibility
+): boolean => (
+  role === "admin" || role === "partner" || responsibility === "client"
+);
 
 export const normalizeServiceEventResponsibilityForRole = (
   role: AccountRole | undefined,
@@ -55,9 +67,24 @@ export const createDefaultServiceEventDraft = (
     endDate: today,
     endTime: DEFAULT_END_TIME,
     allDayStartDate: today,
-    allDayEndDate: today
+    allDayEndDate: today,
+    status: "upcoming"
   };
 };
+
+export const createServiceEventDraftFromEvent = (event: LocationServiceEvent): ServiceEventDraft => ({
+  title: event.title,
+  description: event.description ?? "",
+  responsibility: event.responsibility,
+  scheduleMode: isAllDayTimeRange(event.time, event.endTime) ? "all-day" : "timed",
+  startDate: event.date,
+  startTime: formatTimeInputValue(event.time),
+  endDate: event.endDate,
+  endTime: formatTimeInputValue(event.endTime),
+  allDayStartDate: event.date,
+  allDayEndDate: event.endDate,
+  status: event.status
+});
 
 export const createLocationServiceEventRequestFromDraft = (
   draft: ServiceEventDraft,
@@ -89,7 +116,7 @@ export const createLocationServiceEventRequestFromDraft = (
       endDate: draft.endDate,
       endTime: draft.endTime,
       description: draft.description.trim() ? draft.description.trim() : null,
-      status: "upcoming"
+      status: draft.status
     };
   }
 
@@ -113,6 +140,6 @@ export const createLocationServiceEventRequestFromDraft = (
     endDate: draft.allDayEndDate,
     endTime: ALL_DAY_END_TIME,
     description: draft.description.trim() ? draft.description.trim() : null,
-    status: "upcoming"
+    status: draft.status
   };
 };

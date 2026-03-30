@@ -17,10 +17,15 @@ vi.mock("../context/ProfileContext", () => ({
 
 vi.mock("../util/location/locationEventApi", () => ({
   createLocationEventById: vi.fn(),
-  fetchLocationEventsById: vi.fn(async () => [])
+  fetchLocationEventsById: vi.fn(async () => []),
+  updateLocationEventById: vi.fn()
 }));
 
 vi.mock("../pages/authenticated/panels/location/ServiceEventCreateModal", () => ({
+  default: () => null
+}));
+
+vi.mock("../pages/authenticated/panels/location/ServiceEventEditModal", () => ({
   default: () => null
 }));
 

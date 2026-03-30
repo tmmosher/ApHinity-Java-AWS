@@ -3,10 +3,16 @@ import {createMemo, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
-import {createLocationEventById, fetchLocationEventsById} from "../../../../util/location/locationEventApi";
+import {
+  createLocationEventById,
+  fetchLocationEventsById,
+  updateLocationEventById
+} from "../../../../util/location/locationEventApi";
 import {formatLocationEventMonth, normalizeMonthStart} from "../../../../util/location/dateUtility";
 import type {CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
+import {canEditLocationServiceEvent} from "../../../../util/location/serviceEventForm";
 import ServiceEventCreateModal from "./ServiceEventCreateModal";
+import ServiceEventEditModal from "./ServiceEventEditModal";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 
 type ServiceEventCalendarResource = {
@@ -20,7 +26,10 @@ export const DashboardLocationServiceCalendarPanel = () => {
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
   const [isCreateModalOpen, setIsCreateModalOpen] = createSignal(false);
+  const [editingEvent, setEditingEvent] = createSignal<LocationServiceEvent>();
+  const [isEditModalOpen, setIsEditModalOpen] = createSignal(false);
   const [calendarMonth, setCalendarMonth] = createSignal(normalizeMonthStart(new Date()));
+  const role = createMemo(() => profileContext.profile()?.role);
 
   const viewedMonth = createMemo(() => formatLocationEventMonth(calendarMonth()));
   const serviceEventRequest = createMemo(() => ({
@@ -64,6 +73,22 @@ export const DashboardLocationServiceCalendarPanel = () => {
     toast.success("Service event created.");
   };
 
+  const saveEditedServiceEvent = async (request: CreateLocationServiceEventRequest): Promise<void> => {
+    const event = editingEvent();
+    if (!event) {
+      throw new Error("No service event selected for editing.");
+    }
+
+    await updateLocationEventById(host, params.locationId, event.id, request);
+    await refetchServiceEvents();
+    toast.success("Service event updated.");
+  };
+
+  const beginEditingServiceEvent = (event: LocationServiceEvent) => {
+    setEditingEvent(event);
+    setIsEditModalOpen(true);
+  };
+
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
@@ -102,14 +127,27 @@ export const DashboardLocationServiceCalendarPanel = () => {
           isLoading={serviceEventResource.loading && serviceEvents() === undefined}
           error={serviceEventErrorMessage()}
           onRetry={() => void refetchServiceEvents()}
+          canEditEvent={(event) => canEditLocationServiceEvent(role(), event.responsibility)}
+          onEditEvent={beginEditingServiceEvent}
         />
       </section>
 
       <ServiceEventCreateModal
         isOpen={isCreateModalOpen()}
-        role={profileContext.profile()?.role}
+        role={role()}
         onSave={saveServiceEvent}
         onClose={() => setIsCreateModalOpen(false)}
+      />
+
+      <ServiceEventEditModal
+        isOpen={isEditModalOpen()}
+        role={role()}
+        event={editingEvent()}
+        onSave={saveEditedServiceEvent}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingEvent(undefined);
+        }}
       />
     </div>
   );

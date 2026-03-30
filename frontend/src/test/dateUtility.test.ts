@@ -2,8 +2,11 @@ import {describe, expect, it} from "vitest";
 import {
   compareDates,
   formatDateInputValue,
+  formatDisplayTime,
   formatLocationEventMonth,
+  formatTimeInputValue,
   isSameCalendarMonth,
+  isAllDayTimeRange,
   listDateRangeInclusive,
   normalizeMonthStart,
   normalizeYearMonth,
@@ -16,6 +19,13 @@ describe("dateUtility", () => {
 
     expect(formatDateInputValue(date)).toBe("2026-03-25");
     expect(formatLocationEventMonth(date)).toBe("2026-03");
+  });
+
+  it("formats and normalizes time values for form and display use", () => {
+    expect(formatTimeInputValue("13:45:00")).toBe("13:45");
+    expect(formatDisplayTime("13:45:00")).toContain("1:45");
+    expect(isAllDayTimeRange("00:00:00", "23:59:59")).toBe(true);
+    expect(isAllDayTimeRange("09:00:00", "10:00:00")).toBe(false);
   });
 
   it("normalizes viewed months to the first day of the month", () => {

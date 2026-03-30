@@ -4,7 +4,20 @@ const { corporate, forest } = require("daisyui/src/theming/themes");
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
-    extend: {}
+    extend: {
+      extend: {
+        keyframes: {
+          "gradient-border": {
+            "0%": { "background-position": "0% 50%" },
+            "50%": { "background-position": "100% 50%" },
+            "100%": { "background-position": "0% 50%" },
+          },
+        },
+        animation: {
+          "gradient-border": "gradient-border 6s ease infinite",
+        },
+      },
+    }
   },
   plugins: [require("daisyui")],
   daisyui: {

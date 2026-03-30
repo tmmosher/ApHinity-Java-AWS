@@ -18,13 +18,17 @@ type ApiErrorPayload = {
   path?: string;
 };
 
-const parseRouteLocationId = (locationId: string): number => {
-  const parsedId = Number(locationId);
+const parsePositiveRouteId = (value: string | number, label: string): number => {
+  const parsedId = Number(value);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    throw new Error("Invalid location id");
+    throw new Error(`Invalid ${label}`);
   }
   return parsedId;
 };
+
+const parseRouteLocationId = (locationId: string): number => parsePositiveRouteId(locationId, "location id");
+
+const parseRouteEventId = (eventId: number): number => parsePositiveRouteId(eventId, "event id");
 
 const parseApiErrorPayload = (value: unknown): ApiErrorPayload | null => {
   if (!isRecord(value)) {
@@ -95,9 +99,12 @@ const throwLocationEventLoadError = async (response: Response): Promise<never> =
   throw new Error("Unable to load service events");
 };
 
-const throwLocationEventMutationError = async (response: Response): Promise<never> => {
+const throwLocationEventMutationError = async (
+  response: Response,
+  action: "create" | "update"
+): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
-  console.warn("createLocationEvent failed", {
+  console.warn(`${action}LocationEvent failed`, {
     status: response.status,
     code: errorPayload?.code ?? null,
     message: errorPayload?.message ?? null,
@@ -130,7 +137,7 @@ const throwLocationEventMutationError = async (response: Response): Promise<neve
   if (response.status === 403) {
     throw new Error("Insufficient permissions");
   }
-  throw new Error("Unable to create service event");
+  throw new Error(action === "create" ? "Unable to create service event" : "Unable to update service event");
 };
 
 export const fetchLocationEventsById = async (
@@ -171,7 +178,31 @@ export const createLocationEventById = async (
   });
 
   if (!response.ok) {
-    await throwLocationEventMutationError(response);
+    await throwLocationEventMutationError(response, "create");
+  }
+
+  return parseLocationServiceEvent(await response.json());
+};
+
+export const updateLocationEventById = async (
+  host: string,
+  locationId: string,
+  eventId: number,
+  request: CreateLocationServiceEventRequest
+): Promise<LocationServiceEvent> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedEventId = parseRouteEventId(eventId);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/events/" + parsedEventId, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    await throwLocationEventMutationError(response, "update");
   }
 
   return parseLocationServiceEvent(await response.json());

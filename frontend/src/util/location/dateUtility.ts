@@ -8,6 +8,11 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long"
 });
 
+const timeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit"
+});
+
 const weekdayLongFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "long"
 });
@@ -30,6 +35,16 @@ export const formatDate = (date: Date): string => {
 };
 
 export const formatCurrentDate = (): string => formatDate(new Date());
+
+export const formatDisplayDate = (value: string): string => formatDate(parseDateValue(value, "Invalid date value"));
+
+export const formatDisplayTime = (value: string): string => {
+  const parsed = new Date(`1970-01-01T${normalizeTimeValue(value)}`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Invalid time value");
+  }
+  return timeFormatter.format(parsed);
+};
 
 export const compareDates = (left: Date, right: Date): number => {
   if (!left || !right) {
@@ -63,6 +78,14 @@ export const isSameCalendarMonth = (left: Date, right: Date): boolean => (
 );
 
 export const parseDateInputValue = (value: string): Date => new Date(`${value}T00:00:00`);
+
+export const formatTimeInputValue = (value: string): string => normalizeTimeValue(value).slice(0, 5);
+
+export const isAllDayTimeRange = (startTime: string, endTime: string): boolean => {
+  const normalizedStart = normalizeTimeValue(startTime);
+  const normalizedEnd = normalizeTimeValue(endTime);
+  return normalizedStart === "00:00:00" && normalizedEnd.startsWith("23:59");
+};
 
 export const addDays = (date: Date, days: number): Date => {
   const next = new Date(date);
