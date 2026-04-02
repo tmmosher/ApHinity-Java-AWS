@@ -1,14 +1,22 @@
 import type {LocationServiceEvent} from "../../types/Types";
-import {compareDates, formatDateInputValue, parseDateInputValue} from "./dateUtility";
+import {
+  compareDates,
+  formatDateInputValue,
+  parseDateInputValue,
+  parseDateTimeValue
+} from "./dateUtility";
 
-export type ServiceCalendarDayPiece = {
+export type ServiceCalendarVisibleSegment = {
   event: LocationServiceEvent;
-  isStart: boolean;
-  isEnd: boolean;
+  lane: number;
+  startDayIndex: number;
+  endDayIndex: number;
+  startsWithinWeek: boolean;
+  endsWithinWeek: boolean;
 };
 
 export type ServiceCalendarWeekLayout = {
-  visiblePiecesByDay: ReadonlyArray<ReadonlyArray<ServiceCalendarDayPiece | undefined>>;
+  visibleSegments: ReadonlyArray<ServiceCalendarVisibleSegment>;
   hiddenEventsByDay: ReadonlyArray<ReadonlyArray<LocationServiceEvent>>;
 };
 
@@ -16,15 +24,13 @@ type ParsedServiceEvent = {
   event: LocationServiceEvent;
   startDay: Date;
   endDay: Date;
+  startDateTime: Date;
+  endDateTime: Date;
 };
 
-type WeekEventSegment = {
-  event: LocationServiceEvent;
-  startDayIndex: number;
-  endDayIndex: number;
-  startsWithinWeek: boolean;
-  endsWithinWeek: boolean;
-  lane: number;
+type SortableWeekSegment = Omit<ServiceCalendarVisibleSegment, "lane"> & {
+  startDateTime: Date;
+  endDateTime: Date;
 };
 
 const normalizeCalendarDate = (date: Date): Date => (
@@ -37,6 +43,14 @@ const createWeekDayIndexMap = (week: readonly Date[]): Map<string, number> => (
   )
 );
 
+const parseServiceEvent = (event: LocationServiceEvent): ParsedServiceEvent => ({
+  event,
+  startDay: parseDateInputValue(event.date),
+  endDay: parseDateInputValue(event.endDate),
+  startDateTime: parseDateTimeValue(event.date, event.time, "Invalid service event start"),
+  endDateTime: parseDateTimeValue(event.endDate, event.endTime, "Invalid service event end")
+});
+
 const selectLaterDate = (left: Date, right: Date): Date => (
   compareDates(left, right) >= 0 ? left : right
 );
@@ -45,15 +59,17 @@ const selectEarlierDate = (left: Date, right: Date): Date => (
   compareDates(left, right) <= 0 ? left : right
 );
 
-const parseServiceEvent = (event: LocationServiceEvent): ParsedServiceEvent => ({
-  event,
-  startDay: parseDateInputValue(event.date),
-  endDay: parseDateInputValue(event.endDate)
-});
-
-const compareSegmentPriority = (left: WeekEventSegment, right: WeekEventSegment): number => {
+const compareVisibleSegmentPriority = (
+  left: SortableWeekSegment,
+  right: SortableWeekSegment
+): number => {
   if (left.startDayIndex !== right.startDayIndex) {
     return left.startDayIndex - right.startDayIndex;
+  }
+
+  const startDateTimeComparison = compareDates(left.startDateTime, right.startDateTime);
+  if (startDateTimeComparison !== 0) {
+    return startDateTimeComparison;
   }
 
   const leftSpan = left.endDayIndex - left.startDayIndex;
@@ -62,15 +78,20 @@ const compareSegmentPriority = (left: WeekEventSegment, right: WeekEventSegment)
     return rightSpan - leftSpan;
   }
 
+  const endDateTimeComparison = compareDates(left.endDateTime, right.endDateTime);
+  if (endDateTimeComparison !== 0) {
+    return endDateTimeComparison;
+  }
+
   return left.event.id - right.event.id;
 };
 
-const createWeekEventSegment = (
+const createWeekSegment = (
   parsedEvent: ParsedServiceEvent,
   weekStart: Date,
   weekEnd: Date,
   weekDayIndexMap: ReadonlyMap<string, number>
-): WeekEventSegment | undefined => {
+): SortableWeekSegment | undefined => {
   if (
     compareDates(parsedEvent.startDay, weekEnd) > 0 ||
     compareDates(parsedEvent.endDay, weekStart) < 0
@@ -93,15 +114,18 @@ const createWeekEventSegment = (
     endDayIndex,
     startsWithinWeek: compareDates(parsedEvent.startDay, weekStart) >= 0,
     endsWithinWeek: compareDates(parsedEvent.endDay, weekEnd) <= 0,
-    lane: -1
+    startDateTime: parsedEvent.startDateTime,
+    endDateTime: parsedEvent.endDateTime
   };
 };
 
-const assignSegmentLanes = (segments: readonly WeekEventSegment[]): WeekEventSegment[] => {
+const assignSegmentLanes = (
+  segments: readonly SortableWeekSegment[]
+): ServiceCalendarVisibleSegment[] => {
   const occupiedUntilByLane: number[] = [];
 
   return [...segments]
-    .sort(compareSegmentPriority)
+    .sort(compareVisibleSegmentPriority)
     .map((segment) => {
       let lane = 0;
       while (occupiedUntilByLane[lane] !== undefined && occupiedUntilByLane[lane] >= segment.startDayIndex) {
@@ -109,8 +133,9 @@ const assignSegmentLanes = (segments: readonly WeekEventSegment[]): WeekEventSeg
       }
 
       occupiedUntilByLane[lane] = segment.endDayIndex;
+      const {startDateTime: _startDateTime, endDateTime: _endDateTime, ...visibleSegment} = segment;
       return {
-        ...segment,
+        ...visibleSegment,
         lane
       };
     });
@@ -127,14 +152,11 @@ const createWeekLayout = (
 
   const segments = assignSegmentLanes(
     parsedEvents
-      .map((parsedEvent) => createWeekEventSegment(parsedEvent, weekStart, weekEnd, weekDayIndexMap))
-      .filter((segment): segment is WeekEventSegment => segment !== undefined)
+      .map((parsedEvent) => createWeekSegment(parsedEvent, weekStart, weekEnd, weekDayIndexMap))
+      .filter((segment): segment is SortableWeekSegment => segment !== undefined)
   );
 
-  const visiblePiecesByDay = Array.from(
-    {length: week.length},
-    () => Array<ServiceCalendarDayPiece | undefined>(visibleLaneCount).fill(undefined)
-  );
+  const visibleSegments: ServiceCalendarVisibleSegment[] = [];
   const hiddenEventsByDay = Array.from(
     {length: week.length},
     () => [] as LocationServiceEvent[]
@@ -142,13 +164,7 @@ const createWeekLayout = (
 
   for (const segment of segments) {
     if (segment.lane < visibleLaneCount) {
-      for (let dayIndex = segment.startDayIndex; dayIndex <= segment.endDayIndex; dayIndex += 1) {
-        visiblePiecesByDay[dayIndex][segment.lane] = {
-          event: segment.event,
-          isStart: segment.startsWithinWeek && dayIndex === segment.startDayIndex,
-          isEnd: segment.endsWithinWeek && dayIndex === segment.endDayIndex
-        };
-      }
+      visibleSegments.push(segment);
       continue;
     }
 
@@ -158,7 +174,7 @@ const createWeekLayout = (
   }
 
   return {
-    visiblePiecesByDay,
+    visibleSegments,
     hiddenEventsByDay
   };
 };

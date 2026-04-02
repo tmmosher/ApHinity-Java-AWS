@@ -77,6 +77,10 @@ public class ApiExceptionHandler {
         Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
         Map.entry("Graph update conflict", new ErrorDefinition("graph_update_conflict", "Graph update conflict")),
         Map.entry("Event title is required", new ErrorDefinition("event_title_required", "Event title is required")),
+        Map.entry(
+            "Event title must be 42 characters or fewer",
+            new ErrorDefinition("event_title_invalid_length", "Event title must be 42 characters or fewer")
+        ),
         Map.entry("Event responsibility is required", new ErrorDefinition("event_responsibility_required", "Event responsibility is required")),
         Map.entry("Event date is required", new ErrorDefinition("event_date_required", "Event date is required")),
         Map.entry("Event time is required", new ErrorDefinition("event_time_required", "Event time is required")),

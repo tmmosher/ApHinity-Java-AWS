@@ -256,6 +256,37 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void createLocationEventRejectsTitleLongerThanFortyTwoCharacters() throws Exception {
+        createUser("partner-events-invalid-title@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Chandler");
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-invalid-title@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "1234567890123456789012345678901234567890123",
+                          "responsibility": "partner",
+                          "date": "2026-04-10",
+                          "time": "08:45:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "17:15:00",
+                          "description": "Should fail title validation",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("validation_failed"))
+            .andExpect(jsonPath("$.message").value("Validation failed"))
+            .andExpect(jsonPath("$.fieldErrors.title").value("invalid_length"));
+    }
+
+    @Test
     void createLocationEventAllowsClientWhenResponsibilityIsClient() throws Exception {
         AppUser client = createUser("client-events-write@example.com", PASSWORD, true, "client");
         Location location = createLocation("Tempe");

@@ -292,6 +292,29 @@ class LocationEventServiceTest {
     }
 
     @Test
+    void createLocationEventRejectsTitleLongerThanFortyTwoCharacters() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationEventService.createLocationEvent(
+                5L,
+                99L,
+                request("1234567890123456789012345678901234567890123", null, ServiceEventResponsibility.PARTNER)
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Event title must be 42 characters or fewer", ex.getReason());
+        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
+    }
+
+    @Test
     void updateLocationEventRejectsMissingEvent() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));

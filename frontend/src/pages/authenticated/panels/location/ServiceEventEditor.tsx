@@ -1,24 +1,13 @@
-import Dialog from "corvu/dialog";
-import {Match, Show, Switch, createEffect, createMemo, createSignal, on} from "solid-js";
+import {For, Match, Show, Switch, createMemo, createSignal} from "solid-js";
 import type {AccountRole, CreateLocationServiceEventRequest} from "../../../../types/Types";
 import {
   canChooseServiceEventResponsibility,
   createLocationServiceEventRequestFromDraft,
+  SERVICE_EVENT_TITLE_MAX_LENGTH,
   type ServiceEventDraft
 } from "../../../../util/location/serviceEventForm";
 
-type ServiceEventModalProps = {
-  isOpen: boolean;
-  heading: string;
-  description: string;
-  role: AccountRole | undefined;
-  saveLabel: string;
-  getInitialDraft: () => ServiceEventDraft;
-  onSave: (request: CreateLocationServiceEventRequest) => Promise<void>;
-  onClose: () => void;
-};
-
-type UpdateDraftFn = <Key extends keyof ServiceEventDraft>(
+export type UpdateDraftFn = <Key extends keyof ServiceEventDraft>(
   key: Key,
   value: ServiceEventDraft[Key]
 ) => void;
@@ -26,9 +15,35 @@ type UpdateDraftFn = <Key extends keyof ServiceEventDraft>(
 type ServiceEventFormFieldsProps = {
   draft: ServiceEventDraft;
   isSaving: boolean;
+  allowStatusEditing: boolean;
   canChooseResponsibility: boolean;
   updateDraft: UpdateDraftFn;
 };
+
+type ServiceEventEditorControllerProps = {
+  role: () => AccountRole | undefined;
+  getInitialDraft: () => ServiceEventDraft;
+  onSave: (request: CreateLocationServiceEventRequest) => Promise<void>;
+};
+
+type ServiceEventEditorBodyProps = {
+  draft: ServiceEventDraft;
+  isSaving: boolean;
+  allowStatusEditing: boolean;
+  canChooseResponsibility: boolean;
+  updateDraft: UpdateDraftFn;
+  submissionError: string;
+  saveLabel: string;
+  onCancel: () => void;
+  onSubmit: () => void;
+};
+
+const SERVICE_EVENT_STATUS_OPTIONS = [
+  {value: "upcoming", label: "Upcoming"},
+  {value: "current", label: "Current"},
+  {value: "overdue", label: "Overdue"},
+  {value: "completed", label: "Completed"}
+] as const;
 
 const ServiceEventTextFields = (props: Pick<ServiceEventFormFieldsProps, "draft" | "isSaving" | "updateDraft">) => (
   <>
@@ -38,6 +53,7 @@ const ServiceEventTextFields = (props: Pick<ServiceEventFormFieldsProps, "draft"
         type="text"
         class="input input-bordered w-full"
         value={props.draft.title}
+        maxLength={SERVICE_EVENT_TITLE_MAX_LENGTH}
         disabled={props.isSaving}
         onInput={(event) => props.updateDraft("title", event.currentTarget.value)}
       />
@@ -200,6 +216,28 @@ const ServiceEventResponsibilityFields = (
   </Show>
 );
 
+const ServiceEventStatusFields = (
+  props: Pick<ServiceEventFormFieldsProps, "draft" | "isSaving" | "updateDraft" | "allowStatusEditing">
+) => (
+  <Show when={props.allowStatusEditing}>
+    <label class="form-control w-full">
+      <span class="label-text text-sm font-medium">Status</span>
+      <select
+        class="select select-bordered w-full"
+        value={props.draft.status}
+        disabled={props.isSaving}
+        onChange={(event) => props.updateDraft("status", event.currentTarget.value as ServiceEventDraft["status"])}
+      >
+        <For each={SERVICE_EVENT_STATUS_OPTIONS}>
+          {(statusOption) => (
+            <option value={statusOption.value}>{statusOption.label}</option>
+          )}
+        </For>
+      </select>
+    </label>
+  </Show>
+);
+
 const ServiceEventFormFields = (props: ServiceEventFormFieldsProps) => (
   <div class="space-y-4 overflow-y-auto">
     <ServiceEventTextFields
@@ -218,30 +256,31 @@ const ServiceEventFormFields = (props: ServiceEventFormFieldsProps) => (
       canChooseResponsibility={props.canChooseResponsibility}
       updateDraft={props.updateDraft}
     />
+    <ServiceEventStatusFields
+      draft={props.draft}
+      isSaving={props.isSaving}
+      allowStatusEditing={props.allowStatusEditing}
+      updateDraft={props.updateDraft}
+    />
   </div>
 );
 
-export const ServiceEventModal = (props: ServiceEventModalProps) => {
+export const createServiceEventEditorController = (props: ServiceEventEditorControllerProps) => {
   const [draft, setDraft] = createSignal<ServiceEventDraft>(props.getInitialDraft());
   const [submissionError, setSubmissionError] = createSignal("");
   const [isSaving, setIsSaving] = createSignal(false);
 
   const canChooseResponsibility = createMemo(() =>
-    canChooseServiceEventResponsibility(props.role)
+    canChooseServiceEventResponsibility(props.role())
   );
 
-  const resetDraft = () => setDraft(props.getInitialDraft());
-
-  createEffect(on(() => props.isOpen, (isOpen) => {
-    if (!isOpen) {
-      return;
-    }
-    resetDraft();
+  const reset = () => {
+    setDraft(props.getInitialDraft());
     setSubmissionError("");
     setIsSaving(false);
-  }));
+  };
 
-  const updateDraft = <Key extends keyof ServiceEventDraft>(key: Key, value: ServiceEventDraft[Key]) => {
+  const updateDraft: UpdateDraftFn = (key, value) => {
     setDraft((current) => ({
       ...current,
       [key]: value
@@ -251,87 +290,68 @@ export const ServiceEventModal = (props: ServiceEventModalProps) => {
     }
   };
 
-  const closeAndReset = () => {
+  const submit = async (): Promise<boolean> => {
     if (isSaving()) {
-      return;
-    }
-    resetDraft();
-    setSubmissionError("");
-    props.onClose();
-  };
-
-  const submit = async () => {
-    if (isSaving()) {
-      return;
+      return false;
     }
 
     setSubmissionError("");
     setIsSaving(true);
 
     try {
-      const request = createLocationServiceEventRequestFromDraft(draft(), props.role);
+      const request = createLocationServiceEventRequestFromDraft(draft(), props.role());
       await props.onSave(request);
-      resetDraft();
-      props.onClose();
+      return true;
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : "Unable to save service event.");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  return (
-    <Dialog
-      open={props.isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          closeAndReset();
-        }
-      }}
-    >
-      <Dialog.Portal>
-        <Dialog.Overlay class="fixed inset-0 z-50 bg-black/45 data-closed:pointer-events-none" />
-        <Dialog.Content class="fixed inset-0 z-[60] m-auto flex h-[min(92vh,44rem)] w-[min(96vw,42rem)] flex-col gap-4 rounded-xl border border-base-300 bg-base-100 p-4 shadow-2xl data-closed:pointer-events-none md:p-5">
-          <div class="space-y-1">
-            <Dialog.Label class="text-lg font-semibold">{props.heading}</Dialog.Label>
-            <Dialog.Description class="text-sm text-base-content/70">
-              {props.description}
-            </Dialog.Description>
-          </div>
-
-          <ServiceEventFormFields
-            draft={draft()}
-            isSaving={isSaving()}
-            canChooseResponsibility={canChooseResponsibility()}
-            updateDraft={updateDraft}
-          />
-
-          <Show when={submissionError()}>
-            <p class="text-sm text-error">{submissionError()}</p>
-          </Show>
-
-          <div class="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              class="btn btn-sm"
-              disabled={isSaving()}
-              onClick={closeAndReset}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class={"btn btn-sm " + (isSaving() ? "btn-disabled" : "btn-primary")}
-              disabled={isSaving()}
-              onClick={() => void submit()}
-            >
-              {isSaving() ? "Saving..." : props.saveLabel}
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog>
-  );
+  return {
+    draft,
+    isSaving,
+    submissionError,
+    canChooseResponsibility,
+    reset,
+    updateDraft,
+    submit
+  };
 };
 
-export default ServiceEventModal;
+export const ServiceEventEditorBody = (props: ServiceEventEditorBodyProps) => (
+  <>
+    <ServiceEventFormFields
+      draft={props.draft}
+      isSaving={props.isSaving}
+      allowStatusEditing={props.allowStatusEditing}
+      canChooseResponsibility={props.canChooseResponsibility}
+      updateDraft={props.updateDraft}
+    />
+
+    <Show when={props.submissionError}>
+      <p class="text-sm text-error">{props.submissionError}</p>
+    </Show>
+
+    <div class="flex items-center justify-end gap-2">
+      <button
+        type="button"
+        class="btn btn-sm"
+        disabled={props.isSaving}
+        onClick={props.onCancel}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class={"btn btn-sm " + (props.isSaving ? "btn-disabled" : "btn-primary")}
+        disabled={props.isSaving}
+        onClick={props.onSubmit}
+      >
+        {props.isSaving ? "Saving..." : props.saveLabel}
+      </button>
+    </div>
+  </>
+);

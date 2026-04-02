@@ -1,20 +1,21 @@
 import Calendar from "corvu/calendar";
 import Popover from "corvu/popover";
-import {For, Index, Show, createMemo, type Component, type ParentProps} from "solid-js";
-import type {LocationServiceEvent} from "../../../../types/Types";
+import {For, Show, createMemo, type Component, type JSX} from "solid-js";
+import type {AccountRole, CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
 import {
-  formatDisplayDate,
-  formatDisplayTime,
   formatMonthLabel,
   formatWeekdayLong,
   formatWeekdayShort,
-  isSameCalendarMonth
+  isSameCalendarMonth,
+  formatDisplayDate
 } from "../../../../util/location/dateUtility";
 import {
   buildServiceCalendarWeekLayouts,
-  type ServiceCalendarDayPiece,
+  type ServiceCalendarVisibleSegment,
   type ServiceCalendarWeekLayout
 } from "../../../../util/location/serviceCalendarLayout";
+import ServiceEventCreatePopover from "./ServiceEventCreatePopover";
+import ServiceEventEditPopover from "./ServiceEventEditPopover";
 
 type ServiceScheduleCalendarProps = {
   month?: Date;
@@ -23,36 +24,71 @@ type ServiceScheduleCalendarProps = {
   isLoading?: boolean;
   error?: string;
   onRetry?: () => void;
+  eventEditorRole?: AccountRole | undefined;
+  onCreateEventSave?: (request: CreateLocationServiceEventRequest) => Promise<void>;
   canEditEvent?: (event: LocationServiceEvent) => boolean;
-  onEditEvent?: (event: LocationServiceEvent) => void;
+  onEditEventSave?: (
+    event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
 };
 
-type ServiceEventPopoverContentProps = {
-  event: LocationServiceEvent;
+type ServiceEventSegmentProps = {
+  segment: ServiceCalendarVisibleSegment;
   canEdit: boolean;
-  onEdit?: (event: LocationServiceEvent) => void;
-  closePopover: () => void;
-};
-
-type ServiceEventPieceProps = {
-  piece: ServiceCalendarDayPiece;
-  canEdit: boolean;
-  onEditEvent?: (event: LocationServiceEvent) => void;
+  editRole?: AccountRole | undefined;
+  onEditEventSave?: (
+    event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
 };
 
 type HiddenDayEventsPopoverProps = {
-  hiddenEvents: LocationServiceEvent[];
+  dayIndex: number;
+  hiddenEvents: readonly LocationServiceEvent[];
+  editRole?: AccountRole | undefined;
   canEditEvent?: (event: LocationServiceEvent) => boolean;
-  onEditEvent?: (event: LocationServiceEvent) => void;
+  onEditEventSave?: (
+    event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
 };
 
-type CalendarDayCellProps = {
+type ServiceCalendarDayBackgroundProps = {
   day: Date;
-  month: Date;
   dayIndex: number;
-  weekLayout: ServiceCalendarWeekLayout;
+  month: Date;
+  eventEditorRole?: AccountRole | undefined;
+  onCreateEventSave?: (request: CreateLocationServiceEventRequest) => Promise<void>;
+};
+
+type ServiceCalendarWeekRowProps = {
+  week: readonly Date[];
+  month: Date;
+  layout: ServiceCalendarWeekLayout;
+  eventEditorRole?: AccountRole | undefined;
+  onCreateEventSave?: (request: CreateLocationServiceEventRequest) => Promise<void>;
   canEditEvent?: (event: LocationServiceEvent) => boolean;
-  onEditEvent?: (event: LocationServiceEvent) => void;
+  onEditEventSave?: (
+    event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
+};
+
+const MAX_VISIBLE_WEEK_EVENT_LANES = 2;
+const EVENT_GRID_ROW_OFFSET = 2;
+const OVERFLOW_GRID_ROW = MAX_VISIBLE_WEEK_EVENT_LANES + EVENT_GRID_ROW_OFFSET;
+const WEEK_GRID_END_LINE = OVERFLOW_GRID_ROW + 1;
+
+const WEEK_ROW_GRID_CLASS =
+  "relative isolate grid grid-cols-7 grid-rows-[1.35rem_1.05rem_1.05rem_1.05rem] gap-px bg-base-300/70 " +
+  "md:grid-rows-[1.45rem_1.125rem_1.125rem_1.125rem] lg:grid-rows-[1.55rem_1.125rem_1.125rem_1.125rem]";
+
+const CALENDAR_POPOVER_PROPS = {
+  placement: "bottom-start" as const,
+  trapFocus: false,
+  restoreFocus: false,
+  closeOnOutsideFocus: false
 };
 
 const CalendarChevron = (props: {direction: "left" | "right"}) => (
@@ -73,50 +109,66 @@ const CalendarChevron = (props: {direction: "left" | "right"}) => (
   </svg>
 );
 
-const MAX_VISIBLE_WEEK_EVENT_LANES = 2;
-const CALENDAR_POPOVER_PROPS = {
-  placement: "bottom-start" as const,
-  trapFocus: false,
-  restoreFocus: false,
-  closeOnOutsideFocus: false
-};
-const calendarEventPillClass =
-  "relative z-[1] h-[1.05rem] w-full rounded-lg border text-left shadow-sm transition hover:-translate-y-px hover:shadow md:h-[1.125rem]";
+const createGridPlacementStyle = (
+  columnStart: number,
+  columnEnd: number,
+  rowStart: number,
+  rowEnd?: number
+): JSX.CSSProperties => ({
+  "grid-column": `${columnStart} / ${columnEnd}`,
+  "grid-row": rowEnd === undefined ? `${rowStart}` : `${rowStart} / ${rowEnd}`
+});
 
-const calendarEventCardClass =
-  "w-full rounded-lg border text-left shadow-sm transition hover:-translate-y-px hover:shadow";
+const createDayBackgroundStyle = (dayIndex: number): JSX.CSSProperties => (
+  createGridPlacementStyle(dayIndex + 1, dayIndex + 2, 1, WEEK_GRID_END_LINE)
+);
 
-const eventPieceClass = (
+const createVisibleSegmentStyle = (segment: ServiceCalendarVisibleSegment): JSX.CSSProperties => (
+  createGridPlacementStyle(
+    segment.startDayIndex + 1,
+    segment.endDayIndex + 2,
+    segment.lane + EVENT_GRID_ROW_OFFSET
+  )
+);
+
+const createHiddenEventsTriggerStyle = (dayIndex: number): JSX.CSSProperties => (
+  createGridPlacementStyle(dayIndex + 1, dayIndex + 2, OVERFLOW_GRID_ROW)
+);
+
+const weekdayHeaderClass =
+  "bg-base-200/55 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-base-content/60 md:px-4 md:text-xs";
+
+const dayBackgroundClass =
+  "relative flex min-h-0 cursor-pointer flex-col items-start justify-start px-2.5 py-1.5 text-left transition duration-150 ease-out " +
+  "motion-reduce:transform-none motion-reduce:transition-none focus-visible:z-10 focus-visible:outline-none " +
+  "focus-visible:ring-2 focus-visible:ring-primary/40 hover:-translate-y-px hover:bg-base-100/95 hover:shadow-sm " +
+  "active:translate-y-px active:scale-[0.99] data-selected:bg-primary/12 data-today:ring-1 data-today:ring-accent/45 " +
+  "md:px-3 md:py-2";
+
+const calendarEventSegmentClass =
+  "relative z-[2] h-full min-w-0 truncate border px-1.5 text-left text-[9px] font-semibold " +
+  "leading-[1.05rem] shadow-sm transition hover:-translate-y-px hover:shadow md:text-[10px] md:leading-[1.125rem]";
+
+const calendarInteractiveCardClass =
+  "relative z-[2] rounded-lg border text-left shadow-sm transition hover:-translate-y-px hover:shadow";
+
+const eventSegmentClass = (
   responsibility: LocationServiceEvent["responsibility"],
-  piece: ServiceCalendarDayPiece
+  segment: ServiceCalendarVisibleSegment
 ): string => (
-  `${calendarEventPillClass} truncate px-1.5 py-0 text-[9px] font-semibold leading-[1.05rem] md:text-[10px] md:leading-[1.125rem] ` +
-  `${piece.isStart ? "" : "-ml-2.5 rounded-l-none border-l-0 md:-ml-3 "} ` +
-  `${piece.isEnd ? "" : "-mr-2.5 rounded-r-none border-r-0 md:-mr-3 "} ` +
+  `${calendarEventSegmentClass} ${segment.startsWithinWeek ? "rounded-l-lg" : "rounded-l-none"} ` +
+  `${segment.endsWithinWeek ? "rounded-r-lg" : "rounded-r-none"} ` +
   (responsibility === "client"
     ? "border-[#f59e0b]/40 bg-[#f59e0b]/18 text-[#9a3412]"
     : "border-[#86efac] bg-[#dcfce7] text-[#166534]")
 );
 
 const overflowTriggerClass =
-  `${calendarEventPillClass} flex items-center justify-center rounded-lg px-1.5 py-0 text-xs font-semibold leading-[1.05rem] md:leading-[1.125rem] ` +
-  "border-base-300/80 bg-base-200/80 text-base-content/65";
+  `${calendarInteractiveCardClass} flex h-full min-w-0 items-center justify-center px-1.5 text-xs font-semibold ` +
+  "leading-[1.05rem] border-base-300/80 bg-base-200/80 text-base-content/65 md:leading-[1.125rem]";
 
 const overflowListItemClass =
-  `${calendarEventCardClass} flex flex-col gap-1 px-2 py-1.5 ` +
-  "border-base-300/80 bg-base-100 text-base-content";
-
-const formatResponsibilityLabel = (responsibility: LocationServiceEvent["responsibility"]): string => (
-  responsibility === "client" ? "Client" : "Partner"
-);
-
-const formatStatusLabel = (status: LocationServiceEvent["status"]): string => (
-  status.charAt(0).toUpperCase() + status.slice(1)
-);
-
-const formatEventDateTime = (date: string, time: string): string => (
-  `${formatDisplayDate(date)} at ${formatDisplayTime(time)}`
-);
+  `${calendarInteractiveCardClass} flex flex-col gap-1 px-2 py-1.5 border-base-300/80 bg-base-100 text-base-content`;
 
 const formatEventDateRange = (event: LocationServiceEvent): string => (
   event.date === event.endDate
@@ -124,135 +176,40 @@ const formatEventDateRange = (event: LocationServiceEvent): string => (
     : `${formatDisplayDate(event.date)} - ${formatDisplayDate(event.endDate)}`
 );
 
-const ServiceEventDetailItem = (props: {label: string; value: string}) => (
-  <div class="space-y-1">
-    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
-      {props.label}
-    </dt>
-    <dd class="text-base-content/80">{props.value}</dd>
-  </div>
-);
-
-export const requestServiceEventEdit = (
-  closePopover: () => void,
-  event: LocationServiceEvent,
-  onEditEvent?: (event: LocationServiceEvent) => void
-): void => {
-  closePopover();
-  onEditEvent?.(event);
-};
-
-const ServiceEventDetailPopover = (
-  props: ParentProps<{
-    event: LocationServiceEvent;
-    canEdit: boolean;
-    onEditEvent?: (event: LocationServiceEvent) => void;
-  }>
-) => (
-  <Popover {...CALENDAR_POPOVER_PROPS}>
-    {(popover) => (
-      <>
-        {props.children}
-
-        <Popover.Portal>
-          <Popover.Content
-            class="z-50 w-[min(92vw,24rem)] rounded-2xl border border-base-300 bg-base-100 shadow-2xl"
-            data-service-event-popover=""
-          >
-            <ServiceEventPopoverContent
-              event={props.event}
-              canEdit={props.canEdit}
-              onEdit={props.onEditEvent}
-              closePopover={() => popover.setOpen(false)}
-            />
-          </Popover.Content>
-        </Popover.Portal>
-      </>
-    )}
-  </Popover>
-);
-
-const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
-  <div class="space-y-4 p-4 md:p-5">
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0">
-        <Popover.Label class="text-base font-semibold leading-tight">
-          {props.event.title}
-        </Popover.Label>
-      </div>
-
-      <Show when={props.canEdit && props.onEdit}>
-        <button
-          type="button"
-          class="btn btn-primary btn-xs"
-          data-service-event-edit=""
-          onClick={(event) => {
-            event.stopPropagation();
-            requestServiceEventEdit(props.closePopover, props.event, props.onEdit);
-          }}
-        >
-          Edit
-        </button>
-      </Show>
-    </div>
-
-    <dl class="grid gap-3 text-sm md:grid-cols-2">
-      <ServiceEventDetailItem
-        label="Start"
-        value={formatEventDateTime(props.event.date, props.event.time)}
-      />
-      <ServiceEventDetailItem
-        label="End"
-        value={formatEventDateTime(props.event.endDate, props.event.endTime)}
-      />
-      <ServiceEventDetailItem
-        label="Responsibility"
-        value={formatResponsibilityLabel(props.event.responsibility)}
-      />
-      <ServiceEventDetailItem
-        label="Status"
-        value={formatStatusLabel(props.event.status)}
-      />
-    </dl>
-
-    <div class="space-y-1">
-      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
-        Description
-      </p>
-      <Popover.Description class="text-sm leading-6 text-base-content/80">
-        {props.event.description ?? "No description provided."}
-      </Popover.Description>
-    </div>
-  </div>
-);
-
-const ServiceEventPiece = (props: ServiceEventPieceProps) => (
-  <ServiceEventDetailPopover
-    event={props.piece.event}
+const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
+  <ServiceEventEditPopover
+    event={props.segment.event}
     canEdit={props.canEdit}
-    onEditEvent={props.onEditEvent}
+    role={props.editRole}
+    onSave={props.onEditEventSave}
   >
     <Popover.Trigger
       type="button"
-      class={eventPieceClass(props.piece.event.responsibility, props.piece)}
-      title={props.piece.event.title}
+      style={createVisibleSegmentStyle(props.segment)}
+      class={eventSegmentClass(props.segment.event.responsibility, props.segment)}
+      title={props.segment.event.title}
       data-service-event-bar=""
       onClick={(event) => event.stopPropagation()}
     >
-      {props.piece.event.title}
+      {props.segment.event.title}
     </Popover.Trigger>
-  </ServiceEventDetailPopover>
+  </ServiceEventEditPopover>
 );
 
 const HiddenDayEventListItem = (props: {
   event: LocationServiceEvent;
   canEdit: boolean;
-  onEditEvent?: (event: LocationServiceEvent) => void;
+  editRole?: AccountRole | undefined;
+  onEditEventSave?: (
+    event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
 }) => (
-  <ServiceEventDetailPopover
+  <ServiceEventEditPopover
     event={props.event}
     canEdit={props.canEdit}
-    onEditEvent={props.onEditEvent}
+    role={props.editRole}
+    onSave={props.onEditEventSave}
   >
     <Popover.Trigger
       type="button"
@@ -268,13 +225,14 @@ const HiddenDayEventListItem = (props: {
         {formatEventDateRange(props.event)}
       </span>
     </Popover.Trigger>
-  </ServiceEventDetailPopover>
+  </ServiceEventEditPopover>
 );
 
 const HiddenDayEventsPopover = (props: HiddenDayEventsPopoverProps) => (
   <Popover {...CALENDAR_POPOVER_PROPS}>
     <Popover.Trigger
       type="button"
+      style={createHiddenEventsTriggerStyle(props.dayIndex)}
       class={overflowTriggerClass}
       title="Show additional service events"
       data-service-event-overflow-trigger=""
@@ -301,7 +259,8 @@ const HiddenDayEventsPopover = (props: HiddenDayEventsPopoverProps) => (
                 <HiddenDayEventListItem
                   event={event}
                   canEdit={props.canEditEvent?.(event) ?? false}
-                  onEditEvent={props.onEditEvent}
+                  editRole={props.editRole}
+                  onEditEventSave={props.onEditEventSave}
                 />
               )}
             </For>
@@ -312,172 +271,191 @@ const HiddenDayEventsPopover = (props: HiddenDayEventsPopoverProps) => (
   </Popover>
 );
 
-const CalendarDayCell = (props: CalendarDayCellProps) => {
+const ServiceCalendarDayBackground = (props: ServiceCalendarDayBackgroundProps) => {
   const outsideMonth = () => !isSameCalendarMonth(props.day, props.month);
-  const visibleDayPieces = createMemo(() => props.weekLayout.visiblePiecesByDay[props.dayIndex] ?? []);
-  const hiddenDayEvents = createMemo(() => props.weekLayout.hiddenEventsByDay[props.dayIndex] ?? []);
+  const dayCellClassList = {
+    "bg-base-100/85 text-base-content": !outsideMonth(),
+    "bg-base-200/40 text-base-content/40": outsideMonth()
+  };
 
   return (
-    <Calendar.Cell class="w-[14.2857%] p-0 align-top">
-      <Calendar.CellTrigger
-        as="div"
-        day={props.day}
-        class="relative -ml-px -mt-px flex h-[5.75rem] w-full transform-gpu flex-col items-start justify-start overflow-hidden border border-base-300/70 px-2.5 py-1.5 text-left shadow-[0_0_0_0_rgba(0,0,0,0)] transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 hover:-translate-y-px hover:bg-base-100/95 hover:shadow-sm active:translate-y-px active:scale-[0.99] data-selected:border-primary/35 data-selected:bg-primary/12 data-selected:shadow-sm data-today:ring-1 data-today:ring-accent/45 md:h-[6.5rem] md:px-3 md:py-2 lg:h-[7.25rem] xl:h-[7.75rem]"
-        classList={{
-          "bg-base-100/85 text-base-content": !outsideMonth(),
-          "bg-base-200/40 text-base-content/40": outsideMonth()
-        }}
+    <Calendar.Cell as="div" class="contents">
+      <Show
+        when={props.onCreateEventSave}
+        fallback={
+          <Calendar.CellTrigger
+            as="div"
+            day={props.day}
+            style={createDayBackgroundStyle(props.dayIndex)}
+            class={dayBackgroundClass}
+            classList={dayCellClassList}
+          >
+            <span class="text-xs font-semibold tabular-nums md:text-sm">
+              {props.day.getDate()}
+            </span>
+          </Calendar.CellTrigger>
+        }
       >
-        <span class="text-xs font-semibold tabular-nums md:text-sm">
-          {props.day.getDate()}
-        </span>
-
-        <div class="mt-1.5 flex w-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
-          <For each={visibleDayPieces()}>
-            {(piece) => (
-              <Show
-                when={piece}
-                fallback={<div class="h-[1.05rem] w-full md:h-[1.125rem]" aria-hidden="true" />}
-              >
-                {(visiblePiece) => (
-                  <ServiceEventPiece
-                    piece={visiblePiece()}
-                    canEdit={props.canEditEvent?.(visiblePiece().event) ?? false}
-                    onEditEvent={props.onEditEvent}
-                  />
-                )}
-              </Show>
-            )}
-          </For>
-
-          <Show when={hiddenDayEvents().length > 0}>
-            <HiddenDayEventsPopover
-              hiddenEvents={hiddenDayEvents()}
-              canEditEvent={props.canEditEvent}
-              onEditEvent={props.onEditEvent}
-            />
-          </Show>
-        </div>
-      </Calendar.CellTrigger>
+        {(onCreateEventSave) => (
+          <ServiceEventCreatePopover
+            day={props.day}
+            style={createDayBackgroundStyle(props.dayIndex)}
+            class={dayBackgroundClass}
+            classList={dayCellClassList}
+            role={props.eventEditorRole}
+            onSave={onCreateEventSave()}
+          />
+        )}
+      </Show>
     </Calendar.Cell>
   );
 };
 
-export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = (props) => {
-  return (
-    <Calendar
-      mode="single"
-      fixedWeeks
-      disableOutsideDays={false}
-      startOfWeek={0}
-      month={props.month}
-      onMonthChange={props.onMonthChange}
-    >
-      {(calendar) => (
-        (() => {
-          const weekLayouts = createMemo(() => (
-            buildServiceCalendarWeekLayouts(
-              calendar.weeks,
-              props.events ?? [],
-              MAX_VISIBLE_WEEK_EVENT_LANES
-            )
-          ));
+const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
+  <div role="row" class={WEEK_ROW_GRID_CLASS} data-service-calendar-week-row="">
+    <For each={props.week}>
+      {(day, dayIndex) => (
+        <ServiceCalendarDayBackground
+          day={day}
+          dayIndex={dayIndex()}
+          month={props.month}
+          eventEditorRole={props.eventEditorRole}
+          onCreateEventSave={props.onCreateEventSave}
+        />
+      )}
+    </For>
 
-          return (
-            <div class="grid h-full min-h-[42rem] grid-rows-[auto_auto_1fr] gap-5">
-              <div class="flex items-center justify-between gap-3">
-                <Calendar.Nav
-                  action="prev-month"
-                  aria-label="Go to previous month"
-                  class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
-                >
-                  <CalendarChevron direction="left" />
-                </Calendar.Nav>
+    <For each={props.layout.visibleSegments}>
+      {(segment) => (
+        <ServiceEventSegment
+          segment={segment}
+          canEdit={props.canEditEvent?.(segment.event) ?? false}
+          editRole={props.eventEditorRole}
+          onEditEventSave={props.onEditEventSave}
+        />
+      )}
+    </For>
 
-                <div class="min-w-0 text-center">
-                  <p class="text-xs font-semibold uppercase tracking-[0.22em] text-base-content/55">
-                    Viewing Month
-                  </p>
-                  <Calendar.Label class="mt-1 text-lg font-semibold tracking-tight text-base-content md:text-2xl">
-                    {formatMonthLabel(calendar.month)} {calendar.month.getFullYear()}
-                  </Calendar.Label>
-                </div>
+    <For each={props.layout.hiddenEventsByDay}>
+      {(hiddenEvents, dayIndex) => (
+        <Show when={hiddenEvents.length > 0}>
+          <HiddenDayEventsPopover
+            dayIndex={dayIndex()}
+            hiddenEvents={hiddenEvents}
+            editRole={props.eventEditorRole}
+            canEditEvent={props.canEditEvent}
+            onEditEventSave={props.onEditEventSave}
+          />
+        </Show>
+      )}
+    </For>
+  </div>
+);
 
-                <Calendar.Nav
-                  action="next-month"
-                  aria-label="Go to next month"
-                  class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
-                >
-                  <CalendarChevron direction="right" />
-                </Calendar.Nav>
+const WeekdayHeaderCell = (props: {day: Date}) => (
+  <div
+    role="columnheader"
+    aria-label={formatWeekdayLong(props.day)}
+    class={weekdayHeaderClass}
+  >
+    {formatWeekdayShort(props.day)}
+  </div>
+);
+
+export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = (props) => (
+  <Calendar
+    mode="single"
+    fixedWeeks
+    disableOutsideDays={false}
+    startOfWeek={0}
+    month={props.month}
+    onMonthChange={props.onMonthChange}
+  >
+    {(calendar) => {
+      const weekLayouts = createMemo(() => (
+        buildServiceCalendarWeekLayouts(
+          calendar.weeks,
+          props.events ?? [],
+          MAX_VISIBLE_WEEK_EVENT_LANES
+        )
+      ));
+
+      return (
+        <div class="grid h-full min-h-[42rem] grid-rows-[auto_auto_1fr] gap-5">
+          <div class="flex items-center justify-between gap-3">
+            <Calendar.Nav
+              action="prev-month"
+              aria-label="Go to previous month"
+              class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
+            >
+              <CalendarChevron direction="left" />
+            </Calendar.Nav>
+
+            <div class="min-w-0 text-center">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-base-content/55">
+                Viewing Month
+              </p>
+              <Calendar.Label class="mt-1 text-lg font-semibold tracking-tight text-base-content md:text-2xl">
+                {formatMonthLabel(calendar.month)} {calendar.month.getFullYear()}
+              </Calendar.Label>
+            </div>
+
+            <Calendar.Nav
+              action="next-month"
+              aria-label="Go to next month"
+              class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
+            >
+              <CalendarChevron direction="right" />
+            </Calendar.Nav>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
+            <Show when={props.isLoading}>
+              <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
+                Syncing visible months...
+              </span>
+            </Show>
+            <Show when={props.error}>
+              <span class="rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-error">
+                {props.error}
+              </span>
+            </Show>
+            <Show when={props.error && props.onRetry}>
+              <button type="button" class="btn btn-xs btn-outline" onClick={props.onRetry}>
+                Retry
+              </button>
+            </Show>
+          </div>
+
+          <div class="min-h-0 overflow-hidden rounded-2xl border border-base-300/80 bg-base-300/70 shadow-inner">
+            <div role="grid" aria-label="Service schedule calendar" class="grid h-full grid-rows-[auto_1fr] gap-px">
+              <div role="row" class="grid grid-cols-7 gap-px bg-base-300/70">
+                <For each={calendar.weekdays}>
+                  {(weekday) => <WeekdayHeaderCell day={weekday} />}
+                </For>
               </div>
 
-              <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
-                <Show when={props.isLoading}>
-                  <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
-                    Syncing visible months...
-                  </span>
-                </Show>
-                <Show when={props.error}>
-                  <span class="rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-error">
-                    {props.error}
-                  </span>
-                </Show>
-                <Show when={props.error && props.onRetry}>
-                  <button type="button" class="btn btn-xs btn-outline" onClick={props.onRetry}>
-                    Retry
-                  </button>
-                </Show>
-              </div>
-
-              <div class="min-h-0 overflow-hidden rounded-2xl border border-base-300/80 bg-base-200/25 shadow-inner">
-                <Calendar.Table
-                  aria-label="Service schedule calendar"
-                  class="h-full w-full table-fixed border-collapse"
-                >
-                  <thead class="bg-base-200/55">
-                    <tr class="h-12">
-                      <Index each={calendar.weekdays}>
-                        {(weekday) => (
-                          <Calendar.HeadCell
-                            abbr={formatWeekdayLong(weekday())}
-                            class="border-b border-base-300/80 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-base-content/60 md:px-4 md:text-xs"
-                          >
-                            {formatWeekdayShort(weekday())}
-                          </Calendar.HeadCell>
-                        )}
-                      </Index>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    <Index each={calendar.weeks}>
-                      {(week, weekIndex) => (
-                        <tr class="h-[5.75rem] md:h-[6.5rem] lg:h-[7.25rem] xl:h-[7.75rem]">
-                          <Index each={week()}>
-                            {(day, dayIndex) => (
-                              <CalendarDayCell
-                                day={day()}
-                                month={calendar.month}
-                                dayIndex={dayIndex}
-                                weekLayout={weekLayouts()[weekIndex]}
-                                canEditEvent={props.canEditEvent}
-                                onEditEvent={props.onEditEvent}
-                              />
-                            )}
-                          </Index>
-                        </tr>
-                      )}
-                    </Index>
-                  </tbody>
-                </Calendar.Table>
+              <div class="grid min-h-0 gap-px bg-base-300/70">
+                <For each={calendar.weeks}>
+                  {(week, weekIndex) => (
+                    <ServiceCalendarWeekRow
+                      week={week}
+                      month={calendar.month}
+                      layout={weekLayouts()[weekIndex()]}
+                      eventEditorRole={props.eventEditorRole}
+                      onCreateEventSave={props.onCreateEventSave}
+                      canEditEvent={props.canEditEvent}
+                      onEditEventSave={props.onEditEventSave}
+                    />
+                  )}
+                </For>
               </div>
             </div>
-          );
-        })()
-      )}
-    </Calendar>
-  );
-};
+          </div>
+        </div>
+      );
+    }}
+  </Calendar>
+);
 
 export default ServiceScheduleCalendar;

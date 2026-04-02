@@ -56,7 +56,7 @@ const allowedPathsByRole: Record<AccountRole, string[]> = {
   ]
 };
 
-const normalizePathname = (pathname: string): string => {
+export const normalizeDashboardPathname = (pathname: string): string => {
   if (pathname.startsWith("/dashboard/locations/")) {
     return "/dashboard/locations";
   }
@@ -68,6 +68,9 @@ const normalizePathname = (pathname: string): string => {
 
 const isLocationScopedPath = (pathname: string): boolean => locationScopedPaths.has(pathname);
 
+export const isDashboardNavItemActive = (href: string, pathname: string): boolean =>
+  normalizeDashboardPathname(href) === normalizeDashboardPathname(pathname);
+
 export const dashboardNavForAccount = (role: AccountRole, verified: boolean): NavItem[] => {
   const navItems = dashboardNavByRole[role];
   if (verified) {
@@ -77,12 +80,12 @@ export const dashboardNavForAccount = (role: AccountRole, verified: boolean): Na
     if (!item.href) {
       return true;
     }
-    return !isLocationScopedPath(normalizePathname(item.href));
+    return !isLocationScopedPath(normalizeDashboardPathname(item.href));
   });
 };
 
 export const isDashboardPathAllowed = (role: AccountRole, pathname: string, verified: boolean): boolean => {
-  const normalizedPathname = normalizePathname(pathname);
+  const normalizedPathname = normalizeDashboardPathname(pathname);
   if (!verified && isLocationScopedPath(normalizedPathname)) {
     return false;
   }

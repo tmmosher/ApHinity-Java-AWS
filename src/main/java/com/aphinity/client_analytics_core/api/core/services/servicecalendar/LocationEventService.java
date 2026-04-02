@@ -200,6 +200,9 @@ public class LocationEventService {
         if (normalized.isBlank()) {
             throw invalidEventTitle();
         }
+        if (normalized.length() > ServiceEvent.TITLE_MAX_LENGTH) {
+            throw invalidEventTitleLength();
+        }
         return normalized;
     }
 
@@ -348,6 +351,10 @@ public class LocationEventService {
 
     private ResponseStatusException invalidEventTitle() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event title is required");
+    }
+
+    private ResponseStatusException invalidEventTitleLength() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event title must be 42 characters or fewer");
     }
 
     private ResponseStatusException invalidEventResponsibility() {

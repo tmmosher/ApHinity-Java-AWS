@@ -21,23 +21,16 @@ vi.mock("../util/location/locationEventApi", () => ({
   updateLocationEventById: vi.fn()
 }));
 
-vi.mock("../pages/authenticated/panels/location/ServiceEventCreateModal", () => ({
-  default: () => null
-}));
-
-vi.mock("../pages/authenticated/panels/location/ServiceEventEditModal", () => ({
-  default: () => null
-}));
-
 import {DashboardLocationServiceCalendarPanel} from "../pages/authenticated/panels/location/DashboardLocationServiceCalendarPanel";
 
 describe("DashboardLocationServiceSchedulePanel", () => {
-  it("renders the event button above the service calendar", () => {
+  it("explains day-cell creation and renders interactive calendar cells", () => {
     const html = renderToString(DashboardLocationServiceCalendarPanel);
 
     expect(html).toContain("Service Calendar");
-    expect(html).toContain("New Service Event");
-    expect(html).toContain("data-corvu-calendar-table");
-    expect(html.indexOf("New Service Event")).toBeLessThan(html.indexOf("data-corvu-calendar-table"));
+    expect(html).toContain("Click an empty day cell to create a service event.");
+    expect(html).toContain("aria-label=\"Service schedule calendar\"");
+    expect(html).toContain("data-service-calendar-day-trigger");
+    expect(html).not.toContain("New Service Event");
   });
 });

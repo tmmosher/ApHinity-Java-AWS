@@ -11,8 +11,6 @@ import {
 import {formatLocationEventMonth, normalizeMonthStart} from "../../../../util/location/dateUtility";
 import type {CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
 import {canEditLocationServiceEvent} from "../../../../util/location/serviceEventForm";
-import ServiceEventCreateModal from "./ServiceEventCreateModal";
-import ServiceEventEditModal from "./ServiceEventEditModal";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 
 type ServiceEventCalendarResource = {
@@ -25,9 +23,6 @@ export const DashboardLocationServiceCalendarPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
-  const [isCreateModalOpen, setIsCreateModalOpen] = createSignal(false);
-  const [editingEvent, setEditingEvent] = createSignal<LocationServiceEvent>();
-  const [isEditModalOpen, setIsEditModalOpen] = createSignal(false);
   const [calendarMonth, setCalendarMonth] = createSignal(normalizeMonthStart(new Date()));
   const role = createMemo(() => profileContext.profile()?.role);
 
@@ -73,31 +68,25 @@ export const DashboardLocationServiceCalendarPanel = () => {
     toast.success("Service event created.");
   };
 
-  const saveEditedServiceEvent = async (request: CreateLocationServiceEventRequest): Promise<void> => {
-    const event = editingEvent();
-    if (!event) {
-      throw new Error("No service event selected for editing.");
-    }
-
+  const saveEditedServiceEvent = async (
+    event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ): Promise<void> => {
     await updateLocationEventById(host, params.locationId, event.id, request);
     await refetchServiceEvents();
     toast.success("Service event updated.");
   };
 
-  const beginEditingServiceEvent = (event: LocationServiceEvent) => {
-    setEditingEvent(event);
-    setIsEditModalOpen(true);
-  };
-
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
-        <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="space-y-2">
           <div class="space-y-2">
             <h2 class="text-xl font-semibold tracking-tight">Service Calendar</h2>
             <p class="text-sm text-base-content/70">
               View previous, current, and upcoming service events. The calendar loads the previous,
-              current, and next month relative to the month you are viewing.
+              current, and next month relative to the month you are viewing. Click an empty day cell
+              to create a service event.
             </p>
             <div class="flex flex-wrap items-center gap-2 pt-1 text-xs font-medium">
               <span class="rounded-full border border-[#f59e0b]/35 bg-[#f59e0b]/18 px-2.5 py-1 text-[#9a3412]">
@@ -108,14 +97,6 @@ export const DashboardLocationServiceCalendarPanel = () => {
               </span>
             </div>
           </div>
-
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            New Service Event
-          </button>
         </div>
       </section>
 
@@ -127,28 +108,12 @@ export const DashboardLocationServiceCalendarPanel = () => {
           isLoading={serviceEventResource.loading && serviceEvents() === undefined}
           error={serviceEventErrorMessage()}
           onRetry={() => void refetchServiceEvents()}
+          eventEditorRole={role()}
+          onCreateEventSave={saveServiceEvent}
           canEditEvent={(event) => canEditLocationServiceEvent(role(), event.responsibility)}
-          onEditEvent={beginEditingServiceEvent}
+          onEditEventSave={saveEditedServiceEvent}
         />
       </section>
-
-      <ServiceEventCreateModal
-        isOpen={isCreateModalOpen()}
-        role={role()}
-        onSave={saveServiceEvent}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
-
-      <ServiceEventEditModal
-        isOpen={isEditModalOpen()}
-        role={role()}
-        event={editingEvent()}
-        onSave={saveEditedServiceEvent}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingEvent(undefined);
-        }}
-      />
     </div>
   );
 };

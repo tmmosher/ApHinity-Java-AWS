@@ -122,6 +122,24 @@ describe("serviceEventForm helpers", () => {
     });
   });
 
+  it("preserves an edited status in the request payload", () => {
+    const request = createLocationServiceEventRequestFromDraft({
+      title: "Quarterly review",
+      description: "",
+      responsibility: "client",
+      scheduleMode: "timed",
+      startDate: "2026-04-01",
+      startTime: "08:30",
+      endDate: "2026-04-01",
+      endTime: "11:00",
+      allDayStartDate: "2026-04-01",
+      allDayEndDate: "2026-04-01",
+      status: "completed"
+    }, "client");
+
+    expect(request.status).toBe("completed");
+  });
+
   it("rejects blank titles", () => {
     expect(() => createLocationServiceEventRequestFromDraft({
       title: "   ",
@@ -136,6 +154,22 @@ describe("serviceEventForm helpers", () => {
       allDayEndDate: "2026-04-02",
       status: "upcoming"
     }, "client")).toThrowError("Event title is required.");
+  });
+
+  it("rejects titles longer than 42 characters", () => {
+    expect(() => createLocationServiceEventRequestFromDraft({
+      title: "1234567890123456789012345678901234567890123",
+      description: "",
+      responsibility: "client",
+      scheduleMode: "timed",
+      startDate: "2026-03-27",
+      startTime: "08:30",
+      endDate: "2026-03-27",
+      endTime: "11:00",
+      allDayStartDate: "2026-04-01",
+      allDayEndDate: "2026-04-02",
+      status: "upcoming"
+    }, "client")).toThrowError("Event title must be 42 characters or fewer.");
   });
 
   it("rejects timed ranges that end before they start", () => {

@@ -8,39 +8,25 @@ vi.mock("corvu/popover", async () => {
   return { default: Popover };
 });
 
-import ServiceScheduleCalendar, {
-  requestServiceEventEdit
-} from "../pages/authenticated/panels/location/ServiceScheduleCalendar";
+import ServiceScheduleCalendar from "../pages/authenticated/panels/location/ServiceScheduleCalendar";
+import {requestServiceEventEdit} from "../pages/authenticated/panels/location/ServiceEventEditPopover";
 
 describe("ServiceScheduleCalendar", () => {
-  it("closes the popover before opening the edit modal", () => {
-    const closePopover = vi.fn();
-    const openEditor = vi.fn();
-    const event = {
-      id: 9,
-      title: "Partner inspection",
-      responsibility: "partner",
-      date: "2026-04-07",
-      time: "13:00:00",
-      endDate: "2026-04-08",
-      endTime: "15:00:00",
-      description: null,
-      status: "current",
-      createdAt: "2026-03-25T00:00:00Z",
-      updatedAt: "2026-03-25T00:00:00Z"
-    } as const;
+  it("switches the event popover into edit mode", () => {
+    const setIsEditing = vi.fn();
 
-    requestServiceEventEdit(closePopover, event, openEditor);
+    requestServiceEventEdit(setIsEditing);
 
-    expect(closePopover).toHaveBeenCalledWith();
-    expect(openEditor).toHaveBeenCalledWith(event);
+    expect(setIsEditing).toHaveBeenCalledWith(true);
   });
 
-  it("renders connected multi-day event pieces and an overflow trigger for crowded days", () => {
+  it("renders week-row spanning bars and an overflow trigger for crowded days", () => {
     const html = renderToString(() => ServiceScheduleCalendar({
       month: new Date("2026-04-01T00:00:00"),
+      eventEditorRole: "partner",
+      onCreateEventSave: async () => undefined,
+      onEditEventSave: async () => undefined,
       canEditEvent: () => true,
-      onEditEvent: () => undefined,
       events: [
         {
           id: 8,
@@ -87,18 +73,20 @@ describe("ServiceScheduleCalendar", () => {
     expect(html).toContain("Service schedule calendar");
     expect(html).toContain("Go to previous month");
     expect(html).toContain("Go to next month");
-    expect((html.match(/data-corvu-calendar-headcell/g) ?? [])).toHaveLength(7);
     expect((html.match(/data-corvu-calendar-celltrigger/g) ?? [])).toHaveLength(42);
-    expect((html.match(/data-service-event-bar/g) ?? [])).toHaveLength(3);
+    expect((html.match(/data-service-calendar-day-trigger/g) ?? [])).toHaveLength(42);
+    expect((html.match(/data-service-event-create-popover/g) ?? [])).toHaveLength(0);
+    expect((html.match(/data-service-calendar-week-row/g) ?? [])).toHaveLength(6);
+    expect((html.match(/data-service-event-bar/g) ?? [])).toHaveLength(2);
     expect((html.match(/data-service-event-overflow-trigger/g) ?? [])).toHaveLength(1);
     expect(html).toContain("Client kickoff");
     expect(html).toContain("Partner inspection");
-    expect(html).toContain("h-[5.75rem]");
+    expect(html).toContain("grid-column:3 / 5");
+    expect(html).toContain("grid-rows-[1.35rem_1.05rem_1.05rem_1.05rem]");
     expect(html).toContain("...");
-    expect(html).toContain("rounded-r-none");
-    expect(html).toContain("rounded-l-none");
     expect(html).toContain("bg-[#f59e0b]/18");
     expect(html).toContain("bg-[#dcfce7]");
+    expect(html).toContain("cursor-pointer");
     expect(html).toContain("hover:-translate-y-px");
     expect(html).toContain("active:translate-y-px");
   });

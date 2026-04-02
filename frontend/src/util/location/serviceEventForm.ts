@@ -30,6 +30,8 @@ export type ServiceEventDraft = {
   status: ServiceEventStatus;
 };
 
+export const SERVICE_EVENT_TITLE_MAX_LENGTH = 42;
+
 const DEFAULT_START_TIME = "09:00";
 const DEFAULT_END_TIME = "10:00";
 const ALL_DAY_START_TIME = "00:00";
@@ -93,6 +95,9 @@ export const createLocationServiceEventRequestFromDraft = (
   const normalizedTitle = draft.title.trim();
   if (!normalizedTitle) {
     throw new Error("Event title is required.");
+  }
+  if (normalizedTitle.length > SERVICE_EVENT_TITLE_MAX_LENGTH) {
+    throw new Error("Event title must be 42 characters or fewer.");
   }
 
   if (draft.scheduleMode === "timed") {
