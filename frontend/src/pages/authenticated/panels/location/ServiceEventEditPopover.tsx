@@ -10,22 +10,29 @@ import {
   createServiceEventEditorController,
   ServiceEventEditorBody
 } from "./ServiceEventEditor";
+import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "./serviceEventPopoverPosition";
 
 type ServiceEventEditPopoverProps = {
   event: LocationServiceEvent;
   canEdit: boolean;
+  canComplete: boolean;
   role: AccountRole | undefined;
   onSave?: (event: LocationServiceEvent, request: CreateLocationServiceEventRequest) => Promise<void>;
+  onComplete?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type ServiceEventPopoverContentProps = {
   event: LocationServiceEvent;
   canEdit: boolean;
+  canComplete: boolean;
+  isCompleting: boolean;
+  completionError?: string;
   onEdit: () => void;
+  onComplete: () => void;
 };
 
 const EVENT_POPOVER_PROPS = {
-  placement: "bottom-start" as const,
+  ...SERVICE_EVENT_POPOVER_POSITION_PROPS,
   trapFocus: false,
   restoreFocus: false,
   closeOnOutsideFocus: false
@@ -66,6 +73,7 @@ const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
           type="button"
           class="btn btn-primary btn-xs"
           data-service-event-edit=""
+          disabled={props.isCompleting}
           onClick={(event) => {
             event.stopPropagation();
             props.onEdit();
@@ -103,6 +111,34 @@ const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
         {props.event.description ?? "No description provided."}
       </Popover.Description>
     </div>
+
+    <Show when={props.completionError}>
+      {(message) => (
+        <p
+          role="alert"
+          class="rounded-xl border border-error/25 bg-error/10 px-3 py-2 text-sm text-error"
+        >
+          {message()}
+        </p>
+      )}
+    </Show>
+
+    <Show when={props.canComplete}>
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="btn btn-success btn-sm"
+          data-service-event-complete=""
+          disabled={props.isCompleting}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onComplete();
+          }}
+        >
+          {props.isCompleting ? "Marking Complete..." : "Mark Complete"}
+        </button>
+      </div>
+    </Show>
   </div>
 );
 
@@ -112,6 +148,8 @@ export const requestServiceEventEdit = (setIsEditing: (isEditing: boolean) => vo
 
 export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopoverProps>) => {
   const [isEditing, setIsEditing] = createSignal(false);
+  const [isCompleting, setIsCompleting] = createSignal(false);
+  const [completionError, setCompletionError] = createSignal<string>();
   const controller = createServiceEventEditorController({
     role: () => props.role,
     getInitialDraft: () => createServiceEventDraftFromEvent(props.event),
@@ -125,10 +163,33 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
 
   const resetToDetailView = () => {
     controller.reset();
+    setIsCompleting(false);
+    setCompletionError(undefined);
     setIsEditing(false);
   };
 
   const canEdit = () => props.canEdit && props.onSave !== undefined;
+  const canComplete = () => props.canComplete && props.onComplete !== undefined && props.event.status !== "completed";
+  const handleComplete = async (closePopover: () => void): Promise<void> => {
+    if (!canComplete() || isCompleting()) {
+      return;
+    }
+
+    setCompletionError(undefined);
+    setIsCompleting(true);
+
+    try {
+      await props.onComplete?.(props.event);
+      resetToDetailView();
+      closePopover();
+    } catch (error) {
+      setCompletionError(
+        error instanceof Error ? error.message : "Unable to mark service event complete."
+      );
+    } finally {
+      setIsCompleting(false);
+    }
+  };
 
   return (
     <Popover
@@ -154,7 +215,16 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
                   <ServiceEventPopoverContent
                     event={props.event}
                     canEdit={canEdit()}
-                    onEdit={() => requestServiceEventEdit(setIsEditing)}
+                    canComplete={canComplete()}
+                    isCompleting={isCompleting()}
+                    completionError={completionError()}
+                    onEdit={() => {
+                      setCompletionError(undefined);
+                      requestServiceEventEdit(setIsEditing);
+                    }}
+                    onComplete={() => {
+                      void handleComplete(() => popover.setOpen(false));
+                    }}
                   />
                 }
               >

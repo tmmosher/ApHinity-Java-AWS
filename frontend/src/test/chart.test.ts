@@ -4,6 +4,7 @@ import {
   attachPlotlyResizeListener,
   buildPlotlyConfig,
   buildPlotlyLayout,
+  createPlotlyAnimationBaselineData,
   renderPlotlyChart
 } from "../components/Chart";
 
@@ -62,6 +63,52 @@ describe("Chart helpers", () => {
     expect(calledConfig).toMatchObject({
       displayModeBar: true,
       responsive: true
+    });
+  });
+
+  it("builds zero-baseline data for supported trace types", () => {
+    expect(createPlotlyAnimationBaselineData([
+      {type: "bar", x: ["Jan"], y: [9]},
+      {type: "bar", orientation: "h", x: [7], y: ["North"]},
+      {type: "scatter", x: [1, 2], y: [5, 8]},
+      {type: "pie", values: [60, 40]},
+      {type: "indicator", value: 12}
+    ])).toEqual([
+      {type: "bar", x: ["Jan"], y: [0]},
+      {type: "bar", orientation: "h", x: [0], y: ["North"]},
+      {type: "scatter", x: [1, 2], y: [0, 0]},
+      {type: "pie", values: [0, 0]},
+      {type: "indicator", value: 12}
+    ]);
+  });
+
+  it("animates supported traces from a zero baseline when requested", async () => {
+    const react = vi.fn().mockResolvedValue(undefined);
+    const animate = vi.fn().mockResolvedValue(undefined);
+    const plotly = {
+      react,
+      animate
+    } as unknown as {
+      react: (...args: unknown[]) => Promise<unknown>;
+      animate: (...args: unknown[]) => Promise<unknown>;
+    };
+
+    await renderPlotlyChart(
+      plotly as any,
+      {id: "chart-root"} as unknown as HTMLDivElement,
+      [{type: "bar", x: ["Jan"], y: [9]}],
+      undefined,
+      undefined,
+      "light",
+      {animateFromBaseline: true}
+    );
+
+    expect(react).toHaveBeenCalledTimes(1);
+    expect(react.mock.calls[0][1]).toEqual([{type: "bar", x: ["Jan"], y: [0]}]);
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate.mock.calls[0][1]).toMatchObject({
+      data: [{type: "bar", x: ["Jan"], y: [9]}],
+      traces: [0]
     });
   });
 

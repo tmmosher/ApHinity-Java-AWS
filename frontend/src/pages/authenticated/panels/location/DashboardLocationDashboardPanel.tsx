@@ -25,17 +25,29 @@ import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "./LocationDetailContext";
 import {createDashboardLocationResetGuard} from "./locationView";
 
+export const advanceGraphLoadAnimationToken = (
+  currentToken: number,
+  wasLoading: boolean,
+  isLoading: boolean,
+  hasGraphs: boolean
+): number => (
+  wasLoading && !isLoading && hasGraphs
+    ? currentToken + 1
+    : currentToken
+);
+
 export const DashboardLocationDashboardPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
-  const {location, graphs, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
+  const {location, graphs, graphsLoading, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
   const [workingGraphs, setWorkingGraphs] = createSignal<LocationGraph[]>([]);
   const [graphBaselineIndex, setGraphBaselineIndex] = createSignal<Map<number, GraphBaselineEntry>>(new Map());
   const [locationUndoStack, setLocationUndoStack] = createSignal<LocationGraph[][]>([]);
   const [editingGraphId, setEditingGraphId] = createSignal<number | null>(null);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
+  const [graphAnimationToken, setGraphAnimationToken] = createSignal(0);
   const shouldResetDashboardState = createDashboardLocationResetGuard(params.locationId);
 
   const canEditGraphs = createMemo(() =>
@@ -62,8 +74,17 @@ export const DashboardLocationDashboardPanel = () => {
     setWorkingGraphs([]);
     setGraphBaselineIndex(new Map());
     setLocationUndoStack([]);
+    setGraphAnimationToken(0);
     setLocationSessionToken((token) => token + 1);
   });
+
+  createEffect<boolean>((wasLoading) => {
+    const isLoading = graphsLoading();
+    setGraphAnimationToken((current) =>
+      advanceGraphLoadAnimationToken(current, wasLoading, isLoading, graphs() !== undefined)
+    );
+    return isLoading;
+  }, false);
 
   const retryAll = () => {
     void refetchLocation();
@@ -418,6 +439,7 @@ export const DashboardLocationDashboardPanel = () => {
                                         layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
                                         config={(graph.config ?? undefined) as PlotlyConfig | undefined}
                                         style={graph.style ?? undefined}
+                                        animationToken={graphAnimationToken() > 0 ? graphAnimationToken() : undefined}
                                         class="h-full w-full"
                                       />
                                     </div>

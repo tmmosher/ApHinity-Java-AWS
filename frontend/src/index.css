@@ -89,6 +89,14 @@
   animation-delay: 0.41s;
 }
 
+.service-calendar-transition-surface[data-service-calendar-transition="previous"] {
+  /* Animation scaffold: add previous-month transition styles here. */
+}
+
+.service-calendar-transition-surface[data-service-calendar-transition="next"] {
+  /* Animation scaffold: add next-month transition styles here. */
+}
+
 @keyframes gradient-border-trace {
   0% {
     background-position: 110% 0%, 125% 0%;

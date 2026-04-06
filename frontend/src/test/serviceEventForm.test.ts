@@ -1,9 +1,11 @@
 import {describe, expect, it} from "vitest";
 import {
+  canCompleteLocationServiceEvent,
   canEditLocationServiceEvent,
   canChooseServiceEventResponsibility,
   createDefaultServiceEventDraft,
   createLocationServiceEventRequestFromDraft,
+  createLocationServiceEventRequestFromEvent,
   createServiceEventDraftFromEvent
 } from "../util/location/serviceEventForm";
 import {formatDateInputValue} from "../util/location/dateUtility";
@@ -36,6 +38,14 @@ describe("serviceEventForm helpers", () => {
     expect(canEditLocationServiceEvent("admin", "partner")).toBe(true);
     expect(canEditLocationServiceEvent("client", "client")).toBe(true);
     expect(canEditLocationServiceEvent("client", "partner")).toBe(false);
+  });
+
+  it("only allows incomplete events to be marked complete by authorized roles", () => {
+    expect(canCompleteLocationServiceEvent("partner", "partner", "upcoming")).toBe(true);
+    expect(canCompleteLocationServiceEvent("admin", "partner", "current")).toBe(true);
+    expect(canCompleteLocationServiceEvent("client", "client", "overdue")).toBe(true);
+    expect(canCompleteLocationServiceEvent("client", "partner", "upcoming")).toBe(false);
+    expect(canCompleteLocationServiceEvent("partner", "client", "completed")).toBe(false);
   });
 
   it("creates an editable draft from an existing service event", () => {
@@ -92,6 +102,33 @@ describe("serviceEventForm helpers", () => {
       endTime: "11:00",
       description: "Confirm hardware delivery.",
       status: "upcoming"
+    });
+  });
+
+  it("builds an update request from an existing service event", () => {
+    const request = createLocationServiceEventRequestFromEvent({
+      id: 21,
+      title: "Quarterly review",
+      responsibility: "client",
+      date: "2026-04-01",
+      time: "08:30:00",
+      endDate: "2026-04-01",
+      endTime: "11:00:00",
+      description: "Review current metrics",
+      status: "current",
+      createdAt: "2026-03-01T00:00:00Z",
+      updatedAt: "2026-03-02T00:00:00Z"
+    });
+
+    expect(request).toEqual({
+      title: "Quarterly review",
+      responsibility: "client",
+      date: "2026-04-01",
+      time: "08:30:00",
+      endDate: "2026-04-01",
+      endTime: "11:00:00",
+      description: "Review current metrics",
+      status: "current"
     });
   });
 

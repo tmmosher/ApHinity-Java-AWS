@@ -8,7 +8,9 @@ vi.mock("corvu/popover", async () => {
   return { default: Popover };
 });
 
-import ServiceScheduleCalendar from "../pages/authenticated/panels/location/ServiceScheduleCalendar";
+import ServiceScheduleCalendar, {
+  resolveServiceCalendarTransitionDirection
+} from "../pages/authenticated/panels/location/ServiceScheduleCalendar";
 import {requestServiceEventEdit} from "../pages/authenticated/panels/location/ServiceEventEditPopover";
 
 describe("ServiceScheduleCalendar", () => {
@@ -73,6 +75,9 @@ describe("ServiceScheduleCalendar", () => {
     expect(html).toContain("Service schedule calendar");
     expect(html).toContain("Go to previous month");
     expect(html).toContain("Go to next month");
+    expect(html).toContain("data-service-calendar-filter-trigger");
+    expect(html).toContain("data-service-calendar-transition-surface");
+    expect(html).toContain("service-calendar-transition-surface h-full min-h-0");
     expect((html.match(/data-corvu-calendar-celltrigger/g) ?? [])).toHaveLength(42);
     expect((html.match(/data-service-calendar-day-trigger/g) ?? [])).toHaveLength(42);
     expect((html.match(/data-service-event-create-popover/g) ?? [])).toHaveLength(0);
@@ -89,5 +94,28 @@ describe("ServiceScheduleCalendar", () => {
     expect(html).toContain("cursor-pointer");
     expect(html).toContain("hover:-translate-y-px");
     expect(html).toContain("active:translate-y-px");
+  });
+
+  it("resolves swipe directions from the current month to the next month", () => {
+    expect(resolveServiceCalendarTransitionDirection(
+      new Date("2026-04-01T00:00:00"),
+      new Date("2026-03-01T00:00:00")
+    )).toBe("previous");
+    expect(resolveServiceCalendarTransitionDirection(
+      new Date("2026-04-01T00:00:00"),
+      new Date("2026-05-01T00:00:00")
+    )).toBe("next");
+    expect(resolveServiceCalendarTransitionDirection(
+      new Date("2026-04-01T00:00:00"),
+      new Date("2026-04-15T00:00:00")
+    )).toBeUndefined();
+    expect(resolveServiceCalendarTransitionDirection(
+      new Date("2026-12-01T00:00:00"),
+      new Date("2027-01-01T00:00:00")
+    )).toBe("next");
+    expect(resolveServiceCalendarTransitionDirection(
+      new Date("2026-01-01T00:00:00"),
+      new Date("2025-12-01T00:00:00")
+    )).toBe("previous");
   });
 });

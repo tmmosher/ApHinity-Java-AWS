@@ -1,7 +1,11 @@
 import Calendar from "corvu/calendar";
 import Popover from "corvu/popover";
-import {For, Show, createMemo, type Component, type JSX} from "solid-js";
-import type {AccountRole, CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
+import {For, Show, createMemo, createSignal, type Component, type JSX} from "solid-js";
+import type {
+  AccountRole,
+  CreateLocationServiceEventRequest,
+  LocationServiceEvent
+} from "../../../../types/Types";
 import {
   formatMonthLabel,
   formatWeekdayLong,
@@ -9,6 +13,13 @@ import {
   isSameCalendarMonth,
   formatDisplayDate
 } from "../../../../util/location/dateUtility";
+import {
+  countActiveServiceCalendarFilters,
+  createDefaultServiceCalendarFilters,
+  filterLocationServiceEvents,
+  type ServiceCalendarFilters
+} from "../../../../util/location/serviceCalendarFilters";
+import ServiceCalendarFiltersPopover from "./ServiceCalendarFiltersPopover";
 import {
   buildServiceCalendarWeekLayouts,
   type ServiceCalendarVisibleSegment,
@@ -31,16 +42,20 @@ type ServiceScheduleCalendarProps = {
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  canCompleteEvent?: (event: LocationServiceEvent) => boolean;
+  onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type ServiceEventSegmentProps = {
   segment: ServiceCalendarVisibleSegment;
   canEdit: boolean;
+  canComplete: boolean;
   editRole?: AccountRole | undefined;
   onEditEventSave?: (
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type HiddenDayEventsPopoverProps = {
@@ -48,10 +63,12 @@ type HiddenDayEventsPopoverProps = {
   hiddenEvents: readonly LocationServiceEvent[];
   editRole?: AccountRole | undefined;
   canEditEvent?: (event: LocationServiceEvent) => boolean;
+  canCompleteEvent?: (event: LocationServiceEvent) => boolean;
   onEditEventSave?: (
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type ServiceCalendarDayBackgroundProps = {
@@ -69,11 +86,15 @@ type ServiceCalendarWeekRowProps = {
   eventEditorRole?: AccountRole | undefined;
   onCreateEventSave?: (request: CreateLocationServiceEventRequest) => Promise<void>;
   canEditEvent?: (event: LocationServiceEvent) => boolean;
+  canCompleteEvent?: (event: LocationServiceEvent) => boolean;
   onEditEventSave?: (
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
+
+type ServiceCalendarTransitionDirection = "previous" | "next";
 
 const MAX_VISIBLE_WEEK_EVENT_LANES = 2;
 const EVENT_GRID_ROW_OFFSET = 2;
@@ -176,12 +197,31 @@ const formatEventDateRange = (event: LocationServiceEvent): string => (
     : `${formatDisplayDate(event.date)} - ${formatDisplayDate(event.endDate)}`
 );
 
+export const resolveServiceCalendarTransitionDirection = (
+  currentMonth: Date | undefined,
+  nextMonth: Date
+): ServiceCalendarTransitionDirection | undefined => {
+  if (!currentMonth) {
+    return undefined;
+  }
+
+  const currentMonthIndex = currentMonth.getFullYear() * 12 + currentMonth.getMonth();
+  const nextMonthIndex = nextMonth.getFullYear() * 12 + nextMonth.getMonth();
+  if (currentMonthIndex === nextMonthIndex) {
+    return undefined;
+  }
+
+  return nextMonthIndex > currentMonthIndex ? "next" : "previous";
+};
+
 const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
   <ServiceEventEditPopover
     event={props.segment.event}
     canEdit={props.canEdit}
+    canComplete={props.canComplete}
     role={props.editRole}
     onSave={props.onEditEventSave}
+    onComplete={props.onCompleteEvent}
   >
     <Popover.Trigger
       type="button"
@@ -199,17 +239,21 @@ const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
 const HiddenDayEventListItem = (props: {
   event: LocationServiceEvent;
   canEdit: boolean;
+  canComplete: boolean;
   editRole?: AccountRole | undefined;
   onEditEventSave?: (
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 }) => (
   <ServiceEventEditPopover
     event={props.event}
     canEdit={props.canEdit}
+    canComplete={props.canComplete}
     role={props.editRole}
     onSave={props.onEditEventSave}
+    onComplete={props.onCompleteEvent}
   >
     <Popover.Trigger
       type="button"
@@ -259,8 +303,10 @@ const HiddenDayEventsPopover = (props: HiddenDayEventsPopoverProps) => (
                 <HiddenDayEventListItem
                   event={event}
                   canEdit={props.canEditEvent?.(event) ?? false}
+                  canComplete={props.canCompleteEvent?.(event) ?? false}
                   editRole={props.editRole}
                   onEditEventSave={props.onEditEventSave}
+                  onCompleteEvent={props.onCompleteEvent}
                 />
               )}
             </For>
@@ -330,8 +376,10 @@ const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
         <ServiceEventSegment
           segment={segment}
           canEdit={props.canEditEvent?.(segment.event) ?? false}
+          canComplete={props.canCompleteEvent?.(segment.event) ?? false}
           editRole={props.eventEditorRole}
           onEditEventSave={props.onEditEventSave}
+          onCompleteEvent={props.onCompleteEvent}
         />
       )}
     </For>
@@ -344,7 +392,9 @@ const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
             hiddenEvents={hiddenEvents}
             editRole={props.eventEditorRole}
             canEditEvent={props.canEditEvent}
+            canCompleteEvent={props.canCompleteEvent}
             onEditEventSave={props.onEditEventSave}
+            onCompleteEvent={props.onCompleteEvent}
           />
         </Show>
       )}
@@ -362,100 +412,150 @@ const WeekdayHeaderCell = (props: {day: Date}) => (
   </div>
 );
 
-export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = (props) => (
-  <Calendar
-    mode="single"
-    fixedWeeks
-    disableOutsideDays={false}
-    startOfWeek={0}
-    month={props.month}
-    onMonthChange={props.onMonthChange}
-  >
-    {(calendar) => {
-      const weekLayouts = createMemo(() => (
-        buildServiceCalendarWeekLayouts(
-          calendar.weeks,
-          props.events ?? [],
-          MAX_VISIBLE_WEEK_EVENT_LANES
-        )
-      ));
+export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = (props) => {
+  const [filters, setFilters] = createSignal<ServiceCalendarFilters>(createDefaultServiceCalendarFilters());
+  const [transitionDirection, setTransitionDirection] = createSignal<ServiceCalendarTransitionDirection>();
+  // Remount the calendar surface on month changes so future CSS transitions can replay cleanly.
+  const [transitionCycle, setTransitionCycle] = createSignal(0);
+  const activeFilterCount = createMemo(() => countActiveServiceCalendarFilters(filters()));
+  const filteredEvents = createMemo(() => filterLocationServiceEvents(props.events ?? [], filters()));
 
-      return (
-        <div class="grid h-full min-h-[42rem] grid-rows-[auto_auto_1fr] gap-5">
-          <div class="flex items-center justify-between gap-3">
-            <Calendar.Nav
-              action="prev-month"
-              aria-label="Go to previous month"
-              class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
-            >
-              <CalendarChevron direction="left" />
-            </Calendar.Nav>
+  const handleMonthChange = (month: Date) => {
+    const direction = resolveServiceCalendarTransitionDirection(props.month, month);
+    if (direction) {
+      setTransitionDirection(direction);
+      setTransitionCycle((current) => current + 1);
+    }
+    props.onMonthChange?.(month);
+  };
 
-            <div class="min-w-0 text-center">
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-base-content/55">
-                Viewing Month
-              </p>
-              <Calendar.Label class="mt-1 text-lg font-semibold tracking-tight text-base-content md:text-2xl">
-                {formatMonthLabel(calendar.month)} {calendar.month.getFullYear()}
-              </Calendar.Label>
-            </div>
+  return (
+    <Calendar
+      mode="single"
+      fixedWeeks
+      disableOutsideDays={false}
+      startOfWeek={0}
+      month={props.month}
+      onMonthChange={handleMonthChange}
+    >
+      {(calendar) => {
+        const weekLayouts = createMemo(() => (
+          buildServiceCalendarWeekLayouts(
+            calendar.weeks,
+            filteredEvents(),
+            MAX_VISIBLE_WEEK_EVENT_LANES
+          )
+        ));
 
-            <Calendar.Nav
-              action="next-month"
-              aria-label="Go to next month"
-              class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
-            >
-              <CalendarChevron direction="right" />
-            </Calendar.Nav>
-          </div>
+        return (
+          <div class="grid h-full min-h-[42rem] grid-rows-[auto_auto_1fr] gap-5">
+            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+              <Calendar.Nav
+                action="prev-month"
+                aria-label="Go to previous month"
+                class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
+              >
+                <CalendarChevron direction="left" />
+              </Calendar.Nav>
 
-          <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
-            <Show when={props.isLoading}>
-              <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
-                Syncing visible months...
-              </span>
-            </Show>
-            <Show when={props.error}>
-              <span class="rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-error">
-                {props.error}
-              </span>
-            </Show>
-            <Show when={props.error && props.onRetry}>
-              <button type="button" class="btn btn-xs btn-outline" onClick={props.onRetry}>
-                Retry
-              </button>
-            </Show>
-          </div>
+              <div class="flex min-w-0 items-center justify-center gap-2 md:gap-3">
+                <ServiceCalendarFiltersPopover
+                  filters={filters()}
+                  activeFilterCount={activeFilterCount()}
+                  onUpdate={(updater) => {
+                    setFilters((current) => updater(current));
+                  }}
+                />
 
-          <div class="min-h-0 overflow-hidden rounded-2xl border border-base-300/80 bg-base-300/70 shadow-inner">
-            <div role="grid" aria-label="Service schedule calendar" class="grid h-full grid-rows-[auto_1fr] gap-px">
-              <div role="row" class="grid grid-cols-7 gap-px bg-base-300/70">
-                <For each={calendar.weekdays}>
-                  {(weekday) => <WeekdayHeaderCell day={weekday} />}
-                </For>
+                <div class="min-w-0 text-center">
+                  <p class="text-xs font-semibold uppercase tracking-[0.22em] text-base-content/55">
+                    Viewing Month
+                  </p>
+                  <Calendar.Label class="mt-1 text-lg font-semibold tracking-tight text-base-content md:text-2xl">
+                    {formatMonthLabel(calendar.month)} {calendar.month.getFullYear()}
+                  </Calendar.Label>
+                </div>
               </div>
 
-              <div class="grid min-h-0 gap-px bg-base-300/70">
-                <For each={calendar.weeks}>
-                  {(week, weekIndex) => (
-                    <ServiceCalendarWeekRow
-                      week={week}
-                      month={calendar.month}
-                      layout={weekLayouts()[weekIndex()]}
-                      eventEditorRole={props.eventEditorRole}
-                      onCreateEventSave={props.onCreateEventSave}
-                      canEditEvent={props.canEditEvent}
-                      onEditEventSave={props.onEditEventSave}
-                    />
-                  )}
-                </For>
-              </div>
+              <Calendar.Nav
+                action="next-month"
+                aria-label="Go to next month"
+                class="btn btn-sm h-11 min-h-11 w-11 min-w-11 rounded-2xl border border-base-300 bg-base-100/80 px-0 text-base-content/70 shadow-sm transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px hover:bg-base-200/80 hover:text-base-content active:translate-y-px active:scale-[0.98]"
+              >
+                <CalendarChevron direction="right" />
+              </Calendar.Nav>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
+              <Show when={props.isLoading}>
+                <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
+                  Syncing visible months...
+                </span>
+              </Show>
+              <Show when={activeFilterCount() > 0 && props.events !== undefined}>
+                <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
+                  Showing {filteredEvents().length} of {(props.events ?? []).length} events
+                </span>
+              </Show>
+              <Show when={activeFilterCount() > 0 && props.events !== undefined && !props.isLoading && filteredEvents().length === 0}>
+                <span class="rounded-full border border-warning/25 bg-warning/10 px-2.5 py-1 text-warning-content">
+                  No events match the selected filters.
+                </span>
+              </Show>
+              <Show when={props.error}>
+                <span class="rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-error">
+                  {props.error}
+                </span>
+              </Show>
+              <Show when={props.error && props.onRetry}>
+                <button type="button" class="btn btn-xs btn-outline" onClick={props.onRetry}>
+                  Retry
+                </button>
+              </Show>
+            </div>
+
+            <div class="min-h-0 overflow-hidden rounded-2xl border border-base-300/80 bg-base-300/70 shadow-inner">
+              <Show when={transitionCycle() + 1} keyed>
+                {() => (
+                  <div
+                    class="service-calendar-transition-surface h-full min-h-0"
+                    data-service-calendar-transition-surface=""
+                    data-service-calendar-transition={transitionDirection()}
+                  >
+                    <div role="grid" aria-label="Service schedule calendar" class="grid h-full grid-rows-[auto_1fr] gap-px">
+                      <div role="row" class="grid grid-cols-7 gap-px bg-base-300/70">
+                        <For each={calendar.weekdays}>
+                          {(weekday) => <WeekdayHeaderCell day={weekday} />}
+                        </For>
+                      </div>
+
+                      <div class="grid min-h-0 gap-px bg-base-300/70">
+                        <For each={calendar.weeks}>
+                          {(week, weekIndex) => (
+                            <ServiceCalendarWeekRow
+                              week={week}
+                              month={calendar.month}
+                              layout={weekLayouts()[weekIndex()]}
+                              eventEditorRole={props.eventEditorRole}
+                              onCreateEventSave={props.onCreateEventSave}
+                              canEditEvent={props.canEditEvent}
+                              canCompleteEvent={props.canCompleteEvent}
+                              onEditEventSave={props.onEditEventSave}
+                              onCompleteEvent={props.onCompleteEvent}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Show>
             </div>
           </div>
-        </div>
-      );
-    }}
-  </Calendar>
-);
+        );
+      }}
+    </Calendar>
+  );
+};
 
 export default ServiceScheduleCalendar;

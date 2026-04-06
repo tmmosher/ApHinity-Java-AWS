@@ -8,9 +8,32 @@ export type PlotlyData = Partial<Plotly.PlotData>;
 export type PlotlyLayout = Partial<Plotly.Layout>;
 export type PlotlyConfig = Partial<Plotly.Config>;
 type PlotlyReactTarget = Pick<typeof Plotly, "react">;
+type PlotlyAnimatedRenderTarget = Pick<typeof Plotly, "react"> & Partial<Pick<typeof Plotly, "animate">>;
 type PlotlyResizeTarget = Pick<typeof Plotly, "Plots">;
 type ResizeEventTarget = Pick<Window, "addEventListener" | "removeEventListener">;
 type PlotlyModule = typeof Plotly;
+
+type PlotlyRenderOptions = {
+    animateFromBaseline?: boolean;
+};
+
+type PlotlyAnimationFrame = {
+    data: PlotlyData[];
+    layout?: PlotlyLayout;
+    traces: number[];
+};
+
+const GRAPH_LOAD_ANIMATION_OPTIONS = {
+    transition: {
+        duration: 700,
+        easing: "cubic-in-out"
+    },
+    frame: {
+        duration: 700,
+        redraw: false
+    },
+    mode: "afterall" as const
+};
 
 let plotlyModulePromise: Promise<PlotlyModule> | null = null;
 
@@ -20,6 +43,7 @@ export type PlotlyChartProps = {
     layout?: PlotlyLayout;
     config?: PlotlyConfig;
     style?: Record<string, unknown> | null;
+    animationToken?: number | string;
     class?: string;
 };
 
@@ -42,6 +66,66 @@ export const buildPlotlyLayout = (
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === "object" && !Array.isArray(value);
+
+const cloneTraceWithZeroedValues = (
+    trace: PlotlyData,
+    axisKey: "x" | "y" | "values"
+): PlotlyData => {
+    if (!isRecord(trace) || !Array.isArray(trace[axisKey])) {
+        return trace;
+    }
+
+    let changed = false;
+    const zeroedValues = trace[axisKey].map((value) => {
+        if (toFiniteNumber(value) === null) {
+            return value;
+        }
+        changed = true;
+        return 0;
+    });
+
+    if (!changed) {
+        return trace;
+    }
+
+    return {
+        ...trace,
+        [axisKey]: zeroedValues
+    };
+};
+
+export const createPlotlyAnimationBaselineData = (data: PlotlyData[]): PlotlyData[] => (
+    data.map((trace) => {
+        if (!isRecord(trace)) {
+            return trace;
+        }
+
+        const normalizedType = String(trace.type ?? "").toLowerCase();
+        if (normalizedType === "pie") {
+            return cloneTraceWithZeroedValues(trace, "values");
+        }
+        if (normalizedType === "bar" && String(trace.orientation ?? "").toLowerCase() === "h") {
+            return cloneTraceWithZeroedValues(trace, "x");
+        }
+        if (normalizedType === "bar" || normalizedType === "scatter") {
+            return cloneTraceWithZeroedValues(trace, "y");
+        }
+        return trace;
+    })
+);
+
+const canAnimateFromBaseline = (plotly: PlotlyAnimatedRenderTarget): plotly is PlotlyAnimatedRenderTarget & {
+    animate: typeof Plotly.animate;
+} => typeof plotly.animate === "function";
+
+const createPlotlyAnimationFrame = (
+    data: PlotlyData[],
+    layout?: PlotlyLayout
+): PlotlyAnimationFrame => ({
+    data,
+    layout,
+    traces: data.map((_, index) => index)
+});
 
 const toFiniteNumber = (value: unknown): number | null => {
     if (typeof value === "number" && Number.isFinite(value)) {
@@ -161,19 +245,42 @@ export const applyDonutCenterValueToLayout = (
 };
 
 export const renderPlotlyChart = async (
-    plotly: PlotlyReactTarget,
+    plotly: PlotlyAnimatedRenderTarget,
     el: HTMLDivElement,
     data: PlotlyData[],
     layout?: PlotlyLayout,
     config?: PlotlyConfig,
-    themePreference: ThemePreference = getDocumentThemePreference()
+    themePreference: ThemePreference = getDocumentThemePreference(),
+    options: PlotlyRenderOptions = {}
 ) => {
-    const layoutWithDonutCenter = applyDonutCenterValueToLayout(data, layout);
-    await plotly.react(
+    const finalLayout = buildPlotlyLayout(
+        applyDonutCenterValueToLayout(data, layout),
+        themePreference
+    );
+    const finalConfig = buildPlotlyConfig(config);
+
+    if (!options.animateFromBaseline || !canAnimateFromBaseline(plotly)) {
+        await plotly.react(el, data as any, finalLayout as any, finalConfig as any);
+        return;
+    }
+
+    const baselineData = createPlotlyAnimationBaselineData(data);
+    const shouldAnimate = baselineData.some((trace, index) => trace !== data[index]);
+    if (!shouldAnimate) {
+        await plotly.react(el, data as any, finalLayout as any, finalConfig as any);
+        return;
+    }
+
+    const baselineLayout = buildPlotlyLayout(
+        applyDonutCenterValueToLayout(baselineData, layout),
+        themePreference
+    );
+
+    await plotly.react(el, baselineData as any, baselineLayout as any, finalConfig as any);
+    await plotly.animate(
         el,
-        data as any,
-        buildPlotlyLayout(layoutWithDonutCenter, themePreference) as any,
-        buildPlotlyConfig(config) as any
+        createPlotlyAnimationFrame(data, finalLayout) as any,
+        GRAPH_LOAD_ANIMATION_OPTIONS as any
     );
 };
 
@@ -204,6 +311,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
     let cleanupResize: (() => void) | undefined;
     let disconnectThemeObserver: (() => void) | undefined;
     let renderQueue: Promise<void> = Promise.resolve();
+    let lastScheduledAnimationToken: number | string | undefined;
     const [plotlyModule, setPlotlyModule] = createSignal<PlotlyModule | null>(null);
     const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
 
@@ -237,6 +345,11 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         const data = props.data;
         const layout = resolveThemedGraphLayout(props.layout, props.style, activeTheme);
         const config = props.config;
+        const animationToken = props.animationToken;
+        const shouldAnimate = animationToken !== undefined && animationToken !== lastScheduledAnimationToken;
+        if (shouldAnimate) {
+            lastScheduledAnimationToken = animationToken;
+        }
 
         renderQueue = renderQueue
             .catch(() => undefined)
@@ -246,7 +359,15 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
                 }
 
                 try {
-                    await renderPlotlyChart(module, el, data, layout, config, activeTheme);
+                    await renderPlotlyChart(
+                        module,
+                        el,
+                        data,
+                        layout,
+                        config,
+                        activeTheme,
+                        {animateFromBaseline: shouldAnimate}
+                    );
                 } catch (error) {
                     console.error(`Failed to render graph "${props.name}"`, error);
                     return;

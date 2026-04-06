@@ -47,6 +47,14 @@ export const canEditLocationServiceEvent = (
   role === "admin" || role === "partner" || responsibility === "client"
 );
 
+export const canCompleteLocationServiceEvent = (
+  role: AccountRole | undefined,
+  responsibility: ServiceEventResponsibility,
+  status: ServiceEventStatus
+): boolean => (
+  status !== "completed" && canEditLocationServiceEvent(role, responsibility)
+);
+
 export const normalizeServiceEventResponsibilityForRole = (
   role: AccountRole | undefined,
   responsibility: ServiceEventResponsibility
@@ -85,6 +93,19 @@ export const createServiceEventDraftFromEvent = (event: LocationServiceEvent): S
   endTime: formatTimeInputValue(event.endTime),
   allDayStartDate: event.date,
   allDayEndDate: event.endDate,
+  status: event.status
+});
+
+export const createLocationServiceEventRequestFromEvent = (
+  event: LocationServiceEvent
+): CreateLocationServiceEventRequest => ({
+  title: event.title,
+  responsibility: event.responsibility,
+  date: event.date,
+  time: event.time,
+  endDate: event.endDate,
+  endTime: event.endTime,
+  description: event.description,
   status: event.status
 });
 

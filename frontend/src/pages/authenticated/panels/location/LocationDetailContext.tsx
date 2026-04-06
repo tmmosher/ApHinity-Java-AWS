@@ -4,6 +4,7 @@ import type {LocationGraph, LocationSummary} from "../../../../types/Types";
 export type LocationDetailContextValue = {
   location: Accessor<LocationSummary | undefined>;
   graphs: Accessor<LocationGraph[] | undefined>;
+  graphsLoading: Accessor<boolean>;
   graphsError: Accessor<unknown>;
   refetchLocation: () => Promise<void>;
   refetchGraphs: () => Promise<void>;
@@ -17,6 +18,7 @@ export const LocationDetailProvider = (props: LocationDetailProviderProps) => (
   <LocationDetailContext.Provider value={{
     location: props.location,
     graphs: props.graphs,
+    graphsLoading: props.graphsLoading,
     graphsError: props.graphsError,
     refetchLocation: props.refetchLocation,
     refetchGraphs: props.refetchGraphs

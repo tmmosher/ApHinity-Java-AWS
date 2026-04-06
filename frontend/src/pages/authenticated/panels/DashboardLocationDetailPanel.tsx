@@ -57,6 +57,9 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
 
   const location = createMemo(() => getFreshLocationScopedValue(params.locationId, locationResource()));
   const graphs = createMemo(() => getFreshLocationScopedValue(params.locationId, graphResource()));
+  const graphsLoading = createMemo(() =>
+    requestedGraphLocationId() === params.locationId && graphResource.loading
+  );
   const graphsError = createMemo(() =>
     requestedGraphLocationId() === params.locationId && !graphResource.loading
       ? graphResource.error
@@ -105,6 +108,7 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
               <LocationDetailProvider
                 location={location}
                 graphs={graphs}
+                graphsLoading={graphsLoading}
                 graphsError={graphsError}
                 refetchLocation={refetchLocationDetail}
                 refetchGraphs={refetchLocationGraphs}

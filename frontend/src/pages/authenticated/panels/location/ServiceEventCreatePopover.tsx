@@ -7,6 +7,7 @@ import {
   createServiceEventEditorController,
   ServiceEventEditorBody
 } from "./ServiceEventEditor";
+import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "./serviceEventPopoverPosition";
 
 type ServiceEventCreatePopoverProps = {
   day: Date;
@@ -18,7 +19,7 @@ type ServiceEventCreatePopoverProps = {
 };
 
 const CREATE_POPOVER_PROPS = {
-  placement: "bottom-start" as const,
+  ...SERVICE_EVENT_POPOVER_POSITION_PROPS,
   trapFocus: false,
   restoreFocus: false
 };

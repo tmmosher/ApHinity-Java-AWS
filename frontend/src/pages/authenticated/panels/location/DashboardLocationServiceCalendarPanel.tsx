@@ -10,7 +10,11 @@ import {
 } from "../../../../util/location/locationEventApi";
 import {formatLocationEventMonth, normalizeMonthStart} from "../../../../util/location/dateUtility";
 import type {CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
-import {canEditLocationServiceEvent} from "../../../../util/location/serviceEventForm";
+import {
+  canCompleteLocationServiceEvent,
+  canEditLocationServiceEvent,
+  createLocationServiceEventRequestFromEvent
+} from "../../../../util/location/serviceEventForm";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 
 type ServiceEventCalendarResource = {
@@ -77,6 +81,15 @@ export const DashboardLocationServiceCalendarPanel = () => {
     toast.success("Service event updated.");
   };
 
+  const completeServiceEvent = async (event: LocationServiceEvent): Promise<void> => {
+    await updateLocationEventById(host, params.locationId, event.id, {
+      ...createLocationServiceEventRequestFromEvent(event),
+      status: "completed"
+    });
+    await refetchServiceEvents();
+    toast.success("Service event marked complete.");
+  };
+
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
@@ -112,6 +125,8 @@ export const DashboardLocationServiceCalendarPanel = () => {
           onCreateEventSave={saveServiceEvent}
           canEditEvent={(event) => canEditLocationServiceEvent(role(), event.responsibility)}
           onEditEventSave={saveEditedServiceEvent}
+          canCompleteEvent={(event) => canCompleteLocationServiceEvent(role(), event.responsibility, event.status)}
+          onCompleteEvent={completeServiceEvent}
         />
       </section>
     </div>
