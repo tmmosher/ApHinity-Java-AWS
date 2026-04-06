@@ -61,3 +61,6 @@ src/main/resources/static/
 ### Local Gradle caches ###
 /.gradle-home/
 /.gradle-local/
+
+# environment vars
+.env.runtime

@@ -76,6 +76,7 @@ export const dashboardNavForAccount = (role: AccountRole, verified: boolean): Na
   if (verified) {
     return navItems;
   }
+  // returns everything that isn't a location-scoped path
   return navItems.filter((item) => {
     if (!item.href) {
       return true;
