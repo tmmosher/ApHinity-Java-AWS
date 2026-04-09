@@ -25,7 +25,7 @@ import java.util.Map;
  * The handler keeps client-facing messages intentionally safe while still logging
  * detailed context for troubleshooting.
  */
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.aphinity.client_analytics_core.api")
 public class ApiExceptionHandler {
     private final AsyncLogService logService;
 
