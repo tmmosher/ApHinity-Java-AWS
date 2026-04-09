@@ -19,6 +19,7 @@ import {
   buildTraceLabel,
   createTrace,
   getTraceArray,
+  getPieRowColor,
   getTraceColor,
   getTraceType,
   getTraceYAxisRange,
@@ -27,6 +28,7 @@ import {
   removePieRow,
   removeTraceWithPlotly,
   renameTrace,
+  setPieRowColor,
   setTraceColor,
   updateTraceYAxisRange,
   updateCartesianX,
@@ -48,17 +50,20 @@ type GraphEditorModalProps = {
 };
 
 const TRACE_COLOR_VALUES = new Set(Object.values(TRACE_COLOR_OPTIONS));
+const EMPTY_EDITABLE_GRAPH_PAYLOAD: EditableGraphPayload = {
+  data: [],
+  layout: null,
+  config: null,
+  style: null
+};
 
 export const GraphEditorModal = (props: GraphEditorModalProps) => {
-  const [editablePayload, setEditablePayload] = createSignal<EditableGraphPayload>({
-    data: [],
-    layout: null,
-    config: null,
-    style: null
-  });
+  const [editablePayload, setEditablePayload] = createSignal<EditableGraphPayload>(
+    props.graph ? createEditableGraphPayload(props.graph) : EMPTY_EDITABLE_GRAPH_PAYLOAD
+  );
   const [selectedTraceIndex, setSelectedTraceIndex] = createSignal(0);
   const [traceNameDraft, setTraceNameDraft] = createSignal("");
-  const [graphNameDraft, setGraphNameDraft] = createSignal("");
+  const [graphNameDraft, setGraphNameDraft] = createSignal(props.graph?.name ?? "");
   const [operationError, setOperationError] = createSignal("");
   const [renameError, setRenameError] = createSignal("");
   const [isRemovingTrace, setIsRemovingTrace] = createSignal(false);
@@ -103,6 +108,11 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       };
     })
   );
+
+  const isPieGraph = createMemo(() => {
+    const firstTrace = editablePayload().data[0] ?? props.graph?.data[0];
+    return isRecord(firstTrace) && getTraceType(firstTrace) === "pie";
+  });
 
   const selectedTrace = createMemo(() => {
     const trace = editablePayload().data[selectedTraceIndex()];
@@ -156,6 +166,14 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const pieRowIndexes = createMemo(() =>
     Array.from({length: Math.max(pieLabels().length, pieValues().length)}, (_, index) => index)
   );
+
+  const pieRowColors = createMemo(() => {
+    const trace = selectedTrace();
+    if (!trace) {
+      return [] as string[];
+    }
+    return pieRowIndexes().map((rowIndex) => getPieRowColor(trace, rowIndex));
+  });
 
   const cartesianXValues = createMemo(() => {
     const trace = selectedTrace();
@@ -495,25 +513,27 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
               </label>
             </section>
 
-            <TraceControls
-              traceOptions={traceOptions()}
-              selectedTraceIndex={selectedTraceIndex()}
-              traceNameDraft={traceNameDraft()}
-              selectedTraceColor={selectedTraceColorValue()}
-              colorOptions={TRACE_COLOR_OPTIONS}
-              disableAddTrace={isBusy()}
-              disableTraceSelect={isBusy() || traceOptions().length === 0}
-              disableColorSelect={isBusy() || !selectedTraceType()}
-              disableTraceNameInput={isBusy() || !selectedTrace()}
-              disableRenameTrace={isBusy() || !selectedTrace()}
-              disableRemoveTrace={isBusy() || !selectedTrace()}
-              onAddTrace={addNewTrace}
-              onSelectTrace={setSelectedTraceIndex}
-              onChangeTraceName={setTraceNameDraft}
-              onApplyColor={applyTraceColor}
-              onRenameTrace={renameSelectedTrace}
-              onRemoveTrace={() => void removeSelectedTrace()}
-            />
+            <Show when={!isPieGraph()}>
+              <TraceControls
+                traceOptions={traceOptions()}
+                selectedTraceIndex={selectedTraceIndex()}
+                traceNameDraft={traceNameDraft()}
+                selectedTraceColor={selectedTraceColorValue()}
+                colorOptions={TRACE_COLOR_OPTIONS}
+                disableAddTrace={isBusy()}
+                disableTraceSelect={isBusy() || traceOptions().length === 0}
+                disableColorSelect={isBusy() || !selectedTraceType()}
+                disableTraceNameInput={isBusy() || !selectedTrace()}
+                disableRenameTrace={isBusy() || !selectedTrace()}
+                disableRemoveTrace={isBusy() || !selectedTrace()}
+                onAddTrace={addNewTrace}
+                onSelectTrace={setSelectedTraceIndex}
+                onChangeTraceName={setTraceNameDraft}
+                onApplyColor={applyTraceColor}
+                onRenameTrace={renameSelectedTrace}
+                onRemoveTrace={() => void removeSelectedTrace()}
+              />
+            </Show>
 
             <Show
               when={selectedTrace()}
@@ -537,8 +557,13 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       rowIndexes={pieRowIndexes()}
                       labels={pieLabels()}
                       values={pieValues()}
+                      rowColors={pieRowColors()}
+                      colorOptions={TRACE_COLOR_OPTIONS}
                       isBusy={isBusy()}
                       onAddRow={() => updateSelectedTrace((trace) => addPieRow(trace))}
+                      onUpdateColor={(rowIndex, colorHex) =>
+                        updateSelectedTrace((trace) => setPieRowColor(trace, rowIndex, colorHex))
+                      }
                       onUpdateLabel={(rowIndex, rawValue) =>
                         updateSelectedTrace((trace) => updatePieLabel(trace, rowIndex, rawValue))
                       }

@@ -1,4 +1,5 @@
 import {LocationGraph, LocationGraphUpdate} from "../../types/Types";
+import {normalizePlotlyLayoutTitle} from "./graphLayoutTitle";
 
 export type EditableGraphPayload = {
   data: Record<string, unknown>[];
@@ -50,6 +51,20 @@ const parseOptionalGraphObject = (
   return value;
 };
 
+const normalizeEditableLayout = (
+  layout: Record<string, unknown> | null | undefined
+): Record<string, unknown> | null => {
+  if (!isRecord(layout)) {
+    return null;
+  }
+
+  const nextLayout = cloneJson(layout);
+  if ("title" in nextLayout) {
+    nextLayout.title = normalizePlotlyLayoutTitle(nextLayout.title);
+  }
+  return nextLayout;
+};
+
 export const getEditableGraphTitle = (
   layout: Record<string, unknown> | null | undefined
 ): string => {
@@ -72,29 +87,24 @@ export const updateEditableGraphTitle = (
   rawTitle: string
 ): Record<string, unknown> | null => {
   const normalizedTitle = rawTitle.trim();
-  const nextLayout = isRecord(layout) ? cloneJson(layout) : {};
+  const nextLayout = normalizeEditableLayout(layout) ?? {};
 
   if (!normalizedTitle) {
     delete nextLayout.title;
     return Object.keys(nextLayout).length > 0 ? nextLayout : null;
   }
 
-  const existingTitle = nextLayout.title;
-  nextLayout.title = isRecord(existingTitle)
-    ? {
-        ...existingTitle,
-        text: normalizedTitle
-      }
-    : {
-        text: normalizedTitle
-      };
+  nextLayout.title = normalizePlotlyLayoutTitle({
+    ...(isRecord(nextLayout.title) ? nextLayout.title : {}),
+    text: normalizedTitle
+  });
 
   return nextLayout;
 };
 
 const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayload => ({
   data: payload.data,
-  layout: payload.layout ?? null,
+  layout: normalizeEditableLayout(payload.layout),
   config: payload.config ?? null,
   style: payload.style ?? null
 });
@@ -109,12 +119,12 @@ const hasOwnKey = <T extends string>(
   Object.prototype.hasOwnProperty.call(value, key);
 
 export const createEditableGraphPayload = (graph: LocationGraph): EditableGraphPayload =>
-  cloneJson({
+  normalizeGraphPayload(cloneJson({
     data: graph.data,
     layout: graph.layout ?? null,
     config: graph.config ?? null,
     style: graph.style ?? null
-  });
+  }));
 
 export const serializeEditableGraphPayload = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload), null, 2);
@@ -133,10 +143,10 @@ export const parseEditableGraphPayload = (rawPayload: string): EditableGraphPayl
 
   return {
     data: parseGraphDataEntries(parsedPayload.data),
-    layout: parseOptionalGraphObject(
+    layout: normalizeEditableLayout(parseOptionalGraphObject(
       hasOwnKey(parsedPayload, "layout") ? parsedPayload.layout : null,
       "layout"
-    ),
+    )),
     config: parseOptionalGraphObject(
       hasOwnKey(parsedPayload, "config") ? parsedPayload.config : null,
       "config"
@@ -199,6 +209,7 @@ export const applyGraphPayloadEdit = (
   graphId: number,
   nextPayload: EditableGraphPayload
 ): GraphEditResult => {
+  const normalizedNextPayload = normalizeGraphPayload(nextPayload);
   const currentGraph = currentGraphs.find((graph) => graph.id === graphId);
   if (!currentGraph) {
     return {
@@ -208,7 +219,7 @@ export const applyGraphPayloadEdit = (
     };
   }
 
-  if (graphPayloadSignature(createEditableGraphPayload(currentGraph)) === graphPayloadSignature(nextPayload)) {
+  if (graphPayloadSignature(createEditableGraphPayload(currentGraph)) === graphPayloadSignature(normalizedNextPayload)) {
     return {
       nextGraphs: currentGraphs,
       nextUndoStack: undoStack,
@@ -220,10 +231,10 @@ export const applyGraphPayloadEdit = (
     graph.id === graphId
       ? {
           ...graph,
-          data: cloneJson(nextPayload.data),
-          layout: cloneJson(nextPayload.layout ?? null),
-          config: cloneJson(nextPayload.config ?? null),
-          style: cloneJson(nextPayload.style ?? null)
+          data: cloneJson(normalizedNextPayload.data),
+          layout: cloneJson(normalizedNextPayload.layout ?? null),
+          config: cloneJson(normalizedNextPayload.config ?? null),
+          style: cloneJson(normalizedNextPayload.style ?? null)
         }
       : graph
   );

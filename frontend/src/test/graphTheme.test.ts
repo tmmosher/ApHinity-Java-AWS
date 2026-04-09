@@ -89,6 +89,8 @@ describe("graphTheme", () => {
     expect(themedLayout.font).toMatchObject({color: "#eceff4"});
     expect(themedLayout.title).toMatchObject({
       text: "Samples by Facility",
+      x: 0.02,
+      xanchor: "left",
       font: {color: "#eceff4"}
     });
     expect(themedLayout.legend).toMatchObject({
@@ -112,6 +114,22 @@ describe("graphTheme", () => {
     ]);
     expect(themedLayout.paper_bgcolor).toBe("#111827");
     expect(themedLayout.plot_bgcolor).toBe("#0f172a");
+  });
+
+  it("forces top-level layout titles to the left even when a custom x was stored", () => {
+    const themedLayout = resolveThemedGraphLayout({
+      title: {
+        text: "Stored Title",
+        x: 0.5,
+        xanchor: "center"
+      }
+    }, {}, "light");
+
+    expect(themedLayout.title).toMatchObject({
+      text: "Stored Title",
+      x: 0.02,
+      xanchor: "left"
+    });
   });
 
   it("does not inject undefined axis/title keys for donut KPI layouts", () => {

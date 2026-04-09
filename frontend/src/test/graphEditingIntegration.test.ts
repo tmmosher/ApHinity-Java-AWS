@@ -10,6 +10,7 @@ import {
   createTrace,
   removeTraceWithPlotly,
   renameTrace,
+  setPieRowColor,
   setTraceColor,
   updateCartesianX,
   updateCartesianY
@@ -118,6 +119,112 @@ describe("graph editing integration", () => {
         y: [14],
         marker: { color: "#dc2626" },
         line: { color: "#dc2626" }
+      }
+    ]);
+  });
+
+  it("applies pie color edits to the rendered marker colors", async () => {
+    const baseGraph: LocationGraph = {
+      id: 11,
+      name: "Share",
+      data: [{
+        type: "pie",
+        name: "Distribution",
+        labels: ["Open", "Closed"],
+        values: [3, 7],
+        marker: {
+          color: "#2563eb",
+          colors: ["#2563eb", "#16a34a"]
+        }
+      }],
+      layout: { title: { text: "Breakdown" } },
+      config: { displayModeBar: false },
+      style: { height: 280 },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(baseGraph);
+    payload.data = [
+      setTraceColor(payload.data[0], "pie", "#dc2626")
+    ];
+
+    const editResult = applyGraphPayloadEdit([baseGraph], [], 11, payload);
+    expect(editResult.changed).toBe(true);
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      { react } as unknown as { react: (...args: unknown[]) => Promise<unknown> },
+      { id: "chart-root" } as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any,
+      editResult.nextGraphs[0].layout as any,
+      editResult.nextGraphs[0].config as any
+    );
+
+    const [, renderedData] = react.mock.calls[0];
+    expect(renderedData).toEqual([
+      {
+        type: "pie",
+        name: "Distribution",
+        labels: ["Open", "Closed"],
+        values: [3, 7],
+        marker: {
+          color: "#dc2626",
+          colors: ["#dc2626", "#dc2626"]
+        }
+      }
+    ]);
+  });
+
+  it("applies per-slice pie color edits without changing other slices", async () => {
+    const baseGraph: LocationGraph = {
+      id: 12,
+      name: "Share",
+      data: [{
+        type: "pie",
+        name: "Distribution",
+        labels: ["Open", "Closed"],
+        values: [3, 7],
+        marker: {
+          color: "#2563eb",
+          colors: ["#2563eb", "#16a34a"]
+        }
+      }],
+      layout: { title: { text: "Breakdown" } },
+      config: { displayModeBar: false },
+      style: { height: 280 },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(baseGraph);
+    payload.data = [
+      setPieRowColor(payload.data[0], 1, "#dc2626")
+    ];
+
+    const editResult = applyGraphPayloadEdit([baseGraph], [], 12, payload);
+    expect(editResult.changed).toBe(true);
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      { react } as unknown as { react: (...args: unknown[]) => Promise<unknown> },
+      { id: "chart-root" } as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any,
+      editResult.nextGraphs[0].layout as any,
+      editResult.nextGraphs[0].config as any
+    );
+
+    const [, renderedData] = react.mock.calls[0];
+    expect(renderedData).toEqual([
+      {
+        type: "pie",
+        name: "Distribution",
+        labels: ["Open", "Closed"],
+        values: [3, 7],
+        marker: {
+          color: "#2563eb",
+          colors: ["#2563eb", "#dc2626"]
+        }
       }
     ]);
   });

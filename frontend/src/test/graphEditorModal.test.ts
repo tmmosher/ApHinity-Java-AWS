@@ -1,7 +1,9 @@
 import { createRenderEffect, createRoot } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { LocationGraph } from "../types/Types";
 
 let latestTraceControlsProps: Record<string, unknown> | null = null;
+let latestPieTraceEditorProps: Record<string, unknown> | null = null;
 
 vi.mock("corvu/dialog", () => {
   const Dialog = (props: { children: unknown }) => props.children;
@@ -35,7 +37,10 @@ vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
 }));
 
 vi.mock("../components/graph-editor/PieTraceEditor", () => ({
-  default: () => null
+  default: (props: Record<string, unknown>) => {
+    latestPieTraceEditorProps = props;
+    return null;
+  }
 }));
 
 vi.mock("../components/graph-editor/TraceControls", () => ({
@@ -47,12 +52,12 @@ vi.mock("../components/graph-editor/TraceControls", () => ({
 
 import { GraphEditorModal } from "../components/graph-editor/GraphEditorModal";
 
-const renderModal = () =>
+const renderModal = (graph?: LocationGraph) =>
   createRoot((dispose) => {
     createRenderEffect(() => {
       GraphEditorModal({
         isOpen: true,
-        graph: undefined,
+        graph,
         canRenameGraph: false,
         canUndo: false,
         isSaving: false,
@@ -81,9 +86,20 @@ const getTraceControlsProps = () => {
   };
 };
 
+const getPieTraceEditorProps = () => {
+  if (!latestPieTraceEditorProps) {
+    throw new Error("PieTraceEditor mock was not rendered.");
+  }
+  return latestPieTraceEditorProps as {
+    rowColors: string[];
+    onUpdateColor: (rowIndex: number, colorHex: string) => void;
+  };
+};
+
 describe("GraphEditorModal trace controls", () => {
   afterEach(() => {
     latestTraceControlsProps = null;
+    latestPieTraceEditorProps = null;
   });
 
   it("passes the trace-control contract from modal to controls", () => {
@@ -110,6 +126,37 @@ describe("GraphEditorModal trace controls", () => {
       props.onChangeTraceName("Renamed Trace");
       props.onRenameTrace();
     }).not.toThrow();
+
+    dispose();
+  });
+
+  it("hides trace controls for pie graphs and passes row color editing props", async () => {
+    const pieGraph: LocationGraph = {
+      id: 15,
+      name: "Breakdown",
+      data: [{
+        type: "pie",
+        labels: ["Open", "Closed"],
+        values: [3, 7],
+        marker: {
+          color: "#2563eb",
+          colors: ["#2563eb", "#16a34a"]
+        }
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(pieGraph);
+    await Promise.resolve();
+    const pieProps = getPieTraceEditorProps();
+
+    expect(latestTraceControlsProps).toBeNull();
+    expect(pieProps.rowColors).toEqual(["#2563eb", "#16a34a"]);
+    expect(() => pieProps.onUpdateColor(1, "#dc2626")).not.toThrow();
 
     dispose();
   });

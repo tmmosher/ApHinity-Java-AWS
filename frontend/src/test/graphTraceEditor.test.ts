@@ -4,10 +4,12 @@ import {
   addPieRow,
   coerceInputValue,
   createTrace,
+  getPieRowColor,
   getTraceYAxisRange,
   isAutoSizingPieTrace,
   removePieRow,
   renameTrace,
+  setPieRowColor,
   setTraceColor,
   updateTraceYAxisRange,
   updatePieValue
@@ -40,6 +42,25 @@ describe("graphTraceEditor", () => {
     expect(removedColors).toHaveLength(1);
   });
 
+  it("updates only the selected pie row color", () => {
+    const trace: Record<string, unknown> = {
+      type: "pie",
+      labels: ["Open", "Closed"],
+      values: [2, 5],
+      marker: {
+        color: "#2563eb",
+        colors: ["#2563eb", "#16a34a"]
+      }
+    };
+
+    const nextTrace = setPieRowColor(trace, 1, "#dc2626");
+
+    expect(getPieRowColor(nextTrace, 0)).toBe("#2563eb");
+    expect(getPieRowColor(nextTrace, 1)).toBe("#dc2626");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#2563eb", "#dc2626"]);
+    expect((nextTrace.marker as {color: string}).color).toBe("#2563eb");
+  });
+
   it("applies scatter color to marker and line", () => {
     const trace: Record<string, unknown> = {
       type: "scatter",
@@ -50,6 +71,23 @@ describe("graphTraceEditor", () => {
     const nextTrace = setTraceColor(trace, "scatter", "#dc2626");
     expect((nextTrace.marker as {color: string}).color).toBe("#dc2626");
     expect((nextTrace.line as {color: string}).color).toBe("#dc2626");
+  });
+
+  it("applies pie color to the rendered marker color array", () => {
+    const trace: Record<string, unknown> = {
+      type: "pie",
+      labels: ["Open", "Closed"],
+      values: [3, 7],
+      marker: {
+        color: "#2563eb",
+        colors: ["#2563eb", "#16a34a"]
+      }
+    };
+
+    const nextTrace = setTraceColor(trace, "pie", "#dc2626");
+
+    expect((nextTrace.marker as {color: string}).color).toBe("#dc2626");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#dc2626", "#dc2626"]);
   });
 
   it("keeps invalid pie value text for in-progress editing", () => {

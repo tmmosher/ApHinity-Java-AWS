@@ -43,7 +43,7 @@ describe("graphEditor", () => {
 
     expect(parsed).toEqual({
       data: [{type: "bar", x: ["A"], y: [9]}],
-      layout: {title: {text: "Newport Beach"}},
+      layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
       config: {displayModeBar: false},
       style: {height: 320}
     });
@@ -67,7 +67,7 @@ describe("graphEditor", () => {
     expect(result.changed).toBe(true);
     expect(result.nextUndoStack).toHaveLength(1);
     expect(result.nextGraphs[0].data).toEqual([{type: "bar", x: ["A"], y: [11]}]);
-    expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated"}});
+    expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated", x: 0.02, xanchor: "left"}});
   });
 
   it("does not push undo snapshots when payload is unchanged", () => {
@@ -99,7 +99,7 @@ describe("graphEditor", () => {
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [9]}],
-        layout: {title: {text: "Newport Beach"}},
+        layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 320}
       },
@@ -125,7 +125,7 @@ describe("graphEditor", () => {
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [15]}],
-        layout: {title: {text: "Updated"}},
+        layout: {title: {text: "Updated", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 360},
         expectedUpdatedAt: "2026-01-02T00:00:00Z"
@@ -146,11 +146,11 @@ describe("graphEditor", () => {
   it("updates graph titles while preserving existing layout title metadata", () => {
     expect(updateEditableGraphTitle({showlegend: false}, "Updated title")).toEqual({
       showlegend: false,
-      title: {text: "Updated title"}
+      title: {text: "Updated title", x: 0.02, xanchor: "left"}
     });
 
-    expect(updateEditableGraphTitle({title: {text: "Old title", x: 0.02}}, "Next title")).toEqual({
-      title: {text: "Next title", x: 0.02}
+    expect(updateEditableGraphTitle({title: {text: "Old title", x: 0.5, y: 0.9}}, "Next title")).toEqual({
+      title: {text: "Next title", x: 0.02, xanchor: "left", y: 0.9}
     });
   });
 
