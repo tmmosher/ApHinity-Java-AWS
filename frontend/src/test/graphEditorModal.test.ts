@@ -1,4 +1,5 @@
 import { createRenderEffect, createRoot } from "solid-js";
+import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
 
@@ -162,5 +163,27 @@ describe("GraphEditorModal trace controls", () => {
     expect(() => pieProps.onUpdateColor(1, "#dc2626")).not.toThrow();
 
     dispose();
+  });
+
+  it("keeps the delete confirmation rendered while a delete is in progress", () => {
+    const html = renderToString(() =>
+      GraphEditorModal({
+        isOpen: true,
+        graph: undefined,
+        canRenameGraph: false,
+        canDeleteGraph: false,
+        canUndo: false,
+        isDeleting: true,
+        isSaving: false,
+        onApply: vi.fn(),
+        onDeleteGraph: vi.fn().mockResolvedValue(undefined),
+        onRenameGraph: vi.fn().mockResolvedValue(undefined),
+        onUndo: vi.fn(),
+        onClose: vi.fn()
+      })
+    );
+
+    expect(html).toContain("Delete Graph");
+    expect(html).toContain("Deleting...");
   });
 });

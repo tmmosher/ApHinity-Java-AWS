@@ -44,7 +44,7 @@ vi.mock("../pages/authenticated/panels/location/ServiceScheduleCalendar", () => 
   }
 }));
 
-import {DashboardLocationServiceCalendarPanel} from "../pages/authenticated/panels/location/DashboardLocationServiceCalendarPanel";
+import {LocationServiceCalendarPanel} from "../pages/authenticated/panels/location/LocationServiceCalendarPanel";
 
 const createEvent = (overrides?: Partial<LocationServiceEvent>): LocationServiceEvent => ({
   id: 8,
@@ -63,7 +63,7 @@ const createEvent = (overrides?: Partial<LocationServiceEvent>): LocationService
 
 const renderPanel = () => {
   mocks.latestCalendarProps = null;
-  renderToString(DashboardLocationServiceCalendarPanel);
+  renderToString(LocationServiceCalendarPanel);
 
   if (!mocks.latestCalendarProps) {
     throw new Error("ServiceScheduleCalendar was not rendered.");
@@ -75,7 +75,7 @@ const renderPanel = () => {
   };
 };
 
-describe("DashboardLocationServiceCalendarPanel completion wiring", () => {
+describe("LocationServiceCalendarPanel completion wiring", () => {
   beforeEach(() => {
     mocks.currentRole = "partner";
     mocks.latestCalendarProps = null;

@@ -112,6 +112,18 @@ const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayl
 const graphPayloadSignature = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload));
 
+function graphStateSignature(graph: LocationGraph): string {
+  return JSON.stringify({
+    name: graph.name,
+    payload: normalizeGraphPayload({
+      data: graph.data,
+      layout: graph.layout ?? null,
+      config: graph.config ?? null,
+      style: graph.style ?? null
+    })
+  });
+}
+
 const hasOwnKey = <T extends string>(
   value: Record<string, unknown>,
   key: T
@@ -160,6 +172,27 @@ export const parseEditableGraphPayload = (rawPayload: string): EditableGraphPayl
 
 export const cloneLocationGraphs = (graphs: LocationGraph[]): LocationGraph[] =>
   cloneJson(graphs);
+
+export const reconcileLocationGraphs = (
+  currentGraphs: LocationGraph[],
+  nextGraphs: LocationGraph[]
+): LocationGraph[] => {
+  if (currentGraphs.length === 0) {
+    return cloneLocationGraphs(nextGraphs);
+  }
+
+  const currentById = new Map(currentGraphs.map((graph) => [graph.id, graph]));
+  return nextGraphs.map((nextGraph) => {
+    const currentGraph = currentById.get(nextGraph.id);
+    if (!currentGraph) {
+      return nextGraph;
+    }
+    if (graphStateSignature(currentGraph) === graphStateSignature(nextGraph)) {
+      return currentGraph;
+    }
+    return nextGraph;
+  });
+};
 
 export const buildLocationGraphUpdates = (graphs: LocationGraph[]): LocationGraphUpdate[] =>
   graphs.map((graph) => ({

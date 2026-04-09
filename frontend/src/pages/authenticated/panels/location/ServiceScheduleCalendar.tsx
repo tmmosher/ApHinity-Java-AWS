@@ -326,33 +326,28 @@ const ServiceCalendarDayBackground = (props: ServiceCalendarDayBackgroundProps) 
 
   return (
     <Calendar.Cell as="div" class="contents">
-      <Show
-        when={props.onCreateEventSave}
-        fallback={
-          <Calendar.CellTrigger
-            as="div"
-            day={props.day}
-            style={createDayBackgroundStyle(props.dayIndex)}
-            class={dayBackgroundClass}
-            classList={dayCellClassList}
-          >
-            <span class="text-xs font-semibold tabular-nums md:text-sm">
-              {props.day.getDate()}
-            </span>
-          </Calendar.CellTrigger>
-        }
-      >
-        {(onCreateEventSave) => (
-          <ServiceEventCreatePopover
-            day={props.day}
-            style={createDayBackgroundStyle(props.dayIndex)}
-            class={dayBackgroundClass}
-            classList={dayCellClassList}
-            role={props.eventEditorRole}
-            onSave={onCreateEventSave()}
-          />
-        )}
-      </Show>
+      {props.onCreateEventSave ? (
+        <ServiceEventCreatePopover
+          day={props.day}
+          style={createDayBackgroundStyle(props.dayIndex)}
+          class={dayBackgroundClass}
+          classList={dayCellClassList}
+          role={props.eventEditorRole}
+          onSave={props.onCreateEventSave}
+        />
+      ) : (
+        <Calendar.CellTrigger
+          as="div"
+          day={props.day}
+          style={createDayBackgroundStyle(props.dayIndex)}
+          class={dayBackgroundClass}
+          classList={dayCellClassList}
+        >
+          <span class="text-xs font-semibold tabular-nums md:text-sm">
+            {props.day.getDate()}
+          </span>
+        </Calendar.CellTrigger>
+      )}
     </Calendar.Cell>
   );
 };
@@ -516,6 +511,7 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
 
             <div class="min-h-0 overflow-hidden rounded-2xl border border-base-300/80 bg-base-300/70 shadow-inner">
               <Show when={transitionCycle() + 1} keyed>
+                  {/*this works at runtime. ignore the TS error it is majorly buggin*/}
                 {() => (
                   <div
                     class="service-calendar-transition-surface h-full min-h-0"

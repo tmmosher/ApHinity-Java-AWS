@@ -130,13 +130,20 @@ describe("graphTraceEditor", () => {
     const nextTrace = createTrace("scatter", 2);
 
     expect(nextTrace).toEqual({
-      type: "scatter",
+      x: [
+        "2025-01-01",
+        "2025-02-01",
+        "2025-03-01",
+        "2025-04-01",
+        "2025-05-01",
+        "2025-06-01"
+      ],
+      y: [0, 0, 0, 0, 0, 0],
+      line: {color: "#2563eb", width: 2},
       mode: "lines+markers",
       name: "Trace 3",
-      x: [1],
-      y: [0],
-      marker: {color: "#2563eb"},
-      line: {color: "#2563eb"}
+      type: "scatter",
+      marker: {size: 6}
     });
   });
 

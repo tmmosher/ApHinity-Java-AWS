@@ -23,7 +23,7 @@ type GraphCreateModalProps = {
 const GRAPH_TYPE_OPTIONS: Array<{value: LocationGraphType; label: string}> = [
   {value: "pie", label: "Pie"},
   {value: "bar", label: "Bar"},
-  {value: "scatter", label: "Plot"}
+  {value: "scatter", label: "Scatter"}
 ];
 
 export const GraphCreateModal = (props: GraphCreateModalProps) => {

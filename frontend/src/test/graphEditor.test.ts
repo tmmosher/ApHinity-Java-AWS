@@ -8,6 +8,7 @@ import {
   createEditableGraphPayload,
   getEditableGraphTitle,
   parseEditableGraphPayload,
+  reconcileLocationGraphs,
   serializeEditableGraphPayload,
   updateEditableGraphTitle,
   undoGraphPayloadEdit
@@ -135,6 +136,33 @@ describe("graphEditor", () => {
 
   it("returns no save payloads when there are no graph changes", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
+  });
+
+  it("reconciles refreshed graphs without replacing unchanged graph objects", () => {
+    const refreshedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        layout: {title: "Newport Beach"}
+      },
+      {
+        ...baseGraphs[1],
+        name: "Updated Non-Compliances"
+      },
+      {
+        ...baseGraphs[0],
+        id: 12,
+        name: "New Plot",
+        createdAt: "2026-01-05T00:00:00Z",
+        updatedAt: "2026-01-05T00:00:00Z"
+      }
+    ];
+
+    const reconciled = reconcileLocationGraphs(baseGraphs, refreshedGraphs);
+
+    expect(reconciled).toHaveLength(3);
+    expect(reconciled[0]).toBe(baseGraphs[0]);
+    expect(reconciled[1]).toBe(refreshedGraphs[1]);
+    expect(reconciled[2]).toBe(refreshedGraphs[2]);
   });
 
   it("reads graph titles from string and object Plotly layout shapes", () => {

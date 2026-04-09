@@ -44,6 +44,14 @@ import java.util.Objects;
 public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
     private static final String DEFAULT_GRAPH_COLOR = "#2563eb";
+    private static final List<String> DEFAULT_SCATTER_X_VALUES = List.of(
+        "2025-01-01",
+        "2025-02-01",
+        "2025-03-01",
+        "2025-04-01",
+        "2025-05-01",
+        "2025-06-01"
+    );
 
     private enum GraphTemplateType {
         PIE,
@@ -805,23 +813,67 @@ public class LocationService {
             );
             case SCATTER -> new GraphTemplate(
                 "New Plot Graph",
-                List.of(Map.of(
-                    "type", "scatter",
-                    "mode", "lines+markers",
-                    "name", "Trace 1",
-                    "x", List.of(1),
-                    "y", List.of(0),
-                    "marker", Map.of("color", DEFAULT_GRAPH_COLOR),
-                    "line", Map.of("color", DEFAULT_GRAPH_COLOR)
-                )),
-                Map.of(
-                    "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
-                    "showlegend", false
-                ),
+                buildScatterTemplateData(),
+                buildScatterTemplateLayout(),
                 config,
                 style
             );
         };
+    }
+
+    private List<Map<String, Object>> buildScatterTemplateData() {
+        return List.of(
+            buildScatterTrace("HPC", "#1f77b4", List.of(14L, 13L, 12L, 11L, 13L, 12L)),
+            buildScatterTrace("Endotoxin", "#2ca02c", List.of(6L, 5L, 7L, 6L, 5L, 6L)),
+            buildScatterTrace("Legionella", "#d62728", List.of(4L, 6L, 5L, 4L, 5L, 4L)),
+            buildScatterTrace("Key Minerals", "#ff7f0e", List.of(10L, 9L, 8L, 9L, 10L, 9L)),
+            buildScatterTrace("Alkalinity", "#9467bd", List.of(7L, 8L, 7L, 6L, 7L, 8L))
+        );
+    }
+
+    private Map<String, Object> buildScatterTrace(String name, String color, List<Long> yValues) {
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("color", color);
+        line.put("width", 2L);
+
+        Map<String, Object> marker = new LinkedHashMap<>();
+        marker.put("size", 6L);
+
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("x", DEFAULT_SCATTER_X_VALUES);
+        trace.put("y", yValues);
+        trace.put("line", line);
+        trace.put("mode", "lines+markers");
+        trace.put("name", name);
+        trace.put("type", "scatter");
+        trace.put("marker", marker);
+        return trace;
+    }
+
+    private Map<String, Object> buildScatterTemplateLayout() {
+        Map<String, Object> margin = new LinkedHashMap<>();
+        margin.put("b", 10);
+        margin.put("l", 10);
+        margin.put("r", 10);
+        margin.put("t", 10);
+
+        Map<String, Object> font = new LinkedHashMap<>();
+        font.put("size", 22);
+
+        Map<String, Object> annotation = new LinkedHashMap<>();
+        annotation.put("x", 0.5);
+        annotation.put("y", 0.5);
+        annotation.put("font", font);
+        annotation.put("text", "<b>68%</b>");
+        annotation.put("xref", "paper");
+        annotation.put("yref", "paper");
+        annotation.put("showarrow", false);
+
+        Map<String, Object> layout = new LinkedHashMap<>();
+        layout.put("margin", margin);
+        layout.put("showlegend", false);
+        layout.put("annotations", List.of(annotation));
+        return layout;
     }
 
     private Long resolveTargetSectionId(

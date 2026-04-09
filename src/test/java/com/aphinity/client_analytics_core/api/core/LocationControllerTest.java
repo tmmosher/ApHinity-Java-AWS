@@ -162,8 +162,8 @@ class LocationControllerTest {
         GraphResponse expected = new GraphResponse(
             55L,
             "New Plot Graph",
-            List.of(Map.of("type", "scatter", "name", "Trace 1")),
-            Map.of("showlegend", false),
+            scatterGraphData(),
+            scatterGraphLayout(),
             Map.of("displayModeBar", false, "responsive", true),
             Map.of("height", 320),
             Instant.parse("2026-01-03T00:00:00Z"),
@@ -228,5 +228,50 @@ class LocationControllerTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
         verifyNoInteractions(locationService);
+    }
+
+    private static List<Map<String, Object>> scatterGraphData() {
+        return List.of(
+            scatterGraphTrace("HPC", "#1f77b4", List.of(14L, 13L, 12L, 11L, 13L, 12L)),
+            scatterGraphTrace("Endotoxin", "#2ca02c", List.of(6L, 5L, 7L, 6L, 5L, 6L)),
+            scatterGraphTrace("Legionella", "#d62728", List.of(4L, 6L, 5L, 4L, 5L, 4L)),
+            scatterGraphTrace("Key Minerals", "#ff7f0e", List.of(10L, 9L, 8L, 9L, 10L, 9L)),
+            scatterGraphTrace("Alkalinity", "#9467bd", List.of(7L, 8L, 7L, 6L, 7L, 8L))
+        );
+    }
+
+    private static Map<String, Object> scatterGraphTrace(String name, String color, List<Long> yValues) {
+        return Map.of(
+            "x", List.of(
+                "2025-01-01",
+                "2025-02-01",
+                "2025-03-01",
+                "2025-04-01",
+                "2025-05-01",
+                "2025-06-01"
+            ),
+            "y", yValues,
+            "line", Map.of("color", color, "width", 2L),
+            "mode", "lines+markers",
+            "name", name,
+            "type", "scatter",
+            "marker", Map.of("size", 6L)
+        );
+    }
+
+    private static Map<String, Object> scatterGraphLayout() {
+        return Map.of(
+            "margin", Map.of("b", 10, "l", 10, "r", 10, "t", 10),
+            "showlegend", false,
+            "annotations", List.of(Map.of(
+                "x", 0.5,
+                "y", 0.5,
+                "font", Map.of("size", 22),
+                "text", "<b>68%</b>",
+                "xref", "paper",
+                "yref", "paper",
+                "showarrow", false
+            ))
+        );
     }
 }

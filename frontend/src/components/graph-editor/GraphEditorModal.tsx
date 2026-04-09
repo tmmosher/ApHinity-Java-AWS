@@ -705,28 +705,27 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
               <Dialog.Close class="btn btn-sm" disabled={isBusy()}>Close</Dialog.Close>
             </div>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-
-      <Show when={isDeleteConfirmOpen() || props.isDeleting}>
-        <Dialog
-          open={isDeleteConfirmOpen() || props.isDeleting}
-          onOpenChange={(open) => {
-            if (!open) {
-              closeDeleteConfirm();
-            }
-          }}
-        >
-          <Dialog.Portal>
-            <Dialog.Overlay class="fixed inset-0 z-[70] bg-black/55 data-closed:pointer-events-none" />
-            <Dialog.Content
-              class="fixed inset-0 z-[80] m-auto flex h-fit w-[min(92vw,24rem)] flex-col gap-4 rounded-xl border border-base-300 bg-base-100 p-4 shadow-2xl data-closed:pointer-events-none md:p-5"
+          {/* Keep the delete confirm inside the editor dialog subtree.
+              A nested Dialog instance was closing as soon as delete started. */}
+          <Show when={isDeleteConfirmOpen() || props.isDeleting}>
+            <div
+              class="fixed inset-0 z-[70] bg-black/55"
+              aria-hidden="true"
+              onClick={closeDeleteConfirm}
+            />
+            <div
+              class="fixed inset-0 z-[80] m-auto flex h-fit w-[min(92vw,24rem)] flex-col gap-4 rounded-xl border border-base-300 bg-base-100 p-4 shadow-2xl md:p-5"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-graph-title"
+              aria-describedby="delete-graph-description"
+              onClick={(event) => event.stopPropagation()}
             >
               <div class="space-y-1">
-                <Dialog.Label class="text-lg font-semibold">Delete Graph</Dialog.Label>
-                <Dialog.Description class="text-sm text-base-content/70">
+                <h2 id="delete-graph-title" class="text-lg font-semibold">Delete Graph</h2>
+                <p id="delete-graph-description" class="text-sm text-base-content/70">
                   Delete {props.graph?.name ?? "this graph"} immediately from the dashboard.
-                </Dialog.Description>
+                </p>
               </div>
 
               <p class="text-sm text-base-content/80">
@@ -755,10 +754,10 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                   {props.isDeleting ? "Deleting..." : "Delete"}
                 </button>
               </div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog>
-      </Show>
+            </div>
+          </Show>
+        </Dialog.Content>
+      </Dialog.Portal>
     </Dialog>
   );
 };

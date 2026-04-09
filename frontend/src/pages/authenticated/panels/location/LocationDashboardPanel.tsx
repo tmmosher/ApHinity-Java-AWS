@@ -12,8 +12,8 @@ import {
   applyGraphPayloadEdit,
   buildChangedLocationGraphUpdates,
   buildGraphBaselineIndex,
-  cloneLocationGraphs,
   type GraphBaselineEntry,
+  reconcileLocationGraphs,
   undoGraphPayloadEdit,
   type EditableGraphPayload
 } from "../../../../util/graph/graphEditor";
@@ -33,13 +33,15 @@ export const advanceGraphLoadAnimationToken = (
   wasLoading: boolean,
   isLoading: boolean,
   hasGraphs: boolean
-): number => (
-  wasLoading && !isLoading && hasGraphs
+): number => {
+  // Only advance once per location session so later graph refreshes do not replay
+  // the zero-baseline load animation across every existing chart.
+  return currentToken === 0 && wasLoading && !isLoading && hasGraphs
     ? currentToken + 1
-    : currentToken
-);
+    : currentToken;
+};
 
-export const DashboardLocationDashboardPanel = () => {
+export const LocationDashboardPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
@@ -69,7 +71,8 @@ export const DashboardLocationDashboardPanel = () => {
     if (!fetchedGraphs) {
       return;
     }
-    setWorkingGraphs(cloneLocationGraphs(fetchedGraphs));
+    // Keep unchanged graph objects stable so Plotly charts stay mounted across refreshes.
+    setWorkingGraphs((currentGraphs) => reconcileLocationGraphs(currentGraphs, fetchedGraphs));
     setGraphBaselineIndex(buildGraphBaselineIndex(fetchedGraphs));
     setLocationUndoStack([]);
   });

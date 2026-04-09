@@ -20,6 +20,58 @@ const createMockResponse = (ok: boolean, payload: unknown): Response =>
     json: vi.fn().mockResolvedValue(payload)
   }) as unknown as Response;
 
+const SCATTER_X_VALUES = [
+  "2025-01-01",
+  "2025-02-01",
+  "2025-03-01",
+  "2025-04-01",
+  "2025-05-01",
+  "2025-06-01"
+];
+
+const createScatterTrace = (name: string, color: string, yValues: number[]) => ({
+  type: "scatter",
+  name,
+  x: [...SCATTER_X_VALUES],
+  y: yValues,
+  line: {color, width: 2},
+  mode: "lines+markers",
+  marker: {size: 6}
+});
+
+const SCATTER_GRAPH_LAYOUT = {
+  margin: {b: 10, l: 10, r: 10, t: 10},
+  showlegend: false,
+  annotations: [
+    {
+      x: 0.5,
+      y: 0.5,
+      font: {size: 22},
+      text: "<b>68%</b>",
+      xref: "paper",
+      yref: "paper",
+      showarrow: false
+    }
+  ]
+};
+
+const buildScatterGraphResponse = () => ({
+  id: 44,
+  name: "New Plot Graph",
+  data: [
+    createScatterTrace("HPC", "#1f77b4", [14, 13, 12, 11, 13, 12]),
+    createScatterTrace("Endotoxin", "#2ca02c", [6, 5, 7, 6, 5, 6]),
+    createScatterTrace("Legionella", "#d62728", [4, 6, 5, 4, 5, 4]),
+    createScatterTrace("Key Minerals", "#ff7f0e", [10, 9, 8, 9, 10, 9]),
+    createScatterTrace("Alkalinity", "#9467bd", [7, 8, 7, 6, 7, 8])
+  ],
+  layout: SCATTER_GRAPH_LAYOUT,
+  config: {displayModeBar: false, responsive: true},
+  style: {height: 320},
+  createdAt: "2026-01-05T00:00:00Z",
+  updatedAt: "2026-01-05T00:00:00Z"
+});
+
 describe("DashboardLocationDetailPanel data loaders", () => {
   const host = "https://example.test";
   const apiFetchMock = vi.mocked(apiFetch);
@@ -233,16 +285,7 @@ describe("DashboardLocationDetailPanel data loaders", () => {
   });
 
   it("creates a graph through the dedicated create endpoint", async () => {
-    apiFetchMock.mockResolvedValue(createMockResponse(true, {
-      id: 44,
-      name: "New Plot Graph",
-      data: [{type: "scatter", mode: "lines+markers", x: [1], y: [0]}],
-      layout: {showlegend: false},
-      config: {displayModeBar: false, responsive: true},
-      style: {height: 320},
-      createdAt: "2026-01-05T00:00:00Z",
-      updatedAt: "2026-01-05T00:00:00Z"
-    }));
+    apiFetchMock.mockResolvedValue(createMockResponse(true, buildScatterGraphResponse()));
 
     const result = await createLocationGraphById(host, "55", {
       sectionId: 3,
@@ -260,7 +303,14 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       })
     });
     expect(result.name).toBe("New Plot Graph");
-    expect(result.data[0].type).toBe("scatter");
+    expect(result.data).toHaveLength(5);
+    expect(result.data[0]).toMatchObject({
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#1f77b4", width: 2},
+      marker: {size: 6}
+    });
+    expect(result.layout).toEqual(SCATTER_GRAPH_LAYOUT);
     expect(result.config).toEqual({displayModeBar: false, responsive: true});
   });
 

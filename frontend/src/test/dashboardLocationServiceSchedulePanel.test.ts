@@ -21,11 +21,11 @@ vi.mock("../util/location/locationEventApi", () => ({
   updateLocationEventById: vi.fn()
 }));
 
-import {DashboardLocationServiceCalendarPanel} from "../pages/authenticated/panels/location/DashboardLocationServiceCalendarPanel";
+import {LocationServiceCalendarPanel} from "../pages/authenticated/panels/location/LocationServiceCalendarPanel";
 
 describe("DashboardLocationServiceSchedulePanel", () => {
   it("explains day-cell creation and renders interactive calendar cells", () => {
-    const html = renderToString(DashboardLocationServiceCalendarPanel);
+    const html = renderToString(LocationServiceCalendarPanel);
 
     expect(html).toContain("Service Calendar");
     expect(html).toContain("Click an empty day cell to create a service event.");

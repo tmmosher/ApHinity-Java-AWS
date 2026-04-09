@@ -444,14 +444,15 @@ class LocationServiceTest {
 
         assertEquals(31L, response.id());
         assertEquals("New Plot Graph", response.name());
+        assertEquals(expectedScatterTemplateData(), response.data());
+        assertEquals(expectedScatterTemplateLayout(), response.layout());
         verify(graphRepository).saveAndFlush(any(Graph.class));
         verify(locationGraphRepository).save(any(LocationGraph.class));
         verify(locationRepository).saveAndFlush(location);
 
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
-        assertEquals(1, traces.size());
-        assertEquals("scatter", traces.getFirst().get("type"));
-        assertEquals("lines+markers", traces.getFirst().get("mode"));
+        assertEquals(expectedScatterTemplateData(), traces);
+        assertEquals(expectedScatterTemplateLayout(), savedGraphHolder[0].getLayout());
         assertEquals(Map.of("displayModeBar", false, "responsive", true), savedGraphHolder[0].getConfig());
         assertEquals(Map.of("height", 320), savedGraphHolder[0].getStyle());
 
@@ -1072,5 +1073,50 @@ class LocationServiceTest {
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError("Unable to set raw graph data for legacy payload test", ex);
         }
+    }
+
+    private List<Map<String, Object>> expectedScatterTemplateData() {
+        return List.of(
+            expectedScatterTrace("HPC", "#1f77b4", List.of(14L, 13L, 12L, 11L, 13L, 12L)),
+            expectedScatterTrace("Endotoxin", "#2ca02c", List.of(6L, 5L, 7L, 6L, 5L, 6L)),
+            expectedScatterTrace("Legionella", "#d62728", List.of(4L, 6L, 5L, 4L, 5L, 4L)),
+            expectedScatterTrace("Key Minerals", "#ff7f0e", List.of(10L, 9L, 8L, 9L, 10L, 9L)),
+            expectedScatterTrace("Alkalinity", "#9467bd", List.of(7L, 8L, 7L, 6L, 7L, 8L))
+        );
+    }
+
+    private Map<String, Object> expectedScatterTrace(String name, String color, List<Long> yValues) {
+        return Map.of(
+            "x", List.of(
+                "2025-01-01",
+                "2025-02-01",
+                "2025-03-01",
+                "2025-04-01",
+                "2025-05-01",
+                "2025-06-01"
+            ),
+            "y", yValues,
+            "line", Map.of("color", color, "width", 2L),
+            "mode", "lines+markers",
+            "name", name,
+            "type", "scatter",
+            "marker", Map.of("size", 6L)
+        );
+    }
+
+    private Map<String, Object> expectedScatterTemplateLayout() {
+        return Map.of(
+            "margin", Map.of("b", 10, "l", 10, "r", 10, "t", 10),
+            "showlegend", false,
+            "annotations", List.of(Map.of(
+                "x", 0.5,
+                "y", 0.5,
+                "font", Map.of("size", 22),
+                "text", "<b>68%</b>",
+                "xref", "paper",
+                "yref", "paper",
+                "showarrow", false
+            ))
+        );
     }
 }

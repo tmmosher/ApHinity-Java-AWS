@@ -18,7 +18,7 @@ export const TRACE_COLOR_OPTIONS: Record<string, string> = {
   "Crimson Red": "#dc2626",
   "Deep Violet": "#7c3aed",
   "Slate Gray": "#475569",
-  "Light Gray": "rgb(209, 213, 219)"
+  "Light Gray": "rgb(209, 213, 219)"  // yoinked this as a default
 };
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -109,6 +109,17 @@ export const getTraceColor = (trace: Record<string, unknown>): string | null => 
 const getDefaultTraceColor = (): string =>
   Object.values(TRACE_COLOR_OPTIONS)[0];
 
+const DEFAULT_SCATTER_X_VALUES = [
+  "2025-01-01",
+  "2025-02-01",
+  "2025-03-01",
+  "2025-04-01",
+  "2025-05-01",
+  "2025-06-01"
+];
+
+const DEFAULT_SCATTER_Y_VALUES = [0, 0, 0, 0, 0, 0];
+
 export const getPieRowColor = (
   trace: Record<string, unknown>,
   rowIndex: number
@@ -170,13 +181,13 @@ export const createTrace = (
 
   if (traceType === "scatter") {
     return {
-      type: "scatter",
+      x: [...DEFAULT_SCATTER_X_VALUES],
+      y: [...DEFAULT_SCATTER_Y_VALUES],
+      line: {color: defaultColor, width: 2},
       mode: "lines+markers",
       name: traceName,
-      x: [1],
-      y: [0],
-      marker: {color: defaultColor},
-      line: {color: defaultColor}
+      type: "scatter",
+      marker: {size: 6}
     };
   }
 

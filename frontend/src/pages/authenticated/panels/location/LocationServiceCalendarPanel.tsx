@@ -23,7 +23,7 @@ type ServiceEventCalendarResource = {
   value: LocationServiceEvent[];
 };
 
-export const DashboardLocationServiceCalendarPanel = () => {
+export const LocationServiceCalendarPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
