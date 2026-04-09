@@ -8,7 +8,9 @@ import TraceControls from "./TraceControls";
 import type {LocationGraph} from "../../types/Types";
 import {
   type EditableGraphPayload,
-  createEditableGraphPayload
+  createEditableGraphPayload,
+  getEditableGraphTitle,
+  updateEditableGraphTitle
 } from "../../util/graph/graphEditor";
 import {
   TRACE_COLOR_OPTIONS,
@@ -183,6 +185,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     return getTraceYAxisRange(editablePayload().layout ?? null, trace);
   });
 
+  const graphTitleDraft = createMemo(() => getEditableGraphTitle(editablePayload().layout ?? null));
+
   const updateSelectedTrace = (
     mutator: (trace: Record<string, unknown>) => Record<string, unknown>
   ) => {
@@ -230,6 +234,14 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     }
 
     updateSelectedTrace((trace) => setTraceColor(trace, traceType, colorHex));
+  };
+
+  const updateGraphTitle = (rawTitle: string) => {
+    setEditablePayload((current) => ({
+      ...current,
+      layout: updateEditableGraphTitle(current.layout ?? null, rawTitle)
+    }));
+    setOperationError("");
   };
 
   const addNewTrace = () => {
@@ -466,6 +478,23 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
           </div>
 
           <div class="space-y-4 overflow-y-auto">
+            <section class="rounded-lg border border-base-300 bg-base-200/30 p-3">
+              <label class="form-control w-full">
+                <span class="label-text text-sm font-medium">Graph title</span>
+                <span class="label-text-alt text-xs text-base-content/70">
+                  This updates the chart title inside the graph layout.
+                </span>
+                <input
+                  type="text"
+                  class="input input-bordered input-sm mt-2 w-full"
+                  value={graphTitleDraft()}
+                  disabled={isBusy()}
+                  placeholder="Optional graph title"
+                  onInput={(event) => updateGraphTitle(event.currentTarget.value)}
+                />
+              </label>
+            </section>
+
             <TraceControls
               traceOptions={traceOptions()}
               selectedTraceIndex={selectedTraceIndex()}

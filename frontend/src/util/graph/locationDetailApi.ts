@@ -1,8 +1,9 @@
-import {parseLocationGraphList, parseLocationSummary} from "../common/coreApi";
+import {parseLocationGraph, parseLocationGraphList, parseLocationSummary} from "../common/coreApi";
 import {apiFetch} from "../common/apiFetch";
 import {
   LocationGraph,
   LocationGraphRenameResult,
+  LocationGraphType,
   LocationGraphUpdate,
   LocationSummary
 } from "../../types/Types";
@@ -64,9 +65,15 @@ const parseLocationGraphRenameResult = (value: unknown): LocationGraphRenameResu
   };
 };
 
+type CreateLocationGraphRequest = {
+  sectionId?: number;
+  createNewSection?: boolean;
+  graphType: LocationGraphType;
+};
+
 const throwGraphMutationError = async (
   response: Response,
-  operation: "save" | "rename"
+  operation: "create" | "save" | "rename"
 ): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
   console.warn(`${operation}LocationGraph failed`, {
@@ -103,10 +110,22 @@ const throwGraphMutationError = async (
     }
   }
 
-  throw new Error(operation === "rename" ? "Unable to rename graph" : "Unable to save location graphs");
+  if (operation === "rename") {
+    throw new Error("Unable to rename graph");
+  }
+  if (operation === "create") {
+    throw new Error("Unable to create graph");
+  }
+  throw new Error("Unable to save location graphs");
 };
 
 const errorCheck = (code: string) => {
+    if (code === "location_section_not_found") {
+        throw new Error("Location section not found");
+    }
+    if (code === "graph_type_invalid") {
+        throw new Error("Graph type is invalid");
+    }
     if (code === "graph_update_conflict") {
         throw new Error("Graph update conflict");
     }
@@ -203,6 +222,40 @@ export const saveLocationGraphsById = async (
   if (!response.ok) {
     await throwGraphMutationError(response, "save");
   }
+};
+
+/**
+ * Creates a new graph for a location and assigns it to a dashboard section.
+ *
+ * Endpoint: `POST /api/core/locations/{locationId}/graphs`
+ * Body: `{ graphType, sectionId? , createNewSection? }`
+ *
+ * @param host API host base URL.
+ * @param locationId Location id from route params.
+ * @param request Target section and graph type.
+ * @returns Created graph payload.
+ * @throws {Error} When id is invalid or request fails.
+ */
+export const createLocationGraphById = async (
+  host: string,
+  locationId: string,
+  request: CreateLocationGraphRequest
+): Promise<LocationGraph> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/graphs", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    await throwGraphMutationError(response, "create");
+  }
+
+  return parseLocationGraph(await response.json());
 };
 
 /**

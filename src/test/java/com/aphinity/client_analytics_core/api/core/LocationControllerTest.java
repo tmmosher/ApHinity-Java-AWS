@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateBatchRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphCreateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.location.LocationRequest;
@@ -149,6 +150,33 @@ class LocationControllerTest {
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).updateLocationGraphData(42L, 8L, request.graphs());
+    }
+
+    @Test
+    void createLocationGraphDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationGraphCreateRequest request = new LocationGraphCreateRequest(null, true, "scatter");
+        GraphResponse expected = new GraphResponse(
+            55L,
+            "New Plot Graph",
+            List.of(Map.of("type", "scatter", "name", "Trace 1")),
+            Map.of("showlegend", false),
+            Map.of("displayModeBar", false, "responsive", true),
+            Map.of("height", 320),
+            Instant.parse("2026-01-03T00:00:00Z"),
+            Instant.parse("2026-01-03T00:00:00Z")
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.createLocationGraph(42L, 8L, null, true, "scatter")).thenReturn(expected);
+
+        GraphResponse actual = locationController.createLocationGraph(jwt, 8L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).createLocationGraph(42L, 8L, null, true, "scatter");
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
@@ -29,8 +30,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -40,6 +43,22 @@ import java.util.Objects;
 @Service
 public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
+    private static final String DEFAULT_GRAPH_COLOR = "#2563eb";
+
+    private enum GraphTemplateType {
+        PIE,
+        BAR,
+        SCATTER
+    }
+
+    private record GraphTemplate(
+        String name,
+        List<Map<String, Object>> data,
+        Map<String, Object> layout,
+        Map<String, Object> config,
+        Map<String, Object> style
+    ) {
+    }
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -132,6 +151,99 @@ public class LocationService {
             .map(LocationGraph::getGraph)
             .map(this::toGraphResponse)
             .toList();
+    }
+
+    /**
+     * Creates a graph, links it to the location, and appends it to the selected dashboard section.
+     * Only partner/admin callers may create new graphs.
+     *
+     * @param userId authenticated user id performing the create
+     * @param locationId target location id
+     * @param sectionId dashboard section identifier receiving the new graph
+     * @param graphType requested graph template type
+     * @return created graph payload
+     */
+    @Transactional
+    public GraphResponse createLocationGraph(
+        Long userId,
+        Long locationId,
+        Long sectionId,
+        boolean createNewSection,
+        String graphType
+    ) {
+        AppUser user = requireUser(userId);
+        if (!accountRoleService.isPartnerOrAdmin(user)) {
+            log.warn(
+                "Rejected graph create due to insufficient permissions actorUserId={} locationId={} sectionId={} createNewSection={} graphType={}",
+                userId,
+                locationId,
+                sectionId,
+                createNewSection,
+                graphType
+            );
+            throw forbidden();
+        }
+
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        Long targetSectionId = resolveTargetSectionId(location.getSectionLayout(), sectionId, createNewSection);
+        GraphTemplateType templateType = parseGraphTemplateType(graphType);
+        GraphTemplate template = buildGraphTemplate(templateType);
+
+        Graph graph = new Graph();
+        graph.setName(template.name());
+        graph.setLayout(template.layout());
+        graph.setConfig(template.config());
+        graph.setStyle(template.style());
+        graph.setData(template.data());
+
+        Graph savedGraph;
+        try {
+            savedGraph = graphRepository.saveAndFlush(graph);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Graph create persistence failed before assignment actorUserId={} locationId={} sectionId={} createNewSection={} graphType={}",
+                userId,
+                locationId,
+                targetSectionId,
+                createNewSection,
+                graphType,
+                ex
+            );
+            throw ex;
+        }
+
+        Long graphId = savedGraph.getId();
+        if (graphId == null) {
+            throw new IllegalStateException("Created graph id was null");
+        }
+
+        location.setSectionLayout(
+            appendGraphToSectionLayout(location.getSectionLayout(), targetSectionId, createNewSection, graphId)
+        );
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setId(new LocationGraphId(locationId, graphId));
+        locationGraph.setLocation(location);
+        locationGraph.setGraph(savedGraph);
+
+        try {
+            locationGraphRepository.save(locationGraph);
+            locationRepository.saveAndFlush(location);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Graph assignment persistence failed actorUserId={} locationId={} graphId={} sectionId={} createNewSection={} graphType={}",
+                userId,
+                locationId,
+                graphId,
+                targetSectionId,
+                createNewSection,
+                graphType,
+                ex
+            );
+            throw ex;
+        }
+
+        return toGraphResponse(savedGraph);
     }
 
     /**
@@ -567,6 +679,204 @@ public class LocationService {
         );
     }
 
+    private GraphTemplateType parseGraphTemplateType(String rawGraphType) {
+        if (rawGraphType == null) {
+            throw invalidGraphType();
+        }
+
+        return switch (rawGraphType.strip().toLowerCase(Locale.ROOT)) {
+            case "pie" -> GraphTemplateType.PIE;
+            case "bar" -> GraphTemplateType.BAR;
+            case "scatter" -> GraphTemplateType.SCATTER;
+            default -> throw invalidGraphType();
+        };
+    }
+
+    private GraphTemplate buildGraphTemplate(GraphTemplateType graphType) {
+        Map<String, Object> config = Map.of(
+            "displayModeBar", false,
+            "responsive", true
+        );
+        Map<String, Object> style = Map.of("height", 320);
+
+        return switch (graphType) {
+            case PIE -> new GraphTemplate(
+                "New Pie Graph",
+                List.of(Map.of(
+                    "type", "pie",
+                    "name", "Trace 1",
+                    "labels", List.of("Slice 1"),
+                    "values", List.of(1),
+                    "marker", Map.of(
+                        "color", DEFAULT_GRAPH_COLOR,
+                        "colors", List.of(DEFAULT_GRAPH_COLOR)
+                    )
+                )),
+                Map.of(
+                    "margin", Map.of("t", 16, "r", 16, "b", 16, "l", 16),
+                    "showlegend", false
+                ),
+                config,
+                style
+            );
+            case BAR -> new GraphTemplate(
+                "New Bar Graph",
+                List.of(Map.of(
+                    "type", "bar",
+                    "name", "Trace 1",
+                    "x", List.of("Point 1"),
+                    "y", List.of(0),
+                    "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
+                )),
+                Map.of(
+                    "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                    "showlegend", false
+                ),
+                config,
+                style
+            );
+            case SCATTER -> new GraphTemplate(
+                "New Plot Graph",
+                List.of(Map.of(
+                    "type", "scatter",
+                    "mode", "lines+markers",
+                    "name", "Trace 1",
+                    "x", List.of(1),
+                    "y", List.of(0),
+                    "marker", Map.of("color", DEFAULT_GRAPH_COLOR),
+                    "line", Map.of("color", DEFAULT_GRAPH_COLOR)
+                )),
+                Map.of(
+                    "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                    "showlegend", false
+                ),
+                config,
+                style
+            );
+        };
+    }
+
+    private Long resolveTargetSectionId(
+        Map<String, Object> sectionLayout,
+        Long sectionId,
+        boolean createNewSection
+    ) {
+        if (createNewSection) {
+            return nextSectionId(sectionLayout);
+        }
+
+        requireExistingSection(sectionLayout, sectionId);
+        return sectionId;
+    }
+
+    private Long nextSectionId(Map<String, Object> sectionLayout) {
+        long maxSectionId = 0L;
+        for (Object sectionValue : readSectionList(sectionLayout)) {
+            if (!(sectionValue instanceof Map<?, ?> sectionMap)) {
+                continue;
+            }
+            Object rawSectionId = sectionMap.get("section_id");
+            if (rawSectionId instanceof Number sectionNumber) {
+                maxSectionId = Math.max(maxSectionId, sectionNumber.longValue());
+            }
+        }
+        return maxSectionId + 1;
+    }
+
+    private Map<String, Object> appendGraphToSectionLayout(
+        Map<String, Object> sectionLayout,
+        Long sectionId,
+        boolean createNewSection,
+        Long graphId
+    ) {
+        Map<String, Object> nextLayout = sectionLayout == null
+            ? new LinkedHashMap<>()
+            : new LinkedHashMap<>(sectionLayout);
+        List<Object> sections = readSectionList(sectionLayout);
+
+        boolean matchedSection = false;
+        List<Object> nextSections = new ArrayList<>(sections.size());
+        for (Object sectionValue : sections) {
+            if (!(sectionValue instanceof Map<?, ?> sectionMap)) {
+                nextSections.add(sectionValue);
+                continue;
+            }
+
+            Map<String, Object> nextSection = copyObjectMap(sectionMap);
+            if (matchesSectionId(nextSection.get("section_id"), sectionId)) {
+                List<Object> graphIds = copyGraphIdList(nextSection.get("graph_ids"));
+                graphIds.add(graphId);
+                nextSection.put("graph_ids", List.copyOf(graphIds));
+                matchedSection = true;
+            }
+            nextSections.add(nextSection);
+        }
+
+        if (!matchedSection) {
+            if (!createNewSection) {
+                throw locationSectionNotFound();
+            }
+            nextSections.add(Map.of(
+                "section_id", sectionId,
+                "graph_ids", List.of(graphId)
+            ));
+        }
+
+        nextLayout.put("sections", List.copyOf(nextSections));
+        return nextLayout;
+    }
+
+    private void requireExistingSection(Map<String, Object> sectionLayout, Long sectionId) {
+        if (sectionId == null) {
+            throw locationSectionNotFound();
+        }
+
+        boolean matchedSection = readSectionList(sectionLayout).stream()
+            .filter(Map.class::isInstance)
+            .map(Map.class::cast)
+            .anyMatch(section -> matchesSectionId(section.get("section_id"), sectionId));
+
+        if (!matchedSection) {
+            throw locationSectionNotFound();
+        }
+    }
+
+    private List<Object> readSectionList(Map<String, Object> sectionLayout) {
+        if (sectionLayout == null) {
+            return List.of();
+        }
+
+        Object sectionsValue = sectionLayout.get("sections");
+        if (!(sectionsValue instanceof List<?> sections)) {
+            return List.of();
+        }
+
+        return new ArrayList<>(sections);
+    }
+
+    private Map<String, Object> copyObjectMap(Map<?, ?> source) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null) {
+                copy.put(String.valueOf(key), value);
+            }
+        });
+        return copy;
+    }
+
+    private boolean matchesSectionId(Object rawSectionId, Long expectedSectionId) {
+        return rawSectionId instanceof Number sectionNumber
+            && expectedSectionId != null
+            && sectionNumber.longValue() == expectedSectionId;
+    }
+
+    private List<Object> copyGraphIdList(Object rawGraphIds) {
+        if (!(rawGraphIds instanceof List<?> graphIds)) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(graphIds);
+    }
+
     /**
      * Trims and validates location names.
      */
@@ -660,6 +970,14 @@ public class LocationService {
 
     private ResponseStatusException invalidGraphName() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph name is required");
+    }
+
+    private ResponseStatusException invalidGraphType() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph type is invalid");
+    }
+
+    private ResponseStatusException locationSectionNotFound() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location section not found");
     }
 
     private ResponseStatusException duplicateGraphUpdates() {
