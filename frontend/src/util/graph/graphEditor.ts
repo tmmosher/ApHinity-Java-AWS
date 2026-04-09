@@ -50,6 +50,48 @@ const parseOptionalGraphObject = (
   return value;
 };
 
+export const getEditableGraphTitle = (
+  layout: Record<string, unknown> | null | undefined
+): string => {
+  if (!isRecord(layout)) {
+    return "";
+  }
+
+  const title = layout.title;
+  if (typeof title === "string") {
+    return title;
+  }
+  if (isRecord(title) && typeof title.text === "string") {
+    return title.text;
+  }
+  return "";
+};
+
+export const updateEditableGraphTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  rawTitle: string
+): Record<string, unknown> | null => {
+  const normalizedTitle = rawTitle.trim();
+  const nextLayout = isRecord(layout) ? cloneJson(layout) : {};
+
+  if (!normalizedTitle) {
+    delete nextLayout.title;
+    return Object.keys(nextLayout).length > 0 ? nextLayout : null;
+  }
+
+  const existingTitle = nextLayout.title;
+  nextLayout.title = isRecord(existingTitle)
+    ? {
+        ...existingTitle,
+        text: normalizedTitle
+      }
+    : {
+        text: normalizedTitle
+      };
+
+  return nextLayout;
+};
+
 const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayload => ({
   data: payload.data,
   layout: payload.layout ?? null,

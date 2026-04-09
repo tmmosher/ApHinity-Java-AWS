@@ -97,12 +97,18 @@
     /* animation hook for future use */
 }
 
+@property --gradient-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0turn;
+}
+
 @keyframes gradient-border-orbit {
   from {
-    transform: rotate(0turn);
+    --gradient-border-angle: 0turn;
   }
   to {
-    transform: rotate(1turn);
+    --gradient-border-angle: 1turn;
   }
 }
 
@@ -123,14 +129,21 @@
 }
 
 .gradient-border-frame::before {
+  --gradient-border-angle: 0turn;
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   padding: inherit;
-  background-image: conic-gradient(from 0deg, #8add68, #3e50bf, #8add68);
+  background-image: conic-gradient(
+    from var(--gradient-border-angle),
+    #8add68,
+    #3e50bf,
+    #8add68
+  );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
 

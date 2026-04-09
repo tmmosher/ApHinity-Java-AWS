@@ -1,6 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
 import {
+  createLocationGraphById,
   fetchLocationById,
   fetchLocationGraphsById,
   renameLocationGraphById,
@@ -228,6 +229,83 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       name: "Updated graph title",
       updatedAt: "2026-01-05T00:00:00Z"
     });
+  });
+
+  it("creates a graph through the dedicated create endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 44,
+      name: "New Plot Graph",
+      data: [{type: "scatter", mode: "lines+markers", x: [1], y: [0]}],
+      layout: {showlegend: false},
+      config: {displayModeBar: false, responsive: true},
+      style: {height: 320},
+      createdAt: "2026-01-05T00:00:00Z",
+      updatedAt: "2026-01-05T00:00:00Z"
+    }));
+
+    const result = await createLocationGraphById(host, "55", {
+      sectionId: 3,
+      graphType: "scatter"
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sectionId: 3,
+        graphType: "scatter"
+      })
+    });
+    expect(result.name).toBe("New Plot Graph");
+    expect(result.data[0].type).toBe("scatter");
+    expect(result.config).toEqual({displayModeBar: false, responsive: true});
+  });
+
+  it("creates a graph and requests a new section when needed", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 45,
+      name: "New Bar Graph",
+      data: [{type: "bar", name: "Trace 1", x: ["Point 1"], y: [0]}],
+      layout: {showlegend: false},
+      config: {displayModeBar: false, responsive: true},
+      style: {height: 320},
+      createdAt: "2026-01-05T00:00:00Z",
+      updatedAt: "2026-01-05T00:00:00Z"
+    }));
+
+    const result = await createLocationGraphById(host, "55", {
+      createNewSection: true,
+      graphType: "bar"
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        createNewSection: true,
+        graphType: "bar"
+      })
+    });
+    expect(result.name).toBe("New Bar Graph");
+    expect(result.data[0].type).toBe("bar");
+  });
+
+  it("surfaces permission errors when graph creation is rejected", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "forbidden",
+      message: "Insufficient permissions"
+    }));
+
+    await expect(
+      createLocationGraphById(host, "55", {
+        sectionId: 3,
+        graphType: "bar"
+      })
+    ).rejects.toThrowError("Insufficient permissions");
   });
 
   it("rejects invalid route location ids before save request dispatch", async () => {

@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.controllers.location;
 
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateBatchRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphCreateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.location.LocationRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
@@ -92,6 +93,72 @@ public class LocationController {
     public List<GraphResponse> locationGraphs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationService.getAccessibleLocationGraphs(userId, locationId);
+    }
+
+    /**
+     * Creates a new graph and assigns it to a dashboard section for the location.
+     * Only partner/admin users are authorized to create location graphs.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param request validated request containing the target section and graph type
+     * @return created graph payload
+     */
+    @PostMapping("/locations/{locationId}/graphs")
+    @ResponseStatus(HttpStatus.CREATED)
+    public GraphResponse createLocationGraph(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @Valid @RequestBody LocationGraphCreateRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received location graph create request actorUserId={} locationId={} sectionId={} createNewSection={} graphType={}",
+            userId,
+            locationId,
+            request.sectionId(),
+            request.createNewSection(),
+            request.graphType()
+        );
+        try {
+            GraphResponse response = locationService.createLocationGraph(
+                userId,
+                locationId,
+                request.sectionId(),
+                Boolean.TRUE.equals(request.createNewSection()),
+                request.graphType()
+            );
+            log.info(
+                "Completed location graph create request actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                response.id()
+            );
+            return response;
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location graph create request actorUserId={} locationId={} sectionId={} createNewSection={} graphType={} status={} reason={}",
+                userId,
+                locationId,
+                request.sectionId(),
+                request.createNewSection(),
+                request.graphType(),
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location graph create request actorUserId={} locationId={} sectionId={} createNewSection={} graphType={}",
+                userId,
+                locationId,
+                request.sectionId(),
+                request.createNewSection(),
+                request.graphType(),
+                ex
+            );
+            throw ex;
+        }
     }
 
     /**

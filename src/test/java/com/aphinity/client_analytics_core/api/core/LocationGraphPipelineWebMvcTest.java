@@ -39,13 +39,15 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -312,6 +314,113 @@ class LocationGraphPipelineWebMvcTest {
         assertEquals(List.of(9L), traces.get(0).get("y"));
         assertEquals("Forecast", traces.get(1).get("name"));
         assertEquals(List.of(12L), traces.get(1).get("y"));
+    }
+
+    @Test
+    void createLocationGraphBuildsDefaultPayloadAndAppendsItToRequestedSection() throws Exception {
+        Long userId = 47L;
+        Long locationId = 83L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(300L)),
+                Map.of("section_id", 2, "graph_ids", List.of())
+            )
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(510L);
+            graph.setCreatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "sectionId": 2,
+                          "graphType": "bar"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(510))
+            .andExpect(jsonPath("$.name").value("New Bar Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("bar"))
+            .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
+            .andExpect(jsonPath("$.data[0].x[0]").value("Point 1"))
+            .andExpect(jsonPath("$.data[0].y[0]").value(0))
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(true))
+            .andExpect(jsonPath("$.style.height").value(320));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(300L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(510L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void createLocationGraphCreatesANewSectionWhenRequested() throws Exception {
+        Long userId = 48L;
+        Long locationId = 84L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(511L);
+            graph.setCreatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "createNewSection": true,
+                          "graphType": "bar"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(511))
+            .andExpect(jsonPath("$.name").value("New Bar Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("bar"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(1, sections.size());
+        assertEquals(1L, ((Number) sections.getFirst().get("section_id")).longValue());
+        assertEquals(List.of(511L), sections.getFirst().get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
     }
 
     @Test

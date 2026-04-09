@@ -6,8 +6,10 @@ import {
   buildGraphBaselineIndex,
   buildLocationGraphUpdates,
   createEditableGraphPayload,
+  getEditableGraphTitle,
   parseEditableGraphPayload,
   serializeEditableGraphPayload,
+  updateEditableGraphTitle,
   undoGraphPayloadEdit
 } from "../util/graph/graphEditor";
 
@@ -133,6 +135,30 @@ describe("graphEditor", () => {
 
   it("returns no save payloads when there are no graph changes", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
+  });
+
+  it("reads graph titles from string and object Plotly layout shapes", () => {
+    expect(getEditableGraphTitle({title: "Legacy title"})).toBe("Legacy title");
+    expect(getEditableGraphTitle({title: {text: "Current title", x: 0.02}})).toBe("Current title");
+    expect(getEditableGraphTitle({showlegend: false})).toBe("");
+  });
+
+  it("updates graph titles while preserving existing layout title metadata", () => {
+    expect(updateEditableGraphTitle({showlegend: false}, "Updated title")).toEqual({
+      showlegend: false,
+      title: {text: "Updated title"}
+    });
+
+    expect(updateEditableGraphTitle({title: {text: "Old title", x: 0.02}}, "Next title")).toEqual({
+      title: {text: "Next title", x: 0.02}
+    });
+  });
+
+  it("removes the graph title when the draft is cleared", () => {
+    expect(updateEditableGraphTitle({title: {text: "Old"}, showlegend: false}, "   ")).toEqual({
+      showlegend: false
+    });
+    expect(updateEditableGraphTitle({title: {text: "Old"}}, "")).toBeNull();
   });
 
   it("uses precomputed baseline signatures when building changed graph updates", () => {

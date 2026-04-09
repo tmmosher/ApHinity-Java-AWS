@@ -321,6 +321,139 @@ class LocationServiceTest {
     }
 
     @Test
+    void createLocationGraphRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.createLocationGraph(5L, 99L, 2L, false, "bar")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository, locationGraphRepository);
+    }
+
+    @Test
+    void createLocationGraphRejectsUnknownSection() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of(11L)))
+        ));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.createLocationGraph(5L, 99L, 2L, false, "bar")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Location section not found", ex.getReason());
+        verify(graphRepository, never()).saveAndFlush(any(Graph.class));
+        verifyNoInteractions(locationGraphRepository);
+    }
+
+    @Test
+    void createLocationGraphPersistsGraphAndAppendsItToRequestedSection() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(11L)),
+                Map.of("section_id", 2, "graph_ids", List.of())
+            )
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(31L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, 2L, false, "scatter");
+
+        assertEquals(31L, response.id());
+        assertEquals("New Plot Graph", response.name());
+        verify(graphRepository).saveAndFlush(any(Graph.class));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals(1, traces.size());
+        assertEquals("scatter", traces.getFirst().get("type"));
+        assertEquals("lines+markers", traces.getFirst().get("mode"));
+        assertEquals(Map.of("displayModeBar", false, "responsive", true), savedGraphHolder[0].getConfig());
+        assertEquals(Map.of("height", 320), savedGraphHolder[0].getStyle());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(11L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(31L), sections.get(1).get("graph_ids"));
+    }
+
+    @Test
+    void createLocationGraphCreatesAndAppendsANewSectionWhenRequested() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 2, "graph_ids", List.of(11L)),
+                Map.of("section_id", 4, "graph_ids", List.of(12L))
+            )
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(45L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, null, true, "bar");
+
+        assertEquals(45L, response.id());
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals("bar", traces.getFirst().get("type"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(3, sections.size());
+        assertEquals(5L, sections.get(2).get("section_id"));
+        assertEquals(List.of(45L), sections.get(2).get("graph_ids"));
+    }
+
+    @Test
     void updateLocationGraphDataRejectsCallerWithoutElevatedRole() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));

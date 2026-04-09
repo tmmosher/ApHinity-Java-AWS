@@ -1,12 +1,13 @@
 import {A, useParams} from "@solidjs/router";
 import PlotlyChart, {loadPlotlyModule} from "../../../../components/Chart";
+import GraphCreateModal from "../../../../components/graph-editor/GraphCreateModal";
 import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../../components/Chart";
 import GraphEditorModal from "../../../../components/graph-editor/GraphEditorModal";
 import {For, Show, Suspense, createEffect, createMemo, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
-import {LocationGraph, LocationSectionLayout} from "../../../../types/Types";
+import {LocationGraph, LocationGraphType, LocationSectionLayout} from "../../../../types/Types";
 import {
   applyGraphPayloadEdit,
   buildChangedLocationGraphUpdates,
@@ -18,6 +19,7 @@ import {
 } from "../../../../util/graph/graphEditor";
 import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {
+  createLocationGraphById,
   renameLocationGraphById,
   saveLocationGraphsById
 } from "../../../../util/graph/locationDetailApi";
@@ -45,6 +47,8 @@ export const DashboardLocationDashboardPanel = () => {
   const [graphBaselineIndex, setGraphBaselineIndex] = createSignal<Map<number, GraphBaselineEntry>>(new Map());
   const [locationUndoStack, setLocationUndoStack] = createSignal<LocationGraph[][]>([]);
   const [editingGraphId, setEditingGraphId] = createSignal<number | null>(null);
+  const [isCreateGraphModalOpen, setIsCreateGraphModalOpen] = createSignal(false);
+  const [isCreatingGraph, setIsCreatingGraph] = createSignal(false);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
   const [graphAnimationToken, setGraphAnimationToken] = createSignal(0);
@@ -70,6 +74,8 @@ export const DashboardLocationDashboardPanel = () => {
       return;
     }
     setEditingGraphId(null);
+    setIsCreateGraphModalOpen(false);
+    setIsCreatingGraph(false);
     setIsSavingGraphChanges(false);
     setWorkingGraphs([]);
     setGraphBaselineIndex(new Map());
@@ -128,6 +134,38 @@ export const DashboardLocationDashboardPanel = () => {
     );
   });
 
+  const sectionOptions = createMemo(() =>
+    orderedSections().map((section) => ({
+      id: section.section_id,
+      label: `Section ${section.section_id} (${section.graph_ids.length} graph${section.graph_ids.length === 1 ? "" : "s"})`
+    }))
+  );
+
+  const nextSectionId = createMemo(() => {
+    const sections = orderedSections();
+    if (sections.length === 0) {
+      return 1;
+    }
+    return Math.max(...sections.map((section) => section.section_id)) + 1;
+  });
+
+  const canCreateGraphs = createMemo(() =>
+    canEditGraphs()
+    && !hasPendingGraphChanges()
+    && !isSavingGraphChanges()
+    && !isCreatingGraph()
+  );
+
+  const createGraphDisabledReason = () => {
+    if (hasPendingGraphChanges()) {
+      return "Apply or undo your pending graph changes before creating a new graph.";
+    }
+    if (isSavingGraphChanges() || isCreatingGraph()) {
+      return "Graph changes are already being saved.";
+    }
+    return undefined;
+  };
+
   const sectionGraphs = (section: LocationSectionLayout): LocationGraph[] =>
     section.graph_ids
       .map((graphId) => graphById().get(graphId))
@@ -170,16 +208,24 @@ export const DashboardLocationDashboardPanel = () => {
   );
 
   const closeGraphEditor = () => setEditingGraphId(null);
+  const closeCreateGraphModal = () => setIsCreateGraphModalOpen(false);
 
   const openGraphEditor = (graphId: number) => {
-    if (isSavingGraphChanges() || !canEditGraphs()) {
+    if (isSavingGraphChanges() || isCreatingGraph() || !canEditGraphs()) {
       return;
     }
     setEditingGraphId(graphId);
   };
 
+  const openCreateGraphModal = () => {
+    if (!canCreateGraphs()) {
+      return;
+    }
+    setIsCreateGraphModalOpen(true);
+  };
+
   const applyLocalGraphEdit = (graphId: number, payload: EditableGraphPayload) => {
-    if (isSavingGraphChanges() || !canEditGraphs()) {
+    if (isSavingGraphChanges() || isCreatingGraph() || !canEditGraphs()) {
       return;
     }
     const result = applyGraphPayloadEdit(
@@ -196,7 +242,7 @@ export const DashboardLocationDashboardPanel = () => {
   };
 
   const renameGraphFromModal = async (graphId: number, name: string): Promise<void> => {
-    if (isSavingGraphChanges() || !canEditGraphs()) {
+    if (isSavingGraphChanges() || isCreatingGraph() || !canEditGraphs()) {
       throw new Error("Unable to rename graph.");
     }
 
@@ -245,8 +291,70 @@ export const DashboardLocationDashboardPanel = () => {
     }
   };
 
+  const createGraphFromModal = async (request: {
+    graphType: LocationGraphType;
+    sectionId?: number;
+    createNewSection: boolean;
+  }): Promise<void> => {
+    if (isSavingGraphChanges() || isCreatingGraph() || hasPendingGraphChanges() || !canEditGraphs()) {
+      throw new Error("Unable to create graph.");
+    }
+
+    const createLocationId = params.locationId;
+    const createSessionToken = locationSessionToken();
+    setIsCreatingGraph(true);
+
+    try {
+      await createLocationGraphById(host, createLocationId, request);
+
+      if (createLocationId !== params.locationId || createSessionToken !== locationSessionToken()) {
+        return;
+      }
+
+      setIsCreateGraphModalOpen(false);
+      toast.success("Graph created.");
+
+      try {
+        await Promise.all([refetchGraphs(), refetchLocation()]);
+        if (createLocationId !== params.locationId || createSessionToken !== locationSessionToken()) {
+          return;
+        }
+      } catch {
+        if (createLocationId === params.locationId && createSessionToken === locationSessionToken()) {
+          toast.error("Graph created, but automatic refresh failed. Please refresh the page.");
+        }
+      }
+    } catch (error) {
+      if (createLocationId !== params.locationId || createSessionToken !== locationSessionToken()) {
+        return;
+      }
+
+      if (error instanceof Error && error.message === "CSRF invalid") {
+        throw new Error("Security token refresh failed. Please retry creating the graph.");
+      }
+      if (error instanceof Error && error.message === "Security token rejected") {
+        throw new Error("Security validation failed. Retrying usually succeeds.");
+      }
+      if (error instanceof Error && error.message === "Authentication required") {
+        throw new Error("Session refresh failed. Please sign in again.");
+      }
+      if (error instanceof Error && error.message === "Insufficient permissions") {
+        throw new Error("You no longer have permission to create graphs.");
+      }
+      if (error instanceof Error && error.message === "Location section not found") {
+        throw new Error("Selected section is no longer available. Please refresh and try again.");
+      }
+
+      throw error instanceof Error ? error : new Error("Unable to create graph.");
+    } finally {
+      if (createLocationId === params.locationId && createSessionToken === locationSessionToken()) {
+        setIsCreatingGraph(false);
+      }
+    }
+  };
+
   const undoLastGraphEdit = () => {
-    if (isSavingGraphChanges()) {
+    if (isSavingGraphChanges() || isCreatingGraph()) {
       return;
     }
     const result = undoGraphPayloadEdit(workingGraphs(), locationUndoStack());
@@ -258,7 +366,7 @@ export const DashboardLocationDashboardPanel = () => {
   };
 
   const applyGraphChanges = async () => {
-    if (isSavingGraphChanges() || !hasPendingGraphChanges() || !canEditGraphs()) {
+    if (isSavingGraphChanges() || isCreatingGraph() || !hasPendingGraphChanges() || !canEditGraphs()) {
       return;
     }
 
@@ -345,16 +453,25 @@ export const DashboardLocationDashboardPanel = () => {
           <div class="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              class={"btn btn-sm " + (hasPendingGraphChanges() && !isSavingGraphChanges() ? "btn-primary" : "btn-disabled")}
-              disabled={!hasPendingGraphChanges() || isSavingGraphChanges()}
+              class={"btn btn-sm " + (canCreateGraphs() ? "btn-outline" : "btn-disabled")}
+              disabled={!canCreateGraphs()}
+              title={createGraphDisabledReason()}
+              onClick={openCreateGraphModal}
+            >
+              {isCreatingGraph() ? "Creating..." : "Add Graph"}
+            </button>
+            <button
+              type="button"
+              class={"btn btn-sm " + (hasPendingGraphChanges() && !isSavingGraphChanges() && !isCreatingGraph() ? "btn-primary" : "btn-disabled")}
+              disabled={!hasPendingGraphChanges() || isSavingGraphChanges() || isCreatingGraph()}
               onClick={() => void applyGraphChanges()}
             >
               Apply
             </button>
             <button
               type="button"
-              class={"btn btn-sm " + (hasPendingGraphChanges() && !isSavingGraphChanges() ? "btn-outline" : "btn-disabled")}
-              disabled={!hasPendingGraphChanges() || isSavingGraphChanges()}
+              class={"btn btn-sm " + (hasPendingGraphChanges() && !isSavingGraphChanges() && !isCreatingGraph() ? "btn-outline" : "btn-disabled")}
+              disabled={!hasPendingGraphChanges() || isSavingGraphChanges() || isCreatingGraph()}
               onClick={undoLastGraphEdit}
             >
               Undo
@@ -418,8 +535,8 @@ export const DashboardLocationDashboardPanel = () => {
                                 <Show when={canEditGraphs()}>
                                   <button
                                     type="button"
-                                    class={"btn btn-xs " + (isSavingGraphChanges() ? "btn-disabled" : "btn-outline")}
-                                    disabled={isSavingGraphChanges()}
+                                    class={"btn btn-xs " + (isSavingGraphChanges() || isCreatingGraph() ? "btn-disabled" : "btn-outline")}
+                                    disabled={isSavingGraphChanges() || isCreatingGraph()}
                                     onClick={() => openGraphEditor(graph.id)}
                                   >
                                     Edit
@@ -466,11 +583,19 @@ export const DashboardLocationDashboardPanel = () => {
       </Show>
 
       <Show when={canEditGraphs()}>
+        <GraphCreateModal
+          isOpen={isCreateGraphModalOpen()}
+          isCreating={isCreatingGraph()}
+          sectionOptions={sectionOptions()}
+          nextSectionId={nextSectionId()}
+          onCreate={createGraphFromModal}
+          onClose={closeCreateGraphModal}
+        />
         <GraphEditorModal
           isOpen={editingGraphId() !== null}
           graph={editingGraph()}
-          canRenameGraph={canEditGraphs()}
-          canUndo={hasPendingGraphChanges() && !isSavingGraphChanges()}
+          canRenameGraph={canEditGraphs() && !isCreatingGraph()}
+          canUndo={hasPendingGraphChanges() && !isSavingGraphChanges() && !isCreatingGraph()}
           isSaving={isSavingGraphChanges()}
           onApply={applyLocalGraphEdit}
           onRenameGraph={renameGraphFromModal}
