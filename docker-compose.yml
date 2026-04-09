@@ -4,6 +4,8 @@ services:
   app:
     build:
       context: .
+      args:
+        VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     ports:
       - "8080:8080"
     env_file:
