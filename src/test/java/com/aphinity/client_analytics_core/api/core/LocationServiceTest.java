@@ -5,6 +5,7 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
@@ -321,6 +322,57 @@ class LocationServiceTest {
     }
 
     @Test
+    void deleteLocationGraphRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationGraph(5L, 99L, 31L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository, locationGraphRepository);
+    }
+
+    @Test
+    void deleteLocationGraphRemovesGraphFromSectionLayoutAndDeletesGraph() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(31L, 44L)),
+                Map.of("section_id", 2, "graph_ids", List.of(57L))
+            )
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(99L, 31L)).thenReturn(Optional.of(graph));
+        when(locationGraphRepository.findByIdGraphId(31L)).thenReturn(List.of());
+
+        locationService.deleteLocationGraph(5L, 99L, 31L);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(44L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(57L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).deleteById(new LocationGraphId(99L, 31L));
+        verify(graphRepository).delete(graph);
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
     void createLocationGraphRejectsCallerWithoutElevatedRole() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
@@ -407,6 +459,71 @@ class LocationServiceTest {
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
         assertEquals(List.of(11L), sections.get(0).get("graph_ids"));
         assertEquals(List.of(31L), sections.get(1).get("graph_ids"));
+    }
+
+    @Test
+    void createLocationGraphBuildsDonutPieTemplate() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of()))
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(33L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, 1L, false, "pie");
+
+        assertEquals(33L, response.id());
+        assertEquals("New Pie Graph", response.name());
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals(1, traces.size());
+        assertEquals("pie", traces.getFirst().get("type"));
+        assertEquals(0.72, ((Number) traces.getFirst().get("hole")).doubleValue());
+        assertEquals(false, traces.getFirst().get("sort"));
+        assertEquals(List.of("fill"), traces.getFirst().get("labels"));
+        @SuppressWarnings("unchecked")
+        List<Object> values = (List<Object>) traces.getFirst().get("values");
+        assertEquals(1, values.size());
+        assertEquals(30L, ((Number) values.getFirst()).longValue());
+        assertEquals("none", traces.getFirst().get("textinfo"));
+        assertEquals("clockwise", traces.getFirst().get("direction"));
+        assertEquals("%{label}: %{value}<extra></extra>", traces.getFirst().get("hovertemplate"));
+        assertEquals(
+            Map.of("color", "#2563eb", "colors", List.of("#2563eb")),
+            traces.getFirst().get("marker")
+        );
+        assertEquals(
+            Map.of(
+                "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
+                "showlegend", false,
+                "annotations", List.of(Map.of(
+                    "x", 0.5,
+                    "y", 0.5,
+                    "text", "<b>30</b>",
+                    "xref", "paper",
+                    "yref", "paper",
+                    "showarrow", false,
+                    "font", Map.of("size", 22)
+                ))
+            ),
+            response.layout()
+        );
     }
 
     @Test

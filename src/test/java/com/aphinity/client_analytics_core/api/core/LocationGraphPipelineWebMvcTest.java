@@ -46,6 +46,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -420,6 +421,52 @@ class LocationGraphPipelineWebMvcTest {
         assertEquals(1L, ((Number) sections.getFirst().get("section_id")).longValue());
         assertEquals(List.of(511L), sections.getFirst().get("graph_ids"));
         verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void deleteLocationGraphRemovesItFromSectionLayoutThroughPipeline() throws Exception {
+        Long userId = 49L;
+        Long locationId = 85L;
+        Long graphId = 512L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(graphId, 300L)),
+                Map.of("section_id", 2, "graph_ids", List.of(301L))
+            )
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+        Graph graph = new Graph();
+        graph.setId(graphId);
+        graph.setName("Delete me");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, graphId))
+            .thenReturn(Optional.of(graph));
+        when(locationGraphRepository.findByIdGraphId(graphId)).thenReturn(List.of());
+
+        mockMvc.perform(
+                delete("/core/locations/{locationId}/graphs/{graphId}", locationId, graphId)
+                    .with(csrf().asHeader())
+            )
+            .andExpect(status().isNoContent());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(300L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(301L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).deleteById(new com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId(locationId, graphId));
+        verify(graphRepository).delete(graph);
         verify(locationRepository).saveAndFlush(location);
     }
 

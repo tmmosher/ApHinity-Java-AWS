@@ -247,6 +247,60 @@ public class LocationService {
     }
 
     /**
+     * Deletes a graph assigned to a location and removes its section layout reference.
+     * Only partner/admin callers may delete location graphs.
+     *
+     * @param userId authenticated user id performing the delete
+     * @param locationId target location id
+     * @param graphId target graph id
+     */
+    @Transactional
+    public void deleteLocationGraph(Long userId, Long locationId, Long graphId) {
+        AppUser user = requireUser(userId);
+        if (!accountRoleService.isPartnerOrAdmin(user)) {
+            log.warn(
+                "Rejected graph delete due to insufficient permissions actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId
+            );
+            throw forbidden();
+        }
+
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        Graph graph = graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, graphId)
+            .orElseThrow(this::locationGraphNotFound);
+
+        location.setSectionLayout(removeGraphFromSectionLayout(location.getSectionLayout(), graphId));
+
+        try {
+            locationGraphRepository.deleteById(new LocationGraphId(locationId, graphId));
+            locationGraphRepository.flush();
+            if (locationGraphRepository.findByIdGraphId(graphId).isEmpty()) {
+                graphRepository.delete(graph);
+                graphRepository.flush();
+            }
+            locationRepository.saveAndFlush(location);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Graph delete persistence failed actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId,
+                ex
+            );
+            throw ex;
+        }
+
+        log.info(
+            "Deleted location graph locationId={} graphId={} actorUserId={}",
+            locationId,
+            graphId,
+            userId
+        );
+    }
+
+    /**
      * Replaces graph trace data (and optional layout) for one or more graphs linked to a location.
      * Only partner/admin callers may mutate graph payloads.
      *
@@ -705,16 +759,30 @@ public class LocationService {
                 List.of(Map.of(
                     "type", "pie",
                     "name", "Trace 1",
-                    "labels", List.of("Slice 1"),
-                    "values", List.of(1),
+                    "hole", 0.72,
+                    "sort", false,
+                    "labels", List.of("fill"),
+                    "values", List.of(30),
                     "marker", Map.of(
                         "color", DEFAULT_GRAPH_COLOR,
                         "colors", List.of(DEFAULT_GRAPH_COLOR)
-                    )
+                    ),
+                    "textinfo", "none",
+                    "direction", "clockwise",
+                    "hovertemplate", "%{label}: %{value}<extra></extra>"
                 )),
                 Map.of(
-                    "margin", Map.of("t", 16, "r", 16, "b", 16, "l", 16),
-                    "showlegend", false
+                    "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
+                    "showlegend", false,
+                    "annotations", List.of(Map.of(
+                        "x", 0.5,
+                        "y", 0.5,
+                        "text", "<b>30</b>",
+                        "xref", "paper",
+                        "yref", "paper",
+                        "showarrow", false,
+                        "font", Map.of("size", 22)
+                    ))
                 ),
                 config,
                 style
@@ -826,6 +894,37 @@ public class LocationService {
         return nextLayout;
     }
 
+    private Map<String, Object> removeGraphFromSectionLayout(
+        Map<String, Object> sectionLayout,
+        Long graphId
+    ) {
+        Map<String, Object> nextLayout = sectionLayout == null
+            ? new LinkedHashMap<>()
+            : new LinkedHashMap<>(sectionLayout);
+        List<Object> sections = readSectionList(sectionLayout);
+        List<Object> nextSections = new ArrayList<>(sections.size());
+
+        for (Object sectionValue : sections) {
+            if (!(sectionValue instanceof Map<?, ?> sectionMap)) {
+                nextSections.add(sectionValue);
+                continue;
+            }
+
+            Map<String, Object> nextSection = copyObjectMap(sectionMap);
+            List<Object> retainedGraphIds = new ArrayList<>();
+            for (Object rawGraphId : copyGraphIdList(nextSection.get("graph_ids"))) {
+                if (!matchesGraphId(rawGraphId, graphId)) {
+                    retainedGraphIds.add(rawGraphId);
+                }
+            }
+            nextSection.put("graph_ids", List.copyOf(retainedGraphIds));
+            nextSections.add(nextSection);
+        }
+
+        nextLayout.put("sections", List.copyOf(nextSections));
+        return nextLayout;
+    }
+
     private void requireExistingSection(Map<String, Object> sectionLayout, Long sectionId) {
         if (sectionId == null) {
             throw locationSectionNotFound();
@@ -868,6 +967,12 @@ public class LocationService {
         return rawSectionId instanceof Number sectionNumber
             && expectedSectionId != null
             && sectionNumber.longValue() == expectedSectionId;
+    }
+
+    private boolean matchesGraphId(Object rawGraphId, Long expectedGraphId) {
+        return rawGraphId instanceof Number graphNumber
+            && expectedGraphId != null
+            && graphNumber.longValue() == expectedGraphId;
     }
 
     private List<Object> copyGraphIdList(Object rawGraphIds) {

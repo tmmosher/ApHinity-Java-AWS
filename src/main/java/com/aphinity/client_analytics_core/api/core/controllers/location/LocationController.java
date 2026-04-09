@@ -279,6 +279,58 @@ public class LocationController {
     }
 
     /**
+     * Deletes a single graph assigned to a location.
+     * Only partner/admin users are authorized to delete location graphs.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param graphId graph identifier
+     */
+    @DeleteMapping("/locations/{locationId}/graphs/{graphId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteLocationGraph(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @PathVariable Long graphId
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received location graph delete request actorUserId={} locationId={} graphId={}",
+            userId,
+            locationId,
+            graphId
+        );
+        try {
+            locationService.deleteLocationGraph(userId, locationId, graphId);
+            log.info(
+                "Completed location graph delete request actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId
+            );
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location graph delete request actorUserId={} locationId={} graphId={} status={} reason={}",
+                userId,
+                locationId,
+                graphId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location graph delete request actorUserId={} locationId={} graphId={}",
+                userId,
+                locationId,
+                graphId,
+                ex
+            );
+            throw ex;
+        }
+    }
+
+    /**
      * Updates a location name.
      *
      * @param jwt authenticated principal JWT

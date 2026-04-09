@@ -59,9 +59,12 @@ const renderModal = (graph?: LocationGraph) =>
         isOpen: true,
         graph,
         canRenameGraph: false,
+        canDeleteGraph: false,
         canUndo: false,
+        isDeleting: false,
         isSaving: false,
         onApply: vi.fn(),
+        onDeleteGraph: vi.fn().mockResolvedValue(undefined),
         onRenameGraph: vi.fn().mockResolvedValue(undefined),
         onUndo: vi.fn(),
         onClose: vi.fn()

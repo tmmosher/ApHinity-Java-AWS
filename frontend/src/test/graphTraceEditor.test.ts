@@ -140,6 +140,26 @@ describe("graphTraceEditor", () => {
     });
   });
 
+  it("creates pie traces with donut defaults", () => {
+    const nextTrace = createTrace("pie", 0);
+
+    expect(nextTrace).toEqual({
+      type: "pie",
+      name: "Trace 1",
+      hole: 0.72,
+      sort: false,
+      labels: ["fill"],
+      values: [30],
+      textinfo: "none",
+      direction: "clockwise",
+      hovertemplate: "%{label}: %{value}<extra></extra>",
+      marker: {
+        color: "#2563eb",
+        colors: ["#2563eb"]
+      }
+    });
+  });
+
   it("renames traces and clears names when blank input is provided", () => {
     const trace: Record<string, unknown> = {
       type: "bar",

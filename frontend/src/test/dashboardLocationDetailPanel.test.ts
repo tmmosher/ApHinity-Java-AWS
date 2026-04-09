@@ -2,6 +2,7 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
 import {
   createLocationGraphById,
+  deleteLocationGraphById,
   fetchLocationById,
   fetchLocationGraphsById,
   renameLocationGraphById,
@@ -294,6 +295,16 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     expect(result.data[0].type).toBe("bar");
   });
 
+  it("deletes a graph through the dedicated delete endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await deleteLocationGraphById(host, "55", 12);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs/12", {
+      method: "DELETE"
+    });
+  });
+
   it("surfaces permission errors when graph creation is rejected", async () => {
     apiFetchMock.mockResolvedValue(createMockResponse(false, {
       code: "forbidden",
@@ -384,5 +395,16 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     await expect(
       renameLocationGraphById(host, "55", 12, "   ")
     ).rejects.toThrowError("Graph name is required");
+  });
+
+  it("throws a location-graph error when delete target no longer exists", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "location_graph_not_found",
+      message: "Location graph not found"
+    }));
+
+    await expect(
+      deleteLocationGraphById(host, "55", 12)
+    ).rejects.toThrowError("Location graph not found");
   });
 });

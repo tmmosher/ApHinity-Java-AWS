@@ -180,6 +180,21 @@ class LocationControllerTest {
     }
 
     @Test
+    void deleteLocationGraphDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationController.deleteLocationGraph(jwt, 8L, 31L);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).deleteLocationGraph(42L, 8L, 31L);
+    }
+
+    @Test
     void updateLocationGraphNameDelegatesToServiceForAuthenticatedUser() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")

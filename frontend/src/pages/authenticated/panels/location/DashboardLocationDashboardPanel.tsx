@@ -20,6 +20,7 @@ import {
 import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {
   createLocationGraphById,
+  deleteLocationGraphById,
   renameLocationGraphById,
   saveLocationGraphsById
 } from "../../../../util/graph/locationDetailApi";
@@ -49,6 +50,7 @@ export const DashboardLocationDashboardPanel = () => {
   const [editingGraphId, setEditingGraphId] = createSignal<number | null>(null);
   const [isCreateGraphModalOpen, setIsCreateGraphModalOpen] = createSignal(false);
   const [isCreatingGraph, setIsCreatingGraph] = createSignal(false);
+  const [isDeletingGraph, setIsDeletingGraph] = createSignal(false);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
   const [graphAnimationToken, setGraphAnimationToken] = createSignal(0);
@@ -58,6 +60,9 @@ export const DashboardLocationDashboardPanel = () => {
     canEditLocationGraphs(profileContext.profile()?.role)
   );
   const hasPendingGraphChanges = createMemo(() => locationUndoStack().length > 0);
+  const isGraphMutationBusy = createMemo(() =>
+    isSavingGraphChanges() || isCreatingGraph() || isDeletingGraph()
+  );
 
   createEffect(() => {
     const fetchedGraphs = graphs();
@@ -76,6 +81,7 @@ export const DashboardLocationDashboardPanel = () => {
     setEditingGraphId(null);
     setIsCreateGraphModalOpen(false);
     setIsCreatingGraph(false);
+    setIsDeletingGraph(false);
     setIsSavingGraphChanges(false);
     setWorkingGraphs([]);
     setGraphBaselineIndex(new Map());
@@ -152,16 +158,15 @@ export const DashboardLocationDashboardPanel = () => {
   const canCreateGraphs = createMemo(() =>
     canEditGraphs()
     && !hasPendingGraphChanges()
-    && !isSavingGraphChanges()
-    && !isCreatingGraph()
+    && !isGraphMutationBusy()
   );
 
   const createGraphDisabledReason = () => {
     if (hasPendingGraphChanges()) {
       return "Apply or undo your pending graph changes before creating a new graph.";
     }
-    if (isSavingGraphChanges() || isCreatingGraph()) {
-      return "Graph changes are already being saved.";
+    if (isGraphMutationBusy()) {
+      return "Another graph action is already in progress.";
     }
     return undefined;
   };
@@ -211,7 +216,7 @@ export const DashboardLocationDashboardPanel = () => {
   const closeCreateGraphModal = () => setIsCreateGraphModalOpen(false);
 
   const openGraphEditor = (graphId: number) => {
-    if (isSavingGraphChanges() || isCreatingGraph() || !canEditGraphs()) {
+    if (isGraphMutationBusy() || !canEditGraphs()) {
       return;
     }
     setEditingGraphId(graphId);
@@ -225,7 +230,7 @@ export const DashboardLocationDashboardPanel = () => {
   };
 
   const applyLocalGraphEdit = (graphId: number, payload: EditableGraphPayload) => {
-    if (isSavingGraphChanges() || isCreatingGraph() || !canEditGraphs()) {
+    if (isGraphMutationBusy() || !canEditGraphs()) {
       return;
     }
     const result = applyGraphPayloadEdit(
@@ -242,7 +247,7 @@ export const DashboardLocationDashboardPanel = () => {
   };
 
   const renameGraphFromModal = async (graphId: number, name: string): Promise<void> => {
-    if (isSavingGraphChanges() || isCreatingGraph() || !canEditGraphs()) {
+    if (isGraphMutationBusy() || !canEditGraphs()) {
       throw new Error("Unable to rename graph.");
     }
 
@@ -296,7 +301,7 @@ export const DashboardLocationDashboardPanel = () => {
     sectionId?: number;
     createNewSection: boolean;
   }): Promise<void> => {
-    if (isSavingGraphChanges() || isCreatingGraph() || hasPendingGraphChanges() || !canEditGraphs()) {
+    if (isGraphMutationBusy() || hasPendingGraphChanges() || !canEditGraphs()) {
       throw new Error("Unable to create graph.");
     }
 
@@ -353,8 +358,69 @@ export const DashboardLocationDashboardPanel = () => {
     }
   };
 
+  const deleteGraphFromModal = async (graphId: number): Promise<void> => {
+    if (hasPendingGraphChanges()) {
+      throw new Error("Apply or undo your pending graph changes before deleting a graph.");
+    }
+    if (isGraphMutationBusy() || !canEditGraphs()) {
+      throw new Error("Unable to delete graph.");
+    }
+
+    const deleteLocationId = params.locationId;
+    const deleteSessionToken = locationSessionToken();
+    setIsDeletingGraph(true);
+
+    try {
+      await deleteLocationGraphById(host, deleteLocationId, graphId);
+
+      if (deleteLocationId !== params.locationId || deleteSessionToken !== locationSessionToken()) {
+        return;
+      }
+
+      setEditingGraphId(null);
+      toast.success("Graph deleted.");
+
+      try {
+        await Promise.all([refetchGraphs(), refetchLocation()]);
+        if (deleteLocationId !== params.locationId || deleteSessionToken !== locationSessionToken()) {
+          return;
+        }
+      } catch {
+        if (deleteLocationId === params.locationId && deleteSessionToken === locationSessionToken()) {
+          toast.error("Graph deleted, but automatic refresh failed. Please refresh the page.");
+        }
+      }
+    } catch (error) {
+      if (deleteLocationId !== params.locationId || deleteSessionToken !== locationSessionToken()) {
+        return;
+      }
+
+      if (error instanceof Error && error.message === "CSRF invalid") {
+        throw new Error("Security token refresh failed. Please retry deleting the graph.");
+      }
+      if (error instanceof Error && error.message === "Security token rejected") {
+        throw new Error("Security validation failed. Retrying usually succeeds.");
+      }
+      if (error instanceof Error && error.message === "Authentication required") {
+        throw new Error("Session refresh failed. Please sign in again.");
+      }
+      if (error instanceof Error && error.message === "Insufficient permissions") {
+        throw new Error("You no longer have permission to delete graphs.");
+      }
+      if (error instanceof Error && error.message === "Location graph not found") {
+        throw new Error("Selected graph is no longer available. Please refresh and try again.");
+      }
+
+      throw error instanceof Error ? error : new Error("Unable to delete graph.");
+    } finally {
+      if (deleteLocationId === params.locationId && deleteSessionToken === locationSessionToken()) {
+        setIsDeletingGraph(false);
+      }
+    }
+  };
+
   const undoLastGraphEdit = () => {
-    if (isSavingGraphChanges() || isCreatingGraph()) {
+    if (isGraphMutationBusy()) {
       return;
     }
     const result = undoGraphPayloadEdit(workingGraphs(), locationUndoStack());
@@ -366,7 +432,7 @@ export const DashboardLocationDashboardPanel = () => {
   };
 
   const applyGraphChanges = async () => {
-    if (isSavingGraphChanges() || isCreatingGraph() || !hasPendingGraphChanges() || !canEditGraphs()) {
+    if (isGraphMutationBusy() || !hasPendingGraphChanges() || !canEditGraphs()) {
       return;
     }
 
@@ -462,16 +528,16 @@ export const DashboardLocationDashboardPanel = () => {
             </button>
             <button
               type="button"
-              class={"btn btn-sm " + (hasPendingGraphChanges() && !isSavingGraphChanges() && !isCreatingGraph() ? "btn-primary" : "btn-disabled")}
-              disabled={!hasPendingGraphChanges() || isSavingGraphChanges() || isCreatingGraph()}
+              class={"btn btn-sm " + (hasPendingGraphChanges() && !isGraphMutationBusy() ? "btn-primary" : "btn-disabled")}
+              disabled={!hasPendingGraphChanges() || isGraphMutationBusy()}
               onClick={() => void applyGraphChanges()}
             >
               Apply
             </button>
             <button
               type="button"
-              class={"btn btn-sm " + (hasPendingGraphChanges() && !isSavingGraphChanges() && !isCreatingGraph() ? "btn-outline" : "btn-disabled")}
-              disabled={!hasPendingGraphChanges() || isSavingGraphChanges() || isCreatingGraph()}
+              class={"btn btn-sm " + (hasPendingGraphChanges() && !isGraphMutationBusy() ? "btn-outline" : "btn-disabled")}
+              disabled={!hasPendingGraphChanges() || isGraphMutationBusy()}
               onClick={undoLastGraphEdit}
             >
               Undo
@@ -535,8 +601,8 @@ export const DashboardLocationDashboardPanel = () => {
                                 <Show when={canEditGraphs()}>
                                   <button
                                     type="button"
-                                    class={"btn btn-xs " + (isSavingGraphChanges() || isCreatingGraph() ? "btn-disabled" : "btn-outline")}
-                                    disabled={isSavingGraphChanges() || isCreatingGraph()}
+                                    class={"btn btn-xs " + (isGraphMutationBusy() ? "btn-disabled" : "btn-outline")}
+                                    disabled={isGraphMutationBusy()}
                                     onClick={() => openGraphEditor(graph.id)}
                                   >
                                     Edit
@@ -594,10 +660,13 @@ export const DashboardLocationDashboardPanel = () => {
         <GraphEditorModal
           isOpen={editingGraphId() !== null}
           graph={editingGraph()}
-          canRenameGraph={canEditGraphs() && !isCreatingGraph()}
-          canUndo={hasPendingGraphChanges() && !isSavingGraphChanges() && !isCreatingGraph()}
+          canRenameGraph={canEditGraphs() && !isGraphMutationBusy()}
+          canDeleteGraph={canEditGraphs() && !hasPendingGraphChanges() && !isGraphMutationBusy()}
+          canUndo={hasPendingGraphChanges() && !isGraphMutationBusy()}
+          isDeleting={isDeletingGraph()}
           isSaving={isSavingGraphChanges()}
           onApply={applyLocalGraphEdit}
+          onDeleteGraph={deleteGraphFromModal}
           onRenameGraph={renameGraphFromModal}
           onUndo={undoLastGraphEdit}
           onClose={closeGraphEditor}

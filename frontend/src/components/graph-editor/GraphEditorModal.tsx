@@ -41,9 +41,12 @@ type GraphEditorModalProps = {
   isOpen: boolean;
   graph: LocationGraph | undefined;
   canRenameGraph: boolean;
+  canDeleteGraph: boolean;
   canUndo: boolean;
+  isDeleting: boolean;
   isSaving: boolean;
   onApply: (graphId: number, payload: EditableGraphPayload) => void;
+  onDeleteGraph: (graphId: number) => Promise<void>;
   onRenameGraph: (graphId: number, name: string) => Promise<void>;
   onUndo: () => void;
   onClose: () => void;
@@ -66,11 +69,13 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const [graphNameDraft, setGraphNameDraft] = createSignal(props.graph?.name ?? "");
   const [operationError, setOperationError] = createSignal("");
   const [renameError, setRenameError] = createSignal("");
+  const [deleteError, setDeleteError] = createSignal("");
   const [isRemovingTrace, setIsRemovingTrace] = createSignal(false);
   const [isSavingRename, setIsSavingRename] = createSignal(false);
   const [isRenamePopoverOpen, setIsRenamePopoverOpen] = createSignal(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = createSignal(false);
 
-  const isBusy = () => props.isSaving || isRemovingTrace() || isSavingRename();
+  const isBusy = () => props.isSaving || props.isDeleting || isRemovingTrace() || isSavingRename();
 
   createEffect(on(() => [props.isOpen, props.graph?.id] as const, ([isOpen, graphId]) => {
     if (!isOpen || graphId === undefined || !props.graph) {
@@ -83,7 +88,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     setTraceNameDraft("");
     setOperationError("");
     setRenameError("");
+    setDeleteError("");
     setIsRenamePopoverOpen(false);
+    setIsDeleteConfirmOpen(false);
   }));
 
   createEffect(() => {
@@ -333,10 +340,12 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const close = () => {
-    if (isRemovingTrace()) {
+    if (isBusy()) {
       return;
     }
     setOperationError("");
+    setDeleteError("");
+    setIsDeleteConfirmOpen(false);
     props.onClose();
   };
 
@@ -387,6 +396,39 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       return false;
     } finally {
       setIsSavingRename(false);
+    }
+  };
+
+  const closeDeleteConfirm = () => {
+    if (props.isDeleting) {
+      return;
+    }
+    setDeleteError("");
+    setIsDeleteConfirmOpen(false);
+  };
+
+  const openDeleteConfirm = () => {
+    if (isBusy() || !props.canDeleteGraph || !props.graph) {
+      return;
+    }
+    setDeleteError("");
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const deleteGraph = async (): Promise<void> => {
+    const graph = props.graph;
+    if (!graph || isBusy()) {
+      return;
+    }
+
+    setDeleteError("");
+
+    try {
+      await props.onDeleteGraph(graph.id);
+      setIsDeleteConfirmOpen(false);
+      props.onClose();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete graph.");
     }
   };
 
@@ -630,27 +672,93 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
             <p class="text-sm text-error">{operationError()}</p>
           </Show>
 
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              class={"btn btn-sm " + (props.canUndo && !isBusy() ? "btn-outline" : "btn-disabled")}
-              disabled={!props.canUndo || isBusy()}
-              onClick={props.onUndo}
-            >
-              Undo
-            </button>
-            <button
-              type="button"
-              class={"btn btn-sm " + (isBusy() ? "btn-disabled" : "btn-primary")}
-              disabled={isBusy()}
-              onClick={applyEdit}
-            >
-              {props.isSaving ? "Saving..." : isRemovingTrace() ? "Updating..." : "Apply"}
-            </button>
-            <Dialog.Close class="btn btn-sm" disabled={isBusy()}>Close</Dialog.Close>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center">
+              <Show when={props.graph}>
+                <button
+                  type="button"
+                  class={"btn btn-sm " + (props.canDeleteGraph && !isBusy() ? "btn-ghost text-error hover:bg-error/10" : "btn-disabled")}
+                  disabled={!props.canDeleteGraph || isBusy()}
+                  onClick={openDeleteConfirm}
+                >
+                  Delete Graph
+                </button>
+              </Show>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                class={"btn btn-sm " + (props.canUndo && !isBusy() ? "btn-outline" : "btn-disabled")}
+                disabled={!props.canUndo || isBusy()}
+                onClick={props.onUndo}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                class={"btn btn-sm " + (isBusy() ? "btn-disabled" : "btn-primary")}
+                disabled={isBusy()}
+                onClick={applyEdit}
+              >
+                {props.isSaving ? "Saving..." : isRemovingTrace() ? "Updating..." : "Apply"}
+              </button>
+              <Dialog.Close class="btn btn-sm" disabled={isBusy()}>Close</Dialog.Close>
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      <Show when={isDeleteConfirmOpen() || props.isDeleting}>
+        <Dialog
+          open={isDeleteConfirmOpen() || props.isDeleting}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeDeleteConfirm();
+            }
+          }}
+        >
+          <Dialog.Portal>
+            <Dialog.Overlay class="fixed inset-0 z-[70] bg-black/55 data-closed:pointer-events-none" />
+            <Dialog.Content
+              class="fixed inset-0 z-[80] m-auto flex h-fit w-[min(92vw,24rem)] flex-col gap-4 rounded-xl border border-base-300 bg-base-100 p-4 shadow-2xl data-closed:pointer-events-none md:p-5"
+            >
+              <div class="space-y-1">
+                <Dialog.Label class="text-lg font-semibold">Delete Graph</Dialog.Label>
+                <Dialog.Description class="text-sm text-base-content/70">
+                  Delete {props.graph?.name ?? "this graph"} immediately from the dashboard.
+                </Dialog.Description>
+              </div>
+
+              <p class="text-sm text-base-content/80">
+                This sends the delete request to the server right away and cannot be undone from this modal.
+              </p>
+
+              <Show when={deleteError()}>
+                <p class="text-sm text-error">{deleteError()}</p>
+              </Show>
+
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-ghost"
+                  disabled={props.isDeleting}
+                  onClick={closeDeleteConfirm}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class={"btn btn-sm " + (props.isDeleting ? "btn-disabled" : "btn-error")}
+                  disabled={props.isDeleting}
+                  onClick={() => void deleteGraph()}
+                >
+                  {props.isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog>
+      </Show>
     </Dialog>
   );
 };

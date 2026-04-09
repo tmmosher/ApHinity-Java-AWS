@@ -156,8 +156,13 @@ export const createTrace = (
       {
         type: "pie",
         name: traceName,
-        labels: ["Slice 1"],
-        values: [0]
+        hole: 0.72,
+        sort: false,
+        labels: ["fill"],
+        values: [30],
+        textinfo: "none",
+        direction: "clockwise",
+        hovertemplate: "%{label}: %{value}<extra></extra>"
       },
       defaultColor
     );

@@ -73,7 +73,7 @@ type CreateLocationGraphRequest = {
 
 const throwGraphMutationError = async (
   response: Response,
-  operation: "create" | "save" | "rename"
+  operation: "create" | "save" | "rename" | "delete"
 ): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
   console.warn(`${operation}LocationGraph failed`, {
@@ -95,17 +95,7 @@ const throwGraphMutationError = async (
       throw new Error("Security token rejected");
     }
   } catch (error) {
-    if (
-      error instanceof Error &&
-      (
-        error.message === "Graph update conflict"
-        || error.message === "Graph name is required"
-        || error.message === "CSRF invalid"
-        || error.message === "Insufficient permissions"
-        || error.message === "Authentication required"
-        || error.message === "Security token rejected"
-      )
-    ) {
+    if (error instanceof Error) {
       throw error;
     }
   }
@@ -116,12 +106,18 @@ const throwGraphMutationError = async (
   if (operation === "create") {
     throw new Error("Unable to create graph");
   }
+  if (operation === "delete") {
+    throw new Error("Unable to delete graph");
+  }
   throw new Error("Unable to save location graphs");
 };
 
 const errorCheck = (code: string) => {
     if (code === "location_section_not_found") {
         throw new Error("Location section not found");
+    }
+    if (code === "location_graph_not_found") {
+        throw new Error("Location graph not found");
     }
     if (code === "graph_type_invalid") {
         throw new Error("Graph type is invalid");
@@ -293,4 +289,31 @@ export const renameLocationGraphById = async (
   }
 
   return parseLocationGraphRenameResult(await response.json());
+};
+
+/**
+ * Deletes a graph assigned to a location.
+ *
+ * Endpoint: `DELETE /api/core/locations/{locationId}/graphs/{graphId}`
+ *
+ * @param host API host base URL.
+ * @param locationId Location id from route params.
+ * @param graphId Graph id to delete.
+ * @throws {Error} When ids are invalid or the request fails.
+ */
+export const deleteLocationGraphById = async (
+  host: string,
+  locationId: string,
+  graphId: number
+): Promise<void> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedGraphId = parseGraphId(graphId);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/graphs/" + parsedGraphId, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    await throwGraphMutationError(response, "delete");
+  }
 };
