@@ -446,6 +446,8 @@ class LocationServiceTest {
         assertEquals("New Plot Graph", response.name());
         assertEquals(expectedScatterTemplateData(), response.data());
         assertEquals(expectedScatterTemplateLayout(), response.layout());
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
+        assertEquals(expectedScatterTemplateStyle(), response.style());
         verify(graphRepository).saveAndFlush(any(Graph.class));
         verify(locationGraphRepository).save(any(LocationGraph.class));
         verify(locationRepository).saveAndFlush(location);
@@ -453,8 +455,8 @@ class LocationServiceTest {
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
         assertEquals(expectedScatterTemplateData(), traces);
         assertEquals(expectedScatterTemplateLayout(), savedGraphHolder[0].getLayout());
-        assertEquals(Map.of("displayModeBar", false, "responsive", true), savedGraphHolder[0].getConfig());
-        assertEquals(Map.of("height", 320), savedGraphHolder[0].getStyle());
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
+        assertEquals(expectedScatterTemplateStyle(), savedGraphHolder[0].getStyle());
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
@@ -1095,40 +1097,32 @@ class LocationServiceTest {
     }
 
     private List<Map<String, Object>> expectedScatterTemplateData() {
-        return List.of(
-            expectedScatterTrace("HPC", "#1f77b4"),
-            expectedScatterTrace("Endotoxin", "#2ca02c"),
-            expectedScatterTrace("Legionella", "#d62728"),
-            expectedScatterTrace("Key Minerals", "#ff7f0e"),
-            expectedScatterTrace("Alkalinity", "#9467bd")
-        );
-    }
-
-    private Map<String, Object> expectedScatterTrace(String name, String color) {
-        return Map.of(
-            "x", List.of(),
-            "y", List.of(),
-            "line", Map.of("color", color, "width", 2L),
-            "mode", "lines+markers",
-            "name", name,
-            "type", "scatter",
-            "marker", Map.of("size", 6L)
-        );
+        return List.of();
     }
 
     private Map<String, Object> expectedScatterTemplateLayout() {
         return Map.of(
-            "margin", Map.of("b", 10, "l", 10, "r", 10, "t", 10),
-            "showlegend", false,
-            "annotations", List.of(Map.of(
-                "x", 0.5,
-                "y", 0.5,
-                "font", Map.of("size", 22),
-                "text", "<b>68%</b>",
-                "xref", "paper",
-                "yref", "paper",
-                "showarrow", false
-            ))
+            "title", Map.of("x", 0.02, "text", "", "xanchor", "left"),
+            "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "% Non-Compliance", "ticksuffix", "%"),
+            "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
+            "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+        );
+    }
+
+    private Map<String, Object> expectedScatterTemplateStyle() {
+        return Map.of(
+            "theme", Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 320
         );
     }
 }

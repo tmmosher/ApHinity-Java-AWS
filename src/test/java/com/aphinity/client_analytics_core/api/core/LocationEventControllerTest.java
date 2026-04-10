@@ -12,6 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
@@ -20,6 +24,7 @@ import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,6 +75,38 @@ class LocationEventControllerTest {
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationEventService).createLocationEvent(42L, 8L, request);
+    }
+
+    @Test
+    void downloadLocationEventTemplateDelegatesToServiceAndReturnsAttachmentHeaders() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        Resource template = new ByteArrayResource(new byte[]{1, 2, 3}) {
+            @Override
+            public String getFilename() {
+                return "service_calendar_template.xlsx";
+            }
+        };
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationEventService.getServiceCalendarTemplate(42L, 8L)).thenReturn(template);
+
+        ResponseEntity<Resource> actual = locationEventController.downloadLocationEventTemplate(jwt, 8L);
+
+        assertSame(template, actual.getBody());
+        assertEquals(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            actual.getHeaders().getContentType().toString()
+        );
+        assertEquals(3L, actual.getHeaders().getContentLength());
+        assertEquals(
+            "attachment; filename=\"service_calendar_template.xlsx\"",
+            actual.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)
+        );
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).getServiceCalendarTemplate(42L, 8L);
     }
 
     @Test

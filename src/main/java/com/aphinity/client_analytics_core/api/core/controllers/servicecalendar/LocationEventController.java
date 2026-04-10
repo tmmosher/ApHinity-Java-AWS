@@ -7,7 +7,12 @@ import com.aphinity.client_analytics_core.api.core.services.servicecalendar.Loca
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -30,6 +36,8 @@ import java.util.List;
 @RequestMapping({"/core", "/api/core"})
 public class LocationEventController {
     private static final Logger log = LoggerFactory.getLogger(LocationEventController.class);
+    private static final MediaType EXCEL_MEDIA_TYPE =
+        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
     private final LocationEventService locationEventService;
     private final AuthenticatedUserService authenticatedUserService;
@@ -50,6 +58,31 @@ public class LocationEventController {
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationEventService.getAccessibleLocationEvents(userId, locationId, resolveViewedMonth(month));
+    }
+
+    @GetMapping("/locations/{locationId}/events/template")
+    public ResponseEntity<Resource> downloadLocationEventTemplate(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        Resource templateResource = locationEventService.getServiceCalendarTemplate(userId, locationId);
+
+        try {
+            return ResponseEntity.ok()
+                .contentType(EXCEL_MEDIA_TYPE)
+                .contentLength(templateResource.contentLength())
+                .header(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    ContentDisposition.attachment()
+                        .filename(templateResource.getFilename())
+                        .build()
+                        .toString()
+                )
+                .body(templateResource);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Service calendar template unavailable", ex);
+        }
     }
 
     @PostMapping("/locations/{locationId}/events")

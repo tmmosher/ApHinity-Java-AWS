@@ -34,6 +34,9 @@ vi.mock("solid-toast", () => ({
 vi.mock("../util/location/locationEventApi", () => ({
   createLocationEventById: mocks.createLocationEventById,
   fetchLocationEventsById: mocks.fetchLocationEventsById,
+  getLocationEventTemplateDownloadUrl: vi.fn((host: string, locationId: string) =>
+    host + "/api/core/locations/" + locationId + "/events/template"
+  ),
   updateLocationEventById: mocks.updateLocationEventById
 }));
 

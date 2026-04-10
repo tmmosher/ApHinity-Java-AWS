@@ -20,45 +20,35 @@ const createMockResponse = (ok: boolean, payload: unknown): Response =>
     json: vi.fn().mockResolvedValue(payload)
   }) as unknown as Response;
 
-const createScatterTrace = (name: string, color: string) => ({
-  type: "scatter",
-  name,
-  x: [],
-  y: [],
-  line: {color, width: 2},
-  mode: "lines+markers",
-  marker: {size: 6}
-});
-
 const SCATTER_GRAPH_LAYOUT = {
-  margin: {b: 10, l: 10, r: 10, t: 10},
-  showlegend: false,
-  annotations: [
-    {
-      x: 0.5,
-      y: 0.5,
-      font: {size: 22},
-      text: "<b>68%</b>",
-      xref: "paper",
-      yref: "paper",
-      showarrow: false
+  title: {x: 0.02, text: "", xanchor: "left"},
+  xaxis: {type: "date", tickformat: "%b %Y"},
+  yaxis: {range: [0, 100], title: "% Non-Compliance", ticksuffix: "%"},
+  legend: {x: 0, y: -0.3, orientation: "h"},
+  margin: {b: 60, l: 50, r: 20, t: 50}
+};
+
+const SCATTER_GRAPH_STYLE = {
+  theme: {
+    dark: {
+      gridColor: "rgba(148, 163, 184, 0.3)",
+      textColor: "#e5e7eb"
+    },
+    light: {
+      gridColor: "rgba(15, 23, 42, 0.15)",
+      textColor: "#111827"
     }
-  ]
+  },
+  height: 320
 };
 
 const buildScatterGraphResponse = () => ({
   id: 44,
   name: "New Plot Graph",
-  data: [
-    createScatterTrace("HPC", "#1f77b4"),
-    createScatterTrace("Endotoxin", "#2ca02c"),
-    createScatterTrace("Legionella", "#d62728"),
-    createScatterTrace("Key Minerals", "#ff7f0e"),
-    createScatterTrace("Alkalinity", "#9467bd")
-  ],
+  data: [],
   layout: SCATTER_GRAPH_LAYOUT,
-  config: {displayModeBar: false, responsive: true},
-  style: {height: 320},
+  config: {displayModeBar: false, responsive: false},
+  style: SCATTER_GRAPH_STYLE,
   createdAt: "2026-01-05T00:00:00Z",
   updatedAt: "2026-01-05T00:00:00Z"
 });
@@ -294,13 +284,10 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       })
     });
     expect(result.name).toBe("New Plot Graph");
-    expect(result.data).toHaveLength(5);
-    expect(result.data[0]).toMatchObject({
-      type: "scatter",
-      mode: "lines+markers",
-      line: {color: "#1f77b4", width: 2},
-      marker: {size: 6}
-    });
+    expect(result.data).toEqual([]);
+    expect(result.layout).toEqual(SCATTER_GRAPH_LAYOUT);
+    expect(result.config).toEqual({displayModeBar: false, responsive: false});
+    expect(result.style).toEqual(SCATTER_GRAPH_STYLE);
     expect(result).toEqual(buildScatterGraphResponse());
   });
 

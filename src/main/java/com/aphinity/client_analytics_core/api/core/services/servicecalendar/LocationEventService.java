@@ -12,6 +12,8 @@ import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,8 @@ import java.util.List;
 @Service
 public class LocationEventService {
     private static final Logger log = LoggerFactory.getLogger(LocationEventService.class);
+    private static final String SERVICE_CALENDAR_TEMPLATE_PATH =
+        "servicecalendar/service_calendar_template.xlsx";
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -67,6 +71,23 @@ public class LocationEventService {
         return serviceEventRepository.findVisibleByLocationIdAndDateWindow(locationId, windowStart, windowEnd).stream()
             .map(this::toResponse)
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Resource getServiceCalendarTemplate(Long userId, Long locationId) {
+        AppUser user = requireUser(userId);
+        if (!locationRepository.existsById(locationId)) {
+            throw locationNotFound();
+        }
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+
+        Resource resource = new ClassPathResource(SERVICE_CALENDAR_TEMPLATE_PATH);
+        if (!resource.exists()) {
+            throw serviceCalendarTemplateUnavailable();
+        }
+        return resource;
     }
 
     @Transactional
@@ -382,5 +403,9 @@ public class LocationEventService {
             HttpStatus.BAD_REQUEST,
             "Event end must be on or after the start date and time"
         );
+    }
+
+    private ResponseStatusException serviceCalendarTemplateUnavailable() {
+        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Service calendar template unavailable");
     }
 }

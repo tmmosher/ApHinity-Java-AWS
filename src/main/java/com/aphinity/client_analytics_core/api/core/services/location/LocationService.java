@@ -808,8 +808,8 @@ public class LocationService {
                 "New Plot Graph",
                 buildScatterTemplateData(),
                 buildScatterTemplateLayout(),
-                config,
-                Map.of("height", 320)
+                buildScatterTemplateConfig(),
+                buildScatterTemplateStyle()
             );
         };
     }
@@ -832,58 +832,61 @@ public class LocationService {
     }
 
     private List<Map<String, Object>> buildScatterTemplateData() {
-        return List.of(
-            buildScatterTrace("HPC", "#1f77b4"),
-            buildScatterTrace("Endotoxin", "#2ca02c"),
-            buildScatterTrace("Legionella", "#d62728"),
-            buildScatterTrace("Key Minerals", "#ff7f0e"),
-            buildScatterTrace("Alkalinity", "#9467bd")
-        );
-    }
-
-    private Map<String, Object> buildScatterTrace(String name, String color) {
-        Map<String, Object> line = new LinkedHashMap<>();
-        line.put("color", color);
-        line.put("width", 2L);
-
-        Map<String, Object> marker = new LinkedHashMap<>();
-        marker.put("size", 6L);
-
-        Map<String, Object> trace = new LinkedHashMap<>();
-        trace.put("x", List.of());
-        trace.put("y", List.of());
-        trace.put("line", line);
-        trace.put("mode", "lines+markers");
-        trace.put("name", name);
-        trace.put("type", "scatter");
-        trace.put("marker", marker);
-        return trace;
+        return List.of();
     }
 
     private Map<String, Object> buildScatterTemplateLayout() {
-        Map<String, Object> margin = new LinkedHashMap<>();
-        margin.put("b", 10);
-        margin.put("l", 10);
-        margin.put("r", 10);
-        margin.put("t", 10);
-
-        Map<String, Object> font = new LinkedHashMap<>();
-        font.put("size", 22);
-
-        Map<String, Object> annotation = new LinkedHashMap<>();
-        annotation.put("x", 0.5);
-        annotation.put("y", 0.5);
-        annotation.put("font", font);
-        annotation.put("text", "<b>68%</b>");
-        annotation.put("xref", "paper");
-        annotation.put("yref", "paper");
-        annotation.put("showarrow", false);
-
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("margin", margin);
-        layout.put("showlegend", false);
-        layout.put("annotations", List.of(annotation));
+        layout.put("title", Map.of(
+            "x", 0.02,
+            "text", "",
+            "xanchor", "left"
+        ));
+        layout.put("xaxis", Map.of(
+            "type", "date",
+            "tickformat", "%b %Y"
+        ));
+        layout.put("yaxis", Map.of(
+            "range", List.of(0, 100),
+            "title", "% Non-Compliance",
+            "ticksuffix", "%"
+        ));
+        layout.put("legend", Map.of(
+            "x", 0,
+            "y", -0.3,
+            "orientation", "h"
+        ));
+        layout.put("margin", Map.of(
+            "b", 60,
+            "l", 50,
+            "r", 20,
+            "t", 50
+        ));
         return layout;
+    }
+
+    private Map<String, Object> buildScatterTemplateConfig() {
+        return Map.of(
+            "displayModeBar", false,
+            "responsive", false
+        );
+    }
+
+    private Map<String, Object> buildScatterTemplateStyle() {
+        return Map.of(
+            "theme",
+            Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 320
+        );
     }
 
     private Long resolveTargetSectionId(

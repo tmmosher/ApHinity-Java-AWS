@@ -48,19 +48,25 @@ const SCATTER_X_VALUES = [
 ];
 
 const SCATTER_LAYOUT = {
-  margin: {b: 10, l: 10, r: 10, t: 10},
-  showlegend: false,
-  annotations: [
-    {
-      x: 0.5,
-      y: 0.5,
-      font: {size: 22},
-      text: "<b>68%</b>",
-      xref: "paper",
-      yref: "paper",
-      showarrow: false
+  title: {x: 0.02, text: "", xanchor: "left"},
+  xaxis: {type: "date", tickformat: "%b %Y"},
+  yaxis: {range: [0, 100], title: "% Non-Compliance", ticksuffix: "%"},
+  legend: {x: 0, y: -0.3, orientation: "h"},
+  margin: {b: 60, l: 50, r: 20, t: 50}
+};
+
+const SCATTER_STYLE = {
+  theme: {
+    dark: {
+      gridColor: "rgba(148, 163, 184, 0.3)",
+      textColor: "#e5e7eb"
+    },
+    light: {
+      gridColor: "rgba(15, 23, 42, 0.15)",
+      textColor: "#111827"
     }
-  ]
+  },
+  height: 320
 };
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -86,35 +92,19 @@ const buildScatterGraph = (id: number, name: string, yOffset: number): LocationG
     buildScatterTrace("Alkalinity", "#9467bd", [7 + yOffset, 8 + yOffset, 7 + yOffset, 6 + yOffset, 7 + yOffset, 8 + yOffset])
   ],
   layout: cloneJson(SCATTER_LAYOUT),
-  config: {displayModeBar: false, responsive: true},
-  style: {height: 320},
+  config: {displayModeBar: false, responsive: false},
+  style: cloneJson(SCATTER_STYLE),
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z"
-});
-
-const buildBlankScatterTrace = (name: string, color: string) => ({
-  type: "scatter",
-  name,
-  x: [],
-  y: [],
-  line: {color, width: 2},
-  mode: "lines+markers",
-  marker: {size: 6}
 });
 
 const buildBlankScatterGraph = (id: number, name: string): LocationGraph => ({
   id,
   name,
-  data: [
-    buildBlankScatterTrace("HPC", "#1f77b4"),
-    buildBlankScatterTrace("Endotoxin", "#2ca02c"),
-    buildBlankScatterTrace("Legionella", "#d62728"),
-    buildBlankScatterTrace("Key Minerals", "#ff7f0e"),
-    buildBlankScatterTrace("Alkalinity", "#9467bd")
-  ],
+  data: [],
   layout: cloneJson(SCATTER_LAYOUT),
-  config: {displayModeBar: false, responsive: true},
-  style: {height: 320},
+  config: {displayModeBar: false, responsive: false},
+  style: cloneJson(SCATTER_STYLE),
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z"
 });
@@ -208,6 +198,8 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect((refreshedBar?.data[0].y as unknown[])).toEqual([5]);
 
     expect(refreshedCreated).toEqual(createdGraph);
+    expect(refreshedCreated?.config).toEqual({displayModeBar: false, responsive: false});
+    expect(refreshedCreated?.style).toEqual(SCATTER_STYLE);
   });
 
   it("drops deleted pie graph state before the next graph create flow reuses dashboard caches", () => {
@@ -235,17 +227,9 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect(refreshedGraphs).toHaveLength(2);
     expect(refreshedGraphs[0]).toBe(remainingBarGraph);
     expect(refreshedGraphs[1]).toEqual(createdGraph);
-    for (const trace of refreshedGraphs[1].data) {
-      expect(trace).toMatchObject({
-        type: "scatter",
-        mode: "lines+markers",
-        line: {width: 2},
-        marker: {size: 6}
-      });
-      expect(trace.x).toEqual([]);
-      expect(trace.y).toEqual([]);
-      expect(trace).not.toHaveProperty("labels");
-      expect(trace).not.toHaveProperty("values");
-    }
+    expect(refreshedGraphs[1].data).toEqual([]);
+    expect(refreshedGraphs[1].layout).toEqual(SCATTER_LAYOUT);
+    expect(refreshedGraphs[1].config).toEqual({displayModeBar: false, responsive: false});
+    expect(refreshedGraphs[1].style).toEqual(SCATTER_STYLE);
   });
 });

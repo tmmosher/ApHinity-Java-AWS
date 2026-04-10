@@ -3,6 +3,7 @@ import {apiFetch} from "../util/common/apiFetch";
 import {
   createLocationEventById,
   fetchLocationEventsById,
+  getLocationEventTemplateDownloadUrl,
   updateLocationEventById
 } from "../util/location/locationEventApi";
 import {formatLocationEventMonth} from "../util/location/dateUtility";
@@ -67,6 +68,11 @@ describe("locationEventApi", () => {
         updatedAt: "2026-03-25T00:00:00Z"
       }
     ]);
+  });
+
+  it("builds the service calendar template download URL", () => {
+    expect(getLocationEventTemplateDownloadUrl(host, "42"))
+      .toBe(host + "/api/core/locations/42/events/template");
   });
 
   it("rejects invalid service event months before dispatch", async () => {

@@ -162,6 +162,11 @@ export const fetchLocationEventsById = async (
   return parseLocationServiceEventList(await response.json());
 };
 
+export const getLocationEventTemplateDownloadUrl = (host: string, locationId: string): string => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  return host + "/api/core/locations/" + parsedLocationId + "/events/template";
+};
+
 export const createLocationEventById = async (
   host: string,
   locationId: string,

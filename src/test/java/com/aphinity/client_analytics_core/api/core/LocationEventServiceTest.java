@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -30,6 +31,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -125,6 +127,39 @@ class LocationEventServiceTest {
             LocalDate.parse("2026-02-01"),
             LocalDate.parse("2026-04-30")
         );
+    }
+
+    @Test
+    void getServiceCalendarTemplateReturnsClassPathResourceForAuthorizedClient() throws Exception {
+        AppUser user = verifiedUser(5L);
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
+
+        Resource resource = locationEventService.getServiceCalendarTemplate(5L, 99L);
+
+        assertEquals("service_calendar_template.xlsx", resource.getFilename());
+        assertTrue(resource.exists());
+        assertTrue(resource.contentLength() > 0);
+    }
+
+    @Test
+    void getServiceCalendarTemplateRejectsUnauthorizedClient() {
+        AppUser user = verifiedUser(5L);
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationEventService.getServiceCalendarTemplate(5L, 99L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
     }
 
     @Test

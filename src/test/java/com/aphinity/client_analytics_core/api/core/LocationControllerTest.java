@@ -164,8 +164,8 @@ class LocationControllerTest {
             "New Plot Graph",
             scatterGraphData(),
             scatterGraphLayout(),
-            Map.of("displayModeBar", false, "responsive", true),
-            Map.of("height", 320),
+            Map.of("displayModeBar", false, "responsive", false),
+            scatterGraphStyle(),
             Instant.parse("2026-01-03T00:00:00Z"),
             Instant.parse("2026-01-03T00:00:00Z")
         );
@@ -231,40 +231,32 @@ class LocationControllerTest {
     }
 
     private static List<Map<String, Object>> scatterGraphData() {
-        return List.of(
-            scatterGraphTrace("HPC", "#1f77b4"),
-            scatterGraphTrace("Endotoxin", "#2ca02c"),
-            scatterGraphTrace("Legionella", "#d62728"),
-            scatterGraphTrace("Key Minerals", "#ff7f0e"),
-            scatterGraphTrace("Alkalinity", "#9467bd")
-        );
-    }
-
-    private static Map<String, Object> scatterGraphTrace(String name, String color) {
-        return Map.of(
-            "x", List.of(),
-            "y", List.of(),
-            "line", Map.of("color", color, "width", 2L),
-            "mode", "lines+markers",
-            "name", name,
-            "type", "scatter",
-            "marker", Map.of("size", 6L)
-        );
+        return List.of();
     }
 
     private static Map<String, Object> scatterGraphLayout() {
         return Map.of(
-            "margin", Map.of("b", 10, "l", 10, "r", 10, "t", 10),
-            "showlegend", false,
-            "annotations", List.of(Map.of(
-                "x", 0.5,
-                "y", 0.5,
-                "font", Map.of("size", 22),
-                "text", "<b>68%</b>",
-                "xref", "paper",
-                "yref", "paper",
-                "showarrow", false
-            ))
+            "title", Map.of("x", 0.02, "text", "", "xanchor", "left"),
+            "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "% Non-Compliance", "ticksuffix", "%"),
+            "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
+            "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+        );
+    }
+
+    private static Map<String, Object> scatterGraphStyle() {
+        return Map.of(
+            "theme", Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 320
         );
     }
 }

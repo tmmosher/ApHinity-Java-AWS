@@ -6,6 +6,7 @@ import {useProfile} from "../../../../context/ProfileContext";
 import {
   createLocationEventById,
   fetchLocationEventsById,
+  getLocationEventTemplateDownloadUrl,
   updateLocationEventById
 } from "../../../../util/location/locationEventApi";
 import {formatLocationEventMonth, normalizeMonthStart} from "../../../../util/location/dateUtility";
@@ -15,6 +16,7 @@ import {
   canEditLocationServiceEvent,
   createLocationServiceEventRequestFromEvent
 } from "../../../../util/location/serviceEventForm";
+import ServiceCalendarIntroPopover from "./ServiceCalendarIntroPopover";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 
 type ServiceEventCalendarResource = {
@@ -31,6 +33,9 @@ export const LocationServiceCalendarPanel = () => {
   const role = createMemo(() => profileContext.profile()?.role);
 
   const viewedMonth = createMemo(() => formatLocationEventMonth(calendarMonth()));
+  const serviceCalendarTemplateHref = createMemo(() =>
+    getLocationEventTemplateDownloadUrl(host, params.locationId)
+  );
   const serviceEventRequest = createMemo(() => ({
     locationId: params.locationId,
     month: viewedMonth()
@@ -93,23 +98,11 @@ export const LocationServiceCalendarPanel = () => {
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
-        <div class="space-y-2">
-          <div class="space-y-2">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div class="space-y-1">
             <h2 class="text-xl font-semibold tracking-tight">Service Calendar</h2>
-            <p class="text-sm text-base-content/70">
-              View previous, current, and upcoming service events. The calendar loads the previous,
-              current, and next month relative to the month you are viewing. Click an empty day cell
-              to create a service event.
-            </p>
-            <div class="flex flex-wrap items-center gap-2 pt-1 text-xs font-medium">
-              <span class="rounded-full border border-[#f59e0b]/35 bg-[#f59e0b]/18 px-2.5 py-1 text-[#9a3412]">
-                Client
-              </span>
-              <span class="rounded-full border border-[#86efac] bg-[#dcfce7] px-2.5 py-1 text-[#166534]">
-                Partner
-              </span>
-            </div>
           </div>
+          <ServiceCalendarIntroPopover templateHref={serviceCalendarTemplateHref()} />
         </div>
       </section>
 

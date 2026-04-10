@@ -139,6 +139,38 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void downloadLocationEventTemplateRejectsMissingAuthentication() throws Exception {
+        Location location = createLocation("Unauthenticated template location");
+
+        mockMvc.perform(get("/api/core/locations/{locationId}/events/template", location.getId()))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("authentication_required"));
+    }
+
+    @Test
+    void downloadLocationEventTemplateReturnsAttachmentForAccessibleLocation() throws Exception {
+        AppUser user = createUser("client-events-template@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Scottsdale");
+        addMembership(location, user);
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-template@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                get("/api/core/locations/{locationId}/events/template", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andReturn();
+
+        assertThat(result.getResponse().getContentType())
+            .contains("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+            .contains("attachment")
+            .contains("service_calendar_template.xlsx");
+        assertThat(result.getResponse().getContentAsByteArray()).isNotEmpty();
+    }
+
+    @Test
     void createLocationAllowsAdmins() throws Exception {
         createUser("admin-locations@example.com", PASSWORD, true, "admin");
         AuthCookies authCookies = loginAndCaptureCookies("admin-locations@example.com", PASSWORD);
