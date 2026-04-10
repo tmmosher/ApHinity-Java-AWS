@@ -29,24 +29,11 @@ import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "./LocationDetailContext";
 import {createDashboardLocationResetGuard} from "./locationView";
 
-export const advanceGraphLoadAnimationToken = (
-  currentToken: number,
-  wasLoading: boolean,
-  isLoading: boolean,
-  hasGraphs: boolean
-): number => {
-  // Only advance once per location session so later graph refreshes do not replay
-  // the zero-baseline load animation across every existing chart.
-  return currentToken === 0 && wasLoading && !isLoading && hasGraphs
-    ? currentToken + 1
-    : currentToken;
-};
-
 export const LocationDashboardPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
-  const {location, graphs, graphsLoading, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
+  const {location, graphs, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
   const [workingGraphs, setWorkingGraphs] = createSignal<LocationGraph[]>([]);
   const [graphBaselineIndex, setGraphBaselineIndex] = createSignal<Map<number, GraphBaselineEntry>>(new Map());
   const [locationUndoStack, setLocationUndoStack] = createSignal<LocationGraph[][]>([]);
@@ -56,7 +43,6 @@ export const LocationDashboardPanel = () => {
   const [isDeletingGraph, setIsDeletingGraph] = createSignal(false);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
-  const [graphAnimationToken, setGraphAnimationToken] = createSignal(0);
   const shouldResetDashboardState = createDashboardLocationResetGuard(params.locationId);
 
   const canEditGraphs = createMemo(() =>
@@ -90,17 +76,8 @@ export const LocationDashboardPanel = () => {
     setWorkingGraphs([]);
     setGraphBaselineIndex(new Map());
     setLocationUndoStack([]);
-    setGraphAnimationToken(0);
     setLocationSessionToken((token) => token + 1);
   });
-
-  createEffect<boolean>((wasLoading) => {
-    const isLoading = graphsLoading();
-    setGraphAnimationToken((current) =>
-      advanceGraphLoadAnimationToken(current, wasLoading, isLoading, graphs() !== undefined)
-    );
-    return isLoading;
-  }, false);
 
   const retryAll = () => {
     void refetchLocation();
@@ -202,19 +179,6 @@ export const LocationDashboardPanel = () => {
     }
     return new Date(current.updatedAt).toLocaleString();
   };
-
-  const graphLoadingFallback = (graphName: string) => (
-    <div class="graph-loading-placeholder h-72 w-full" role="status" aria-live="polite" aria-label={`Loading graph ${graphName}`}>
-      <div class="graph-loading-line graph-loading-line-wide" />
-      <div class="graph-loading-line graph-loading-line-medium" />
-      <div class="graph-loading-bars">
-        <span class="graph-loading-bar graph-loading-bar-1" />
-        <span class="graph-loading-bar graph-loading-bar-2" />
-        <span class="graph-loading-bar graph-loading-bar-3" />
-        <span class="graph-loading-bar graph-loading-bar-4" />
-      </div>
-    </div>
-  );
 
   const closeGraphEditor = () => setEditingGraphId(null);
   const closeCreateGraphModal = () => setIsCreateGraphModalOpen(false);
@@ -626,7 +590,7 @@ export const LocationDashboardPanel = () => {
                                 when={!plotlyModule.error}
                                 fallback={<p class="h-72 w-full rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">Unable to load graph renderer.</p>}
                               >
-                                <Suspense fallback={graphLoadingFallback(graph.name)}>
+                                <Suspense fallback={<div class="h-72 w-full rounded-lg border border-base-300 bg-base-100 p-4 text-sm text-base-content/70">Loading graph {graph.name}...</div>}>
                                   <Show when={plotlyModule()}>
                                     <div class="w-full" style={{height: resolveGraphHeight(graph.style)}}>
                                       <PlotlyChart
@@ -635,7 +599,6 @@ export const LocationDashboardPanel = () => {
                                         layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
                                         config={(graph.config ?? undefined) as PlotlyConfig | undefined}
                                         style={graph.style ?? undefined}
-                                        animationToken={graphAnimationToken() > 0 ? graphAnimationToken() : undefined}
                                         class="h-full w-full"
                                       />
                                     </div>
