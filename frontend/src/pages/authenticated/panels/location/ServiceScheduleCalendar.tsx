@@ -44,6 +44,8 @@ type ServiceScheduleCalendarProps = {
   ) => Promise<void>;
   canCompleteEvent?: (event: LocationServiceEvent) => boolean;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
+  canDeleteEvent?: (event: LocationServiceEvent) => boolean;
+  onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type ServiceEventSegmentProps = {
@@ -56,6 +58,8 @@ type ServiceEventSegmentProps = {
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
+  canDeleteEvent?: (event: LocationServiceEvent) => boolean;
+  onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type HiddenDayEventsPopoverProps = {
@@ -69,6 +73,8 @@ type HiddenDayEventsPopoverProps = {
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
+  canDeleteEvent?: (event: LocationServiceEvent) => boolean;
+  onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type ServiceCalendarDayBackgroundProps = {
@@ -92,6 +98,8 @@ type ServiceCalendarWeekRowProps = {
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
+  canDeleteEvent?: (event: LocationServiceEvent) => boolean;
+  onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
 type ServiceCalendarTransitionDirection = "previous" | "next";
@@ -179,6 +187,7 @@ const eventSegmentClass = (
 ): string => (
   `${calendarEventSegmentClass} ${segment.startsWithinWeek ? "rounded-l-lg" : "rounded-l-none"} ` +
   `${segment.endsWithinWeek ? "rounded-r-lg" : "rounded-r-none"} ` +
+  `${isStagedCalendarEvent(segment.event) ? "border-dashed ring-1 ring-primary/45 ring-inset " : ""}` +
   (responsibility === "client"
     ? "border-[#f59e0b]/40 bg-[#f59e0b]/18 text-[#9a3412]"
     : "border-[#86efac] bg-[#dcfce7] text-[#166534]")
@@ -190,6 +199,10 @@ const overflowTriggerClass =
 
 const overflowListItemClass =
   `${calendarInteractiveCardClass} flex flex-col gap-1 px-2 py-1.5 border-base-300/80 bg-base-100 text-base-content`;
+
+const isStagedCalendarEvent = (event: LocationServiceEvent): boolean => (
+  "isStaged" in event && event.isStaged === true
+);
 
 const formatEventDateRange = (event: LocationServiceEvent): string => (
   event.date === event.endDate
@@ -219,9 +232,12 @@ const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
     event={props.segment.event}
     canEdit={props.canEdit}
     canComplete={props.canComplete}
+    canDelete={props.canDeleteEvent?.(props.segment.event) ?? false}
     role={props.editRole}
     onSave={props.onEditEventSave}
     onComplete={props.onCompleteEvent}
+    onDelete={props.onDeleteEvent}
+    deleteLabel="Delete"
   >
     <Popover.Trigger
       type="button"
@@ -246,18 +262,23 @@ const HiddenDayEventListItem = (props: {
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
+  canDeleteEvent?: (event: LocationServiceEvent) => boolean;
+  onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 }) => (
   <ServiceEventEditPopover
     event={props.event}
     canEdit={props.canEdit}
     canComplete={props.canComplete}
+    canDelete={props.canDeleteEvent?.(props.event) ?? false}
     role={props.editRole}
     onSave={props.onEditEventSave}
     onComplete={props.onCompleteEvent}
+    onDelete={props.onDeleteEvent}
+    deleteLabel="Delete"
   >
     <Popover.Trigger
       type="button"
-      class={overflowListItemClass}
+      class={overflowListItemClass + (isStagedCalendarEvent(props.event) ? " border-dashed ring-1 ring-primary/45 ring-inset" : "")}
       title={props.event.title}
       data-service-event-overflow-item=""
       onClick={(event) => event.stopPropagation()}
@@ -307,6 +328,8 @@ const HiddenDayEventsPopover = (props: HiddenDayEventsPopoverProps) => (
                   editRole={props.editRole}
                   onEditEventSave={props.onEditEventSave}
                   onCompleteEvent={props.onCompleteEvent}
+                  canDeleteEvent={props.canDeleteEvent}
+                  onDeleteEvent={props.onDeleteEvent}
                 />
               )}
             </For>
@@ -375,6 +398,8 @@ const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
           editRole={props.eventEditorRole}
           onEditEventSave={props.onEditEventSave}
           onCompleteEvent={props.onCompleteEvent}
+          canDeleteEvent={props.canDeleteEvent}
+          onDeleteEvent={props.onDeleteEvent}
         />
       )}
     </For>
@@ -390,6 +415,8 @@ const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
             canCompleteEvent={props.canCompleteEvent}
             onEditEventSave={props.onEditEventSave}
             onCompleteEvent={props.onCompleteEvent}
+            canDeleteEvent={props.canDeleteEvent}
+            onDeleteEvent={props.onDeleteEvent}
           />
         </Show>
       )}
@@ -546,6 +573,8 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
                               canCompleteEvent={props.canCompleteEvent}
                               onEditEventSave={props.onEditEventSave}
                               onCompleteEvent={props.onCompleteEvent}
+                              canDeleteEvent={props.canDeleteEvent}
+                              onDeleteEvent={props.onDeleteEvent}
                             />
                           )}
                         </For>

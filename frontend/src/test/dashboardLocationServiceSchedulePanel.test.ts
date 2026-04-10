@@ -21,6 +21,7 @@ vi.mock("../util/location/locationEventApi", () => ({
   getLocationEventTemplateDownloadUrl: vi.fn((host: string, locationId: string) =>
     host + "/api/core/locations/" + locationId + "/events/template"
   ),
+  uploadLocationEventCalendarById: vi.fn(),
   updateLocationEventById: vi.fn()
 }));
 
@@ -33,6 +34,9 @@ describe("DashboardLocationServiceSchedulePanel", () => {
     expect(html).toContain("Service Calendar");
     expect(html).toContain("Get started");
     expect(html).toContain("data-service-calendar-intro-trigger");
+    expect(html).toContain("data-service-calendar-upload-input");
+    expect(html).toContain("data-service-calendar-apply");
+    expect(html).toContain("data-service-calendar-undo");
     expect(html).toContain("aria-label=\"Service schedule calendar\"");
     expect(html).toContain("data-service-calendar-day-trigger");
     expect(html).not.toContain("View previous, current, and upcoming service events.");

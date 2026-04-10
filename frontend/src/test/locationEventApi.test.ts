@@ -4,6 +4,7 @@ import {
   createLocationEventById,
   fetchLocationEventsById,
   getLocationEventTemplateDownloadUrl,
+  uploadLocationEventCalendarById,
   updateLocationEventById
 } from "../util/location/locationEventApi";
 import {formatLocationEventMonth} from "../util/location/dateUtility";
@@ -73,6 +74,22 @@ describe("locationEventApi", () => {
   it("builds the service calendar template download URL", () => {
     expect(getLocationEventTemplateDownloadUrl(host, "42"))
       .toBe(host + "/api/core/locations/42/events/template");
+  });
+
+  it("uploads a service calendar spreadsheet", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {importedCount: 3}, 201));
+    const file = new File(["spreadsheet"], "service_calendar_upload.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+
+    const result = await uploadLocationEventCalendarById(host, "42", file);
+
+    expect(apiFetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = apiFetchMock.mock.calls[0];
+    expect(url).toBe(host + "/api/core/locations/42/events/calendar-upload");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeInstanceOf(FormData);
+    expect(result).toEqual({importedCount: 3});
   });
 
   it("rejects invalid service event months before dispatch", async () => {

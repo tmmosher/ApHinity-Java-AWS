@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   latestCalendarProps: null as Record<string, unknown> | null,
   createLocationEventById: vi.fn(),
   fetchLocationEventsById: vi.fn(async () => []),
+  uploadLocationEventCalendarById: vi.fn(),
   updateLocationEventById: vi.fn(async () => undefined),
   toastSuccess: vi.fn()
 }));
@@ -37,6 +38,7 @@ vi.mock("../util/location/locationEventApi", () => ({
   getLocationEventTemplateDownloadUrl: vi.fn((host: string, locationId: string) =>
     host + "/api/core/locations/" + locationId + "/events/template"
   ),
+  uploadLocationEventCalendarById: mocks.uploadLocationEventCalendarById,
   updateLocationEventById: mocks.updateLocationEventById
 }));
 
@@ -85,6 +87,7 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
     mocks.createLocationEventById.mockReset();
     mocks.fetchLocationEventsById.mockReset();
     mocks.fetchLocationEventsById.mockResolvedValue([]);
+    mocks.uploadLocationEventCalendarById.mockReset();
     mocks.updateLocationEventById.mockReset();
     mocks.updateLocationEventById.mockResolvedValue(undefined);
     mocks.toastSuccess.mockReset();

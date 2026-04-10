@@ -16,6 +16,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
@@ -107,6 +108,29 @@ class LocationEventControllerTest {
         );
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationEventService).getServiceCalendarTemplate(42L, 8L);
+    }
+
+    @Test
+    void uploadLocationEventCalendarDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "service_calendar_upload.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[]{1, 2, 3}
+        );
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationEventService.uploadServiceCalendar(42L, 8L, file)).thenReturn(3);
+
+        var actual = locationEventController.uploadLocationEventCalendar(jwt, 8L, file);
+
+        assertEquals(3, actual.importedCount());
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).uploadServiceCalendar(42L, 8L, file);
     }
 
     @Test
