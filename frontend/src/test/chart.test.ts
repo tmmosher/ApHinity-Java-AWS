@@ -82,6 +82,92 @@ describe("Chart helpers", () => {
     ]);
   });
 
+  it("animates multi-trace scatter charts from a zero baseline without losing the final payload", async () => {
+    const react = vi.fn().mockResolvedValue(undefined);
+    const animate = vi.fn().mockResolvedValue(undefined);
+    const plotly = {
+      react,
+      animate
+    } as unknown as {
+      react: (...args: unknown[]) => Promise<unknown>;
+      animate: (...args: unknown[]) => Promise<unknown>;
+    };
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+    const data = [
+      {
+        type: "scatter",
+        name: "HPC",
+        x: ["2025-01-01", "2025-02-01"],
+        y: [14, 13],
+        line: {color: "#1f77b4", width: 2},
+        mode: "lines+markers",
+        marker: {size: 6}
+      },
+      {
+        type: "scatter",
+        name: "Endotoxin",
+        x: ["2025-01-01", "2025-02-01"],
+        y: [6, 5],
+        line: {color: "#2ca02c", width: 2},
+        mode: "lines+markers",
+        marker: {size: 6}
+      }
+    ];
+
+    await renderPlotlyChart(
+      plotly as any,
+      element,
+      data,
+      {
+        margin: {b: 10, l: 10, r: 10, t: 10},
+        showlegend: false,
+        annotations: [
+          {
+            x: 0.5,
+            y: 0.5,
+            font: {size: 22},
+            text: "<b>68%</b>",
+            xref: "paper",
+            yref: "paper",
+            showarrow: false
+          }
+        ]
+      },
+      undefined,
+      "light",
+      {animateFromBaseline: true}
+    );
+
+    expect(react).toHaveBeenCalledTimes(1);
+    expect(react.mock.calls[0][1]).toEqual([
+      {
+        type: "scatter",
+        name: "HPC",
+        x: ["2025-01-01", "2025-02-01"],
+        y: [0, 0],
+        line: {color: "#1f77b4", width: 2},
+        mode: "lines+markers",
+        marker: {size: 6}
+      },
+      {
+        type: "scatter",
+        name: "Endotoxin",
+        x: ["2025-01-01", "2025-02-01"],
+        y: [0, 0],
+        line: {color: "#2ca02c", width: 2},
+        mode: "lines+markers",
+        marker: {size: 6}
+      }
+    ]);
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate.mock.calls[0][1]).toMatchObject({
+      data,
+      traces: [0, 1]
+    });
+    expect(data[0].y).toEqual([14, 13]);
+    expect(data[1].y).toEqual([6, 5]);
+  });
+
   it("animates supported traces from a zero baseline when requested", async () => {
     const react = vi.fn().mockResolvedValue(undefined);
     const animate = vi.fn().mockResolvedValue(undefined);
