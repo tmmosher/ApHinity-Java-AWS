@@ -88,6 +88,10 @@ public class ApiExceptionHandler {
         Map.entry("Event time is required", new ErrorDefinition("event_time_required", "Event time is required")),
         Map.entry("Event status is required", new ErrorDefinition("event_status_required", "Event status is required")),
         Map.entry("Event end must be on or after the start date and time", new ErrorDefinition("event_range_invalid", "Event end must be on or after the start date and time")),
+        Map.entry(
+            "Service calendar template unavailable",
+            new ErrorDefinition("service_calendar_template_unavailable", "Service calendar template unavailable")
+        ),
         Map.entry("Invite not found", new ErrorDefinition("invite_not_found", "Invite not found")),
         Map.entry("Invite expired", new ErrorDefinition("invite_expired", "Invite expired")),
         Map.entry("Invite is not pending", new ErrorDefinition("invite_not_pending", "Invite is not pending")),
@@ -105,6 +109,24 @@ public class ApiExceptionHandler {
      */
     public ApiExceptionHandler(AsyncLogService logService) {
         this.logService = logService;
+    }
+
+    @ExceptionHandler(ApiClientException.class)
+    public ResponseEntity<ApiErrorResponse> handleApiClientException(ApiClientException ex) {
+        int status = ex.getStatus().value();
+        logService.log(formatHandledException(
+            "ApiClientException",
+            ex,
+            "status=" + status + ", code=" + ex.getCode()
+        ));
+        ApiErrorResponse response = new ApiErrorResponse(
+            ex.getCode(),
+            safeMessage(ex.getMessage()),
+            status,
+            Instant.now(),
+            Map.of()
+        );
+        return ResponseEntity.status(ex.getStatus()).body(response);
     }
 
     /**

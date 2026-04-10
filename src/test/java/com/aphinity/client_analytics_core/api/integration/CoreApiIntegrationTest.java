@@ -9,11 +9,17 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -35,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -168,6 +175,66 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .contains("attachment")
             .contains("service_calendar_template.xlsx");
         assertThat(result.getResponse().getContentAsByteArray()).isNotEmpty();
+    }
+
+    @Test
+    void uploadLocationEventCalendarImportsSpreadsheetRows() throws Exception {
+        createUser("partner-events-upload@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Flagstaff");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-upload@example.com", PASSWORD);
+
+        byte[] spreadsheet = createServiceCalendarSpreadsheet(
+            List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),
+            List.of("Imported visit", "Spreadsheet upload", "2026-04-15", "2026-04-15", "09:30", "10:45", "False", "Partner")
+        );
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/events/calendar-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "service_calendar_upload.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.importedCount").value(1));
+
+        List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
+        assertEquals(1, persistedEvents.size());
+        assertEquals("Imported visit", persistedEvents.getFirst().getTitle());
+        assertEquals(ServiceEventResponsibility.PARTNER, persistedEvents.getFirst().getResponsibility());
+    }
+
+    @Test
+    void uploadLocationEventCalendarReturnsRowSpecificErrors() throws Exception {
+        createUser("partner-events-upload-invalid@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Prescott");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-upload-invalid@example.com", PASSWORD);
+
+        byte[] spreadsheet = createServiceCalendarSpreadsheet(
+            List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),
+            List.of("Imported visit", "", "2026-04-15", "2026-04-15", "09:30", "10:45", "False", "Vendor")
+        );
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/events/calendar-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "service_calendar_upload.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("service_calendar_row_invalid"))
+            .andExpect(jsonPath("$.message").value("Row 2: Responsibility must be Client or Partner."));
     }
 
     @Test
@@ -1518,5 +1585,22 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         }
         // CookieCsrfTokenRepository validates by matching header and cookie values.
         return UUID.randomUUID().toString();
+    }
+
+    private byte[] createServiceCalendarSpreadsheet(List<String> headerRow, List<String> dataRow) throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Service Calendar");
+            writeSpreadsheetRow(sheet.createRow(0), headerRow);
+            writeSpreadsheetRow(sheet.createRow(1), dataRow);
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        }
+    }
+
+    private void writeSpreadsheetRow(Row row, List<String> values) {
+        for (int index = 0; index < values.size(); index += 1) {
+            row.createCell(index).setCellValue(values.get(index));
+        }
     }
 }

@@ -16,19 +16,27 @@ type ServiceEventEditPopoverProps = {
   event: LocationServiceEvent;
   canEdit: boolean;
   canComplete: boolean;
+  canDelete?: boolean;
   role: AccountRole | undefined;
   onSave?: (event: LocationServiceEvent, request: CreateLocationServiceEventRequest) => Promise<void>;
   onComplete?: (event: LocationServiceEvent) => Promise<void>;
+  onDelete?: (event: LocationServiceEvent) => Promise<void>;
+  deleteLabel?: string;
 };
 
 type ServiceEventPopoverContentProps = {
   event: LocationServiceEvent;
   canEdit: boolean;
   canComplete: boolean;
+  canDelete: boolean;
   isCompleting: boolean;
+  isDeleting: boolean;
   completionError?: string;
+  deletionError?: string;
   onEdit: () => void;
   onComplete: () => void;
+  onDelete: () => void;
+  deleteLabel: string;
 };
 
 const EVENT_POPOVER_PROPS = {
@@ -123,20 +131,48 @@ const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
       )}
     </Show>
 
-    <Show when={props.canComplete}>
-      <div class="flex justify-end">
-        <button
-          type="button"
-          class="btn btn-success btn-sm"
-          data-service-event-complete=""
-          disabled={props.isCompleting}
-          onClick={(event) => {
-            event.stopPropagation();
-            props.onComplete();
-          }}
+    <Show when={props.deletionError}>
+      {(message) => (
+        <p
+          role="alert"
+          class="rounded-xl border border-error/25 bg-error/10 px-3 py-2 text-sm text-error"
         >
-          {props.isCompleting ? "Marking Complete..." : "Mark Complete"}
-        </button>
+          {message()}
+        </p>
+      )}
+    </Show>
+
+    <Show when={props.canComplete || props.canDelete}>
+      <div class="flex items-center justify-between gap-2">
+        <Show when={props.canDelete}>
+          <button
+            type="button"
+            class="btn btn-error btn-outline btn-sm"
+            data-service-event-delete=""
+            disabled={props.isCompleting || props.isDeleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onDelete();
+            }}
+          >
+            {props.isDeleting ? "Deleting..." : props.deleteLabel}
+          </button>
+        </Show>
+
+        <Show when={props.canComplete}>
+          <button
+            type="button"
+            class="btn btn-success btn-sm"
+            data-service-event-complete=""
+            disabled={props.isCompleting || props.isDeleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onComplete();
+            }}
+          >
+            {props.isCompleting ? "Marking Complete..." : "Mark Complete"}
+          </button>
+        </Show>
       </div>
     </Show>
   </div>
@@ -149,7 +185,9 @@ export const requestServiceEventEdit = (setIsEditing: (isEditing: boolean) => vo
 export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopoverProps>) => {
   const [isEditing, setIsEditing] = createSignal(false);
   const [isCompleting, setIsCompleting] = createSignal(false);
+  const [isDeleting, setIsDeleting] = createSignal(false);
   const [completionError, setCompletionError] = createSignal<string>();
+  const [deletionError, setDeletionError] = createSignal<string>();
   const controller = createServiceEventEditorController({
     role: () => props.role,
     getInitialDraft: () => createServiceEventDraftFromEvent(props.event),
@@ -164,18 +202,22 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
   const resetToDetailView = () => {
     controller.reset();
     setIsCompleting(false);
+    setIsDeleting(false);
     setCompletionError(undefined);
+    setDeletionError(undefined);
     setIsEditing(false);
   };
 
   const canEdit = () => props.canEdit && props.onSave !== undefined;
   const canComplete = () => props.canComplete && props.onComplete !== undefined && props.event.status !== "completed";
+  const canDelete = () => (props.canDelete ?? false) && props.onDelete !== undefined;
   const handleComplete = async (closePopover: () => void): Promise<void> => {
     if (!canComplete() || isCompleting()) {
       return;
     }
 
     setCompletionError(undefined);
+    setDeletionError(undefined);
     setIsCompleting(true);
 
     try {
@@ -188,6 +230,27 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
       );
     } finally {
       setIsCompleting(false);
+    }
+  };
+  const handleDelete = async (closePopover: () => void): Promise<void> => {
+    if (!canDelete() || isDeleting()) {
+      return;
+    }
+
+    setCompletionError(undefined);
+    setDeletionError(undefined);
+    setIsDeleting(true);
+
+    try {
+      await props.onDelete?.(props.event);
+      resetToDetailView();
+      closePopover();
+    } catch (error) {
+      setDeletionError(
+        error instanceof Error ? error.message : "Unable to delete service event."
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -216,15 +279,23 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
                     event={props.event}
                     canEdit={canEdit()}
                     canComplete={canComplete()}
+                    canDelete={canDelete()}
                     isCompleting={isCompleting()}
+                    isDeleting={isDeleting()}
                     completionError={completionError()}
+                    deletionError={deletionError()}
                     onEdit={() => {
                       setCompletionError(undefined);
+                      setDeletionError(undefined);
                       requestServiceEventEdit(setIsEditing);
                     }}
                     onComplete={() => {
                       void handleComplete(() => popover.setOpen(false));
                     }}
+                    onDelete={() => {
+                      void handleDelete(() => popover.setOpen(false));
+                    }}
+                    deleteLabel={props.deleteLabel ?? "Delete"}
                   />
                 }
               >

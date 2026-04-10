@@ -1,6 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.controllers.servicecalendar;
 
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
+import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceCalendarUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.YearMonth;
@@ -82,6 +85,59 @@ public class LocationEventController {
                 .body(templateResource);
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Service calendar template unavailable", ex);
+        }
+    }
+
+    @PostMapping(path = "/locations/{locationId}/events/calendar-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ServiceCalendarUploadResponse uploadLocationEventCalendar(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @RequestParam("file") MultipartFile file
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received service calendar upload request actorUserId={} locationId={} filename={}",
+            userId,
+            locationId,
+            file == null ? null : file.getOriginalFilename()
+        );
+        try {
+            int importedCount = locationEventService.uploadServiceCalendar(userId, locationId, file);
+            log.info(
+                "Completed service calendar upload request actorUserId={} locationId={} importedCount={}",
+                userId,
+                locationId,
+                importedCount
+            );
+            return new ServiceCalendarUploadResponse(importedCount);
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected service calendar upload request actorUserId={} locationId={} status={} reason={}",
+                userId,
+                locationId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (ApiClientException ex) {
+            log.warn(
+                "Rejected service calendar upload request actorUserId={} locationId={} status={} code={} message={}",
+                userId,
+                locationId,
+                ex.getStatus().value(),
+                ex.getCode(),
+                ex.getMessage()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed service calendar upload request actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
         }
     }
 

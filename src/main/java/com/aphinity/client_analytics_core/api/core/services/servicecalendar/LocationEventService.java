@@ -12,6 +12,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.slf4j.Logger;
@@ -20,12 +21,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -39,19 +42,22 @@ public class LocationEventService {
     private final LocationUserRepository locationUserRepository;
     private final ServiceEventRepository serviceEventRepository;
     private final AccountRoleService accountRoleService;
+    private final ServiceCalendarSpreadsheetParser serviceCalendarSpreadsheetParser;
 
     public LocationEventService(
         AppUserRepository appUserRepository,
         LocationRepository locationRepository,
         LocationUserRepository locationUserRepository,
         ServiceEventRepository serviceEventRepository,
-        AccountRoleService accountRoleService
+        AccountRoleService accountRoleService,
+        ServiceCalendarSpreadsheetParser serviceCalendarSpreadsheetParser
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
         this.locationUserRepository = locationUserRepository;
         this.serviceEventRepository = serviceEventRepository;
         this.accountRoleService = accountRoleService;
+        this.serviceCalendarSpreadsheetParser = serviceCalendarSpreadsheetParser;
     }
 
     @Transactional(readOnly = true)
@@ -88,6 +94,48 @@ public class LocationEventService {
             throw serviceCalendarTemplateUnavailable();
         }
         return resource;
+    }
+
+    @Transactional
+    public int uploadServiceCalendar(Long userId, Long locationId, MultipartFile file) {
+        AppUser user = requireUser(userId);
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+
+        List<ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow> parsedRows =
+            serviceCalendarSpreadsheetParser.parse(file);
+        List<ServiceEvent> serviceEvents = new ArrayList<>(parsedRows.size());
+
+        for (ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow parsedRow : parsedRows) {
+            try {
+                ServiceEventResponsibility responsibility = normalizeResponsibility(parsedRow.request().responsibility());
+                requireCreatePermission(user, locationId, responsibility);
+
+                ServiceEvent serviceEvent = new ServiceEvent();
+                serviceEvent.setLocation(location);
+                applyRequest(serviceEvent, parsedRow.request());
+                serviceEvents.add(serviceEvent);
+            } catch (ResponseStatusException ex) {
+                throw spreadsheetRowInvalid(parsedRow.rowNumber(), ex.getReason());
+            }
+        }
+
+        try {
+            serviceEventRepository.saveAllAndFlush(serviceEvents);
+            locationRepository.touchUpdatedAt(locationId, Instant.now());
+            return serviceEvents.size();
+        } catch (RuntimeException ex) {
+            log.error(
+                "Service calendar upload persistence failed actorUserId={} locationId={} importedCount={}",
+                userId,
+                locationId,
+                serviceEvents.size(),
+                ex
+            );
+            throw ex;
+        }
     }
 
     @Transactional
@@ -407,5 +455,14 @@ public class LocationEventService {
 
     private ResponseStatusException serviceCalendarTemplateUnavailable() {
         return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Service calendar template unavailable");
+    }
+
+    private ApiClientException spreadsheetRowInvalid(int rowNumber, String reason) {
+        String message = reason == null || reason.isBlank() ? "Request failed" : reason;
+        return new ApiClientException(
+            HttpStatus.BAD_REQUEST,
+            "service_calendar_row_invalid",
+            "Row " + rowNumber + ": " + message
+        );
     }
 }

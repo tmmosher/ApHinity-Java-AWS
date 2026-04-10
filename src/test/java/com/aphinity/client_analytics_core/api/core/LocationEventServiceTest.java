@@ -13,6 +13,8 @@ import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.Loca
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarSpreadsheetParser;
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -55,6 +58,9 @@ class LocationEventServiceTest {
 
     @Mock
     private AccountRoleService accountRoleService;
+
+    @Mock
+    private ServiceCalendarSpreadsheetParser serviceCalendarSpreadsheetParser;
 
     @InjectMocks
     private LocationEventService locationEventService;
@@ -160,6 +166,67 @@ class LocationEventServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("Insufficient permissions", ex.getReason());
+    }
+
+    @Test
+    void uploadServiceCalendarPersistsParsedRowsAndTouchesLocation() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "service_calendar_upload.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[]{1, 2, 3}
+        );
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(serviceCalendarSpreadsheetParser.parse(file)).thenReturn(List.of(
+            new ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow(
+                2,
+                request("Imported event", "Imported description", ServiceEventResponsibility.PARTNER)
+            )
+        ));
+
+        int importedCount = locationEventService.uploadServiceCalendar(5L, 99L, file);
+
+        assertEquals(1, importedCount);
+        verify(serviceEventRepository).saveAllAndFlush(any());
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void uploadServiceCalendarRejectsUnauthorizedPartnerRowsForClient() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "service_calendar_upload.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[]{1, 2, 3}
+        );
+
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
+        when(serviceCalendarSpreadsheetParser.parse(file)).thenReturn(List.of(
+            new ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow(
+                2,
+                request("Imported event", "Imported description", ServiceEventResponsibility.PARTNER)
+            )
+        ));
+
+        ApiClientException ex = assertThrows(ApiClientException.class, () ->
+            locationEventService.uploadServiceCalendar(5L, 99L, file)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("service_calendar_row_invalid", ex.getCode());
+        assertEquals("Row 2: Insufficient permissions", ex.getMessage());
     }
 
     @Test

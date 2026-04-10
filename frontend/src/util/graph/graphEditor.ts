@@ -1,5 +1,6 @@
 import {LocationGraph, LocationGraphUpdate} from "../../types/Types";
 import {normalizePlotlyLayoutTitle} from "./graphLayoutTitle";
+import {applyStateSnapshot, undoStateSnapshot} from "../common/stateHistory";
 
 export type EditableGraphPayload = {
   data: Record<string, unknown>[];
@@ -298,10 +299,17 @@ export const applyGraphPayloadEdit = (
       : graph
   );
 
-  return {
+  const result = applyStateSnapshot(
+    currentGraphs,
+    undoStack,
     nextGraphs,
-    nextUndoStack: [...undoStack, cloneLocationGraphs(currentGraphs)],
-    changed: true
+    cloneLocationGraphs
+  );
+
+  return {
+    nextGraphs: result.nextState,
+    nextUndoStack: result.nextUndoStack,
+    changed: result.changed
   };
 };
 
@@ -309,18 +317,10 @@ export const undoGraphPayloadEdit = (
   currentGraphs: LocationGraph[],
   undoStack: LocationGraph[][]
 ): GraphUndoResult => {
-  if (undoStack.length === 0) {
-    return {
-      nextGraphs: currentGraphs,
-      nextUndoStack: undoStack,
-      undone: false
-    };
-  }
-
-  const previousGraphs = undoStack[undoStack.length - 1];
+  const result = undoStateSnapshot(currentGraphs, undoStack, cloneLocationGraphs);
   return {
-    nextGraphs: cloneLocationGraphs(previousGraphs),
-    nextUndoStack: undoStack.slice(0, -1),
-    undone: true
+    nextGraphs: result.nextState,
+    nextUndoStack: result.nextUndoStack,
+    undone: result.undone
   };
 };

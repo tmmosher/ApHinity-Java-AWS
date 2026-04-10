@@ -18,6 +18,10 @@ type ApiErrorPayload = {
   path?: string;
 };
 
+type ServiceCalendarUploadResponse = {
+  importedCount?: unknown;
+};
+
 const parsePositiveRouteId = (value: string | number, label: string): number => {
   const parsedId = Number(value);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
@@ -90,6 +94,16 @@ const parseLocationServiceEventList = (value: unknown): LocationServiceEvent[] =
   return value.map(parseLocationServiceEvent);
 };
 
+const parseServiceCalendarUploadResponse = (value: unknown): {importedCount: number} => {
+  const response = value as ServiceCalendarUploadResponse | null | undefined;
+  if (response == null || typeof response.importedCount !== "number" || response.importedCount < 0) {
+    throw new Error("Invalid service calendar upload response");
+  }
+  return {
+    importedCount: response.importedCount
+  };
+};
+
 const throwLocationEventLoadError = async (response: Response): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
 
@@ -140,6 +154,41 @@ const throwLocationEventMutationError = async (
   throw new Error(action === "create" ? "Unable to create service event" : "Unable to update service event");
 };
 
+const throwLocationEventUploadError = async (response: Response): Promise<never> => {
+  const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
+  console.warn("uploadLocationEventCalendar failed", {
+    status: response.status,
+    code: errorPayload?.code ?? null,
+    message: errorPayload?.message ?? null,
+    error: errorPayload?.error ?? null,
+    path: errorPayload?.path ?? null
+  });
+
+  if (
+    errorPayload?.code === "authentication_required"
+    || errorPayload?.code === "invalid_refresh_token"
+    || errorPayload?.code === "missing_refresh_token"
+  ) {
+    throw new Error("Authentication required");
+  }
+  if (errorPayload?.code === "csrf_invalid") {
+    throw new Error("CSRF invalid");
+  }
+  if (errorPayload?.code === "forbidden") {
+    throw new Error("Insufficient permissions");
+  }
+  if (
+    (response.status === 403 || errorPayload?.status === 403)
+    && errorPayload?.error === "Forbidden"
+  ) {
+    throw new Error("Security token rejected");
+  }
+  if (errorPayload?.message) {
+    throw new Error(errorPayload.message);
+  }
+  throw new Error("Unable to upload service calendar spreadsheet");
+};
+
 export const fetchLocationEventsById = async (
   host: string,
   locationId: string,
@@ -165,6 +214,27 @@ export const fetchLocationEventsById = async (
 export const getLocationEventTemplateDownloadUrl = (host: string, locationId: string): string => {
   const parsedLocationId = parseRouteLocationId(locationId);
   return host + "/api/core/locations/" + parsedLocationId + "/events/template";
+};
+
+export const uploadLocationEventCalendarById = async (
+  host: string,
+  locationId: string,
+  file: File
+): Promise<{importedCount: number}> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/events/calendar-upload", {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    await throwLocationEventUploadError(response);
+  }
+
+  return parseServiceCalendarUploadResponse(await response.json());
 };
 
 export const createLocationEventById = async (
