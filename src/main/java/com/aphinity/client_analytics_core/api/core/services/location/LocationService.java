@@ -44,14 +44,6 @@ import java.util.Objects;
 public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
     private static final String DEFAULT_GRAPH_COLOR = "#2563eb";
-    private static final List<String> DEFAULT_SCATTER_X_VALUES = List.of(
-        "2025-01-01",
-        "2025-02-01",
-        "2025-03-01",
-        "2025-04-01",
-        "2025-05-01",
-        "2025-06-01"
-    );
 
     private enum GraphTemplateType {
         PIE,
@@ -800,8 +792,8 @@ public class LocationService {
                 List.of(Map.of(
                     "type", "bar",
                     "name", "Trace 1",
-                    "x", List.of("Point 1"),
-                    "y", List.of(0),
+                    "x", List.of(),
+                    "y", List.of(),
                     "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
                 )),
                 Map.of(
@@ -823,15 +815,15 @@ public class LocationService {
 
     private List<Map<String, Object>> buildScatterTemplateData() {
         return List.of(
-            buildScatterTrace("HPC", "#1f77b4", List.of(14L, 13L, 12L, 11L, 13L, 12L)),
-            buildScatterTrace("Endotoxin", "#2ca02c", List.of(6L, 5L, 7L, 6L, 5L, 6L)),
-            buildScatterTrace("Legionella", "#d62728", List.of(4L, 6L, 5L, 4L, 5L, 4L)),
-            buildScatterTrace("Key Minerals", "#ff7f0e", List.of(10L, 9L, 8L, 9L, 10L, 9L)),
-            buildScatterTrace("Alkalinity", "#9467bd", List.of(7L, 8L, 7L, 6L, 7L, 8L))
+            buildScatterTrace("HPC", "#1f77b4"),
+            buildScatterTrace("Endotoxin", "#2ca02c"),
+            buildScatterTrace("Legionella", "#d62728"),
+            buildScatterTrace("Key Minerals", "#ff7f0e"),
+            buildScatterTrace("Alkalinity", "#9467bd")
         );
     }
 
-    private Map<String, Object> buildScatterTrace(String name, String color, List<Long> yValues) {
+    private Map<String, Object> buildScatterTrace(String name, String color) {
         Map<String, Object> line = new LinkedHashMap<>();
         line.put("color", color);
         line.put("width", 2L);
@@ -840,8 +832,8 @@ public class LocationService {
         marker.put("size", 6L);
 
         Map<String, Object> trace = new LinkedHashMap<>();
-        trace.put("x", DEFAULT_SCATTER_X_VALUES);
-        trace.put("y", yValues);
+        trace.put("x", List.of());
+        trace.put("y", List.of());
         trace.put("line", line);
         trace.put("mode", "lines+markers");
         trace.put("name", name);

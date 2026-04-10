@@ -8,6 +8,7 @@ import {
   createEditableGraphPayload,
   getEditableGraphTitle,
   parseEditableGraphPayload,
+  pruneDeletedLocationGraphState,
   reconcileLocationGraphs,
   serializeEditableGraphPayload,
   updateEditableGraphTitle,
@@ -136,6 +137,24 @@ describe("graphEditor", () => {
 
   it("returns no save payloads when there are no graph changes", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
+  });
+
+  it("prunes deleted graphs from the local dashboard caches", () => {
+    const baselineIndex = buildGraphBaselineIndex(baseGraphs);
+    const cleanupResult = pruneDeletedLocationGraphState(
+      baseGraphs,
+      [baseGraphs],
+      baselineIndex,
+      11
+    );
+
+    expect(cleanupResult.nextGraphs).toHaveLength(1);
+    expect(cleanupResult.nextGraphs[0]).toBe(baseGraphs[0]);
+    expect(cleanupResult.nextUndoStack).toEqual([]);
+    expect(cleanupResult.nextBaselineIndex.has(11)).toBe(false);
+    expect(cleanupResult.nextBaselineIndex.get(10)).toMatchObject({
+      expectedUpdatedAt: "2026-01-02T00:00:00Z"
+    });
   });
 
   it("reconciles refreshed graphs without replacing unchanged graph objects", () => {

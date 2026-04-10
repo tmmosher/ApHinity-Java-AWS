@@ -1,4 +1,4 @@
-import { createRenderEffect, createRoot } from "solid-js";
+import { batch, createRenderEffect, createRoot, createSignal } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
@@ -73,6 +73,35 @@ const renderModal = (graph?: LocationGraph) =>
     });
 
     return dispose;
+  });
+
+const renderControllableModal = (graph?: LocationGraph) =>
+  createRoot((dispose) => {
+    const [isOpen, setIsOpen] = createSignal(true);
+    const [currentGraph, setCurrentGraph] = createSignal<LocationGraph | undefined>(graph);
+
+    createRenderEffect(() => {
+      GraphEditorModal({
+        isOpen: isOpen(),
+        graph: currentGraph(),
+        canRenameGraph: false,
+        canDeleteGraph: false,
+        canUndo: false,
+        isDeleting: false,
+        isSaving: false,
+        onApply: vi.fn(),
+        onDeleteGraph: vi.fn().mockResolvedValue(undefined),
+        onRenameGraph: vi.fn().mockResolvedValue(undefined),
+        onUndo: vi.fn(),
+        onClose: vi.fn()
+      });
+    });
+
+    return {
+      dispose,
+      setIsOpen,
+      setCurrentGraph
+    };
   });
 
 const getTraceControlsProps = () => {
@@ -161,6 +190,50 @@ describe("GraphEditorModal trace controls", () => {
     expect(latestTraceControlsProps).toBeNull();
     expect(pieProps.rowColors).toEqual(["#2563eb", "#16a34a"]);
     expect(() => pieProps.onUpdateColor(1, "#dc2626")).not.toThrow();
+
+    dispose();
+  });
+
+  it("clears stale editor payload state when a deleted graph closes", async () => {
+    const pieGraph: LocationGraph = {
+      id: 16,
+      name: "Cleanup Target",
+      data: [{
+        type: "pie",
+        labels: ["Open", "Closed"],
+        values: [68, 32],
+        marker: {
+          color: "#2563eb",
+          colors: ["#2563eb", "#16a34a"]
+        }
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const {dispose, setCurrentGraph, setIsOpen} = renderControllableModal(pieGraph);
+    await Promise.resolve();
+
+    expect(getPieTraceEditorProps()).toMatchObject({
+      rowColors: ["#2563eb", "#16a34a"]
+    });
+
+    latestTraceControlsProps = null;
+    latestPieTraceEditorProps = null;
+
+    batch(() => {
+      setCurrentGraph(undefined);
+      setIsOpen(false);
+    });
+    await Promise.resolve();
+
+    expect(() => getPieTraceEditorProps()).toThrowError("PieTraceEditor mock was not rendered.");
+    const traceControls = getTraceControlsProps();
+    expect(traceControls.traceOptions).toEqual([]);
+    expect(traceControls.traceNameDraft).toBe("");
 
     dispose();
   });

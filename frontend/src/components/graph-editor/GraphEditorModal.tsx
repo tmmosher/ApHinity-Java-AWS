@@ -77,8 +77,27 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
 
   const isBusy = () => props.isSaving || props.isDeleting || isRemovingTrace() || isSavingRename();
 
+  const resetEditorState = () => {
+    setEditablePayload(EMPTY_EDITABLE_GRAPH_PAYLOAD);
+    setSelectedTraceIndex(0);
+    setTraceNameDraft("");
+    setGraphNameDraft("");
+    setOperationError("");
+    setRenameError("");
+    setDeleteError("");
+    setIsRemovingTrace(false);
+    setIsSavingRename(false);
+    setIsRenamePopoverOpen(false);
+    setIsDeleteConfirmOpen(false);
+  };
+
   createEffect(on(() => [props.isOpen, props.graph?.id] as const, ([isOpen, graphId]) => {
-    if (!isOpen || graphId === undefined || !props.graph) {
+    if (!isOpen) {
+      resetEditorState();
+      return;
+    }
+
+    if (graphId === undefined || !props.graph) {
       return;
     }
 
@@ -343,9 +362,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     if (isBusy()) {
       return;
     }
-    setOperationError("");
-    setDeleteError("");
-    setIsDeleteConfirmOpen(false);
+    resetEditorState();
     props.onClose();
   };
 
@@ -425,7 +442,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
 
     try {
       await props.onDeleteGraph(graph.id);
-      setIsDeleteConfirmOpen(false);
+      resetEditorState();
       props.onClose();
     } catch (error) {
       setDeleteError(error instanceof Error ? error.message : "Unable to delete graph.");

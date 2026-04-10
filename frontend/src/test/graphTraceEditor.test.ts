@@ -126,24 +126,29 @@ describe("graphTraceEditor", () => {
     expect((nextTrace.values as unknown[])[1]).toBe(40);
   });
 
-  it("creates a new trace using the selected trace type and default naming", () => {
+  it("creates a blank scatter trace using the selected trace type and default naming", () => {
     const nextTrace = createTrace("scatter", 2);
 
     expect(nextTrace).toEqual({
-      x: [
-        "2025-01-01",
-        "2025-02-01",
-        "2025-03-01",
-        "2025-04-01",
-        "2025-05-01",
-        "2025-06-01"
-      ],
-      y: [0, 0, 0, 0, 0, 0],
+      x: [],
+      y: [],
       line: {color: "#2563eb", width: 2},
       mode: "lines+markers",
       name: "Trace 3",
       type: "scatter",
       marker: {size: 6}
+    });
+  });
+
+  it("creates a blank bar trace using the selected trace type and default naming", () => {
+    const nextTrace = createTrace("bar", 0);
+
+    expect(nextTrace).toEqual({
+      type: "bar",
+      name: "Trace 1",
+      x: [],
+      y: [],
+      marker: {color: "#2563eb"}
     });
   });
 

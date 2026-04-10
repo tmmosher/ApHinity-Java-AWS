@@ -20,20 +20,11 @@ const createMockResponse = (ok: boolean, payload: unknown): Response =>
     json: vi.fn().mockResolvedValue(payload)
   }) as unknown as Response;
 
-const SCATTER_X_VALUES = [
-  "2025-01-01",
-  "2025-02-01",
-  "2025-03-01",
-  "2025-04-01",
-  "2025-05-01",
-  "2025-06-01"
-];
-
-const createScatterTrace = (name: string, color: string, yValues: number[]) => ({
+const createScatterTrace = (name: string, color: string) => ({
   type: "scatter",
   name,
-  x: [...SCATTER_X_VALUES],
-  y: yValues,
+  x: [],
+  y: [],
   line: {color, width: 2},
   mode: "lines+markers",
   marker: {size: 6}
@@ -59,11 +50,11 @@ const buildScatterGraphResponse = () => ({
   id: 44,
   name: "New Plot Graph",
   data: [
-    createScatterTrace("HPC", "#1f77b4", [14, 13, 12, 11, 13, 12]),
-    createScatterTrace("Endotoxin", "#2ca02c", [6, 5, 7, 6, 5, 6]),
-    createScatterTrace("Legionella", "#d62728", [4, 6, 5, 4, 5, 4]),
-    createScatterTrace("Key Minerals", "#ff7f0e", [10, 9, 8, 9, 10, 9]),
-    createScatterTrace("Alkalinity", "#9467bd", [7, 8, 7, 6, 7, 8])
+    createScatterTrace("HPC", "#1f77b4"),
+    createScatterTrace("Endotoxin", "#2ca02c"),
+    createScatterTrace("Legionella", "#d62728"),
+    createScatterTrace("Key Minerals", "#ff7f0e"),
+    createScatterTrace("Alkalinity", "#9467bd")
   ],
   layout: SCATTER_GRAPH_LAYOUT,
   config: {displayModeBar: false, responsive: true},
@@ -310,15 +301,14 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       line: {color: "#1f77b4", width: 2},
       marker: {size: 6}
     });
-    expect(result.layout).toEqual(SCATTER_GRAPH_LAYOUT);
-    expect(result.config).toEqual({displayModeBar: false, responsive: true});
+    expect(result).toEqual(buildScatterGraphResponse());
   });
 
   it("creates a graph and requests a new section when needed", async () => {
     apiFetchMock.mockResolvedValue(createMockResponse(true, {
       id: 45,
       name: "New Bar Graph",
-      data: [{type: "bar", name: "Trace 1", x: ["Point 1"], y: [0]}],
+      data: [{type: "bar", name: "Trace 1", x: [], y: []}],
       layout: {showlegend: false},
       config: {displayModeBar: false, responsive: true},
       style: {height: 320},
@@ -343,6 +333,9 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     });
     expect(result.name).toBe("New Bar Graph");
     expect(result.data[0].type).toBe("bar");
+    expect(result.data[0].x).toEqual([]);
+    expect(result.data[0].y).toEqual([]);
+    expect(result.data[0].marker).toEqual({color: "#2563eb"});
   });
 
   it("deletes a graph through the dedicated delete endpoint", async () => {

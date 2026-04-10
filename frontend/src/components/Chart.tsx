@@ -244,6 +244,21 @@ export const applyDonutCenterValueToLayout = (
     };
 };
 
+export const purgePlotlyChart = (
+    plotly: Partial<Pick<typeof Plotly, "purge">> | null | undefined,
+    el: HTMLDivElement
+) => {
+    if (!plotly || typeof plotly.purge !== "function") {
+        return;
+    }
+
+    try {
+        plotly.purge(el);
+    } catch {
+        // Plotly cleanup should never block graph teardown.
+    }
+};
+
 export const renderPlotlyChart = async (
     plotly: PlotlyAnimatedRenderTarget,
     el: HTMLDivElement,
@@ -369,10 +384,15 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
                         {animateFromBaseline: shouldAnimate}
                     );
                 } catch (error) {
+                    purgePlotlyChart(module, el);
                     console.error(`Failed to render graph "${props.name}"`, error);
                     return;
                 }
-                if (!disposed && !cleanupResize) {
+                if (disposed) {
+                    purgePlotlyChart(module, el);
+                    return;
+                }
+                if (!cleanupResize) {
                     cleanupResize = attachPlotlyResizeListener(window, module, el);
                 }
             });
@@ -382,6 +402,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         disposed = true;
         cleanupResize?.();
         disconnectThemeObserver?.();
+        purgePlotlyChart(plotlyModule(), el);
     });
 
     return <div ref={el} class={props.class} />;

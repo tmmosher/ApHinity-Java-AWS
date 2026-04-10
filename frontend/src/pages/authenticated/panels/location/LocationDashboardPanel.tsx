@@ -14,6 +14,7 @@ import {
   buildGraphBaselineIndex,
   type GraphBaselineEntry,
   reconcileLocationGraphs,
+  pruneDeletedLocationGraphState,
   undoGraphPayloadEdit,
   type EditableGraphPayload
 } from "../../../../util/graph/graphEditor";
@@ -380,6 +381,15 @@ export const LocationDashboardPanel = () => {
         return;
       }
 
+      const cleanupResult = pruneDeletedLocationGraphState(
+        workingGraphs(),
+        locationUndoStack(),
+        graphBaselineIndex(),
+        graphId
+      );
+      setWorkingGraphs(cleanupResult.nextGraphs);
+      setLocationUndoStack(cleanupResult.nextUndoStack);
+      setGraphBaselineIndex(cleanupResult.nextBaselineIndex);
       setEditingGraphId(null);
       toast.success("Graph deleted.");
 

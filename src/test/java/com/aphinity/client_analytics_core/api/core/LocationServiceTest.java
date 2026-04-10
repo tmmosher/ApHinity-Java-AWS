@@ -563,6 +563,9 @@ class LocationServiceTest {
 
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
         assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals(List.of(), traces.getFirst().get("x"));
+        assertEquals(List.of(), traces.getFirst().get("y"));
+        assertEquals(Map.of("color", "#2563eb"), traces.getFirst().get("marker"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
@@ -1077,25 +1080,18 @@ class LocationServiceTest {
 
     private List<Map<String, Object>> expectedScatterTemplateData() {
         return List.of(
-            expectedScatterTrace("HPC", "#1f77b4", List.of(14L, 13L, 12L, 11L, 13L, 12L)),
-            expectedScatterTrace("Endotoxin", "#2ca02c", List.of(6L, 5L, 7L, 6L, 5L, 6L)),
-            expectedScatterTrace("Legionella", "#d62728", List.of(4L, 6L, 5L, 4L, 5L, 4L)),
-            expectedScatterTrace("Key Minerals", "#ff7f0e", List.of(10L, 9L, 8L, 9L, 10L, 9L)),
-            expectedScatterTrace("Alkalinity", "#9467bd", List.of(7L, 8L, 7L, 6L, 7L, 8L))
+            expectedScatterTrace("HPC", "#1f77b4"),
+            expectedScatterTrace("Endotoxin", "#2ca02c"),
+            expectedScatterTrace("Legionella", "#d62728"),
+            expectedScatterTrace("Key Minerals", "#ff7f0e"),
+            expectedScatterTrace("Alkalinity", "#9467bd")
         );
     }
 
-    private Map<String, Object> expectedScatterTrace(String name, String color, List<Long> yValues) {
+    private Map<String, Object> expectedScatterTrace(String name, String color) {
         return Map.of(
-            "x", List.of(
-                "2025-01-01",
-                "2025-02-01",
-                "2025-03-01",
-                "2025-04-01",
-                "2025-05-01",
-                "2025-06-01"
-            ),
-            "y", yValues,
+            "x", List.of(),
+            "y", List.of(),
             "line", Map.of("color", color, "width", 2L),
             "mode", "lines+markers",
             "name", name,

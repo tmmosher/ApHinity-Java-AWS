@@ -5,6 +5,7 @@ import {
   buildPlotlyConfig,
   buildPlotlyLayout,
   createPlotlyAnimationBaselineData,
+  purgePlotlyChart,
   renderPlotlyChart
 } from "../components/Chart";
 
@@ -64,6 +65,33 @@ describe("Chart helpers", () => {
       displayModeBar: true,
       responsive: true
     });
+  });
+
+  it("purges Plotly state when a chart is torn down", () => {
+    const purge = vi.fn();
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+
+    purgePlotlyChart({purge} as unknown as {purge: (...args: unknown[]) => void}, element);
+
+    expect(purge).toHaveBeenCalledTimes(1);
+    expect(purge).toHaveBeenCalledWith(element);
+  });
+
+  it("treats missing Plotly cleanup hooks as a no-op", () => {
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+
+    expect(() => purgePlotlyChart(undefined, element)).not.toThrow();
+  });
+
+  it("swallows Plotly purge failures during cleanup", () => {
+    const purge = vi.fn(() => {
+      throw new Error("cleanup failed");
+    });
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+
+    expect(() =>
+      purgePlotlyChart({purge} as unknown as {purge: (...args: unknown[]) => void}, element)
+    ).not.toThrow();
   });
 
   it("builds zero-baseline data for supported trace types", () => {

@@ -1,6 +1,10 @@
 import {describe, expect, it} from "vitest";
 import type {LocationGraph} from "../types/Types";
-import {reconcileLocationGraphs} from "../util/graph/graphEditor";
+import {
+  buildGraphBaselineIndex,
+  pruneDeletedLocationGraphState,
+  reconcileLocationGraphs
+} from "../util/graph/graphEditor";
 import {advanceGraphLoadAnimationToken} from "../pages/authenticated/panels/location/LocationDashboardPanel";
 
 const SCATTER_X_VALUES = [
@@ -57,11 +61,79 @@ const buildScatterGraph = (id: number, name: string, yOffset: number): LocationG
   updatedAt: "2026-01-02T00:00:00Z"
 });
 
+const buildBlankScatterTrace = (name: string, color: string) => ({
+  type: "scatter",
+  name,
+  x: [],
+  y: [],
+  line: {color, width: 2},
+  mode: "lines+markers",
+  marker: {size: 6}
+});
+
+const buildBlankScatterGraph = (id: number, name: string): LocationGraph => ({
+  id,
+  name,
+  data: [
+    buildBlankScatterTrace("HPC", "#1f77b4"),
+    buildBlankScatterTrace("Endotoxin", "#2ca02c"),
+    buildBlankScatterTrace("Legionella", "#d62728"),
+    buildBlankScatterTrace("Key Minerals", "#ff7f0e"),
+    buildBlankScatterTrace("Alkalinity", "#9467bd")
+  ],
+  layout: cloneJson(SCATTER_LAYOUT),
+  config: {displayModeBar: false, responsive: true},
+  style: {height: 320},
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z"
+});
+
 const buildBarGraph = (id: number, name: string): LocationGraph => ({
   id,
   name,
   data: [{type: "bar", name: "Trace 1", x: ["Point 1"], y: [5]}],
   layout: {showlegend: false},
+  config: {displayModeBar: false, responsive: true},
+  style: {height: 320},
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z"
+});
+
+const buildPieGraph = (id: number, name: string): LocationGraph => ({
+  id,
+  name,
+  data: [
+    {
+      type: "pie",
+      name: "Distribution",
+      labels: ["Open", "Closed"],
+      values: [68, 32],
+      marker: {
+        color: "#2563eb",
+        colors: ["#2563eb", "#16a34a"]
+      },
+      hole: 0.72,
+      sort: false,
+      textinfo: "none",
+      direction: "clockwise",
+      hovertemplate: "%{label}: %{value}<extra></extra>"
+    }
+  ],
+  layout: cloneJson({
+    margin: {b: 10, l: 10, r: 10, t: 10},
+    showlegend: false,
+    annotations: [
+      {
+        x: 0.5,
+        y: 0.5,
+        font: {size: 22},
+        text: "<b>68%</b>",
+        xref: "paper",
+        yref: "paper",
+        showarrow: false
+      }
+    ]
+  }),
   config: {displayModeBar: false, responsive: true},
   style: {height: 320},
   createdAt: "2026-01-01T00:00:00Z",
@@ -74,7 +146,7 @@ describe("LocationDashboardPanel create flow regressions", () => {
   it("keeps existing graph payloads intact after creating a new graph and refreshing", () => {
     const existingScatterGraph = buildScatterGraph(11, "Existing Scatter", 0);
     const existingBarGraph = buildBarGraph(12, "Existing Bar");
-    const createdGraph = buildScatterGraph(13, "New Plot Graph", 1);
+    const createdGraph = buildBlankScatterGraph(13, "New Plot Graph");
 
     const refreshedGraphs = reconcileLocationGraphs(
       [existingScatterGraph, existingBarGraph],
@@ -104,11 +176,48 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect(refreshedBar?.data).toHaveLength(1);
     expect((refreshedBar?.data[0].y as unknown[])).toEqual([5]);
 
-    expect(refreshedCreated?.data).toHaveLength(5);
-    expect(refreshedCreated?.layout).toEqual(SCATTER_LAYOUT);
-    expect((refreshedCreated?.data[0].y as unknown[])).toEqual([15, 14, 13, 12, 14, 13]);
+    expect(refreshedCreated).toEqual(createdGraph);
 
     expect(advanceGraphLoadAnimationToken(0, true, false, true)).toBe(1);
     expect(advanceGraphLoadAnimationToken(1, true, false, true)).toBe(1);
+  });
+
+  it("drops deleted pie graph state before the next graph create flow reuses dashboard caches", () => {
+    const deletedPieGraph = buildPieGraph(21, "Deleted Pie");
+    const remainingBarGraph = buildBarGraph(22, "Remaining Bar");
+    const baselineIndex = buildGraphBaselineIndex([deletedPieGraph, remainingBarGraph]);
+
+    const cleanupResult = pruneDeletedLocationGraphState(
+      [deletedPieGraph, remainingBarGraph],
+      [[deletedPieGraph, remainingBarGraph]],
+      baselineIndex,
+      deletedPieGraph.id
+    );
+
+    expect(cleanupResult.nextGraphs).toEqual([remainingBarGraph]);
+    expect(cleanupResult.nextUndoStack).toEqual([]);
+    expect(cleanupResult.nextBaselineIndex.has(deletedPieGraph.id)).toBe(false);
+
+    const createdGraph = buildBlankScatterGraph(23, "New Plot Graph");
+    const refreshedGraphs = reconcileLocationGraphs(
+      cleanupResult.nextGraphs,
+      [cloneJson(remainingBarGraph), cloneJson(createdGraph)]
+    );
+
+    expect(refreshedGraphs).toHaveLength(2);
+    expect(refreshedGraphs[0]).toBe(remainingBarGraph);
+    expect(refreshedGraphs[1]).toEqual(createdGraph);
+    for (const trace of refreshedGraphs[1].data) {
+      expect(trace).toMatchObject({
+        type: "scatter",
+        mode: "lines+markers",
+        line: {width: 2},
+        marker: {size: 6}
+      });
+      expect(trace.x).toEqual([]);
+      expect(trace.y).toEqual([]);
+      expect(trace).not.toHaveProperty("labels");
+      expect(trace).not.toHaveProperty("values");
+    }
   });
 });

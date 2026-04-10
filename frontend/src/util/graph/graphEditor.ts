@@ -25,6 +25,12 @@ export type GraphBaselineEntry = {
   expectedUpdatedAt: string | null;
 };
 
+export type DeletedGraphCleanupResult = {
+  nextGraphs: LocationGraph[];
+  nextUndoStack: LocationGraph[][];
+  nextBaselineIndex: Map<number, GraphBaselineEntry>;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -209,6 +215,26 @@ export const buildGraphBaselineIndex = (graphs: LocationGraph[]): Map<number, Gr
     });
   }
   return baselineById;
+};
+
+export const pruneDeletedLocationGraphState = (
+  currentGraphs: LocationGraph[],
+  currentUndoStack: LocationGraph[][],
+  currentBaselineIndex: Map<number, GraphBaselineEntry>,
+  deletedGraphId: number
+): DeletedGraphCleanupResult => {
+  const nextGraphs = currentGraphs.filter((graph) => graph.id !== deletedGraphId);
+  const nextBaselineIndex = new Map(currentBaselineIndex);
+  nextBaselineIndex.delete(deletedGraphId);
+
+  // Deleting a graph invalidates any local undo history that still references it.
+  // The delete action is blocked while there are pending edits, so clearing the
+  // stack here is a safe reset of stale client state.
+  return {
+    nextGraphs,
+    nextUndoStack: currentUndoStack.length > 0 ? [] : currentUndoStack,
+    nextBaselineIndex
+  };
 };
 
 export const buildChangedLocationGraphUpdates = (

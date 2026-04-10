@@ -232,25 +232,18 @@ class LocationControllerTest {
 
     private static List<Map<String, Object>> scatterGraphData() {
         return List.of(
-            scatterGraphTrace("HPC", "#1f77b4", List.of(14L, 13L, 12L, 11L, 13L, 12L)),
-            scatterGraphTrace("Endotoxin", "#2ca02c", List.of(6L, 5L, 7L, 6L, 5L, 6L)),
-            scatterGraphTrace("Legionella", "#d62728", List.of(4L, 6L, 5L, 4L, 5L, 4L)),
-            scatterGraphTrace("Key Minerals", "#ff7f0e", List.of(10L, 9L, 8L, 9L, 10L, 9L)),
-            scatterGraphTrace("Alkalinity", "#9467bd", List.of(7L, 8L, 7L, 6L, 7L, 8L))
+            scatterGraphTrace("HPC", "#1f77b4"),
+            scatterGraphTrace("Endotoxin", "#2ca02c"),
+            scatterGraphTrace("Legionella", "#d62728"),
+            scatterGraphTrace("Key Minerals", "#ff7f0e"),
+            scatterGraphTrace("Alkalinity", "#9467bd")
         );
     }
 
-    private static Map<String, Object> scatterGraphTrace(String name, String color, List<Long> yValues) {
+    private static Map<String, Object> scatterGraphTrace(String name, String color) {
         return Map.of(
-            "x", List.of(
-                "2025-01-01",
-                "2025-02-01",
-                "2025-03-01",
-                "2025-04-01",
-                "2025-05-01",
-                "2025-06-01"
-            ),
-            "y", yValues,
+            "x", List.of(),
+            "y", List.of(),
             "line", Map.of("color", color, "width", 2L),
             "mode", "lines+markers",
             "name", name,
