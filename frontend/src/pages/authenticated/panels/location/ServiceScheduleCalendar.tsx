@@ -414,6 +414,17 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
   const [transitionCycle, setTransitionCycle] = createSignal(0);
   const activeFilterCount = createMemo(() => countActiveServiceCalendarFilters(filters()));
   const filteredEvents = createMemo(() => filterLocationServiceEvents(props.events ?? [], filters()));
+  const showNoMatchMessage = createMemo(() => (
+    activeFilterCount() > 0
+    && props.events !== undefined
+    && !props.isLoading
+    && filteredEvents().length === 0
+  ));
+  const hasToolbarInfo = createMemo(() => (
+    props.isLoading
+    || Boolean(props.error)
+    || showNoMatchMessage()
+  ));
 
   const handleMonthChange = (month: Date) => {
     const direction = resolveServiceCalendarTransitionDirection(props.month, month);
@@ -453,23 +464,13 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
                 <CalendarChevron direction="left" />
               </Calendar.Nav>
 
-              <div class="flex min-w-0 items-center justify-center gap-2 md:gap-3">
-                <ServiceCalendarFiltersPopover
-                  filters={filters()}
-                  activeFilterCount={activeFilterCount()}
-                  onUpdate={(updater) => {
-                    setFilters((current) => updater(current));
-                  }}
-                />
-
-                <div class="min-w-0 text-center">
-                  <p class="text-xs font-semibold uppercase tracking-[0.22em] text-base-content/55">
-                    Viewing Month
-                  </p>
-                  <Calendar.Label class="mt-1 text-lg font-semibold tracking-tight text-base-content md:text-2xl">
-                    {formatMonthLabel(calendar.month)} {calendar.month.getFullYear()}
-                  </Calendar.Label>
-                </div>
+              <div class="min-w-0 text-center">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-base-content/55">
+                  Viewing Month
+                </p>
+                <Calendar.Label class="mt-1 text-lg font-semibold tracking-tight text-base-content md:text-2xl">
+                  {formatMonthLabel(calendar.month)} {calendar.month.getFullYear()}
+                </Calendar.Label>
               </div>
 
               <Calendar.Nav
@@ -481,31 +482,38 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
               </Calendar.Nav>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
-              <Show when={props.isLoading}>
-                <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
-                  Syncing visible months...
-                </span>
-              </Show>
-              <Show when={activeFilterCount() > 0 && props.events !== undefined}>
-                <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
-                  Showing {filteredEvents().length} of {(props.events ?? []).length} events
-                </span>
-              </Show>
-              <Show when={activeFilterCount() > 0 && props.events !== undefined && !props.isLoading && filteredEvents().length === 0}>
-                <span class="rounded-full border border-warning/25 bg-warning/10 px-2.5 py-1 text-warning-content">
-                  No events match the selected filters.
-                </span>
-              </Show>
-              <Show when={props.error}>
-                <span class="rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-error">
-                  {props.error}
-                </span>
-              </Show>
-              <Show when={props.error && props.onRetry}>
-                <button type="button" class="btn btn-xs btn-outline" onClick={props.onRetry}>
-                  Retry
-                </button>
+            <div class="flex w-full flex-wrap items-center gap-3" data-service-calendar-toolbar="">
+              <ServiceCalendarFiltersPopover
+                filters={filters()}
+                activeFilterCount={activeFilterCount()}
+                onUpdate={(updater) => {
+                  setFilters((current) => updater(current));
+                }}
+              />
+
+              <Show when={hasToolbarInfo()}>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/70 sm:ml-auto sm:justify-end">
+                  <Show when={props.isLoading}>
+                    <span class="rounded-full border border-base-300 bg-base-100 px-2.5 py-1 font-medium">
+                      Syncing visible months...
+                    </span>
+                  </Show>
+                  <Show when={showNoMatchMessage()}>
+                    <span class="rounded-full border border-warning/25 bg-warning/10 px-2.5 py-1 text-warning-content">
+                      No events match the selected filters.
+                    </span>
+                  </Show>
+                  <Show when={props.error}>
+                    <span class="rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-error">
+                      {props.error}
+                    </span>
+                  </Show>
+                  <Show when={props.error && props.onRetry}>
+                    <button type="button" class="btn btn-xs btn-outline" onClick={props.onRetry}>
+                      Retry
+                    </button>
+                  </Show>
+                </div>
               </Show>
             </div>
 

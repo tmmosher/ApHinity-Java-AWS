@@ -75,9 +75,12 @@ describe("ServiceScheduleCalendar", () => {
     expect(html).toContain("Service schedule calendar");
     expect(html).toContain("Go to previous month");
     expect(html).toContain("Go to next month");
+    expect(html).toContain("data-service-calendar-toolbar");
     expect(html).toContain("data-service-calendar-filter-trigger");
     expect(html).toContain("data-service-calendar-transition-surface");
     expect(html).toContain("service-calendar-transition-surface h-full min-h-0");
+    expect(html.indexOf("Viewing Month")).toBeLessThan(html.indexOf("data-service-calendar-toolbar"));
+    expect(html.indexOf("data-service-calendar-toolbar")).toBeLessThan(html.indexOf("data-service-calendar-transition-surface"));
     expect((html.match(/data-corvu-calendar-celltrigger/g) ?? [])).toHaveLength(42);
     expect((html.match(/data-service-calendar-day-trigger/g) ?? [])).toHaveLength(42);
     expect((html.match(/data-service-event-create-popover/g) ?? [])).toHaveLength(0);
