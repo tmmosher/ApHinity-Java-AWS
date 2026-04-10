@@ -74,6 +74,10 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const [isSavingRename, setIsSavingRename] = createSignal(false);
   const [isRenamePopoverOpen, setIsRenamePopoverOpen] = createSignal(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = createSignal(false);
+  // Once the editor is closed or the graph disappears, render the empty state
+  // immediately instead of showing stale trace data for one more pass.
+  const visibleEditablePayload = () =>
+    props.isOpen && props.graph !== undefined ? editablePayload() : EMPTY_EDITABLE_GRAPH_PAYLOAD;
 
   const isBusy = () => props.isSaving || props.isDeleting || isRemovingTrace() || isSavingRename();
 
@@ -92,12 +96,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   createEffect(on(() => [props.isOpen, props.graph?.id] as const, ([isOpen, graphId]) => {
-    if (!isOpen) {
+    if (!isOpen || graphId === undefined || props.graph === undefined) {
       resetEditorState();
-      return;
-    }
-
-    if (graphId === undefined || !props.graph) {
       return;
     }
 
@@ -113,7 +113,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   }));
 
   createEffect(() => {
-    const count = editablePayload().data.length;
+    const count = visibleEditablePayload().data.length;
     if (count === 0) {
       if (selectedTraceIndex() !== 0) {
         setSelectedTraceIndex(0);
@@ -126,7 +126,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   });
 
   const traceOptions = createMemo(() =>
-    editablePayload().data.map((entry, index) => {
+    visibleEditablePayload().data.map((entry, index) => {
       const trace = isRecord(entry) ? entry : {};
       return {
         index,
@@ -136,12 +136,12 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   );
 
   const isPieGraph = createMemo(() => {
-    const firstTrace = editablePayload().data[0] ?? props.graph?.data[0];
+    const firstTrace = visibleEditablePayload().data[0];
     return isRecord(firstTrace) && getTraceType(firstTrace) === "pie";
   });
 
   const selectedTrace = createMemo(() => {
-    const trace = editablePayload().data[selectedTraceIndex()];
+    const trace = visibleEditablePayload().data[selectedTraceIndex()];
     return isRecord(trace) ? trace : undefined;
   });
 
@@ -221,15 +221,17 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     Array.from({length: Math.max(cartesianXValues().length, cartesianYValues().length)}, (_, index) => index)
   );
 
+  const visibleEditableGraphPayloadLayout = () => visibleEditablePayload().layout ?? null;
+
   const selectedTraceYAxisRange = createMemo<[unknown, unknown]>(() => {
     const trace = selectedTrace();
     if (!trace) {
       return ["", ""];
     }
-    return getTraceYAxisRange(editablePayload().layout ?? null, trace);
+    return getTraceYAxisRange(visibleEditableGraphPayloadLayout(), trace);
   });
 
-  const graphTitleDraft = createMemo(() => getEditableGraphTitle(editablePayload().layout ?? null));
+  const graphTitleDraft = createMemo(() => getEditableGraphTitle(visibleEditableGraphPayloadLayout()));
 
   const updateSelectedTrace = (
     mutator: (trace: Record<string, unknown>) => Record<string, unknown>

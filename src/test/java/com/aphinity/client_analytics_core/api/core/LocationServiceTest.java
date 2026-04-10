@@ -491,6 +491,20 @@ class LocationServiceTest {
 
         assertEquals(33L, response.id());
         assertEquals("New Pie Graph", response.name());
+        Map<String, Object> expectedPieStyle = Map.of(
+            "theme",
+            Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 160
+        );
 
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
         assertEquals(1, traces.size());
@@ -525,6 +539,8 @@ class LocationServiceTest {
             ),
             response.layout()
         );
+        assertEquals(expectedPieStyle, response.style());
+        assertEquals(expectedPieStyle, savedGraphHolder[0].getStyle());
     }
 
     @Test

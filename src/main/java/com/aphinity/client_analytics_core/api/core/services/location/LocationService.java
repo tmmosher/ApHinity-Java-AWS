@@ -39,6 +39,8 @@ import java.util.Objects;
 
 /**
  * Business logic for location visibility and membership administration.
+ * This whole file has sorta exploded out of control.
+ *  TODO split this up into multiple services perhaps as an accessor / operator service pair?
  */
 @Service
 public class LocationService {
@@ -751,7 +753,6 @@ public class LocationService {
             "displayModeBar", false,
             "responsive", true
         );
-        Map<String, Object> style = Map.of("height", 320);
 
         return switch (graphType) {
             case PIE -> new GraphTemplate(
@@ -762,7 +763,7 @@ public class LocationService {
                     "hole", 0.72,
                     "sort", false,
                     "labels", List.of("fill"),
-                    "values", List.of(30),
+                    "values", List.of(0),
                     "marker", Map.of(
                         "color", DEFAULT_GRAPH_COLOR,
                         "colors", List.of(DEFAULT_GRAPH_COLOR)
@@ -777,7 +778,7 @@ public class LocationService {
                     "annotations", List.of(Map.of(
                         "x", 0.5,
                         "y", 0.5,
-                        "text", "<b>30</b>",
+                        "text", "<b>0</b>",
                         "xref", "paper",
                         "yref", "paper",
                         "showarrow", false,
@@ -785,7 +786,7 @@ public class LocationService {
                     ))
                 ),
                 config,
-                style
+                buildPieGraphStyle()
             );
             case BAR -> new GraphTemplate(
                 "New Bar Graph",
@@ -801,16 +802,33 @@ public class LocationService {
                     "showlegend", false
                 ),
                 config,
-                style
+                Map.of("height", 320)
             );
             case SCATTER -> new GraphTemplate(
                 "New Plot Graph",
                 buildScatterTemplateData(),
                 buildScatterTemplateLayout(),
                 config,
-                style
+                Map.of("height", 320)
             );
         };
+    }
+
+    private Map<String, Object> buildPieGraphStyle() {
+        return Map.of(
+            "theme",
+            Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 160
+        );
     }
 
     private List<Map<String, Object>> buildScatterTemplateData() {

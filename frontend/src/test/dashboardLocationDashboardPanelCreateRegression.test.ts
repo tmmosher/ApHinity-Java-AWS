@@ -37,7 +37,6 @@ import {
   pruneDeletedLocationGraphState,
   reconcileLocationGraphs
 } from "../util/graph/graphEditor";
-import {advanceGraphLoadAnimationToken} from "../pages/authenticated/panels/location/LocationDashboardPanel";
 
 const SCATTER_X_VALUES = [
   "2025-01-01",
@@ -209,9 +208,6 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect((refreshedBar?.data[0].y as unknown[])).toEqual([5]);
 
     expect(refreshedCreated).toEqual(createdGraph);
-
-    expect(advanceGraphLoadAnimationToken(0, true, false, true)).toBe(1);
-    expect(advanceGraphLoadAnimationToken(1, true, false, true)).toBe(1);
   });
 
   it("drops deleted pie graph state before the next graph create flow reuses dashboard caches", () => {

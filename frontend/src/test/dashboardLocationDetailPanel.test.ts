@@ -308,7 +308,7 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     apiFetchMock.mockResolvedValue(createMockResponse(true, {
       id: 45,
       name: "New Bar Graph",
-      data: [{type: "bar", name: "Trace 1", x: [], y: []}],
+      data: [{type: "bar", name: "Trace 1", x: [], y: [], marker: {color: "#2563eb"}}],
       layout: {showlegend: false},
       config: {displayModeBar: false, responsive: true},
       style: {height: 320},
