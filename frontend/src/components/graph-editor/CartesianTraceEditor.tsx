@@ -8,6 +8,10 @@ type CartesianTraceEditorProps = {
   yValues: unknown[];
   yRangeMin: unknown;
   yRangeMax: unknown;
+  xDrafts: Record<number, string>;
+  yDrafts: Record<number, string>;
+  yRangeMinDraft?: string;
+  yRangeMaxDraft?: string;
   isBusy: boolean;
   onAddRow: () => void;
   onUpdateX: (rowIndex: number, rawValue: string) => void;
@@ -35,11 +39,12 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => (
       <label class="form-control">
         <span class="label-text">Y range min</span>
         <input
-          class="input input-bordered input-sm mt-1"
+          class={"input input-bordered input-sm mt-1" + (props.yRangeMinDraft !== undefined ? " input-error" : "")}
+          aria-invalid={props.yRangeMinDraft !== undefined}
           type="text"
           inputmode="decimal"
           placeholder="Auto"
-          value={toInputValue(props.yRangeMin)}
+          value={props.yRangeMinDraft ?? toInputValue(props.yRangeMin)}
           disabled={props.isBusy}
           onInput={(event) => props.onUpdateYRangeMin(event.currentTarget.value)}
         />
@@ -47,11 +52,12 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => (
       <label class="form-control">
         <span class="label-text">Y range max</span>
         <input
-          class="input input-bordered input-sm mt-1"
+          class={"input input-bordered input-sm mt-1" + (props.yRangeMaxDraft !== undefined ? " input-error" : "")}
+          aria-invalid={props.yRangeMaxDraft !== undefined}
           type="text"
           inputmode="decimal"
           placeholder="Auto"
-          value={toInputValue(props.yRangeMax)}
+          value={props.yRangeMaxDraft ?? toInputValue(props.yRangeMax)}
           disabled={props.isBusy}
           onInput={(event) => props.onUpdateYRangeMax(event.currentTarget.value)}
         />
@@ -64,19 +70,21 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => (
           {(_, rowIndex) => (
             <li class="grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <input
-                class="input input-bordered input-sm"
+                class={"input input-bordered input-sm" + (props.xDrafts[rowIndex] !== undefined ? " input-error" : "")}
+                aria-invalid={props.xDrafts[rowIndex] !== undefined}
                 type="text"
                 placeholder="X value"
-                value={toInputValue(props.xValues[rowIndex])}
+                value={props.xDrafts[rowIndex] ?? toInputValue(props.xValues[rowIndex])}
                 disabled={props.isBusy}
                 onInput={(event) => props.onUpdateX(rowIndex, event.currentTarget.value)}
               />
               <input
-                class="input input-bordered input-sm"
+                class={"input input-bordered input-sm" + (props.yDrafts[rowIndex] !== undefined ? " input-error" : "")}
+                aria-invalid={props.yDrafts[rowIndex] !== undefined}
                 type="text"
                 inputmode="decimal"
                 placeholder="Y value"
-                value={toInputValue(props.yValues[rowIndex])}
+                value={props.yDrafts[rowIndex] ?? toInputValue(props.yValues[rowIndex])}
                 disabled={props.isBusy}
                 onInput={(event) => props.onUpdateY(rowIndex, event.currentTarget.value)}
               />

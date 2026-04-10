@@ -5,6 +5,7 @@ type PieTraceEditorProps = {
   rowIndexes: number[];
   labels: unknown[];
   values: unknown[];
+  valueDrafts: Record<number, string>;
   rowColors: string[];
   colorOptions: Record<string, string>;
   isBusy: boolean;
@@ -47,11 +48,12 @@ const PieTraceEditor = (props: PieTraceEditorProps) => (
                 onInput={(event) => props.onUpdateLabel(rowIndex, event.currentTarget.value)}
               />
               <input
-                class="input input-bordered input-sm"
+                class={"input input-bordered input-sm" + (props.valueDrafts[rowIndex] !== undefined ? " input-error" : "")}
+                aria-invalid={props.valueDrafts[rowIndex] !== undefined}
                 type="text"
                 inputmode="decimal"
                 placeholder="Value"
-                value={toInputValue(props.values[rowIndex])}
+                value={props.valueDrafts[rowIndex] ?? toInputValue(props.values[rowIndex])}
                 disabled={props.isBusy}
                 onInput={(event) => props.onUpdateValue(rowIndex, event.currentTarget.value)}
               />

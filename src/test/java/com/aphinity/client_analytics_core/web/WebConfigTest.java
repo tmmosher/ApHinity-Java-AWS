@@ -44,14 +44,14 @@ class WebConfigTest {
     @Test
     void doesNotForwardMappedApiRoutes() throws Exception {
         mockMvc.perform(get("/api/echo"))
-            .andExpect(status().isInternalServerError())
+            .andExpect(status().isNotFound())
             .andExpect(forwardedUrl(null));
     }
 
     @Test
     void doesNotForwardUnknownApiRoutes() throws Exception {
         mockMvc.perform(get("/api/unknown"))
-            .andExpect(status().isInternalServerError())
+            .andExpect(status().isNotFound())
             .andExpect(forwardedUrl(null));
     }
 

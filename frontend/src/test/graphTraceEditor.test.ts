@@ -7,6 +7,7 @@ import {
   getPieRowColor,
   getTraceYAxisRange,
   isAutoSizingPieTrace,
+  parseNumericInput,
   removePieRow,
   renameTrace,
   setPieRowColor,
@@ -20,6 +21,14 @@ describe("graphTraceEditor", () => {
     expect(coerceInputValue("-", 3, true)).toBe("-");
     expect(coerceInputValue(".", 3, true)).toBe(".");
     expect(coerceInputValue("1.", 3, true)).toBe("1.");
+  });
+
+  it("parses only complete numeric graph inputs", () => {
+    expect(parseNumericInput("42")).toBe(42);
+    expect(parseNumericInput("  3.5 ")).toBe(3.5);
+    expect(parseNumericInput("abc")).toBeNull();
+    expect(parseNumericInput("1.")).toBeNull();
+    expect(parseNumericInput("-")).toBeNull();
   });
 
   it("syncs pie marker colors when rows are added and removed", () => {

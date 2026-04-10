@@ -71,6 +71,11 @@ export const coerceInputValue = (
   return rawValue;
 };
 
+export const parseNumericInput = (rawValue: string): number | null => {
+  const parsedValue = coerceInputValue(rawValue, 0, true);
+  return typeof parsedValue === "number" ? parsedValue : null;
+};
+
 export const getTraceArray = (trace: Record<string, unknown>, field: string): unknown[] => {
   const value = trace[field];
   return Array.isArray(value) ? [...value] : [];

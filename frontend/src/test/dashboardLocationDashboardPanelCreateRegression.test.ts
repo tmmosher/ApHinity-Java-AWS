@@ -1,4 +1,36 @@
-import {describe, expect, it} from "vitest";
+import {describe, expect, it, vi} from "vitest";
+
+vi.mock("@solidjs/router", () => ({
+  A: (props: {children?: unknown}) => props.children ?? null,
+  useParams: () => ({locationId: "42"})
+}));
+
+vi.mock("../context/ApiHostContext", () => ({
+  useApiHost: () => "https://example.test"
+}));
+
+vi.mock("../context/ProfileContext", () => ({
+  useProfile: () => ({
+    profile: () => ({role: "partner"})
+  })
+}));
+
+vi.mock("../components/graph-editor/GraphEditorModal", () => ({
+  __esModule: true,
+  default: () => null
+}));
+
+vi.mock("../pages/authenticated/panels/location/LocationDetailContext", () => ({
+  useLocationDetail: () => ({
+    location: () => undefined,
+    graphs: () => undefined,
+    graphsLoading: () => false,
+    graphsError: () => undefined,
+    refetchLocation: async () => undefined,
+    refetchGraphs: async () => undefined
+  })
+}));
+
 import type {LocationGraph} from "../types/Types";
 import {
   buildGraphBaselineIndex,

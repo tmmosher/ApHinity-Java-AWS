@@ -5,6 +5,7 @@ import type { LocationGraph } from "../types/Types";
 
 let latestTraceControlsProps: Record<string, unknown> | null = null;
 let latestPieTraceEditorProps: Record<string, unknown> | null = null;
+let latestCartesianTraceEditorProps: Record<string, unknown> | null = null;
 
 vi.mock("corvu/dialog", () => {
   const Dialog = (props: { children: unknown }) => props.children;
@@ -34,7 +35,10 @@ vi.mock("../components/Chart", () => ({
 }));
 
 vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
-  default: () => null
+  default: (props: Record<string, unknown>) => {
+    latestCartesianTraceEditorProps = props;
+    return null;
+  }
 }));
 
 vi.mock("../components/graph-editor/PieTraceEditor", () => ({
@@ -124,8 +128,29 @@ const getPieTraceEditorProps = () => {
     throw new Error("PieTraceEditor mock was not rendered.");
   }
   return latestPieTraceEditorProps as {
+    values: unknown[];
+    valueDrafts: Record<number, string>;
     rowColors: string[];
+    onUpdateValue: (rowIndex: number, rawValue: string) => void;
     onUpdateColor: (rowIndex: number, colorHex: string) => void;
+  };
+};
+
+const getCartesianTraceEditorProps = () => {
+  if (!latestCartesianTraceEditorProps) {
+    throw new Error("CartesianTraceEditor mock was not rendered.");
+  }
+  return latestCartesianTraceEditorProps as {
+    xValues: unknown[];
+    yValues: unknown[];
+    xDrafts: Record<number, string>;
+    yDrafts: Record<number, string>;
+    yRangeMinDraft?: string;
+    yRangeMaxDraft?: string;
+    onUpdateX: (rowIndex: number, rawValue: string) => void;
+    onUpdateY: (rowIndex: number, rawValue: string) => void;
+    onUpdateYRangeMin: (rawValue: string) => void;
+    onUpdateYRangeMax: (rawValue: string) => void;
   };
 };
 
@@ -133,6 +158,7 @@ describe("GraphEditorModal trace controls", () => {
   afterEach(() => {
     latestTraceControlsProps = null;
     latestPieTraceEditorProps = null;
+    latestCartesianTraceEditorProps = null;
   });
 
   it("passes the trace-control contract from modal to controls", () => {
@@ -190,6 +216,71 @@ describe("GraphEditorModal trace controls", () => {
     expect(latestTraceControlsProps).toBeNull();
     expect(pieProps.rowColors).toEqual(["#2563eb", "#16a34a"]);
     expect(() => pieProps.onUpdateColor(1, "#dc2626")).not.toThrow();
+
+    dispose();
+  });
+
+  it("stages invalid pie values in the modal instead of mutating graph data", async () => {
+    const pieGraph: LocationGraph = {
+      id: 16,
+      name: "Breakdown",
+      data: [{
+        type: "pie",
+        labels: ["Open", "Closed"],
+        values: [3, 7],
+        marker: {
+          color: "#2563eb",
+          colors: ["#2563eb", "#16a34a"]
+        }
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(pieGraph);
+    await Promise.resolve();
+
+    const pieProps = getPieTraceEditorProps();
+    pieProps.onUpdateValue(0, "abc");
+    await Promise.resolve();
+
+    const updatedPieProps = getPieTraceEditorProps();
+    expect(updatedPieProps.values).toEqual([3, 7]);
+    expect(updatedPieProps.valueDrafts[0]).toBe("abc");
+
+    dispose();
+  });
+
+  it("rejects invalid cartesian values while the modal is open", async () => {
+    const scatterGraph: LocationGraph = {
+      id: 17,
+      name: "Trend",
+      data: [{
+        type: "scatter",
+        name: "Daily",
+        x: ["2026-01-01"],
+        y: [9]
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(scatterGraph);
+    await Promise.resolve();
+
+    const cartesianProps = getCartesianTraceEditorProps();
+    cartesianProps.onUpdateY(0, "abc");
+    await Promise.resolve();
+
+    const invalidProps = getCartesianTraceEditorProps();
+    expect(invalidProps.yValues).toEqual([9]);
+    expect(invalidProps.yDrafts[0]).toBe("abc");
 
     dispose();
   });

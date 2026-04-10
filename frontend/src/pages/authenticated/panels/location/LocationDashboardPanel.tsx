@@ -635,7 +635,6 @@ export const LocationDashboardPanel = () => {
                                         layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
                                         config={(graph.config ?? undefined) as PlotlyConfig | undefined}
                                         style={graph.style ?? undefined}
-                                        animationToken={graphAnimationToken() > 0 ? graphAnimationToken() : undefined}
                                         class="h-full w-full"
                                       />
                                     </div>
