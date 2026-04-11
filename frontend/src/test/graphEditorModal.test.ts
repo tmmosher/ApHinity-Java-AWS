@@ -304,6 +304,21 @@ describe("GraphEditorModal trace controls", () => {
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-02T00:00:00Z"
     };
+    const barGraph: LocationGraph = {
+      id: 18,
+      name: "Fresh Target",
+      data: [{
+        type: "bar",
+        name: "Bar Trace",
+        x: ["Point 1"],
+        y: [12]
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
 
     const {dispose, setCurrentGraph, setIsOpen} = renderControllableModal(pieGraph);
     await Promise.resolve();
@@ -312,19 +327,25 @@ describe("GraphEditorModal trace controls", () => {
       rowColors: ["#2563eb", "#16a34a"]
     });
 
-    latestTraceControlsProps = null;
-    latestPieTraceEditorProps = null;
-
     batch(() => {
       setCurrentGraph(undefined);
       setIsOpen(false);
     });
     await Promise.resolve();
 
+    latestTraceControlsProps = null;
+    latestPieTraceEditorProps = null;
+    batch(() => {
+      setCurrentGraph(barGraph);
+      setIsOpen(true);
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
     expect(() => getPieTraceEditorProps()).toThrowError("PieTraceEditor mock was not rendered.");
     const traceControls = getTraceControlsProps();
-    expect(traceControls.traceOptions).toEqual([]);
-    expect(traceControls.traceNameDraft).toBe("");
+    expect(traceControls.traceOptions).toEqual([{index: 0, label: "1. Bar Trace (bar)"}]);
+    expect(traceControls.traceNameDraft).toBe("Bar Trace");
 
     dispose();
   });

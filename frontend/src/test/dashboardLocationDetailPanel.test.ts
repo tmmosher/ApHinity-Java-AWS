@@ -45,7 +45,15 @@ const SCATTER_GRAPH_STYLE = {
 const buildScatterGraphResponse = () => ({
   id: 44,
   name: "New Plot Graph",
-  data: [],
+  data: [{
+    type: "scatter",
+    name: "Trace 1",
+    x: [],
+    y: [],
+    line: {color: "#2563eb", width: 2},
+    mode: "lines+markers",
+    marker: {size: 6}
+  }],
   layout: SCATTER_GRAPH_LAYOUT,
   config: {displayModeBar: false, responsive: false},
   style: SCATTER_GRAPH_STYLE,
@@ -284,7 +292,10 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       })
     });
     expect(result.name).toBe("New Plot Graph");
-    expect(result.data).toEqual([]);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].type).toBe("scatter");
+    expect(result.data[0].x).toEqual([]);
+    expect(result.data[0].y).toEqual([]);
     expect(result.layout).toEqual(SCATTER_GRAPH_LAYOUT);
     expect(result.config).toEqual({displayModeBar: false, responsive: false});
     expect(result.style).toEqual(SCATTER_GRAPH_STYLE);

@@ -380,6 +380,63 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void createLocationGraphBuildsScatterTemplateWithAScatterTrace() throws Exception {
+        Long userId = 52L;
+        Long locationId = 86L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of("sections", List.of(Map.of("section_id", 1, "graph_ids", List.of()))));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(512L);
+            graph.setCreatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "sectionId": 1,
+                          "graphType": "scatter"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(512))
+            .andExpect(jsonPath("$.name").value("New Plot Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("scatter"))
+            .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
+            .andExpect(jsonPath("$.data[0].x").isArray())
+            .andExpect(jsonPath("$.data[0].x").isEmpty())
+            .andExpect(jsonPath("$.data[0].y").isArray())
+            .andExpect(jsonPath("$.data[0].y").isEmpty())
+            .andExpect(jsonPath("$.data[0].line.color").value("#2563eb"))
+            .andExpect(jsonPath("$.data[0].line.width").value(2))
+            .andExpect(jsonPath("$.data[0].mode").value("lines+markers"))
+            .andExpect(jsonPath("$.data[0].marker.size").value(6))
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(false));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(512L), sections.getFirst().get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
     void createLocationGraphCreatesANewSectionWhenRequested() throws Exception {
         Long userId = 48L;
         Long locationId = 84L;

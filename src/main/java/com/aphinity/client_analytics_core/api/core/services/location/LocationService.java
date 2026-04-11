@@ -832,7 +832,20 @@ public class LocationService {
     }
 
     private List<Map<String, Object>> buildScatterTemplateData() {
-        return List.of();
+        return List.of(
+            Map.of(
+                "type", "scatter",
+                "name", "Trace 1",
+                "x", List.of(),
+                "y", List.of(),
+                "line", Map.of(
+                    "color", DEFAULT_GRAPH_COLOR,
+                    "width", 2
+                ),
+                "mode", "lines+markers",
+                "marker", Map.of("size", 6)
+            )
+        );
     }
 
     private Map<String, Object> buildScatterTemplateLayout() {

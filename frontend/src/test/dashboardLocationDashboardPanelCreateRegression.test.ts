@@ -101,7 +101,15 @@ const buildScatterGraph = (id: number, name: string, yOffset: number): LocationG
 const buildBlankScatterGraph = (id: number, name: string): LocationGraph => ({
   id,
   name,
-  data: [],
+  data: [{
+    type: "scatter",
+    name: "Trace 1",
+    x: [],
+    y: [],
+    line: {color: "#2563eb", width: 2},
+    mode: "lines+markers",
+    marker: {size: 6}
+  }],
   layout: cloneJson(SCATTER_LAYOUT),
   config: {displayModeBar: false, responsive: false},
   style: cloneJson(SCATTER_STYLE),

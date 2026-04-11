@@ -39,7 +39,7 @@ export const ServiceCalendarIntroPopoverContent: Component<ServiceCalendarIntroP
       <a
         class="btn btn-outline btn-sm rounded-xl"
         href={props.templateHref}
-        data-service-calendar-template-link=""
+        download="service_calendar_template.xlsx"
       >
         Get a copy of the Excel template
       </a>
@@ -64,14 +64,14 @@ export const ServiceCalendarIntroPopover: Component<ServiceCalendarIntroPopoverP
     <Popover.Trigger
       type="button"
       class={introTriggerClass}
-      aria-label="Open service calendar getting started guide"
+      aria-label="Open service calendar guide"
       data-service-calendar-intro-trigger=""
     >
       Get started
     </Popover.Trigger>
 
     <Popover.Portal>
-      <Popover.Content class="z-50 w-[min(92vw,28rem)] rounded-2xl border border-base-300 bg-base-100 shadow-2xl">
+      <Popover.Content class="z-50 w-[min(92vw,28rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl">
         <ServiceCalendarIntroPopoverContent templateHref={props.templateHref} />
       </Popover.Content>
     </Popover.Portal>

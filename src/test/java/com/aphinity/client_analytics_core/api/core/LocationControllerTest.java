@@ -231,7 +231,20 @@ class LocationControllerTest {
     }
 
     private static List<Map<String, Object>> scatterGraphData() {
-        return List.of();
+        return List.of(
+            Map.of(
+                "type", "scatter",
+                "name", "Trace 1",
+                "x", List.of(),
+                "y", List.of(),
+                "line", Map.of(
+                    "color", "#2563eb",
+                    "width", 2
+                ),
+                "mode", "lines+markers",
+                "marker", Map.of("size", 6)
+            )
+        );
     }
 
     private static Map<String, Object> scatterGraphLayout() {

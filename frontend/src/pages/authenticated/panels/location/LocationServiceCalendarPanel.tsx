@@ -349,9 +349,7 @@ export const LocationServiceCalendarPanel = () => {
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div class="space-y-1">
-            <h2 class="text-xl font-semibold tracking-tight">Service Calendar</h2>
-          </div>
+          <h2 class="text-xl font-semibold tracking-tight">Service Calendar</h2>
           <div class="flex flex-col items-stretch gap-3 md:items-end">
             <div class="flex flex-wrap items-center gap-3">
               <ServiceCalendarIntroPopover templateHref={serviceCalendarTemplateHref()} />
