@@ -50,7 +50,7 @@ const SCATTER_X_VALUES = [
 const SCATTER_LAYOUT = {
   title: {x: 0.02, text: "", xanchor: "left"},
   xaxis: {type: "date", tickformat: "%b %Y"},
-  yaxis: {range: [0, 100], title: "% Non-Compliance", ticksuffix: "%"},
+  yaxis: {range: [0, 100], title: "% Compliance", ticksuffix: "%"},
   legend: {x: 0, y: -0.3, orientation: "h"},
   margin: {b: 60, l: 50, r: 20, t: 50}
 };
@@ -235,7 +235,7 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect(refreshedGraphs).toHaveLength(2);
     expect(refreshedGraphs[0]).toBe(remainingBarGraph);
     expect(refreshedGraphs[1]).toEqual(createdGraph);
-    expect(refreshedGraphs[1].data).toEqual([]);
+    expect(refreshedGraphs[1].data).toEqual(createdGraph.data);
     expect(refreshedGraphs[1].layout).toEqual(SCATTER_LAYOUT);
     expect(refreshedGraphs[1].config).toEqual({displayModeBar: false, responsive: false});
     expect(refreshedGraphs[1].style).toEqual(SCATTER_STYLE);

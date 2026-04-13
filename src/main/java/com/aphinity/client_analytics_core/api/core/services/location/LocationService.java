@@ -861,7 +861,7 @@ public class LocationService {
         ));
         layout.put("yaxis", Map.of(
             "range", List.of(0, 100),
-            "title", "% Non-Compliance",
+            "title", "% Compliance",
             "ticksuffix", "%"
         ));
         layout.put("legend", Map.of(

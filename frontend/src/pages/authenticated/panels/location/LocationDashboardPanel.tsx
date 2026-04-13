@@ -7,7 +7,7 @@ import {For, Show, Suspense, createEffect, createMemo, createResource, createSig
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
-import {LocationGraph, LocationGraphType, LocationSectionLayout} from "../../../../types/Types";
+import {LocationGraph, LocationSectionLayout} from "../../../../types/Types";
 import {
   applyGraphPayloadEdit,
   buildChangedLocationGraphUpdates,
@@ -18,6 +18,11 @@ import {
   undoGraphPayloadEdit,
   type EditableGraphPayload
 } from "../../../../util/graph/graphEditor";
+import {
+  buildCreateLocationGraphRequest,
+  buildPostCreateGraphUpdate,
+  type GraphCreateModalRequest
+} from "../../../../util/graph/graphCreate";
 import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {
   createLocationGraphById,
@@ -197,6 +202,25 @@ export const LocationDashboardPanel = () => {
     setIsCreateGraphModalOpen(true);
   };
 
+  const resolveGraphCreateFollowUpFailureMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message === "CSRF invalid") {
+      return "Graph created, but the custom Y-axis title could not be saved because the security token expired. Reopen the graph and try again.";
+    }
+    if (error instanceof Error && error.message === "Security token rejected") {
+      return "Graph created, but the custom Y-axis title could not be saved because security validation failed. Reopen the graph and try again.";
+    }
+    if (error instanceof Error && error.message === "Authentication required") {
+      return "Graph created, but the custom Y-axis title could not be saved because your session expired. Sign in again and retry from the graph editor.";
+    }
+    if (error instanceof Error && error.message === "Insufficient permissions") {
+      return "Graph created, but the custom Y-axis title could not be saved because you no longer have permission to edit graphs.";
+    }
+    if (error instanceof Error && error.message === "Graph update conflict") {
+      return "Graph created, but the custom Y-axis title could not be saved due to a graph update conflict. Reopen the graph and try again.";
+    }
+    return "Graph created, but the custom Y-axis title could not be saved. Reopen the graph and try again.";
+  };
+
   const applyLocalGraphEdit = (graphId: number, payload: EditableGraphPayload) => {
     if (isGraphMutationBusy() || !canEditGraphs()) {
       return;
@@ -264,24 +288,33 @@ export const LocationDashboardPanel = () => {
     }
   };
 
-  const createGraphFromModal = async (request: {
-    graphType: LocationGraphType;
-    sectionId?: number;
-    createNewSection: boolean;
-  }): Promise<void> => {
+  const createGraphFromModal = async (request: GraphCreateModalRequest): Promise<void> => {
     if (isGraphMutationBusy() || hasPendingGraphChanges() || !canEditGraphs()) {
       throw new Error("Unable to create graph.");
     }
 
     const createLocationId = params.locationId;
     const createSessionToken = locationSessionToken();
+    let createdGraph: LocationGraph | null = null;
     setIsCreatingGraph(true);
 
     try {
-      await createLocationGraphById(host, createLocationId, request);
+      createdGraph = await createLocationGraphById(
+        host,
+        createLocationId,
+        buildCreateLocationGraphRequest(request)
+      );
 
       if (createLocationId !== params.locationId || createSessionToken !== locationSessionToken()) {
         return;
+      }
+
+      const postCreateUpdate = buildPostCreateGraphUpdate(createdGraph, request);
+      if (postCreateUpdate) {
+        await saveLocationGraphsById(host, createLocationId, [postCreateUpdate]);
+        if (createLocationId !== params.locationId || createSessionToken !== locationSessionToken()) {
+          return;
+        }
       }
 
       setIsCreateGraphModalOpen(false);
@@ -299,6 +332,18 @@ export const LocationDashboardPanel = () => {
       }
     } catch (error) {
       if (createLocationId !== params.locationId || createSessionToken !== locationSessionToken()) {
+        return;
+      }
+      if (createdGraph) {
+        setIsCreateGraphModalOpen(false);
+        toast.error(resolveGraphCreateFollowUpFailureMessage(error));
+        try {
+          await Promise.all([refetchGraphs(), refetchLocation()]);
+        } catch {
+          if (createLocationId === params.locationId && createSessionToken === locationSessionToken()) {
+            toast.error("Graph created, but automatic refresh failed. Please refresh the page.");
+          }
+        }
         return;
       }
 

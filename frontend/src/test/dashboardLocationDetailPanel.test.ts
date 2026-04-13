@@ -23,7 +23,7 @@ const createMockResponse = (ok: boolean, payload: unknown): Response =>
 const SCATTER_GRAPH_LAYOUT = {
   title: {x: 0.02, text: "", xanchor: "left"},
   xaxis: {type: "date", tickformat: "%b %Y"},
-  yaxis: {range: [0, 100], title: "% Non-Compliance", ticksuffix: "%"},
+  yaxis: {range: [0, 100], title: "% Compliance", ticksuffix: "%"},
   legend: {x: 0, y: -0.3, orientation: "h"},
   margin: {b: 60, l: 50, r: 20, t: 50}
 };

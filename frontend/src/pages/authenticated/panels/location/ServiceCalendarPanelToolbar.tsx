@@ -15,10 +15,17 @@ type ServiceCalendarPanelToolbarProps = {
   onUndo: () => void;
 };
 
+const toolbarActionButtonClass =
+  "btn h-11 min-h-11 rounded-2xl px-4 text-sm font-medium shadow-sm transition duration-150 ease-out " +
+  "motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px active:translate-y-px active:scale-[0.98]";
+
+const toolbarUploadInputClass =
+  "file-input file-input-bordered h-11 min-h-11 w-full min-w-[18rem] rounded-2xl text-sm md:w-auto";
+
 export const ServiceCalendarPanelToolbar = (props: ServiceCalendarPanelToolbarProps) => (
-  <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div class="space-y-1">
-      <h2 class="text-xl font-semibold tracking-tight">Service Calendar</h2>
+      <h2 class="flex h-11 items-center text-xl font-semibold tracking-tight">Service Calendar</h2>
     </div>
     <div class="flex flex-col items-stretch gap-3 md:items-end">
       <div class="flex flex-wrap items-center gap-3">
@@ -27,7 +34,7 @@ export const ServiceCalendarPanelToolbar = (props: ServiceCalendarPanelToolbarPr
           ref={props.spreadsheetUploadInputRef}
           type="file"
           accept=".xlsx"
-          class="file-input file-input-bordered file-input-sm w-full min-w-[18rem] rounded-2xl md:w-auto"
+          class={toolbarUploadInputClass}
           aria-label="Import service calendar spreadsheet"
           data-service-calendar-upload-input=""
           disabled={props.isMutationBusy}
@@ -35,7 +42,7 @@ export const ServiceCalendarPanelToolbar = (props: ServiceCalendarPanelToolbarPr
         />
         <button
           type="button"
-          class={"btn btn-sm rounded-2xl " + (
+          class={toolbarActionButtonClass + " " + (
             props.hasStagedImportedEvents && !props.isMutationBusy ? "btn-primary" : "btn-disabled"
           )}
           disabled={!props.hasStagedImportedEvents || props.isMutationBusy}
@@ -46,7 +53,7 @@ export const ServiceCalendarPanelToolbar = (props: ServiceCalendarPanelToolbarPr
         </button>
         <button
           type="button"
-          class={"btn btn-sm rounded-2xl " + (
+          class={toolbarActionButtonClass + " " + (
             props.hasPendingImportedEventChanges && !props.isMutationBusy ? "btn-outline" : "btn-disabled"
           )}
           disabled={!props.hasPendingImportedEventChanges || props.isMutationBusy}

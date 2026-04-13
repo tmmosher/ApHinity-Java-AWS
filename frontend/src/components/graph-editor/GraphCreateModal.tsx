@@ -1,6 +1,7 @@
 import Dialog from "corvu/dialog";
 import {For, Show, createEffect, createSignal} from "solid-js";
 import type {LocationGraphType} from "../../types/Types";
+import {DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE} from "../../util/graph/graphCreate";
 
 const NEW_SECTION_VALUE = "__new_section__";
 
@@ -16,6 +17,7 @@ type GraphCreateModalProps = {
     graphType: LocationGraphType;
     sectionId?: number;
     createNewSection: boolean;
+    yAxisTitle?: string;
   }) => Promise<void>;
   onClose: () => void;
 };
@@ -29,6 +31,7 @@ const GRAPH_TYPE_OPTIONS: Array<{value: LocationGraphType; label: string}> = [
 export const GraphCreateModal = (props: GraphCreateModalProps) => {
   const [selectedSectionId, setSelectedSectionId] = createSignal("");
   const [selectedGraphType, setSelectedGraphType] = createSignal<LocationGraphType>("pie");
+  const [yAxisTitle, setYAxisTitle] = createSignal(DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE);
   const [createError, setCreateError] = createSignal("");
 
   createEffect(() => {
@@ -39,6 +42,7 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
     const firstSection = props.sectionOptions[0];
     setSelectedSectionId(firstSection ? String(firstSection.id) : NEW_SECTION_VALUE);
     setSelectedGraphType("pie");
+    setYAxisTitle(DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE);
     setCreateError("");
   });
 
@@ -67,7 +71,8 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
       if (selection === NEW_SECTION_VALUE) {
         await props.onCreate({
           graphType: selectedGraphType(),
-          createNewSection: true
+          createNewSection: true,
+          yAxisTitle: selectedGraphType() === "scatter" ? yAxisTitle() : undefined
         });
         return;
       }
@@ -81,7 +86,8 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
       await props.onCreate({
         graphType: selectedGraphType(),
         sectionId,
-        createNewSection: false
+        createNewSection: false,
+        yAxisTitle: selectedGraphType() === "scatter" ? yAxisTitle() : undefined
       });
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : "Unable to create graph.");
@@ -149,6 +155,22 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
                   : "Choose an existing section or create a new one."}
               </span>
             </label>
+
+            <Show when={selectedGraphType() === "scatter"}>
+              <label class="form-control w-full">
+                <span class="label-text text-sm">Y-axis title</span>
+                <input
+                  type="text"
+                  class="input input-bordered w-full"
+                  value={yAxisTitle()}
+                  disabled={props.isCreating}
+                  onInput={(event) => setYAxisTitle(event.currentTarget.value)}
+                />
+                <span class="label-text-alt text-xs text-base-content/70">
+                  Defaults to % Compliance for new scatter graphs.
+                </span>
+              </label>
+            </Show>
 
             <Show when={createError()}>
               <p class="text-sm text-error">{createError()}</p>

@@ -31,7 +31,7 @@ import {
   type StagedLocationServiceEvent,
   undoStagedServiceCalendarMutation
 } from "../../../../util/location/stagedServiceCalendar";
-import ServiceCalendarIntroPopover from "./ServiceCalendarIntroPopover";
+import ServiceCalendarPanelToolbar from "./ServiceCalendarPanelToolbar";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 import {createDashboardLocationResetGuard} from "./locationView";
 
@@ -348,56 +348,25 @@ export const LocationServiceCalendarPanel = () => {
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
-        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <h2 class="text-xl font-semibold tracking-tight">Service Calendar</h2>
-          <div class="flex flex-col items-stretch gap-3 md:items-end">
-            <div class="flex flex-wrap items-center gap-3">
-              <ServiceCalendarIntroPopover templateHref={serviceCalendarTemplateHref()} />
-              <input
-                ref={(element) => {
-                  spreadsheetUploadInput = element;
-                }}
-                type="file"
-                accept=".xlsx"
-                class="file-input file-input-bordered file-input-sm w-full min-w-[18rem] rounded-2xl md:w-auto"
-                aria-label="Import service calendar spreadsheet"
-                data-service-calendar-upload-input=""
-                disabled={isImportedEventMutationBusy()}
-                onChange={(event) => {
-                  void stageSpreadsheetImport(event);
-                }}
-              />
-              <button
-                type="button"
-                class={"btn btn-sm rounded-2xl " + (
-                  hasStagedImportedEvents() && !isImportedEventMutationBusy() ? "btn-primary" : "btn-disabled"
-                )}
-                disabled={!hasStagedImportedEvents() || isImportedEventMutationBusy()}
-                data-service-calendar-apply=""
-                onClick={() => void applyImportedEvents()}
-              >
-                {isApplyingImportedEvents() ? "Applying..." : "Apply"}
-              </button>
-              <button
-                type="button"
-                class={"btn btn-sm rounded-2xl " + (
-                  hasPendingImportedEventChanges() && !isImportedEventMutationBusy() ? "btn-outline" : "btn-disabled"
-                )}
-                disabled={!hasPendingImportedEventChanges() || isImportedEventMutationBusy()}
-                data-service-calendar-undo=""
-                onClick={undoLastImportedEventMutation}
-              >
-                Undo
-              </button>
-            </div>
-            <Show when={hasPendingImportedEventChanges()}>
-              <p class="text-right text-xs text-base-content/70">
-                {stagedImportedEvents().length} staged service event{stagedImportedEvents().length === 1 ? "" : "s"} -{" "}
-                {stagedImportUndoStack().length} pending import mutation{stagedImportUndoStack().length === 1 ? "" : "s"}
-              </p>
-            </Show>
-          </div>
-        </div>
+        <ServiceCalendarPanelToolbar
+          templateHref={serviceCalendarTemplateHref()}
+          spreadsheetUploadInputRef={(element) => {
+            spreadsheetUploadInput = element;
+          }}
+          isMutationBusy={isImportedEventMutationBusy()}
+          isApplyingImportedEvents={isApplyingImportedEvents()}
+          hasStagedImportedEvents={hasStagedImportedEvents()}
+          hasPendingImportedEventChanges={hasPendingImportedEventChanges()}
+          stagedEventCount={stagedImportedEvents().length}
+          pendingMutationCount={stagedImportUndoStack().length}
+          onSpreadsheetInputChange={(event) => {
+            void stageSpreadsheetImport(event);
+          }}
+          onApply={() => {
+            void applyImportedEvents();
+          }}
+          onUndo={undoLastImportedEventMutation}
+        />
       </section>
 
       <section class="flex min-h-[44rem] flex-1 flex-col rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">

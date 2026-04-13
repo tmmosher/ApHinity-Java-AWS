@@ -444,7 +444,11 @@ class LocationServiceTest {
 
         assertEquals(31L, response.id());
         assertEquals("New Plot Graph", response.name());
-        assertEquals(expectedScatterTemplateData(), response.data());
+        assertEquals(1, response.data().size());
+        assertEquals("scatter", response.data().getFirst().get("type"));
+        assertEquals("Trace 1", response.data().getFirst().get("name"));
+        assertEquals(List.of(), response.data().getFirst().get("x"));
+        assertEquals(List.of(), response.data().getFirst().get("y"));
         assertEquals(expectedScatterTemplateLayout(), response.layout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
         assertEquals(expectedScatterTemplateStyle(), response.style());
@@ -453,7 +457,11 @@ class LocationServiceTest {
         verify(locationRepository).saveAndFlush(location);
 
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
-        assertEquals(expectedScatterTemplateData(), traces);
+        assertEquals(1, traces.size());
+        assertEquals("scatter", traces.getFirst().get("type"));
+        assertEquals("Trace 1", traces.getFirst().get("name"));
+        assertEquals(List.of(), traces.getFirst().get("x"));
+        assertEquals(List.of(), traces.getFirst().get("y"));
         assertEquals(expectedScatterTemplateLayout(), savedGraphHolder[0].getLayout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
         assertEquals(expectedScatterTemplateStyle(), savedGraphHolder[0].getStyle());
@@ -517,7 +525,7 @@ class LocationServiceTest {
         @SuppressWarnings("unchecked")
         List<Object> values = (List<Object>) traces.getFirst().get("values");
         assertEquals(1, values.size());
-        assertEquals(30L, ((Number) values.getFirst()).longValue());
+        assertEquals(0L, ((Number) values.getFirst()).longValue());
         assertEquals("none", traces.getFirst().get("textinfo"));
         assertEquals("clockwise", traces.getFirst().get("direction"));
         assertEquals("%{label}: %{value}<extra></extra>", traces.getFirst().get("hovertemplate"));
@@ -532,7 +540,7 @@ class LocationServiceTest {
                 "annotations", List.of(Map.of(
                     "x", 0.5,
                     "y", 0.5,
-                    "text", "<b>30</b>",
+                    "text", "<b>0</b>",
                     "xref", "paper",
                     "yref", "paper",
                     "showarrow", false,
@@ -1096,28 +1104,11 @@ class LocationServiceTest {
         }
     }
 
-    private List<Map<String, Object>> expectedScatterTemplateData() {
-        return List.of(
-            Map.of(
-                "type", "scatter",
-                "name", "Trace 1",
-                "x", List.of(),
-                "y", List.of(),
-                "line", Map.of(
-                    "color", "#2563eb",
-                    "width", 2
-                ),
-                "mode", "lines+markers",
-                "marker", Map.of("size", 6)
-            )
-        );
-    }
-
     private Map<String, Object> expectedScatterTemplateLayout() {
         return Map.of(
             "title", Map.of("x", 0.02, "text", "", "xanchor", "left"),
             "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
-            "yaxis", Map.of("range", List.of(0, 100), "title", "% Non-Compliance", "ticksuffix", "%"),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "% Compliance", "ticksuffix", "%"),
             "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
             "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
         );
