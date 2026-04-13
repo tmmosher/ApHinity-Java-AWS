@@ -369,7 +369,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].y").isEmpty())
             .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
-            .andExpect(jsonPath("$.config.responsive").value(true))
+            .andExpect(jsonPath("$.config.responsive").value(false))
             .andExpect(jsonPath("$.style.height").value(320));
 
         @SuppressWarnings("unchecked")
