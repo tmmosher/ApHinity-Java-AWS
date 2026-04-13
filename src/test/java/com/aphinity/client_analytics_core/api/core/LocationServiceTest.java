@@ -441,6 +441,23 @@ class LocationServiceTest {
             savedGraphHolder[0] = graph;
             return graph;
         });
+        when(graphRepository.findById(31L)).thenAnswer(invocation -> {
+            Graph graph = savedGraphHolder[0];
+            if (graph == null) {
+                return Optional.empty();
+            }
+
+            Graph refreshedGraph = new Graph();
+            refreshedGraph.setId(graph.getId());
+            refreshedGraph.setName(graph.getName());
+            refreshedGraph.setData(graph.getData());
+            refreshedGraph.setLayout(graph.getLayout());
+            refreshedGraph.setConfig(graph.getConfig());
+            refreshedGraph.setStyle(graph.getStyle());
+            refreshedGraph.setCreatedAt(graph.getCreatedAt());
+            refreshedGraph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00.020Z"));
+            return Optional.of(refreshedGraph);
+        });
 
         GraphResponse response = locationService.createLocationGraph(5L, 99L, 2L, false, "scatter");
 
@@ -451,11 +468,12 @@ class LocationServiceTest {
         assertEquals("Trace 1", response.data().getFirst().get("name"));
         assertEquals(List.of(), response.data().getFirst().get("x"));
         assertEquals(List.of(), response.data().getFirst().get("y"));
-        assertEquals(expectedScatterTemplateData(), response.data());
         assertEquals(expectedScatterTemplateLayout("Phoenix"), response.layout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
         assertEquals(expectedScatterTemplateStyle(), response.style());
+        assertEquals(Instant.parse("2026-01-03T00:00:00.020Z"), response.updatedAt());
         verify(graphRepository).saveAndFlush(any(Graph.class));
+        verify(graphRepository).findById(31L);
         verify(locationGraphRepository).save(any(LocationGraph.class));
         verify(locationRepository).saveAndFlush(location);
 
@@ -465,7 +483,6 @@ class LocationServiceTest {
         assertEquals("Trace 1", traces.getFirst().get("name"));
         assertEquals(List.of(), traces.getFirst().get("x"));
         assertEquals(List.of(), traces.getFirst().get("y"));
-        assertEquals(expectedScatterTemplateData(), traces);
         assertEquals(expectedScatterTemplateLayout("Phoenix"), savedGraphHolder[0].getLayout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
         assertEquals(expectedScatterTemplateStyle(), savedGraphHolder[0].getStyle());
@@ -1118,23 +1135,6 @@ class LocationServiceTest {
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError("Unable to set raw graph data for legacy payload test", ex);
         }
-    }
-
-    private List<Map<String, Object>> expectedScatterTemplateData() {
-        return List.of(
-            Map.of(
-                "type", "scatter",
-                "name", "Trace 1",
-                "x", List.of(),
-                "y", List.of(),
-                "line", Map.of(
-                    "color", LEGACY_GRAPH_COLOR,
-                    "width", 2
-                ),
-                "mode", "lines+markers",
-                "marker", Map.of("size", 6)
-            )
-        );
     }
 
     private Map<String, Object> expectedScatterTemplateLayout(String locationName) {

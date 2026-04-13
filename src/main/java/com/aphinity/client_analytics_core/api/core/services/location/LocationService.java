@@ -219,6 +219,8 @@ public class LocationService {
             throw new IllegalStateException("Created graph id was null");
         }
 
+        savedGraph = refreshGraphFromStore(graphId, savedGraph);
+
         location.setSectionLayout(
             appendGraphToSectionLayout(location.getSectionLayout(), targetSectionId, createNewSection, graphId)
         );
@@ -450,6 +452,7 @@ public class LocationService {
 
         try {
             Graph savedGraph = graphRepository.saveAndFlush(graph);
+            savedGraph = refreshGraphFromStore(graphId, savedGraph);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return new GraphNameUpdateResponse(
                 savedGraph.getId(),
@@ -1174,6 +1177,10 @@ public class LocationService {
 
     private ResponseStatusException graphUpdateConflict() {
         return new ResponseStatusException(HttpStatus.CONFLICT, "Graph update conflict");
+    }
+
+    private Graph refreshGraphFromStore(Long graphId, Graph fallbackGraph) {
+        return graphRepository.findById(graphId).orElse(fallbackGraph);
     }
 
     private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(
