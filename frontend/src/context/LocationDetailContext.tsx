@@ -1,5 +1,5 @@
 import {createContext, useContext, type Accessor, type ParentProps} from "solid-js";
-import type {LocationGraph, LocationSummary} from "../../../../types/Types";
+import type {LocationGraph, LocationSummary} from "../types/Types";
 
 export type LocationDetailContextValue = {
   location: Accessor<LocationSummary | undefined>;

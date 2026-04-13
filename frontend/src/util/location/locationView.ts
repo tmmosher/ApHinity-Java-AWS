@@ -1,5 +1,5 @@
 import {Accessor, JSX} from "solid-js";
-import {dashboard_icon, gantt_icon, service_icon} from "./LocationIcons";
+import {dashboard_icon, gantt_icon, service_icon} from "../../components/location/LocationIcons";
 
 export type DashboardLocationView = "service-calendar" | "gantt-chart" | "dashboard";
 

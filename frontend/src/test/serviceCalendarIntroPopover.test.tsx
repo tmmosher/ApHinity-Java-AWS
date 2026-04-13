@@ -1,6 +1,6 @@
 import {renderToString} from "solid-js/web";
 import {describe, expect, it} from "vitest";
-import {ServiceCalendarIntroPopoverContent} from "../pages/authenticated/panels/location/ServiceCalendarIntroPopover";
+import {ServiceCalendarIntroPopoverContent} from "../components/service-editor/ServiceCalendarIntroPopover";
 
 describe("ServiceCalendarIntroPopoverContent", () => {
   it("renders the service calendar instructions, legend, and template link", () => {

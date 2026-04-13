@@ -16,7 +16,7 @@ vi.mock("corvu/popover", () => {
   return {default: Popover};
 });
 
-import {ServiceEventCreatePopover} from "../pages/authenticated/panels/location/ServiceEventCreatePopover";
+import {ServiceEventCreatePopover} from "../components/service-editor/ServiceEventCreatePopover";
 
 describe("ServiceEventCreatePopover", () => {
   it("uses fixed positioning and flips upward instead of shifting downward", () => {

@@ -31,9 +31,9 @@ import {
   type StagedLocationServiceEvent,
   undoStagedServiceCalendarMutation
 } from "../../../../util/location/stagedServiceCalendar";
-import ServiceCalendarIntroPopover from "./ServiceCalendarIntroPopover";
+import ServiceCalendarIntroPopover from "../../../../components/service-editor/ServiceCalendarIntroPopover";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
-import {createDashboardLocationResetGuard} from "./locationView";
+import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
 
 type ServiceEventCalendarResource = {
   locationId: string;

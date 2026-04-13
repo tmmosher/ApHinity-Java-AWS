@@ -1,16 +1,16 @@
 import Popover from "corvu/popover";
 import {Show, createSignal, type ParentProps} from "solid-js";
-import type {AccountRole, CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
+import type {AccountRole, CreateLocationServiceEventRequest, LocationServiceEvent} from "../../types/Types";
 import {
   formatDisplayDate,
   formatDisplayTime
-} from "../../../../util/location/dateUtility";
-import {createServiceEventDraftFromEvent} from "../../../../util/location/serviceEventForm";
+} from "../../util/location/dateUtility";
+import {createServiceEventDraftFromEvent} from "../../util/location/serviceEventForm";
 import {
   createServiceEventEditorController,
   ServiceEventEditorBody
 } from "./ServiceEventEditor";
-import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "./serviceEventPopoverPosition";
+import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "../../util/location/serviceEventPopoverPosition";
 
 type ServiceEventEditPopoverProps = {
   event: LocationServiceEvent;
