@@ -3,7 +3,7 @@ import {
   runCreateLocationAction,
   runRenameLocationAction,
   sortLocationsByName
-} from "../pages/authenticated/panels/dashboardLocationsActions";
+} from "../util/location/dashboardLocationsActions";
 import {
   createLocation as createLocationRequest,
   renameLocation as renameLocationRequest

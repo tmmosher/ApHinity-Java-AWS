@@ -31,8 +31,8 @@ import {
   saveLocationGraphsById
 } from "../../../../util/graph/locationDetailApi";
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
-import {useLocationDetail} from "./LocationDetailContext";
-import {createDashboardLocationResetGuard} from "./locationView";
+import {useLocationDetail} from "../../../../context/LocationDetailContext";
+import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
 
 export const LocationDashboardPanel = () => {
   const host = useApiHost();

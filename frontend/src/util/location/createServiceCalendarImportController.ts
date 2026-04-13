@@ -1,10 +1,10 @@
 import {createMemo, createSignal, type Accessor} from "solid-js";
 import {toast} from "solid-toast";
-import type {AccountRole, CreateLocationServiceEventRequest} from "../../../../types/Types";
+import type {AccountRole, CreateLocationServiceEventRequest} from "../../types/Types";
 import {
   buildServiceCalendarSpreadsheetBlob,
   parseServiceCalendarSpreadsheetFile
-} from "../../../../util/location/serviceCalendarSpreadsheet";
+} from "./serviceCalendarSpreadsheet";
 import {
   buildServiceCalendarRequestsFromStagedEvents,
   completeStagedServiceCalendarEvent,
@@ -13,8 +13,8 @@ import {
   stageImportedServiceCalendarEvents,
   type StagedLocationServiceEvent,
   undoStagedServiceCalendarMutation
-} from "../../../../util/location/stagedServiceCalendar";
-import {uploadLocationEventCalendarById} from "../../../../util/location/locationEventApi";
+} from "./stagedServiceCalendar";
+import {uploadLocationEventCalendarById} from "./locationEventApi";
 
 type ServiceCalendarImportControllerProps = {
   host: string;

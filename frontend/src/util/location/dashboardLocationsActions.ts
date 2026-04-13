@@ -1,8 +1,8 @@
-import {ActionResult, LocationSummary} from "../../../types/Types";
+import {ActionResult, LocationSummary} from "../../types/Types";
 import {
   createLocation as createLocationRequest,
   renameLocation as renameLocationRequest
-} from "../../../util/common/locationApi";
+} from "../common/locationApi";
 
 export type RenameLocationActionResult = ActionResult & {
   locationId: number;

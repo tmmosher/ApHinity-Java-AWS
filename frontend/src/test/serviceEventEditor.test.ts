@@ -1,7 +1,7 @@
 import {renderToString} from "solid-js/web";
 import {describe, expect, it} from "vitest";
 import {createDefaultServiceEventDraft} from "../util/location/serviceEventForm";
-import {ServiceEventEditorBody} from "../pages/authenticated/panels/location/ServiceEventEditor";
+import {ServiceEventEditorBody} from "../components/service-editor/ServiceEventEditor";
 
 describe("ServiceEventEditor", () => {
   it("shows status controls when status editing is enabled", () => {

@@ -3,8 +3,8 @@ import {For, Show, type Component} from "solid-js";
 import type {
   ServiceEventResponsibility,
   ServiceEventStatus
-} from "../../../../types/Types";
-import type {ServiceCalendarFilters} from "../../../../util/location/serviceCalendarFilters";
+} from "../../types/Types";
+import type {ServiceCalendarFilters} from "../../util/location/serviceCalendarFilters";
 
 type ServiceCalendarFiltersPopoverProps = {
   filters: ServiceCalendarFilters;

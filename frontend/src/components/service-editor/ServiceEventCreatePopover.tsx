@@ -1,13 +1,13 @@
 import Calendar from "corvu/calendar";
 import Popover from "corvu/popover";
 import {createEffect, createSignal, on, type JSX} from "solid-js";
-import type {AccountRole, CreateLocationServiceEventRequest} from "../../../../types/Types";
-import {createDefaultServiceEventDraft} from "../../../../util/location/serviceEventForm";
+import type {AccountRole, CreateLocationServiceEventRequest} from "../../types/Types";
+import {createDefaultServiceEventDraft} from "../../util/location/serviceEventForm";
 import {
   createServiceEventEditorController,
   ServiceEventEditorBody
 } from "./ServiceEventEditor";
-import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "./serviceEventPopoverPosition";
+import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "../../util/location/serviceEventPopoverPosition";
 
 type ServiceEventCreatePopoverProps = {
   day: Date;

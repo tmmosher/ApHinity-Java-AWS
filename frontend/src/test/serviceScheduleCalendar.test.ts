@@ -11,7 +11,7 @@ vi.mock("corvu/popover", async () => {
 import ServiceScheduleCalendar, {
   resolveServiceCalendarTransitionDirection
 } from "../pages/authenticated/panels/location/ServiceScheduleCalendar";
-import {requestServiceEventEdit} from "../pages/authenticated/panels/location/ServiceEventEditPopover";
+import {requestServiceEventEdit} from "../components/service-editor/ServiceEventEditPopover";
 
 describe("ServiceScheduleCalendar", () => {
   it("switches the event popover into edit mode", () => {

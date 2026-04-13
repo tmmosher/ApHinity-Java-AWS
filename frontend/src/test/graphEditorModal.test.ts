@@ -198,8 +198,8 @@ describe("GraphEditorModal trace controls", () => {
         labels: ["Open", "Closed"],
         values: [3, 7],
         marker: {
-          color: "#2563eb",
-          colors: ["#2563eb", "#16a34a"]
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
         }
       }],
       layout: null,
@@ -214,8 +214,8 @@ describe("GraphEditorModal trace controls", () => {
     const pieProps = getPieTraceEditorProps();
 
     expect(latestTraceControlsProps).toBeNull();
-    expect(pieProps.rowColors).toEqual(["#2563eb", "#16a34a"]);
-    expect(() => pieProps.onUpdateColor(1, "#dc2626")).not.toThrow();
+    expect(pieProps.rowColors).toEqual(["#1f77b4", "#2ca02c"]);
+    expect(() => pieProps.onUpdateColor(1, "#d62728")).not.toThrow();
 
     dispose();
   });
@@ -229,8 +229,8 @@ describe("GraphEditorModal trace controls", () => {
         labels: ["Open", "Closed"],
         values: [3, 7],
         marker: {
-          color: "#2563eb",
-          colors: ["#2563eb", "#16a34a"]
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
         }
       }],
       layout: null,
@@ -294,8 +294,8 @@ describe("GraphEditorModal trace controls", () => {
         labels: ["Open", "Closed"],
         values: [68, 32],
         marker: {
-          color: "#2563eb",
-          colors: ["#2563eb", "#16a34a"]
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
         }
       }],
       layout: null,
@@ -324,13 +324,16 @@ describe("GraphEditorModal trace controls", () => {
     await Promise.resolve();
 
     expect(getPieTraceEditorProps()).toMatchObject({
-      rowColors: ["#2563eb", "#16a34a"]
+      rowColors: ["#1f77b4", "#2ca02c"]
     });
 
     batch(() => {
       setCurrentGraph(undefined);
       setIsOpen(false);
     });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
 
     latestTraceControlsProps = null;
@@ -339,6 +342,9 @@ describe("GraphEditorModal trace controls", () => {
       setCurrentGraph(barGraph);
       setIsOpen(true);
     });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 

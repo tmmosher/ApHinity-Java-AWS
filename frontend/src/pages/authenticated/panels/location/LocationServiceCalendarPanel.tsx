@@ -31,9 +31,9 @@ import {
   type StagedLocationServiceEvent,
   undoStagedServiceCalendarMutation
 } from "../../../../util/location/stagedServiceCalendar";
-import ServiceCalendarPanelToolbar from "./ServiceCalendarPanelToolbar";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
-import {createDashboardLocationResetGuard} from "./locationView";
+import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
+import ServiceCalendarPanelToolbar from "../../../../components/service-editor/ServiceCalendarPanelToolbar";
 
 type ServiceEventCalendarResource = {
   locationId: string;
@@ -350,7 +350,7 @@ export const LocationServiceCalendarPanel = () => {
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
         <ServiceCalendarPanelToolbar
           templateHref={serviceCalendarTemplateHref()}
-          spreadsheetUploadInputRef={(element) => {
+          spreadsheetUploadInputRef={(element: HTMLInputElement | undefined) => {
             spreadsheetUploadInput = element;
           }}
           isMutationBusy={isImportedEventMutationBusy()}
@@ -359,7 +359,7 @@ export const LocationServiceCalendarPanel = () => {
           hasPendingImportedEventChanges={hasPendingImportedEventChanges()}
           stagedEventCount={stagedImportedEvents().length}
           pendingMutationCount={stagedImportUndoStack().length}
-          onSpreadsheetInputChange={(event) => {
+          onSpreadsheetInputChange={(event: Event) => {
             void stageSpreadsheetImport(event);
           }}
           onApply={() => {

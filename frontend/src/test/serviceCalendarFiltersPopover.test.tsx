@@ -1,6 +1,6 @@
 import {renderToString} from "solid-js/web";
 import {describe, expect, it, vi} from "vitest";
-import ServiceCalendarFiltersPopover from "../pages/authenticated/panels/location/ServiceCalendarFiltersPopover";
+import ServiceCalendarFiltersPopover from "../components/service-editor/ServiceCalendarFiltersPopover";
 import {createDefaultServiceCalendarFilters} from "../util/location/serviceCalendarFilters";
 
 vi.mock("corvu/popover", () => {

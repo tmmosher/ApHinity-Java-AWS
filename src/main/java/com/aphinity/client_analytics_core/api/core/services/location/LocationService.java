@@ -45,7 +45,7 @@ import java.util.Objects;
 @Service
 public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
-    private static final String DEFAULT_GRAPH_COLOR = "#2563eb";
+    private static final String DEFAULT_GRAPH_COLOR = "#1f77b4";
 
     private enum GraphTemplateType {
         PIE,
@@ -189,7 +189,7 @@ public class LocationService {
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
         Long targetSectionId = resolveTargetSectionId(location.getSectionLayout(), sectionId, createNewSection);
         GraphTemplateType templateType = parseGraphTemplateType(graphType);
-        GraphTemplate template = buildGraphTemplate(templateType);
+        GraphTemplate template = buildGraphTemplate(templateType, location.getName());
 
         Graph graph = new Graph();
         graph.setName(template.name());
@@ -748,10 +748,10 @@ public class LocationService {
         };
     }
 
-    private GraphTemplate buildGraphTemplate(GraphTemplateType graphType) {
+    private GraphTemplate buildGraphTemplate(GraphTemplateType graphType, String locationName) {
         Map<String, Object> config = Map.of(
             "displayModeBar", false,
-            "responsive", true
+            "responsive", false
         );
 
         return switch (graphType) {
@@ -798,6 +798,7 @@ public class LocationService {
                     "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
                 )),
                 Map.of(
+                    "title", buildLegacyGraphTitle(locationName),
                     "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
                     "showlegend", false
                 ),
@@ -807,11 +808,19 @@ public class LocationService {
             case SCATTER -> new GraphTemplate(
                 "New Plot Graph",
                 buildScatterTemplateData(),
-                buildScatterTemplateLayout(),
+                buildScatterTemplateLayout(locationName),
                 buildScatterTemplateConfig(),
                 buildScatterTemplateStyle()
             );
         };
+    }
+
+    private Map<String, Object> buildLegacyGraphTitle(String locationName) {
+        return Map.of(
+            "x", 0.02,
+            "text", locationName == null ? "" : locationName,
+            "xanchor", "left"
+        );
     }
 
     private Map<String, Object> buildPieGraphStyle() {
@@ -848,13 +857,9 @@ public class LocationService {
         );
     }
 
-    private Map<String, Object> buildScatterTemplateLayout() {
+    private Map<String, Object> buildScatterTemplateLayout(String locationName) {
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("title", Map.of(
-            "x", 0.02,
-            "text", "",
-            "xanchor", "left"
-        ));
+        layout.put("title", buildLegacyGraphTitle(locationName));
         layout.put("xaxis", Map.of(
             "type", "date",
             "tickformat", "%b %Y"

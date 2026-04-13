@@ -18,7 +18,7 @@ vi.mock("corvu/popover", () => {
   return {default: Popover};
 });
 
-import {ServiceEventEditPopover} from "../pages/authenticated/panels/location/ServiceEventEditPopover";
+import {ServiceEventEditPopover} from "../components/service-editor/ServiceEventEditPopover";
 
 const baseEvent = {
   id: 8,

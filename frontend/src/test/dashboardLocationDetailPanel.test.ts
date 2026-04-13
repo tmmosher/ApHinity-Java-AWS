@@ -21,7 +21,7 @@ const createMockResponse = (ok: boolean, payload: unknown): Response =>
   }) as unknown as Response;
 
 const SCATTER_GRAPH_LAYOUT = {
-  title: {x: 0.02, text: "", xanchor: "left"},
+  title: {x: 0.02, text: "Phoenix", xanchor: "left"},
   xaxis: {type: "date", tickformat: "%b %Y"},
   yaxis: {range: [0, 100], title: "% Compliance", ticksuffix: "%"},
   legend: {x: 0, y: -0.3, orientation: "h"},
@@ -50,7 +50,7 @@ const buildScatterGraphResponse = () => ({
     name: "Trace 1",
     x: [],
     y: [],
-    line: {color: "#2563eb", width: 2},
+    line: {color: "#1f77b4", width: 2},
     mode: "lines+markers",
     marker: {size: 6}
   }],
@@ -306,9 +306,9 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     apiFetchMock.mockResolvedValue(createMockResponse(true, {
       id: 45,
       name: "New Bar Graph",
-      data: [{type: "bar", name: "Trace 1", x: [], y: [], marker: {color: "#2563eb"}}],
+      data: [{type: "bar", name: "Trace 1", x: [], y: [], marker: {color: "#1f77b4"}}],
       layout: {showlegend: false},
-      config: {displayModeBar: false, responsive: true},
+      config: {displayModeBar: false, responsive: false},
       style: {height: 320},
       createdAt: "2026-01-05T00:00:00Z",
       updatedAt: "2026-01-05T00:00:00Z"
@@ -333,7 +333,7 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     expect(result.data[0].type).toBe("bar");
     expect(result.data[0].x).toEqual([]);
     expect(result.data[0].y).toEqual([]);
-    expect(result.data[0].marker).toEqual({color: "#2563eb"});
+    expect(result.data[0].marker).toEqual({color: "#1f77b4"});
   });
 
   it("deletes a graph through the dedicated delete endpoint", async () => {

@@ -3,7 +3,7 @@ import {For, Show, createEffect, createMemo, createResource, createSignal, type 
 import {useApiHost} from "../../../context/ApiHostContext";
 import type {LocationGraph, LocationSummary} from "../../../types/Types";
 import {fetchLocationById, fetchLocationGraphsById} from "../../../util/graph/locationDetailApi";
-import {LocationDetailProvider} from "./location/LocationDetailContext";
+import {LocationDetailProvider} from "../../../context/LocationDetailContext";
 import {
   createLocationViewActive,
   dashboardLocationViews,
@@ -12,7 +12,7 @@ import {
   getLocationViewFromPathname,
   getLocationViewHref,
   type LocationScopedResource
-} from "./location/locationView";
+} from "../../../util/location/locationView";
 
 const locationViewButtonClass = (active: boolean): string =>
   "flex min-h-11 items-center justify-center px-3 py-2 text-center text-xs font-semibold tracking-tight transform-gpu transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:text-sm " +

@@ -12,13 +12,13 @@ export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
 };
 
 export const TRACE_COLOR_OPTIONS: Record<string, string> = {
-  "Ocean Blue": "#2563eb",
-  "Forest Green": "#16a34a",
-  "Sunset Orange": "#ea580c",
-  "Crimson Red": "#dc2626",
-  "Deep Violet": "#7c3aed",
-  "Slate Gray": "#475569",
-  "Light Gray": "rgb(209, 213, 219)"  // yoinked this as a default
+  "Legacy Blue": "#1f77b4",
+  "Legacy Green": "#2ca02c",
+  "Legacy Red": "#d62728",
+  "Legacy Orange": "#ff7f0e",
+  "Legacy Purple": "#9467bd",
+  "Legacy Cyan": "#17becf",
+  "Legacy Gray": "#7f7f7f"
 };
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>

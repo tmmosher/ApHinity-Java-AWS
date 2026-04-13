@@ -1,11 +1,11 @@
 import {For, Match, Show, Switch, createMemo, createSignal} from "solid-js";
-import type {AccountRole, CreateLocationServiceEventRequest} from "../../../../types/Types";
+import type {AccountRole, CreateLocationServiceEventRequest} from "../../types/Types";
 import {
   canChooseServiceEventResponsibility,
   createLocationServiceEventRequestFromDraft,
   SERVICE_EVENT_TITLE_MAX_LENGTH,
   type ServiceEventDraft
-} from "../../../../util/location/serviceEventForm";
+} from "../../util/location/serviceEventForm";
 
 export type UpdateDraftFn = <Key extends keyof ServiceEventDraft>(
   key: Key,

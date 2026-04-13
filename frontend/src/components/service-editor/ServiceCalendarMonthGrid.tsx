@@ -5,17 +5,17 @@ import type {
   AccountRole,
   CreateLocationServiceEventRequest,
   LocationServiceEvent
-} from "../../../../types/Types";
+} from "../../types/Types";
 import {
   formatDisplayDate,
   formatWeekdayLong,
   formatWeekdayShort,
   isSameCalendarMonth
-} from "../../../../util/location/dateUtility";
+} from "../../util/location/dateUtility";
 import {
   type ServiceCalendarVisibleSegment,
   type ServiceCalendarWeekLayout
-} from "../../../../util/location/serviceCalendarLayout";
+} from "../../util/location/serviceCalendarLayout";
 import ServiceEventCreatePopover from "./ServiceEventCreatePopover";
 import ServiceEventEditPopover from "./ServiceEventEditPopover";
 

@@ -19,14 +19,14 @@ import {
   filterLocationServiceEvents,
   type ServiceCalendarFilters
 } from "../../../../util/location/serviceCalendarFilters";
-import ServiceCalendarFiltersPopover from "./ServiceCalendarFiltersPopover";
+import ServiceCalendarFiltersPopover from "../../../../components/service-editor/ServiceCalendarFiltersPopover";
 import {
   buildServiceCalendarWeekLayouts,
   type ServiceCalendarVisibleSegment,
   type ServiceCalendarWeekLayout
 } from "../../../../util/location/serviceCalendarLayout";
-import ServiceEventCreatePopover from "./ServiceEventCreatePopover";
-import ServiceEventEditPopover from "./ServiceEventEditPopover";
+import ServiceEventCreatePopover from "../../../../components/service-editor/ServiceEventCreatePopover";
+import ServiceEventEditPopover from "../../../../components/service-editor/ServiceEventEditPopover";
 
 type ServiceScheduleCalendarProps = {
   month?: Date;
