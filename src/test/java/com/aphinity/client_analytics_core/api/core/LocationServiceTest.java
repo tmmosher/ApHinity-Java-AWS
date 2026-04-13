@@ -48,6 +48,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LocationServiceTest {
+    private static final String LEGACY_GRAPH_COLOR = "#1f77b4";
+
     @Mock
     private AppUserRepository appUserRepository;
 
@@ -445,7 +447,7 @@ class LocationServiceTest {
         assertEquals(31L, response.id());
         assertEquals("New Plot Graph", response.name());
         assertEquals(expectedScatterTemplateData(), response.data());
-        assertEquals(expectedScatterTemplateLayout(), response.layout());
+        assertEquals(expectedScatterTemplateLayout("Phoenix"), response.layout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
         assertEquals(expectedScatterTemplateStyle(), response.style());
         verify(graphRepository).saveAndFlush(any(Graph.class));
@@ -454,7 +456,7 @@ class LocationServiceTest {
 
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
         assertEquals(expectedScatterTemplateData(), traces);
-        assertEquals(expectedScatterTemplateLayout(), savedGraphHolder[0].getLayout());
+        assertEquals(expectedScatterTemplateLayout("Phoenix"), savedGraphHolder[0].getLayout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
         assertEquals(expectedScatterTemplateStyle(), savedGraphHolder[0].getStyle());
 
@@ -522,7 +524,7 @@ class LocationServiceTest {
         assertEquals("clockwise", traces.getFirst().get("direction"));
         assertEquals("%{label}: %{value}<extra></extra>", traces.getFirst().get("hovertemplate"));
         assertEquals(
-            Map.of("color", "#2563eb", "colors", List.of("#2563eb")),
+            Map.of("color", LEGACY_GRAPH_COLOR, "colors", List.of(LEGACY_GRAPH_COLOR)),
             traces.getFirst().get("marker")
         );
         assertEquals(
@@ -541,8 +543,10 @@ class LocationServiceTest {
             ),
             response.layout()
         );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
         assertEquals(expectedPieStyle, response.style());
         assertEquals(expectedPieStyle, savedGraphHolder[0].getStyle());
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
     }
 
     @Test
@@ -576,6 +580,15 @@ class LocationServiceTest {
         GraphResponse response = locationService.createLocationGraph(5L, 99L, null, true, "bar");
 
         assertEquals(45L, response.id());
+        assertEquals(
+            Map.of(
+                "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
+                "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                "showlegend", false
+            ),
+            response.layout()
+        );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
         verify(locationGraphRepository).save(any(LocationGraph.class));
         verify(locationRepository).saveAndFlush(location);
 
@@ -583,7 +596,8 @@ class LocationServiceTest {
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals(List.of(), traces.getFirst().get("x"));
         assertEquals(List.of(), traces.getFirst().get("y"));
-        assertEquals(Map.of("color", "#2563eb"), traces.getFirst().get("marker"));
+        assertEquals(Map.of("color", LEGACY_GRAPH_COLOR), traces.getFirst().get("marker"));
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
@@ -1104,7 +1118,7 @@ class LocationServiceTest {
                 "x", List.of(),
                 "y", List.of(),
                 "line", Map.of(
-                    "color", "#2563eb",
+                    "color", LEGACY_GRAPH_COLOR,
                     "width", 2
                 ),
                 "mode", "lines+markers",
@@ -1113,9 +1127,9 @@ class LocationServiceTest {
         );
     }
 
-    private Map<String, Object> expectedScatterTemplateLayout() {
+    private Map<String, Object> expectedScatterTemplateLayout(String locationName) {
         return Map.of(
-            "title", Map.of("x", 0.02, "text", "", "xanchor", "left"),
+            "title", Map.of("x", 0.02, "text", locationName, "xanchor", "left"),
             "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
             "yaxis", Map.of("range", List.of(0, 100), "title", "% Non-Compliance", "ticksuffix", "%"),
             "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),

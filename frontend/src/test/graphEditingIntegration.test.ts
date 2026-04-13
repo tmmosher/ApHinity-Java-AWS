@@ -92,7 +92,7 @@ describe("graph editing integration", () => {
         "14"
       ),
       "scatter",
-      "#dc2626"
+      "#d62728"
     );
     payload.data = [editedTrace];
 
@@ -117,8 +117,8 @@ describe("graph editing integration", () => {
         name: "Daily",
         x: [2],
         y: [14],
-        marker: { color: "#dc2626" },
-        line: { color: "#dc2626" }
+        marker: { color: "#d62728" },
+        line: { color: "#d62728" }
       }
     ]);
   });
@@ -133,8 +133,8 @@ describe("graph editing integration", () => {
         labels: ["Open", "Closed"],
         values: [3, 7],
         marker: {
-          color: "#2563eb",
-          colors: ["#2563eb", "#16a34a"]
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
         }
       }],
       layout: { title: { text: "Breakdown" } },
@@ -146,7 +146,7 @@ describe("graph editing integration", () => {
 
     const payload = createEditableGraphPayload(baseGraph);
     payload.data = [
-      setTraceColor(payload.data[0], "pie", "#dc2626")
+      setTraceColor(payload.data[0], "pie", "#d62728")
     ];
 
     const editResult = applyGraphPayloadEdit([baseGraph], [], 11, payload);
@@ -169,8 +169,8 @@ describe("graph editing integration", () => {
         labels: ["Open", "Closed"],
         values: [3, 7],
         marker: {
-          color: "#dc2626",
-          colors: ["#dc2626", "#dc2626"]
+          color: "#d62728",
+          colors: ["#d62728", "#d62728"]
         }
       }
     ]);
@@ -186,8 +186,8 @@ describe("graph editing integration", () => {
         labels: ["Open", "Closed"],
         values: [3, 7],
         marker: {
-          color: "#2563eb",
-          colors: ["#2563eb", "#16a34a"]
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
         }
       }],
       layout: { title: { text: "Breakdown" } },
@@ -199,7 +199,7 @@ describe("graph editing integration", () => {
 
     const payload = createEditableGraphPayload(baseGraph);
     payload.data = [
-      setPieRowColor(payload.data[0], 1, "#dc2626")
+      setPieRowColor(payload.data[0], 1, "#d62728")
     ];
 
     const editResult = applyGraphPayloadEdit([baseGraph], [], 12, payload);
@@ -222,8 +222,8 @@ describe("graph editing integration", () => {
         labels: ["Open", "Closed"],
         values: [3, 7],
         marker: {
-          color: "#2563eb",
-          colors: ["#2563eb", "#dc2626"]
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#d62728"]
         }
       }
     ]);
@@ -348,7 +348,7 @@ describe("graph editing integration", () => {
     expect(editResult.changed).toBe(true);
     expect(editResult.nextGraphs[0].data).toEqual([
       { type: "bar", name: "Actual", x: ["Jan"], y: [2] },
-      { type: "bar", name: "Trace 2", x: [], y: [], marker: { color: "#2563eb" } }
+      { type: "bar", name: "Trace 2", x: [], y: [], marker: { color: "#1f77b4" } }
     ]);
 
     const react = vi.fn().mockResolvedValue(undefined);
@@ -361,7 +361,7 @@ describe("graph editing integration", () => {
     const [, renderedData] = react.mock.calls[0];
     expect(renderedData).toEqual([
       { type: "bar", name: "Actual", x: ["Jan"], y: [2] },
-      { type: "bar", name: "Trace 2", x: [], y: [], marker: { color: "#2563eb" } }
+      { type: "bar", name: "Trace 2", x: [], y: [], marker: { color: "#1f77b4" } }
     ]);
   });
 });

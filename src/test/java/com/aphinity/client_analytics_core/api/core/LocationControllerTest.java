@@ -238,7 +238,7 @@ class LocationControllerTest {
                 "x", List.of(),
                 "y", List.of(),
                 "line", Map.of(
-                    "color", "#2563eb",
+                    "color", "#1f77b4",
                     "width", 2
                 ),
                 "mode", "lines+markers",
@@ -249,7 +249,7 @@ class LocationControllerTest {
 
     private static Map<String, Object> scatterGraphLayout() {
         return Map.of(
-            "title", Map.of("x", 0.02, "text", "", "xanchor", "left"),
+            "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
             "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
             "yaxis", Map.of("range", List.of(0, 100), "title", "% Non-Compliance", "ticksuffix", "%"),
             "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),

@@ -98,7 +98,7 @@ const buildScatterGraph = (id: number, name: string, yOffset: number): LocationG
   updatedAt: "2026-01-02T00:00:00Z"
 });
 
-const buildBlankScatterGraph = (id: number, name: string): LocationGraph => ({
+const buildBlankScatterGraph = (id: number, name: string, titleText = ""): LocationGraph => ({
   id,
   name,
   data: [{
@@ -106,11 +106,17 @@ const buildBlankScatterGraph = (id: number, name: string): LocationGraph => ({
     name: "Trace 1",
     x: [],
     y: [],
-    line: {color: "#2563eb", width: 2},
+    line: {color: "#1f77b4", width: 2},
     mode: "lines+markers",
     marker: {size: 6}
   }],
-  layout: cloneJson(SCATTER_LAYOUT),
+  layout: {
+    ...cloneJson(SCATTER_LAYOUT),
+    title: {
+      ...cloneJson(SCATTER_LAYOUT.title),
+      text: titleText
+    }
+  },
   config: {displayModeBar: false, responsive: false},
   style: cloneJson(SCATTER_STYLE),
   createdAt: "2026-01-01T00:00:00Z",
@@ -122,7 +128,7 @@ const buildBarGraph = (id: number, name: string): LocationGraph => ({
   name,
   data: [{type: "bar", name: "Trace 1", x: ["Point 1"], y: [5]}],
   layout: {showlegend: false},
-  config: {displayModeBar: false, responsive: true},
+  config: {displayModeBar: false, responsive: false},
   style: {height: 320},
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z"
@@ -138,8 +144,8 @@ const buildPieGraph = (id: number, name: string): LocationGraph => ({
       labels: ["Open", "Closed"],
       values: [68, 32],
       marker: {
-        color: "#2563eb",
-        colors: ["#2563eb", "#16a34a"]
+        color: "#1f77b4",
+        colors: ["#1f77b4", "#2ca02c"]
       },
       hole: 0.72,
       sort: false,
@@ -163,7 +169,7 @@ const buildPieGraph = (id: number, name: string): LocationGraph => ({
       }
     ]
   }),
-  config: {displayModeBar: false, responsive: true},
+  config: {displayModeBar: false, responsive: false},
   style: {height: 320},
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z"
@@ -175,7 +181,7 @@ describe("LocationDashboardPanel create flow regressions", () => {
   it("keeps existing graph payloads intact after creating a new graph and refreshing", () => {
     const existingScatterGraph = buildScatterGraph(11, "Existing Scatter", 0);
     const existingBarGraph = buildBarGraph(12, "Existing Bar");
-    const createdGraph = buildBlankScatterGraph(13, "New Plot Graph");
+    const createdGraph = buildBlankScatterGraph(13, "New Plot Graph", "Phoenix");
 
     const refreshedGraphs = reconcileLocationGraphs(
       [existingScatterGraph, existingBarGraph],
@@ -226,7 +232,7 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect(cleanupResult.nextUndoStack).toEqual([]);
     expect(cleanupResult.nextBaselineIndex.has(deletedPieGraph.id)).toBe(false);
 
-    const createdGraph = buildBlankScatterGraph(23, "New Plot Graph");
+    const createdGraph = buildBlankScatterGraph(23, "New Plot Graph", "Phoenix");
     const refreshedGraphs = reconcileLocationGraphs(
       cleanupResult.nextGraphs,
       [cloneJson(remainingBarGraph), cloneJson(createdGraph)]
@@ -235,8 +241,8 @@ describe("LocationDashboardPanel create flow regressions", () => {
     expect(refreshedGraphs).toHaveLength(2);
     expect(refreshedGraphs[0]).toBe(remainingBarGraph);
     expect(refreshedGraphs[1]).toEqual(createdGraph);
-    expect(refreshedGraphs[1].data).toEqual([]);
-    expect(refreshedGraphs[1].layout).toEqual(SCATTER_LAYOUT);
+    expect(refreshedGraphs[1].data).toEqual(createdGraph.data);
+    expect(refreshedGraphs[1].layout).toEqual(createdGraph.layout);
     expect(refreshedGraphs[1].config).toEqual({displayModeBar: false, responsive: false});
     expect(refreshedGraphs[1].style).toEqual(SCATTER_STYLE);
   });

@@ -362,11 +362,12 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.name").value("New Bar Graph"))
             .andExpect(jsonPath("$.data[0].type").value("bar"))
             .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
-            .andExpect(jsonPath("$.data[0].marker.color").value("#2563eb"))
+            .andExpect(jsonPath("$.data[0].marker.color").value("#1f77b4"))
             .andExpect(jsonPath("$.data[0].x").isArray())
             .andExpect(jsonPath("$.data[0].x").isEmpty())
             .andExpect(jsonPath("$.data[0].y").isArray())
             .andExpect(jsonPath("$.data[0].y").isEmpty())
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
             .andExpect(jsonPath("$.config.responsive").value(true))
             .andExpect(jsonPath("$.style.height").value(320));
@@ -422,10 +423,11 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].x").isEmpty())
             .andExpect(jsonPath("$.data[0].y").isArray())
             .andExpect(jsonPath("$.data[0].y").isEmpty())
-            .andExpect(jsonPath("$.data[0].line.color").value("#2563eb"))
+            .andExpect(jsonPath("$.data[0].line.color").value("#1f77b4"))
             .andExpect(jsonPath("$.data[0].line.width").value(2))
             .andExpect(jsonPath("$.data[0].mode").value("lines+markers"))
             .andExpect(jsonPath("$.data[0].marker.size").value(6))
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
             .andExpect(jsonPath("$.config.responsive").value(false));
 
@@ -474,11 +476,14 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.id").value(511))
             .andExpect(jsonPath("$.name").value("New Bar Graph"))
             .andExpect(jsonPath("$.data[0].type").value("bar"))
-            .andExpect(jsonPath("$.data[0].marker.color").value("#2563eb"))
+            .andExpect(jsonPath("$.data[0].marker.color").value("#1f77b4"))
             .andExpect(jsonPath("$.data[0].x").isArray())
             .andExpect(jsonPath("$.data[0].x").isEmpty())
             .andExpect(jsonPath("$.data[0].y").isArray())
-            .andExpect(jsonPath("$.data[0].y").isEmpty());
+            .andExpect(jsonPath("$.data[0].y").isEmpty())
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(false))
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
