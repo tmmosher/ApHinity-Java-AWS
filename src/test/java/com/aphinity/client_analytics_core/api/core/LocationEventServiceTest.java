@@ -1,24 +1,25 @@
 package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
-import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
-import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
-import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarSpreadsheetParser;
-import com.aphinity.client_analytics_core.api.error.ApiClientException;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarAuthorizationService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarImportService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarTemplateService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventAuditService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventRequestMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
@@ -33,10 +34,13 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -45,22 +49,25 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LocationEventServiceTest {
     @Mock
-    private AppUserRepository appUserRepository;
-
-    @Mock
     private LocationRepository locationRepository;
-
-    @Mock
-    private LocationUserRepository locationUserRepository;
 
     @Mock
     private ServiceEventRepository serviceEventRepository;
 
     @Mock
-    private AccountRoleService accountRoleService;
+    private ServiceCalendarAuthorizationService authorizationService;
+
+    @Spy
+    private ServiceEventRequestMapper requestMapper = new ServiceEventRequestMapper();
+
+    @Spy
+    private ServiceCalendarTemplateService templateService = new ServiceCalendarTemplateService();
 
     @Mock
-    private ServiceCalendarSpreadsheetParser serviceCalendarSpreadsheetParser;
+    private ServiceCalendarImportService importService;
+
+    @Mock
+    private ServiceEventAuditService auditService;
 
     @InjectMocks
     private LocationEventService locationEventService;
@@ -71,20 +78,23 @@ class LocationEventServiceTest {
         ServiceEvent first = serviceEvent(31L, "A visit");
         ServiceEvent second = serviceEvent(32L, "B visit");
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
         when(serviceEventRepository.findVisibleByLocationIdAndDateWindow(
             99L,
             LocalDate.parse("2026-03-01"),
             LocalDate.parse("2026-05-31")
-        ))
-            .thenReturn(List.of(first, second));
+        )).thenReturn(List.of(first, second));
 
-        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(5L, 99L, YearMonth.of(2026, 4));
+        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(
+            5L,
+            99L,
+            YearMonth.of(2026, 4)
+        );
 
         assertEquals(List.of("A visit", "B visit"), response.stream().map(ServiceEventResponse::title).toList());
+        verify(authorizationService).requireUser(5L);
+        verify(authorizationService).requireReadableLocationAccess(user, 99L);
         verify(serviceEventRepository).findVisibleByLocationIdAndDateWindow(
             99L,
             LocalDate.parse("2026-03-01"),
@@ -93,56 +103,27 @@ class LocationEventServiceTest {
     }
 
     @Test
-    void getAccessibleLocationEventsRejectsUnauthorizedClient() {
+    void getAccessibleLocationEventsPropagatesAuthorizationFailure() {
         AppUser user = verifiedUser(5L);
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(false);
+        ResponseStatusException forbidden = new ResponseStatusException(HttpStatus.FORBIDDEN, "Insufficient permissions");
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doThrow(forbidden).when(authorizationService).requireReadableLocationAccess(user, 99L);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             locationEventService.getAccessibleLocationEvents(5L, 99L, YearMonth.of(2026, 4))
         );
 
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
-        assertEquals("Insufficient permissions", ex.getReason());
+        assertSame(forbidden, ex);
         verifyNoInteractions(serviceEventRepository);
-    }
-
-    @Test
-    void getAccessibleLocationEventsUsesRollingThreeMonthWindowForViewedMonth() {
-        AppUser user = verifiedUser(5L);
-        ServiceEvent spanningEvent = serviceEvent(77L, "Cross-month event");
-        spanningEvent.setEventDate(LocalDate.parse("2026-02-28"));
-        spanningEvent.setEndEventDate(LocalDate.parse("2026-03-02"));
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(serviceEventRepository.findVisibleByLocationIdAndDateWindow(
-            99L,
-            LocalDate.parse("2026-02-01"),
-            LocalDate.parse("2026-04-30")
-        )).thenReturn(List.of(spanningEvent));
-
-        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(5L, 99L, YearMonth.of(2026, 3));
-
-        assertEquals(List.of("Cross-month event"), response.stream().map(ServiceEventResponse::title).toList());
-        verify(serviceEventRepository).findVisibleByLocationIdAndDateWindow(
-            99L,
-            LocalDate.parse("2026-02-01"),
-            LocalDate.parse("2026-04-30")
-        );
     }
 
     @Test
     void getServiceCalendarTemplateReturnsClassPathResourceForAuthorizedClient() throws Exception {
         AppUser user = verifiedUser(5L);
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
 
         Resource resource = locationEventService.getServiceCalendarTemplate(5L, 99L);
 
@@ -152,27 +133,7 @@ class LocationEventServiceTest {
     }
 
     @Test
-    void getServiceCalendarTemplateRejectsUnauthorizedClient() {
-        AppUser user = verifiedUser(5L);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(false);
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.getServiceCalendarTemplate(5L, 99L)
-        );
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
-        assertEquals("Insufficient permissions", ex.getReason());
-    }
-
-    @Test
-    void uploadServiceCalendarPersistsParsedRowsAndTouchesLocation() {
-        AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
+    void uploadServiceCalendarDelegatesToImportService() {
         MockMultipartFile file = new MockMultipartFile(
             "file",
             "service_calendar_upload.xlsx",
@@ -180,108 +141,13 @@ class LocationEventServiceTest {
             new byte[]{1, 2, 3}
         );
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(serviceCalendarSpreadsheetParser.parse(file)).thenReturn(List.of(
-            new ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow(
-                2,
-                request("Imported event", "Imported description", ServiceEventResponsibility.PARTNER)
-            )
-        ));
+        when(importService.uploadServiceCalendar(5L, 99L, file)).thenReturn(3);
 
         int importedCount = locationEventService.uploadServiceCalendar(5L, 99L, file);
 
-        assertEquals(1, importedCount);
-        verify(serviceEventRepository).saveAllAndFlush(any());
-        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
-    }
-
-    @Test
-    void uploadServiceCalendarRejectsUnauthorizedPartnerRowsForClient() {
-        AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
-        MockMultipartFile file = new MockMultipartFile(
-            "file",
-            "service_calendar_upload.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            new byte[]{1, 2, 3}
-        );
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
-        when(serviceCalendarSpreadsheetParser.parse(file)).thenReturn(List.of(
-            new ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow(
-                2,
-                request("Imported event", "Imported description", ServiceEventResponsibility.PARTNER)
-            )
-        ));
-
-        ApiClientException ex = assertThrows(ApiClientException.class, () ->
-            locationEventService.uploadServiceCalendar(5L, 99L, file)
-        );
-
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("service_calendar_row_invalid", ex.getCode());
-        assertEquals("Row 2: Insufficient permissions", ex.getMessage());
-    }
-
-    @Test
-    void createLocationEventAllowsClientWhenResponsibilityIsClientAndLocationIsAccessible() {
-        AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
-        when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
-            ServiceEvent event = invocation.getArgument(0);
-            event.setId(55L);
-            event.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            event.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            return event;
-        });
-
-        ServiceEventResponse response = locationEventService.createLocationEvent(
-            5L,
-            99L,
-            request("Client visit", "Client-owned task", ServiceEventResponsibility.CLIENT)
-        );
-
-        assertEquals(55L, response.id());
-        assertEquals("Client visit", response.title());
-        assertEquals(ServiceEventResponsibility.CLIENT, response.responsibility());
-        assertEquals(LocalDate.parse("2026-04-01"), response.endDate());
-        assertEquals(LocalTime.parse("11:00:00"), response.endTime());
-        verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
-    }
-
-    @Test
-    void createLocationEventRejectsClientForPartnerResponsibility() {
-        AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.createLocationEvent(
-                5L,
-                99L,
-                request("Partner visit", "Partner-owned task", ServiceEventResponsibility.PARTNER)
-            )
-        );
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
-        assertEquals("Insufficient permissions", ex.getReason());
-        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
+        assertEquals(3, importedCount);
+        verify(importService).uploadServiceCalendar(5L, 99L, file);
+        verifyNoInteractions(authorizationService, locationRepository, serviceEventRepository, auditService);
     }
 
     @Test
@@ -290,9 +156,9 @@ class LocationEventServiceTest {
         Location location = new Location();
         location.setId(99L);
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        when(authorizationService.requireLocation(99L)).thenReturn(location);
+        doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.PARTNER);
         when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
             ServiceEvent event = invocation.getArgument(0);
             event.setId(44L);
@@ -314,113 +180,69 @@ class LocationEventServiceTest {
         assertEquals(LocalTime.parse("11:00:00"), response.endTime());
         verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+        verify(auditService).recordCreated(eq(5L), any(ServiceEvent.class));
     }
 
     @Test
-    void createLocationEventDefaultsMissingEndDateAndTimeToStartRange() {
+    void createLocationEventRejectsMissingResponsibilityBeforePersistence() {
         AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-        when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
-            ServiceEvent event = invocation.getArgument(0);
-            event.setId(45L);
-            event.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            event.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
-            return event;
-        });
-
-        ServiceEventResponse response = locationEventService.createLocationEvent(
-            5L,
-            99L,
-            request("Single-point visit", "Inspect line pressure", ServiceEventResponsibility.PARTNER, null, null)
+        LocationEventRequest request = new LocationEventRequest(
+            "Service visit",
+            null,
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("09:30:00"),
+            null,
+            null,
+            "Inspect line pressure",
+            ServiceEventStatus.UPCOMING
         );
 
-        assertEquals(LocalDate.parse("2026-04-01"), response.date());
-        assertEquals(LocalTime.parse("09:30:00"), response.time());
-        assertEquals(LocalDate.parse("2026-04-01"), response.endDate());
-        assertEquals(LocalTime.parse("09:30:00"), response.endTime());
-    }
-
-    @Test
-    void createLocationEventRejectsEndBeforeStart() {
-        AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+        when(authorizationService.requireUser(5L)).thenReturn(user);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.createLocationEvent(
-                5L,
-                99L,
-                request(
-                    "Backwards event",
-                    "Inspect line pressure",
-                    ServiceEventResponsibility.PARTNER,
-                    LocalDate.parse("2026-03-31"),
-                    LocalTime.parse("08:30:00")
-                )
-            )
+            locationEventService.createLocationEvent(5L, 99L, request)
         );
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-        assertEquals("Event end must be on or after the start date and time", ex.getReason());
-        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
+        assertEquals("Event responsibility is required", ex.getReason());
+        verifyNoInteractions(serviceEventRepository, locationRepository, auditService);
     }
 
     @Test
-    void createLocationEventRejectsBlankTitle() {
+    void updateLocationEventPersistsUpdatedFieldsAndTouchesLocation() {
         AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.createLocationEvent(5L, 99L, request("   ", null, ServiceEventResponsibility.PARTNER))
+        LocationEventRequest request = request(
+            "  Updated visit  ",
+            "  Updated description  ",
+            ServiceEventResponsibility.CLIENT,
+            LocalDate.parse("2026-04-02"),
+            LocalTime.parse("12:00:00")
         );
+        ServiceEvent serviceEvent = serviceEvent(44L, "Client event");
+        serviceEvent.setResponsibility(ServiceEventResponsibility.CLIENT);
 
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-        assertEquals("Event title is required", ex.getReason());
-        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
-    }
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireLocationExists(99L);
+        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(serviceEvent));
+        doNothing().when(authorizationService).requireUpdatePermission(user, 99L, serviceEvent, ServiceEventResponsibility.CLIENT);
+        when(serviceEventRepository.saveAndFlush(serviceEvent)).thenAnswer(invocation -> invocation.getArgument(0));
 
-    @Test
-    void createLocationEventRejectsTitleLongerThanFortyTwoCharacters() {
-        AppUser user = verifiedUser(5L);
-        Location location = new Location();
-        location.setId(99L);
+        ServiceEventResponse response = locationEventService.updateLocationEvent(5L, 99L, 44L, request);
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
-        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.createLocationEvent(
-                5L,
-                99L,
-                request("1234567890123456789012345678901234567890123", null, ServiceEventResponsibility.PARTNER)
-            )
-        );
-
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-        assertEquals("Event title must be 42 characters or fewer", ex.getReason());
-        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
+        assertEquals("Updated visit", response.title());
+        assertEquals(ServiceEventResponsibility.CLIENT, response.responsibility());
+        assertEquals(LocalDate.parse("2026-04-02"), response.endDate());
+        assertEquals(LocalTime.parse("12:00:00"), response.endTime());
+        verify(serviceEventRepository).saveAndFlush(serviceEvent);
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+        verify(auditService).recordUpdated(eq(5L), any(ServiceEvent.class));
     }
 
     @Test
     void updateLocationEventRejectsMissingEvent() {
         AppUser user = verifiedUser(5L);
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(99L)).thenReturn(true);
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireLocationExists(99L);
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
@@ -429,88 +251,6 @@ class LocationEventServiceTest {
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
         assertEquals("Location event not found", ex.getReason());
-    }
-
-    @Test
-    void updateLocationEventAllowsClientForClientResponsibility() {
-        AppUser user = verifiedUser(5L);
-        ServiceEvent serviceEvent = serviceEvent(44L, "Client event");
-        serviceEvent.setResponsibility(ServiceEventResponsibility.CLIENT);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(serviceEvent));
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(99L, 5L)).thenReturn(true);
-        when(serviceEventRepository.saveAndFlush(serviceEvent)).thenReturn(serviceEvent);
-
-        ServiceEventResponse response = locationEventService.updateLocationEvent(
-            5L,
-            99L,
-            44L,
-            request(
-                "Updated client event",
-                "Updated description",
-                ServiceEventResponsibility.CLIENT,
-                LocalDate.parse("2026-04-02"),
-                LocalTime.parse("12:00:00")
-            )
-        );
-
-        assertEquals("Updated client event", response.title());
-        assertEquals(ServiceEventResponsibility.CLIENT, response.responsibility());
-        assertEquals(LocalDate.parse("2026-04-02"), response.endDate());
-        assertEquals(LocalTime.parse("12:00:00"), response.endTime());
-        verify(serviceEventRepository).saveAndFlush(serviceEvent);
-    }
-
-    @Test
-    void updateLocationEventRejectsClientWhenChangingResponsibilityToPartner() {
-        AppUser user = verifiedUser(5L);
-        ServiceEvent serviceEvent = serviceEvent(44L, "Client event");
-        serviceEvent.setResponsibility(ServiceEventResponsibility.CLIENT);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(serviceEvent));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.updateLocationEvent(
-                5L,
-                99L,
-                44L,
-                request("Partner takeover", "Updated description", ServiceEventResponsibility.PARTNER)
-            )
-        );
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
-        assertEquals("Insufficient permissions", ex.getReason());
-        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
-    }
-
-    @Test
-    void updateLocationEventRejectsClientForPartnerOwnedEvent() {
-        AppUser user = verifiedUser(5L);
-        ServiceEvent serviceEvent = serviceEvent(44L, "Partner event");
-        serviceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
-
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationRepository.existsById(99L)).thenReturn(true);
-        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(serviceEvent));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.updateLocationEvent(
-                5L,
-                99L,
-                44L,
-                request("Client attempt", "Updated description", ServiceEventResponsibility.CLIENT)
-            )
-        );
-
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
-        assertEquals("Insufficient permissions", ex.getReason());
         verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
     }
 
@@ -519,15 +259,33 @@ class LocationEventServiceTest {
         AppUser user = verifiedUser(5L);
         ServiceEvent serviceEvent = serviceEvent(44L, "Delete me");
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireDeletePermission(user);
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(serviceEvent));
 
         locationEventService.deleteLocationEvent(5L, 99L, 44L);
 
+        verify(auditService).recordDeleted(5L, serviceEvent);
         verify(serviceEventRepository).delete(serviceEvent);
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
-        verify(locationRepository, never()).existsById(99L);
+    }
+
+    @Test
+    void deleteLocationEventRejectsMissingEvent() {
+        AppUser user = verifiedUser(5L);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireDeletePermission(user);
+        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationEventService.deleteLocationEvent(5L, 99L, 44L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Location event not found", ex.getReason());
+        verify(authorizationService).requireLocationExists(99L);
+        verify(serviceEventRepository, never()).delete(any(ServiceEvent.class));
     }
 
     private LocationEventRequest request(String title) {
