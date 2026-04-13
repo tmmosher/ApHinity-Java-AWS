@@ -2,6 +2,7 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
 import {
   createLocationEventById,
+  deleteLocationEventById,
   fetchLocationEventsById,
   getLocationEventTemplateDownloadUrl,
   uploadLocationEventCalendarById,
@@ -212,6 +213,16 @@ describe("locationEventApi", () => {
     });
   });
 
+  it("deletes a persisted service event", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, null, 204));
+
+    await deleteLocationEventById(host, "42", 8);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/42/events/8", {
+      method: "DELETE"
+    });
+  });
+
   it("rejects invalid route location ids before dispatch", async () => {
     await expect(createLocationEventById(host, "0", {
       title: "Client kickoff",
@@ -238,6 +249,12 @@ describe("locationEventApi", () => {
       description: null,
       status: "upcoming"
     })).rejects.toThrowError("Invalid event id");
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid route event ids before delete dispatch", async () => {
+    await expect(deleteLocationEventById(host, "42", 0)).rejects.toThrowError("Invalid event id");
 
     expect(apiFetchMock).not.toHaveBeenCalled();
   });

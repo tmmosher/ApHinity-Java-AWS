@@ -2,25 +2,16 @@ import {apiFetch} from "../common/apiFetch";
 import {normalizeYearMonth} from "./dateUtility";
 import type {
   CreateLocationServiceEventRequest,
-  LocationServiceEvent,
-  ServiceEventResponsibility,
-  ServiceEventStatus
+  LocationServiceEvent
 } from "../../types/Types";
+import {
+  apiErrorPayloadSchema,
+  locationServiceEventListSchema,
+  locationServiceEventSchema,
+  serviceCalendarUploadResponseSchema
+} from "./locationEventApiSchemas";
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
-
-type ApiErrorPayload = {
-  code?: string;
-  message?: string;
-  error?: string;
-  status?: number;
-  path?: string;
-};
-
-type ServiceCalendarUploadResponse = {
-  importedCount?: unknown;
-};
+type ApiErrorPayload = ReturnType<typeof parseApiErrorPayload>;
 
 const parsePositiveRouteId = (value: string | number, label: string): number => {
   const parsedId = Number(value);
@@ -34,74 +25,33 @@ const parseRouteLocationId = (locationId: string): number => parsePositiveRouteI
 
 const parseRouteEventId = (eventId: number): number => parsePositiveRouteId(eventId, "event id");
 
-const parseApiErrorPayload = (value: unknown): ApiErrorPayload | null => {
-  if (!isRecord(value)) {
-    return null;
-  }
-  return {
-    code: typeof value.code === "string" ? value.code : undefined,
-    message: typeof value.message === "string" ? value.message : undefined,
-    error: typeof value.error === "string" ? value.error : undefined,
-    status: typeof value.status === "number" ? value.status : undefined,
-    path: typeof value.path === "string" ? value.path : undefined
-  };
+const parseApiErrorPayload = (value: unknown) => {
+  const parsed = apiErrorPayloadSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 };
 
-const isServiceEventResponsibility = (value: unknown): value is ServiceEventResponsibility =>
-  value === "client" || value === "partner";
-
-const isServiceEventStatus = (value: unknown): value is ServiceEventStatus =>
-  value === "upcoming" || value === "current" || value === "overdue" || value === "completed";
-
 const parseLocationServiceEvent = (value: unknown): LocationServiceEvent => {
-  if (!isRecord(value)) {
+  const parsed = locationServiceEventSchema.safeParse(value);
+  if (!parsed.success) {
     throw new Error("Invalid service event response");
   }
-  if (
-    typeof value.id !== "number"
-    || typeof value.title !== "string"
-    || !isServiceEventResponsibility(value.responsibility)
-    || typeof value.date !== "string"
-    || typeof value.time !== "string"
-    || typeof value.endDate !== "string"
-    || typeof value.endTime !== "string"
-    || (value.description !== null && value.description !== undefined && typeof value.description !== "string")
-    || !isServiceEventStatus(value.status)
-    || typeof value.createdAt !== "string"
-    || typeof value.updatedAt !== "string"
-  ) {
-    throw new Error("Invalid service event response");
-  }
-  return {
-    id: value.id,
-    title: value.title,
-    responsibility: value.responsibility,
-    date: value.date,
-    time: value.time,
-    endDate: value.endDate,
-    endTime: value.endTime,
-    description: value.description ?? null,
-    status: value.status,
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt
-  };
+  return parsed.data;
 };
 
 const parseLocationServiceEventList = (value: unknown): LocationServiceEvent[] => {
-  if (!Array.isArray(value)) {
+  const parsed = locationServiceEventListSchema.safeParse(value);
+  if (!parsed.success) {
     throw new Error("Invalid service event response");
   }
-  return value.map(parseLocationServiceEvent);
+  return parsed.data;
 };
 
 const parseServiceCalendarUploadResponse = (value: unknown): {importedCount: number} => {
-  const response = value as ServiceCalendarUploadResponse | null | undefined;
-  if (response == null || typeof response.importedCount !== "number" || response.importedCount < 0) {
+  const parsed = serviceCalendarUploadResponseSchema.safeParse(value);
+  if (!parsed.success) {
     throw new Error("Invalid service calendar upload response");
   }
-  return {
-    importedCount: response.importedCount
-  };
+  return parsed.data;
 };
 
 const throwLocationEventLoadError = async (response: Response): Promise<never> => {
@@ -113,19 +63,10 @@ const throwLocationEventLoadError = async (response: Response): Promise<never> =
   throw new Error("Unable to load service events");
 };
 
-const throwLocationEventMutationError = async (
+const throwAuthenticationOrSecurityError = (
   response: Response,
-  action: "create" | "update"
-): Promise<never> => {
-  const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
-  console.warn(`${action}LocationEvent failed`, {
-    status: response.status,
-    code: errorPayload?.code ?? null,
-    message: errorPayload?.message ?? null,
-    error: errorPayload?.error ?? null,
-    path: errorPayload?.path ?? null
-  });
-
+  errorPayload: ApiErrorPayload
+): void => {
   if (
     errorPayload?.code === "authentication_required"
     || errorPayload?.code === "invalid_refresh_token"
@@ -145,44 +86,50 @@ const throwLocationEventMutationError = async (
   ) {
     throw new Error("Security token rejected");
   }
+};
+
+const logLocationEventError = (
+  operation: string,
+  response: Response,
+  errorPayload: ApiErrorPayload
+): void => {
+  console.warn(operation, {
+    status: response.status,
+    code: errorPayload?.code ?? null,
+    message: errorPayload?.message ?? null,
+    error: errorPayload?.error ?? null,
+    path: errorPayload?.path ?? null
+  });
+};
+
+const throwLocationEventMutationError = async (
+  response: Response,
+  action: "create" | "update" | "delete"
+): Promise<never> => {
+  const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
+  logLocationEventError(`${action}LocationEvent failed`, response, errorPayload);
+  throwAuthenticationOrSecurityError(response, errorPayload);
+
   if (errorPayload?.message) {
     throw new Error(errorPayload.message);
   }
   if (response.status === 403) {
     throw new Error("Insufficient permissions");
   }
-  throw new Error(action === "create" ? "Unable to create service event" : "Unable to update service event");
+  throw new Error(
+    action === "create"
+      ? "Unable to create service event"
+      : action === "update"
+        ? "Unable to update service event"
+        : "Unable to delete service event"
+  );
 };
 
 const throwLocationEventUploadError = async (response: Response): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
-  console.warn("uploadLocationEventCalendar failed", {
-    status: response.status,
-    code: errorPayload?.code ?? null,
-    message: errorPayload?.message ?? null,
-    error: errorPayload?.error ?? null,
-    path: errorPayload?.path ?? null
-  });
+  logLocationEventError("uploadLocationEventCalendar failed", response, errorPayload);
+  throwAuthenticationOrSecurityError(response, errorPayload);
 
-  if (
-    errorPayload?.code === "authentication_required"
-    || errorPayload?.code === "invalid_refresh_token"
-    || errorPayload?.code === "missing_refresh_token"
-  ) {
-    throw new Error("Authentication required");
-  }
-  if (errorPayload?.code === "csrf_invalid") {
-    throw new Error("CSRF invalid");
-  }
-  if (errorPayload?.code === "forbidden") {
-    throw new Error("Insufficient permissions");
-  }
-  if (
-    (response.status === 403 || errorPayload?.status === 403)
-    && errorPayload?.error === "Forbidden"
-  ) {
-    throw new Error("Security token rejected");
-  }
   if (errorPayload?.message) {
     throw new Error(errorPayload.message);
   }
@@ -281,4 +228,21 @@ export const updateLocationEventById = async (
   }
 
   return parseLocationServiceEvent(await response.json());
+};
+
+export const deleteLocationEventById = async (
+  host: string,
+  locationId: string,
+  eventId: number
+): Promise<void> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedEventId = parseRouteEventId(eventId);
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/events/" + parsedEventId, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    await throwLocationEventMutationError(response, "delete");
+  }
 };

@@ -55,6 +55,12 @@ export const canCompleteLocationServiceEvent = (
   status !== "completed" && canEditLocationServiceEvent(role, responsibility)
 );
 
+export const canDeleteLocationServiceEvent = (
+  role: AccountRole | undefined
+): boolean => (
+  role === "admin" || role === "partner"
+);
+
 export const normalizeServiceEventResponsibilityForRole = (
   role: AccountRole | undefined,
   responsibility: ServiceEventResponsibility

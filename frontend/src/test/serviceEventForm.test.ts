@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {
   canCompleteLocationServiceEvent,
+  canDeleteLocationServiceEvent,
   canEditLocationServiceEvent,
   canChooseServiceEventResponsibility,
   createDefaultServiceEventDraft,
@@ -46,6 +47,13 @@ describe("serviceEventForm helpers", () => {
     expect(canCompleteLocationServiceEvent("client", "client", "overdue")).toBe(true);
     expect(canCompleteLocationServiceEvent("client", "partner", "upcoming")).toBe(false);
     expect(canCompleteLocationServiceEvent("partner", "client", "completed")).toBe(false);
+  });
+
+  it("only allows partners and admins to delete persisted service events", () => {
+    expect(canDeleteLocationServiceEvent("partner")).toBe(true);
+    expect(canDeleteLocationServiceEvent("admin")).toBe(true);
+    expect(canDeleteLocationServiceEvent("client")).toBe(false);
+    expect(canDeleteLocationServiceEvent(undefined)).toBe(false);
   });
 
   it("creates an editable draft from an existing service event", () => {
