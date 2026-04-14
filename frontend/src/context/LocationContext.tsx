@@ -4,45 +4,43 @@ import {apiFetch} from "../util/common/apiFetch";
 import {parseLocationList} from "../util/common/coreApi";
 import {LocationSummary} from "../types/Types";
 
-const host = useApiHost();
-
 interface LocationContext {
     locations: Resource<LocationSummary[]>,
     mutate:  Setter<LocationSummary[] | undefined>,
     refetch: (info?: unknown) => (LocationSummary[] | Promise<LocationSummary[] | undefined> | null | undefined),
 }
 
-/**
- * Moved here from individual files because this is frequently used.
- */
-const fetchLocations = async (): Promise<LocationSummary[]> => {
-    const response = await apiFetch(host + "/api/core/locations", {
-        method: "GET"
-    });
-    if (!response.ok) {
-        throw new Error("Unable to load locations.");
-    }
-    return parseLocationList(await response.json());
-};
+const LocationContext = createContext<LocationContext>();
 
-const [locations, {mutate, refetch}] = createResource(
-    () => fetchLocations()
-);
+export const LocationProvider = (props: ParentProps) => {
+    const host = useApiHost();
+    /**
+     * Moved here from individual files because this is frequently used.
+     */
+    const fetchLocations = async (): Promise<LocationSummary[]> => {
+        const response = await apiFetch(host + "/api/core/locations", {
+            method: "GET"
+        });
+        if (!response.ok) {
+            throw new Error("Unable to load locations.");
+        }
+        return parseLocationList(await response.json());
+    };
 
-const locationInformation = {locations, mutate, refetch} as LocationContext;
-const LocationContext = createContext<LocationContext>(locationInformation);
-
-export const LocationProvider = (props: ParentProps) => (
-    <LocationContext.Provider value={locationInformation}>
+    const [locations, {mutate, refetch}] = createResource(
+        () => fetchLocations()
+    );
+    const locationInformation = {locations, mutate, refetch} as LocationContext;
+    return (<LocationContext.Provider value={locationInformation}>
         {props.children}
-    </LocationContext.Provider>
-)
+    </LocationContext.Provider>);
+}
 
 export const useLocations = () => {
     const ctx = useContext(LocationContext);
     if (!ctx) {
         throw new Error(
-            "Unable to load locations. Please login again."
+            "Unable to load locations. Please try again."
         )
     }
     return ctx;

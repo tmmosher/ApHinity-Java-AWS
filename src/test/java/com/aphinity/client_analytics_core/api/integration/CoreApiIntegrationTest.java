@@ -3,17 +3,23 @@ package com.aphinity.client_analytics_core.api.integration;
 import com.aphinity.client_analytics_core.api.auth.AuthCookieNames;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
-import com.aphinity.client_analytics_core.api.core.entities.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.Location;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEvent;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEventResponsibility;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEventStatus;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.location.Location;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -35,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -98,10 +105,23 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         addMembership(location, user);
         createServiceEvent(
             location,
+            "Archived inspection",
+            ServiceEventResponsibility.CLIENT,
+            LocalDate.parse("2025-12-15"),
+            LocalTime.parse("10:00:00"),
+            LocalDate.parse("2025-12-15"),
+            LocalTime.parse("11:00:00"),
+            "Outside the requested three-month window",
+            ServiceEventStatus.COMPLETED
+        );
+        createServiceEvent(
+            location,
             "Water meter inspection",
             ServiceEventResponsibility.PARTNER,
             LocalDate.parse("2026-04-03"),
             LocalTime.parse("09:30:00"),
+            LocalDate.parse("2026-04-04"),
+            LocalTime.parse("11:15:00"),
             "Inspect the primary water meter",
             ServiceEventStatus.UPCOMING
         );
@@ -110,15 +130,111 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         mockMvc.perform(
                 get("/api/core/locations/{locationId}/events", location.getId())
+                    .param("month", "2026-04")
                     .cookie(authCookies(authCookies))
                     .accept(APPLICATION_JSON)
             )
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].title").value("Water meter inspection"))
             .andExpect(jsonPath("$[0].responsibility").value("partner"))
             .andExpect(jsonPath("$[0].date").value("2026-04-03"))
             .andExpect(jsonPath("$[0].time").value("09:30:00"))
+            .andExpect(jsonPath("$[0].endDate").value("2026-04-04"))
+            .andExpect(jsonPath("$[0].endTime").value("11:15:00"))
             .andExpect(jsonPath("$[0].status").value("upcoming"));
+    }
+
+    @Test
+    void downloadLocationEventTemplateRejectsMissingAuthentication() throws Exception {
+        Location location = createLocation("Unauthenticated template location");
+
+        mockMvc.perform(get("/api/core/locations/{locationId}/events/template", location.getId()))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("authentication_required"));
+    }
+
+    @Test
+    void downloadLocationEventTemplateReturnsAttachmentForAccessibleLocation() throws Exception {
+        AppUser user = createUser("client-events-template@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Scottsdale");
+        addMembership(location, user);
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-events-template@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                get("/api/core/locations/{locationId}/events/template", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andReturn();
+
+        assertThat(result.getResponse().getContentType())
+            .contains("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+            .contains("attachment")
+            .contains("service_calendar_template.xlsx");
+        assertThat(result.getResponse().getContentAsByteArray()).isNotEmpty();
+    }
+
+    @Test
+    void uploadLocationEventCalendarImportsSpreadsheetRows() throws Exception {
+        createUser("partner-events-upload@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Flagstaff");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-upload@example.com", PASSWORD);
+
+        byte[] spreadsheet = createServiceCalendarSpreadsheet(
+            List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),
+            List.of("Imported visit", "Spreadsheet upload", "2026-04-15", "2026-04-15", "09:30", "10:45", "False", "Partner")
+        );
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/events/calendar-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "service_calendar_upload.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.importedCount").value(1));
+
+        List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
+        assertEquals(1, persistedEvents.size());
+        assertEquals("Imported visit", persistedEvents.getFirst().getTitle());
+        assertEquals(ServiceEventResponsibility.PARTNER, persistedEvents.getFirst().getResponsibility());
+    }
+
+    @Test
+    void uploadLocationEventCalendarReturnsRowSpecificErrors() throws Exception {
+        createUser("partner-events-upload-invalid@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Prescott");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-upload-invalid@example.com", PASSWORD);
+
+        byte[] spreadsheet = createServiceCalendarSpreadsheet(
+            List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),
+            List.of("Imported visit", "", "2026-04-15", "2026-04-15", "09:30", "10:45", "False", "Vendor")
+        );
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/events/calendar-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "service_calendar_upload.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("service_calendar_row_invalid"))
+            .andExpect(jsonPath("$.message").value("Row 2: Responsibility must be Client or Partner."));
     }
 
     @Test
@@ -179,6 +295,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "partner",
                           "date": "2026-04-10",
                           "time": "08:45:00",
+                          "endDate": "2026-04-12",
+                          "endTime": "17:15:00",
                           "description": "  Check the north pump station  ",
                           "status": "upcoming"
                         }
@@ -189,6 +307,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.responsibility").value("partner"))
             .andExpect(jsonPath("$.date").value("2026-04-10"))
             .andExpect(jsonPath("$.time").value("08:45:00"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-12"))
+            .andExpect(jsonPath("$.endTime").value("17:15:00"))
             .andExpect(jsonPath("$.description").value("Check the north pump station"))
             .andExpect(jsonPath("$.status").value("upcoming"))
             .andReturn();
@@ -196,10 +316,73 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         ServiceEvent persisted = serviceEventRepository.findAll().getFirst();
         assertEquals("Pump station visit", persisted.getTitle());
         assertEquals("Check the north pump station", persisted.getDescription());
+        assertEquals(LocalDate.parse("2026-04-12"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("17:15:00"), persisted.getEndEventTime());
 
         Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
         assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
         assertThat(result.getResponse().getContentAsString()).contains("Pump station visit");
+    }
+
+    @Test
+    void createLocationEventRejectsEndBeforeStart() throws Exception {
+        createUser("partner-events-invalid-range@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Glendale");
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-invalid-range@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Invalid event range",
+                          "responsibility": "partner",
+                          "date": "2026-04-10",
+                          "time": "08:45:00",
+                          "endDate": "2026-04-09",
+                          "endTime": "17:15:00",
+                          "description": "Should fail validation",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("event_range_invalid"))
+            .andExpect(jsonPath("$.message").value("Event end must be on or after the start date and time"));
+    }
+
+    @Test
+    void createLocationEventRejectsTitleLongerThanFortyTwoCharacters() throws Exception {
+        createUser("partner-events-invalid-title@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Chandler");
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-events-invalid-title@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "1234567890123456789012345678901234567890123",
+                          "responsibility": "partner",
+                          "date": "2026-04-10",
+                          "time": "08:45:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "17:15:00",
+                          "description": "Should fail title validation",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("validation_failed"))
+            .andExpect(jsonPath("$.message").value("Validation failed"))
+            .andExpect(jsonPath("$.fieldErrors.title").value("invalid_length"));
     }
 
     @Test
@@ -221,6 +404,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-12",
                           "time": "10:15:00",
+                          "endDate": "2026-04-12",
+                          "endTime": "12:00:00",
                           "description": "Client-owned schedule item",
                           "status": "upcoming"
                         }
@@ -229,11 +414,15 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.title").value("Client can create this"))
             .andExpect(jsonPath("$.responsibility").value("client"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-12"))
+            .andExpect(jsonPath("$.endTime").value("12:00:00"))
             .andExpect(jsonPath("$.description").value("Client-owned schedule item"));
 
         ServiceEvent persisted = serviceEventRepository.findAll().getFirst();
         assertEquals("Client can create this", persisted.getTitle());
         assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
+        assertEquals(LocalDate.parse("2026-04-12"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("12:00:00"), persisted.getEndEventTime());
     }
 
     @Test
@@ -255,6 +444,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "partner",
                           "date": "2026-04-12",
                           "time": "10:15:00",
+                          "endDate": "2026-04-12",
+                          "endTime": "12:00:00",
                           "description": "Attempted unauthorized mutation",
                           "status": "upcoming"
                         }
@@ -293,6 +484,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-06",
                           "time": "11:00:00",
+                          "endDate": "2026-04-08",
+                          "endTime": "16:30:00",
                           "description": "Updated description",
                           "status": "current"
                         }
@@ -303,6 +496,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.responsibility").value("client"))
             .andExpect(jsonPath("$.date").value("2026-04-06"))
             .andExpect(jsonPath("$.time").value("11:00:00"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-08"))
+            .andExpect(jsonPath("$.endTime").value("16:30:00"))
             .andExpect(jsonPath("$.description").value("Updated description"))
             .andExpect(jsonPath("$.status").value("current"));
 
@@ -310,6 +505,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals("Updated event", persisted.getTitle());
         assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
         assertEquals(ServiceEventStatus.CURRENT, persisted.getStatus());
+        assertEquals(LocalDate.parse("2026-04-08"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("16:30:00"), persisted.getEndEventTime());
 
         Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
         assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
@@ -343,6 +540,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-10",
                           "time": "14:30:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "15:45:00",
                           "description": "Updated client description",
                           "status": "current"
                         }
@@ -353,6 +552,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.responsibility").value("client"))
             .andExpect(jsonPath("$.date").value("2026-04-10"))
             .andExpect(jsonPath("$.time").value("14:30:00"))
+            .andExpect(jsonPath("$.endDate").value("2026-04-10"))
+            .andExpect(jsonPath("$.endTime").value("15:45:00"))
             .andExpect(jsonPath("$.description").value("Updated client description"))
             .andExpect(jsonPath("$.status").value("current"));
 
@@ -360,6 +561,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals("Client event updated", persisted.getTitle());
         assertEquals(ServiceEventResponsibility.CLIENT, persisted.getResponsibility());
         assertEquals(ServiceEventStatus.CURRENT, persisted.getStatus());
+        assertEquals(LocalDate.parse("2026-04-10"), persisted.getEndEventDate());
+        assertEquals(LocalTime.parse("15:45:00"), persisted.getEndEventTime());
     }
 
     @Test
@@ -390,6 +593,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "partner",
                           "date": "2026-04-10",
                           "time": "14:30:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "15:45:00",
                           "description": "Updated client description",
                           "status": "current"
                         }
@@ -427,6 +632,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                           "responsibility": "client",
                           "date": "2026-04-10",
                           "time": "14:30:00",
+                          "endDate": "2026-04-10",
+                          "endTime": "15:45:00",
                           "description": "Updated client description",
                           "status": "current"
                         }
@@ -1378,5 +1585,22 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         }
         // CookieCsrfTokenRepository validates by matching header and cookie values.
         return UUID.randomUUID().toString();
+    }
+
+    private byte[] createServiceCalendarSpreadsheet(List<String> headerRow, List<String> dataRow) throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Service Calendar");
+            writeSpreadsheetRow(sheet.createRow(0), headerRow);
+            writeSpreadsheetRow(sheet.createRow(1), dataRow);
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        }
+    }
+
+    private void writeSpreadsheetRow(Row row, List<String> values) {
+        for (int index = 0; index < values.size(); index += 1) {
+            row.createCell(index).setCellValue(values.get(index));
+        }
     }
 }

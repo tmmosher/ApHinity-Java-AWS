@@ -1,12 +1,12 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.LocationInviteController;
-import com.aphinity.client_analytics_core.api.core.entities.LocationInviteStatus;
-import com.aphinity.client_analytics_core.api.core.requests.LocationInviteRequest;
-import com.aphinity.client_analytics_core.api.core.response.LocationInviteResponse;
-import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationInviteController;
+import com.aphinity.client_analytics_core.api.core.entities.location.LocationInviteStatus;
+import com.aphinity.client_analytics_core.api.core.requests.location.LocationInviteRequest;
+import com.aphinity.client_analytics_core.api.core.response.location.LocationInviteResponse;
+import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.LocationInviteService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationInviteService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

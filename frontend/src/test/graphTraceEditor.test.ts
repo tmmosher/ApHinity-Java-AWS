@@ -4,10 +4,13 @@ import {
   addPieRow,
   coerceInputValue,
   createTrace,
+  getPieRowColor,
   getTraceYAxisRange,
   isAutoSizingPieTrace,
+  parseNumericInput,
   removePieRow,
   renameTrace,
+  setPieRowColor,
   setTraceColor,
   updateTraceYAxisRange,
   updatePieValue
@@ -20,14 +23,22 @@ describe("graphTraceEditor", () => {
     expect(coerceInputValue("1.", 3, true)).toBe("1.");
   });
 
+  it("parses only complete numeric graph inputs", () => {
+    expect(parseNumericInput("42")).toBe(42);
+    expect(parseNumericInput("  3.5 ")).toBe(3.5);
+    expect(parseNumericInput("abc")).toBeNull();
+    expect(parseNumericInput("1.")).toBeNull();
+    expect(parseNumericInput("-")).toBeNull();
+  });
+
   it("syncs pie marker colors when rows are added and removed", () => {
     const baseTrace: Record<string, unknown> = {
       type: "pie",
       labels: ["Open"],
       values: [2],
       marker: {
-        color: "#2563eb",
-        colors: ["#2563eb"]
+        color: "#1f77b4",
+        colors: ["#1f77b4"]
       }
     };
 
@@ -40,6 +51,25 @@ describe("graphTraceEditor", () => {
     expect(removedColors).toHaveLength(1);
   });
 
+  it("updates only the selected pie row color", () => {
+    const trace: Record<string, unknown> = {
+      type: "pie",
+      labels: ["Open", "Closed"],
+      values: [2, 5],
+      marker: {
+        color: "#1f77b4",
+        colors: ["#1f77b4", "#2ca02c"]
+      }
+    };
+
+    const nextTrace = setPieRowColor(trace, 1, "#d62728");
+
+    expect(getPieRowColor(nextTrace, 0)).toBe("#1f77b4");
+    expect(getPieRowColor(nextTrace, 1)).toBe("#d62728");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#d62728"]);
+    expect((nextTrace.marker as {color: string}).color).toBe("#1f77b4");
+  });
+
   it("applies scatter color to marker and line", () => {
     const trace: Record<string, unknown> = {
       type: "scatter",
@@ -47,9 +77,26 @@ describe("graphTraceEditor", () => {
       y: [3, 4]
     };
 
-    const nextTrace = setTraceColor(trace, "scatter", "#dc2626");
-    expect((nextTrace.marker as {color: string}).color).toBe("#dc2626");
-    expect((nextTrace.line as {color: string}).color).toBe("#dc2626");
+    const nextTrace = setTraceColor(trace, "scatter", "#d62728");
+    expect((nextTrace.marker as {color: string}).color).toBe("#d62728");
+    expect((nextTrace.line as {color: string}).color).toBe("#d62728");
+  });
+
+  it("applies pie color to the rendered marker color array", () => {
+    const trace: Record<string, unknown> = {
+      type: "pie",
+      labels: ["Open", "Closed"],
+      values: [3, 7],
+      marker: {
+        color: "#1f77b4",
+        colors: ["#1f77b4", "#2ca02c"]
+      }
+    };
+
+    const nextTrace = setTraceColor(trace, "pie", "#d62728");
+
+    expect((nextTrace.marker as {color: string}).color).toBe("#d62728");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#d62728", "#d62728"]);
   });
 
   it("keeps invalid pie value text for in-progress editing", () => {
@@ -88,17 +135,49 @@ describe("graphTraceEditor", () => {
     expect((nextTrace.values as unknown[])[1]).toBe(40);
   });
 
-  it("creates a new trace using the selected trace type and default naming", () => {
+  it("creates a blank scatter trace using the selected trace type and default naming", () => {
     const nextTrace = createTrace("scatter", 2);
 
     expect(nextTrace).toEqual({
-      type: "scatter",
+      x: [],
+      y: [],
+      line: {color: "#1f77b4", width: 2},
       mode: "lines+markers",
       name: "Trace 3",
-      x: [1],
-      y: [0],
-      marker: {color: "#2563eb"},
-      line: {color: "#2563eb"}
+      type: "scatter",
+      marker: {size: 6}
+    });
+  });
+
+  it("creates a blank bar trace using the selected trace type and default naming", () => {
+    const nextTrace = createTrace("bar", 0);
+
+    expect(nextTrace).toEqual({
+      type: "bar",
+      name: "Trace 1",
+      x: [],
+      y: [],
+      marker: {color: "#1f77b4"}
+    });
+  });
+
+  it("creates pie traces with donut defaults", () => {
+    const nextTrace = createTrace("pie", 0);
+
+    expect(nextTrace).toEqual({
+      type: "pie",
+      name: "Trace 1",
+      hole: 0.72,
+      sort: false,
+      labels: ["fill"],
+      values: [30],
+      textinfo: "none",
+      direction: "clockwise",
+      hovertemplate: "%{label}: %{value}<extra></extra>",
+      marker: {
+        color: "#1f77b4",
+        colors: ["#1f77b4"]
+      }
     });
   });
 

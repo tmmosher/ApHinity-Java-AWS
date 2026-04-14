@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [solid({ ssr: true })],
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"]
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"]
   }
 });

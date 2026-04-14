@@ -25,7 +25,7 @@ import java.util.Map;
  * The handler keeps client-facing messages intentionally safe while still logging
  * detailed context for troubleshooting.
  */
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.aphinity.client_analytics_core.api")
 public class ApiExceptionHandler {
     private final AsyncLogService logService;
 
@@ -58,9 +58,11 @@ public class ApiExceptionHandler {
         Map.entry("Insufficient permissions", new ErrorDefinition("forbidden", "Insufficient permissions")),
         Map.entry("Insufficient permissions for location access", new ErrorDefinition("forbidden", "Insufficient permissions for location access")),
         Map.entry("Location not found", new ErrorDefinition("location_not_found", "Location not found")),
+        Map.entry("Location section not found", new ErrorDefinition("location_section_not_found", "Location section not found")),
         Map.entry("Target user not found", new ErrorDefinition("target_user_not_found", "Target user not found")),
         Map.entry("Location membership not found", new ErrorDefinition("location_membership_not_found", "Location membership not found")),
         Map.entry("Location graph not found", new ErrorDefinition("location_graph_not_found", "Location graph not found")),
+        Map.entry("Location event not found", new ErrorDefinition("location_event_not_found", "Location event not found")),
         Map.entry("Invited user not found", new ErrorDefinition("invited_user_not_found", "Invited user not found")),
         Map.entry("Role is invalid", new ErrorDefinition("role_invalid", "Role is invalid")),
         Map.entry("Page index is invalid", new ErrorDefinition("page_invalid", "Page index is invalid")),
@@ -72,9 +74,24 @@ public class ApiExceptionHandler {
         Map.entry("Admin accounts cannot be deleted", new ErrorDefinition("admin_user_deletion_forbidden", "Admin accounts cannot be deleted")),
         Map.entry("User deletion queue is full", new ErrorDefinition("user_deletion_queue_full", "User deletion queue is full")),
         Map.entry("Graph name is required", new ErrorDefinition("graph_name_required", "Graph name is required")),
+        Map.entry("Graph type is invalid", new ErrorDefinition("graph_type_invalid", "Graph type is invalid")),
         Map.entry("Graph data is invalid", new ErrorDefinition("graph_data_invalid", "Graph data is invalid")),
         Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
         Map.entry("Graph update conflict", new ErrorDefinition("graph_update_conflict", "Graph update conflict")),
+        Map.entry("Event title is required", new ErrorDefinition("event_title_required", "Event title is required")),
+        Map.entry(
+            "Event title must be 42 characters or fewer",
+            new ErrorDefinition("event_title_invalid_length", "Event title must be 42 characters or fewer")
+        ),
+        Map.entry("Event responsibility is required", new ErrorDefinition("event_responsibility_required", "Event responsibility is required")),
+        Map.entry("Event date is required", new ErrorDefinition("event_date_required", "Event date is required")),
+        Map.entry("Event time is required", new ErrorDefinition("event_time_required", "Event time is required")),
+        Map.entry("Event status is required", new ErrorDefinition("event_status_required", "Event status is required")),
+        Map.entry("Event end must be on or after the start date and time", new ErrorDefinition("event_range_invalid", "Event end must be on or after the start date and time")),
+        Map.entry(
+            "Service calendar template unavailable",
+            new ErrorDefinition("service_calendar_template_unavailable", "Service calendar template unavailable")
+        ),
         Map.entry("Invite not found", new ErrorDefinition("invite_not_found", "Invite not found")),
         Map.entry("Invite expired", new ErrorDefinition("invite_expired", "Invite expired")),
         Map.entry("Invite is not pending", new ErrorDefinition("invite_not_pending", "Invite is not pending")),
@@ -92,6 +109,24 @@ public class ApiExceptionHandler {
      */
     public ApiExceptionHandler(AsyncLogService logService) {
         this.logService = logService;
+    }
+
+    @ExceptionHandler(ApiClientException.class)
+    public ResponseEntity<ApiErrorResponse> handleApiClientException(ApiClientException ex) {
+        int status = ex.getStatus().value();
+        logService.log(formatHandledException(
+            "ApiClientException",
+            ex,
+            "status=" + status + ", code=" + ex.getCode()
+        ));
+        ApiErrorResponse response = new ApiErrorResponse(
+            ex.getCode(),
+            safeMessage(ex.getMessage()),
+            status,
+            Instant.now(),
+            Map.of()
+        );
+        return ResponseEntity.status(ex.getStatus()).body(response);
     }
 
     /**

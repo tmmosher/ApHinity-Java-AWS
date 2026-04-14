@@ -7,20 +7,20 @@ import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepositor
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.auth.services.MailSendingService;
-import com.aphinity.client_analytics_core.api.core.entities.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.Location;
-import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
-import com.aphinity.client_analytics_core.api.core.entities.LocationGraphId;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEvent;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEventResponsibility;
-import com.aphinity.client_analytics_core.api.core.entities.ServiceEventStatus;
-import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
-import com.aphinity.client_analytics_core.api.core.entities.LocationUserId;
-import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.location.Location;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
+import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
+import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.security.JwtProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
@@ -180,12 +180,38 @@ abstract class AbstractApiIntegrationTest {
         String description,
         ServiceEventStatus status
     ) {
+        return createServiceEvent(
+            location,
+            title,
+            responsibility,
+            date,
+            time,
+            date,
+            time,
+            description,
+            status
+        );
+    }
+
+    protected ServiceEvent createServiceEvent(
+        Location location,
+        String title,
+        ServiceEventResponsibility responsibility,
+        LocalDate date,
+        LocalTime time,
+        LocalDate endDate,
+        LocalTime endTime,
+        String description,
+        ServiceEventStatus status
+    ) {
         ServiceEvent serviceEvent = new ServiceEvent();
         serviceEvent.setLocation(location);
         serviceEvent.setTitle(title);
         serviceEvent.setResponsibility(responsibility);
         serviceEvent.setEventDate(date);
         serviceEvent.setEventTime(time);
+        serviceEvent.setEndEventDate(endDate);
+        serviceEvent.setEndEventTime(endTime);
         serviceEvent.setDescription(description);
         serviceEvent.setStatus(status);
         return serviceEventRepository.save(serviceEvent);

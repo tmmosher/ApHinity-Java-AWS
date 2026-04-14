@@ -14,6 +14,18 @@ COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 RUN npm ci
 
+FROM node-base AS frontend-build
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY frontend ./frontend
+COPY --from=frontend-deps /app/node_modules ./node_modules
+
+ARG VITE_TURNSTILE_SITE_KEY=""
+ENV VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY}
+
+RUN npm run frontend:build
+
 FROM amazoncorretto:21-al2023 AS backend-build
 WORKDIR /app
 
@@ -29,15 +41,13 @@ COPY src ./src
 
 RUN ./gradlew bootJar --no-daemon
 
-FROM node-base
+FROM amazoncorretto:21-al2023
 WORKDIR /app
 
 COPY --from=backend-build /app/build/libs/*.jar /app/app.jar
-COPY package.json package-lock.json ./
-COPY frontend ./frontend
-COPY --from=frontend-deps /app/node_modules ./node_modules
+COPY --from=frontend-build /app/src/main/resources/static /app/static
 
-ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/src/main/resources/static/
+ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/static/
 
 EXPOSE 8080
-ENTRYPOINT ["sh","-c","if [ -n \"$TURNSTILE_SITE_KEY\" ]; then export VITE_TURNSTILE_SITE_KEY=\"$TURNSTILE_SITE_KEY\"; fi; npm run frontend:build && exec java -jar /app/app.jar"]
+ENTRYPOINT ["java","-jar","/app/app.jar"]

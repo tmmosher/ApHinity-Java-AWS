@@ -1,5 +1,6 @@
 import type { PlotlyLayout } from "../components/Chart";
 import type { ThemePreference } from "./themePreference";
+import {normalizePlotlyLayoutTitle} from "./graphLayoutTitle";
 
 export type GraphThemeStyle = {
   textColor: string;
@@ -50,6 +51,21 @@ const applyTitleTheme = (title: unknown, textColor: string): unknown => {
     ...title,
     font: {
       ...(isRecord(title.font) ? title.font : {}),
+      color: textColor
+    }
+  };
+};
+
+const applyLayoutTitleTheme = (title: unknown, textColor: string): unknown => {
+  const normalizedTitle = normalizePlotlyLayoutTitle(title);
+  if (!isRecord(normalizedTitle)) {
+    return normalizedTitle;
+  }
+
+  return {
+    ...normalizedTitle,
+    font: {
+      ...(isRecord(normalizedTitle.font) ? normalizedTitle.font : {}),
       color: textColor
     }
   };
@@ -153,7 +169,7 @@ export const resolveThemedGraphLayout = (
       ...(isRecord(layout.font) ? layout.font : {}),
       color: themeStyle.textColor
     },
-    title: applyTitleTheme(layout.title, themeStyle.textColor),
+    title: applyLayoutTitleTheme(layout.title, themeStyle.textColor),
     legend: applyLegendTheme(layout.legend, themeStyle.textColor),
     xaxis: applyAxisTheme(layout.xaxis, themeStyle.textColor, themeStyle.gridColor),
     yaxis: applyAxisTheme(layout.yaxis, themeStyle.textColor, themeStyle.gridColor),

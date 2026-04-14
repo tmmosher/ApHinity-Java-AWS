@@ -2,22 +2,23 @@ package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
-import com.aphinity.client_analytics_core.api.core.entities.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.Location;
-import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
-import com.aphinity.client_analytics_core.api.core.entities.LocationUser;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.location.Location;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
+import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
-import com.aphinity.client_analytics_core.api.core.response.AccountRole;
-import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
-import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
-import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
-import com.aphinity.client_analytics_core.api.core.services.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -47,6 +48,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LocationServiceTest {
+    private static final String LEGACY_GRAPH_COLOR = "#1f77b4";
+
     @Mock
     private AppUserRepository appUserRepository;
 
@@ -318,6 +321,316 @@ class LocationServiceTest {
         assertEquals("Renamed graph", graph.getName());
         verify(graphRepository).saveAndFlush(graph);
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void deleteLocationGraphRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationGraph(5L, 99L, 31L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository, locationGraphRepository);
+    }
+
+    @Test
+    void deleteLocationGraphRemovesGraphFromSectionLayoutAndDeletesGraph() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(31L, 44L)),
+                Map.of("section_id", 2, "graph_ids", List.of(57L))
+            )
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(99L, 31L)).thenReturn(Optional.of(graph));
+        when(locationGraphRepository.findByIdGraphId(31L)).thenReturn(List.of());
+
+        locationService.deleteLocationGraph(5L, 99L, 31L);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(44L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(57L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).deleteById(new LocationGraphId(99L, 31L));
+        verify(graphRepository).delete(graph);
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void createLocationGraphRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.createLocationGraph(5L, 99L, 2L, false, "bar")
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository, locationGraphRepository);
+    }
+
+    @Test
+    void createLocationGraphRejectsUnknownSection() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of(11L)))
+        ));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.createLocationGraph(5L, 99L, 2L, false, "bar")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Location section not found", ex.getReason());
+        verify(graphRepository, never()).saveAndFlush(any(Graph.class));
+        verifyNoInteractions(locationGraphRepository);
+    }
+
+    @Test
+    void createLocationGraphPersistsGraphAndAppendsItToRequestedSection() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(11L)),
+                Map.of("section_id", 2, "graph_ids", List.of())
+            )
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(31L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+        when(graphRepository.findById(31L)).thenAnswer(invocation -> {
+            Graph graph = savedGraphHolder[0];
+            if (graph == null) {
+                return Optional.empty();
+            }
+
+            Graph refreshedGraph = new Graph();
+            refreshedGraph.setId(graph.getId());
+            refreshedGraph.setName(graph.getName());
+            refreshedGraph.setData(graph.getData());
+            refreshedGraph.setLayout(graph.getLayout());
+            refreshedGraph.setConfig(graph.getConfig());
+            refreshedGraph.setStyle(graph.getStyle());
+            refreshedGraph.setCreatedAt(graph.getCreatedAt());
+            refreshedGraph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00.020Z"));
+            return Optional.of(refreshedGraph);
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, 2L, false, "scatter");
+
+        assertEquals(31L, response.id());
+        assertEquals("New Plot Graph", response.name());
+        assertEquals(1, response.data().size());
+        assertEquals("scatter", response.data().getFirst().get("type"));
+        assertEquals("Trace 1", response.data().getFirst().get("name"));
+        assertEquals(List.of(), response.data().getFirst().get("x"));
+        assertEquals(List.of(), response.data().getFirst().get("y"));
+        assertEquals(expectedScatterTemplateLayout("Phoenix"), response.layout());
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
+        assertEquals(expectedScatterTemplateStyle(), response.style());
+        assertEquals(Instant.parse("2026-01-03T00:00:00.020Z"), response.updatedAt());
+        verify(graphRepository).saveAndFlush(any(Graph.class));
+        verify(graphRepository).findById(31L);
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals(1, traces.size());
+        assertEquals("scatter", traces.getFirst().get("type"));
+        assertEquals("Trace 1", traces.getFirst().get("name"));
+        assertEquals(List.of(), traces.getFirst().get("x"));
+        assertEquals(List.of(), traces.getFirst().get("y"));
+        assertEquals(expectedScatterTemplateLayout("Phoenix"), savedGraphHolder[0].getLayout());
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
+        assertEquals(expectedScatterTemplateStyle(), savedGraphHolder[0].getStyle());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(11L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(31L), sections.get(1).get("graph_ids"));
+    }
+
+    @Test
+    void createLocationGraphBuildsDonutPieTemplate() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of()))
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(33L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, 1L, false, "pie");
+
+        assertEquals(33L, response.id());
+        assertEquals("New Pie Graph", response.name());
+        Map<String, Object> expectedPieStyle = Map.of(
+            "theme",
+            Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 160
+        );
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals(1, traces.size());
+        assertEquals("pie", traces.getFirst().get("type"));
+        assertEquals(0.72, ((Number) traces.getFirst().get("hole")).doubleValue());
+        assertEquals(false, traces.getFirst().get("sort"));
+        assertEquals(List.of("fill"), traces.getFirst().get("labels"));
+        @SuppressWarnings("unchecked")
+        List<Object> values = (List<Object>) traces.getFirst().get("values");
+        assertEquals(1, values.size());
+        assertEquals(0L, ((Number) values.getFirst()).longValue());
+        assertEquals("none", traces.getFirst().get("textinfo"));
+        assertEquals("clockwise", traces.getFirst().get("direction"));
+        assertEquals("%{label}: %{value}<extra></extra>", traces.getFirst().get("hovertemplate"));
+        assertEquals(
+            Map.of("color", LEGACY_GRAPH_COLOR, "colors", List.of(LEGACY_GRAPH_COLOR)),
+            traces.getFirst().get("marker")
+        );
+        assertEquals(
+            Map.of(
+                "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
+                "showlegend", false,
+                "annotations", List.of(Map.of(
+                    "x", 0.5,
+                    "y", 0.5,
+                    "text", "<b>0</b>",
+                    "xref", "paper",
+                    "yref", "paper",
+                    "showarrow", false,
+                    "font", Map.of("size", 22)
+                ))
+            ),
+            response.layout()
+        );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
+        assertEquals(expectedPieStyle, response.style());
+        assertEquals(expectedPieStyle, savedGraphHolder[0].getStyle());
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
+    }
+
+    @Test
+    void createLocationGraphCreatesAndAppendsANewSectionWhenRequested() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 2, "graph_ids", List.of(11L)),
+                Map.of("section_id", 4, "graph_ids", List.of(12L))
+            )
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(45L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, null, true, "bar");
+
+        assertEquals(45L, response.id());
+        assertEquals(
+            Map.of(
+                "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
+                "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                "showlegend", false
+            ),
+            response.layout()
+        );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals(List.of(), traces.getFirst().get("x"));
+        assertEquals(List.of(), traces.getFirst().get("y"));
+        assertEquals(Map.of("color", LEGACY_GRAPH_COLOR), traces.getFirst().get("marker"));
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(3, sections.size());
+        assertEquals(5L, sections.get(2).get("section_id"));
+        assertEquals(List.of(45L), sections.get(2).get("graph_ids"));
     }
 
     @Test
@@ -822,5 +1135,31 @@ class LocationServiceTest {
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError("Unable to set raw graph data for legacy payload test", ex);
         }
+    }
+
+    private Map<String, Object> expectedScatterTemplateLayout(String locationName) {
+        return Map.of(
+            "title", Map.of("x", 0.02, "text", locationName, "xanchor", "left"),
+            "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "% Compliance", "ticksuffix", "%"),
+            "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
+            "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+        );
+    }
+
+    private Map<String, Object> expectedScatterTemplateStyle() {
+        return Map.of(
+            "theme", Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 320
+        );
     }
 }

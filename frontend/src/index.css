@@ -2,96 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes graph-loading-slide {
-  0% {
-    background-position: 180% 0;
+.service-calendar-transition-surface[data-service-calendar-transition="previous"] {
+  /* animation hook for future use */
+}
+
+.service-calendar-transition-surface[data-service-calendar-transition="next"] {
+    /* animation hook for future use */
+}
+
+@property --gradient-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0turn;
+}
+
+@keyframes gradient-border-orbit {
+  from {
+    --gradient-border-angle: 0turn;
   }
-  100% {
-    background-position: -160% 0;
+  to {
+    --gradient-border-angle: 1turn;
   }
 }
 
-@keyframes graph-loading-grow {
-  0%, 100% {
-    opacity: 0.45;
-    transform: scaleY(0.4);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleY(1);
-  }
+.gradient-border {
+  position: relative;
+  border-radius: 1rem;
+  isolation: isolate;
 }
 
-.graph-loading-placeholder {
-  display: grid;
-  grid-template-rows: 12px 8px 1fr;
-  gap: 0.75rem;
-  align-content: start;
-  padding: 0.8rem;
-  border-radius: 0.5rem;
-  border: 1px solid hsl(var(--b3) / 0.9);
-  background: linear-gradient(
-    120deg,
-    hsl(var(--b2) / 0.85) 20%,
-    hsl(var(--b1) / 1) 50%,
-    hsl(var(--b2) / 0.85) 80%
+.gradient-border-frame {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.gradient-border-frame::before {
+  --gradient-border-angle: 0turn;
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: inherit;
+  background-image: conic-gradient(
+    from var(--gradient-border-angle),
+    #8add68,
+    #3e50bf,
+    #8add68
   );
-  background-size: 220% 100%;
-  animation: graph-loading-slide 1.7s ease-in-out infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
-.graph-loading-line {
-  border-radius: 999px;
-  background: hsl(var(--bc) / 0.22);
+.gradient-border[data-active="true"] .gradient-border-frame,
+.gradient-border:active .gradient-border-frame,
+.gradient-border[data-animating="true"] .gradient-border-frame,
+.gradient-border:focus-within .gradient-border-frame {
+  opacity: 1;
 }
 
-.graph-loading-line-wide {
-  width: 72%;
+.gradient-border[data-animating="true"] .gradient-border-frame::before,
+.gradient-border[data-focus-mode="animate-once"]:focus-within .gradient-border-frame::before {
+  animation: gradient-border-orbit 1s linear 1;
 }
 
-.graph-loading-line-medium {
-  width: 48%;
-}
-
-.graph-loading-bars {
-  align-self: end;
-  display: flex;
-  gap: 0.45rem;
-  align-items: flex-end;
-  height: 58%;
-}
-
-.graph-loading-bar {
-  width: 0.65rem;
-  border-radius: 0.35rem;
-  background: hsl(var(--bc) / 0.38);
-  transform-origin: bottom center;
-  animation: graph-loading-grow 0.95s ease-in-out infinite;
-}
-
-.graph-loading-bar-1 {
-  height: 34%;
-  animation-delay: 0.05s;
-}
-
-.graph-loading-bar-2 {
-  height: 62%;
-  animation-delay: 0.17s;
-}
-
-.graph-loading-bar-3 {
-  height: 86%;
-  animation-delay: 0.29s;
-}
-
-.graph-loading-bar-4 {
-  height: 48%;
-  animation-delay: 0.41s;
+.gradient-border-surface {
+  position: relative;
+  z-index: 1;
+  border-radius: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .graph-loading-placeholder,
-  .graph-loading-bar {
+  .gradient-border[data-animating="true"] .gradient-border-frame,
+  .gradient-border[data-focus-mode="animate-once"]:focus-within .gradient-border-frame {
+    animation: none;
+  }
+
+  .gradient-border[data-animating="true"] .gradient-border-frame::before,
+  .gradient-border[data-focus-mode="animate-once"]:focus-within .gradient-border-frame::before {
     animation: none;
   }
 }

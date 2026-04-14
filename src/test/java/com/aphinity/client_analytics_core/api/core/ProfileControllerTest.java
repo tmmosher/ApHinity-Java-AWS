@@ -1,12 +1,12 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.ProfileController;
-import com.aphinity.client_analytics_core.api.core.requests.ProfilePasswordUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.requests.ProfileUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.response.AccountRole;
-import com.aphinity.client_analytics_core.api.core.response.ProfileResponse;
+import com.aphinity.client_analytics_core.api.core.controllers.dashboard.ProfileController;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.ProfilePasswordUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.ProfileUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.ProfileService;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.ProfileService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

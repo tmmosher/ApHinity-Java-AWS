@@ -1,6 +1,8 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
 import {
+  createLocationGraphById,
+  deleteLocationGraphById,
   fetchLocationById,
   fetchLocationGraphsById,
   renameLocationGraphById,
@@ -17,6 +19,47 @@ const createMockResponse = (ok: boolean, payload: unknown): Response =>
     ok,
     json: vi.fn().mockResolvedValue(payload)
   }) as unknown as Response;
+
+const SCATTER_GRAPH_LAYOUT = {
+  title: {x: 0.02, text: "Phoenix", xanchor: "left"},
+  xaxis: {type: "date", tickformat: "%b %Y"},
+  yaxis: {range: [0, 100], title: "% Compliance", ticksuffix: "%"},
+  legend: {x: 0, y: -0.3, orientation: "h"},
+  margin: {b: 60, l: 50, r: 20, t: 50}
+};
+
+const SCATTER_GRAPH_STYLE = {
+  theme: {
+    dark: {
+      gridColor: "rgba(148, 163, 184, 0.3)",
+      textColor: "#e5e7eb"
+    },
+    light: {
+      gridColor: "rgba(15, 23, 42, 0.15)",
+      textColor: "#111827"
+    }
+  },
+  height: 320
+};
+
+const buildScatterGraphResponse = () => ({
+  id: 44,
+  name: "New Plot Graph",
+  data: [{
+    type: "scatter",
+    name: "Trace 1",
+    x: [],
+    y: [],
+    line: {color: "#1f77b4", width: 2},
+    mode: "lines+markers",
+    marker: {size: 6}
+  }],
+  layout: SCATTER_GRAPH_LAYOUT,
+  config: {displayModeBar: false, responsive: false},
+  style: SCATTER_GRAPH_STYLE,
+  createdAt: "2026-01-05T00:00:00Z",
+  updatedAt: "2026-01-05T00:00:00Z"
+});
 
 describe("DashboardLocationDetailPanel data loaders", () => {
   const host = "https://example.test";
@@ -230,6 +273,93 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     });
   });
 
+  it("creates a graph through the dedicated create endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, buildScatterGraphResponse()));
+
+    const result = await createLocationGraphById(host, "55", {
+      sectionId: 3,
+      graphType: "scatter"
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sectionId: 3,
+        graphType: "scatter"
+      })
+    });
+    expect(result.name).toBe("New Plot Graph");
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].type).toBe("scatter");
+    expect(result.data[0].x).toEqual([]);
+    expect(result.data[0].y).toEqual([]);
+    expect(result.layout).toEqual(SCATTER_GRAPH_LAYOUT);
+    expect(result.config).toEqual({displayModeBar: false, responsive: false});
+    expect(result.style).toEqual(SCATTER_GRAPH_STYLE);
+    expect(result).toEqual(buildScatterGraphResponse());
+  });
+
+  it("creates a graph and requests a new section when needed", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 45,
+      name: "New Bar Graph",
+      data: [{type: "bar", name: "Trace 1", x: [], y: [], marker: {color: "#1f77b4"}}],
+      layout: {showlegend: false},
+      config: {displayModeBar: false, responsive: false},
+      style: {height: 320},
+      createdAt: "2026-01-05T00:00:00Z",
+      updatedAt: "2026-01-05T00:00:00Z"
+    }));
+
+    const result = await createLocationGraphById(host, "55", {
+      createNewSection: true,
+      graphType: "bar"
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        createNewSection: true,
+        graphType: "bar"
+      })
+    });
+    expect(result.name).toBe("New Bar Graph");
+    expect(result.data[0].type).toBe("bar");
+    expect(result.data[0].x).toEqual([]);
+    expect(result.data[0].y).toEqual([]);
+    expect(result.data[0].marker).toEqual({color: "#1f77b4"});
+  });
+
+  it("deletes a graph through the dedicated delete endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await deleteLocationGraphById(host, "55", 12);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs/12", {
+      method: "DELETE"
+    });
+  });
+
+  it("surfaces permission errors when graph creation is rejected", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "forbidden",
+      message: "Insufficient permissions"
+    }));
+
+    await expect(
+      createLocationGraphById(host, "55", {
+        sectionId: 3,
+        graphType: "bar"
+      })
+    ).rejects.toThrowError("Insufficient permissions");
+  });
+
   it("rejects invalid route location ids before save request dispatch", async () => {
     await expect(
       saveLocationGraphsById(host, "0", [
@@ -306,5 +436,16 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     await expect(
       renameLocationGraphById(host, "55", 12, "   ")
     ).rejects.toThrowError("Graph name is required");
+  });
+
+  it("throws a location-graph error when delete target no longer exists", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "location_graph_not_found",
+      message: "Location graph not found"
+    }));
+
+    await expect(
+      deleteLocationGraphById(host, "55", 12)
+    ).rejects.toThrowError("Location graph not found");
   });
 });

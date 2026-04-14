@@ -87,6 +87,37 @@ export interface LocationGraphRenameResult {
     updatedAt: string;
 }
 
+export type LocationGraphType = "pie" | "bar" | "scatter";
+
+export type ServiceEventResponsibility = "client" | "partner";
+
+export type ServiceEventStatus = "upcoming" | "current" | "overdue" | "completed";
+
+export interface LocationServiceEvent {
+    id: number;
+    title: string;
+    responsibility: ServiceEventResponsibility;
+    date: string;
+    time: string;
+    endDate: string;
+    endTime: string;
+    description: string | null;
+    status: ServiceEventStatus;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLocationServiceEventRequest {
+    title: string;
+    responsibility: ServiceEventResponsibility;
+    date: string;
+    time: string;
+    endDate: string;
+    endTime: string;
+    description: string | null;
+    status: ServiceEventStatus;
+}
+
 export interface ManagedUser {
   id: number;
   name: string;

@@ -3,17 +3,17 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.security.AccessTokenRefreshFilter;
-import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
-import com.aphinity.client_analytics_core.api.core.entities.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.repositories.GraphRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationGraphRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,13 +39,16 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -312,6 +315,230 @@ class LocationGraphPipelineWebMvcTest {
         assertEquals(List.of(9L), traces.get(0).get("y"));
         assertEquals("Forecast", traces.get(1).get("name"));
         assertEquals(List.of(12L), traces.get(1).get("y"));
+    }
+
+    @Test
+    void createLocationGraphBuildsDefaultPayloadAndAppendsItToRequestedSection() throws Exception {
+        Long userId = 47L;
+        Long locationId = 83L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(300L)),
+                Map.of("section_id", 2, "graph_ids", List.of())
+            )
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(510L);
+            graph.setCreatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-05T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "sectionId": 2,
+                          "graphType": "bar"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(510))
+            .andExpect(jsonPath("$.name").value("New Bar Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("bar"))
+            .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
+            .andExpect(jsonPath("$.data[0].marker.color").value("#1f77b4"))
+            .andExpect(jsonPath("$.data[0].x").isArray())
+            .andExpect(jsonPath("$.data[0].x").isEmpty())
+            .andExpect(jsonPath("$.data[0].y").isArray())
+            .andExpect(jsonPath("$.data[0].y").isEmpty())
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(false))
+            .andExpect(jsonPath("$.style.height").value(320));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(300L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(510L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void createLocationGraphBuildsScatterTemplateWithAScatterTrace() throws Exception {
+        Long userId = 52L;
+        Long locationId = 86L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of("sections", List.of(Map.of("section_id", 1, "graph_ids", List.of()))));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(512L);
+            graph.setCreatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "sectionId": 1,
+                          "graphType": "scatter"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(512))
+            .andExpect(jsonPath("$.name").value("New Plot Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("scatter"))
+            .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
+            .andExpect(jsonPath("$.data[0].x").isArray())
+            .andExpect(jsonPath("$.data[0].x").isEmpty())
+            .andExpect(jsonPath("$.data[0].y").isArray())
+            .andExpect(jsonPath("$.data[0].y").isEmpty())
+            .andExpect(jsonPath("$.data[0].line.color").value("#1f77b4"))
+            .andExpect(jsonPath("$.data[0].line.width").value(2))
+            .andExpect(jsonPath("$.data[0].mode").value("lines+markers"))
+            .andExpect(jsonPath("$.data[0].marker.size").value(6))
+            .andExpect(jsonPath("$.layout.yaxis.title").value("% Compliance"))
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(false));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(512L), sections.getFirst().get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void createLocationGraphCreatesANewSectionWhenRequested() throws Exception {
+        Long userId = 48L;
+        Long locationId = 84L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(511L);
+            graph.setCreatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "createNewSection": true,
+                          "graphType": "bar"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(511))
+            .andExpect(jsonPath("$.name").value("New Bar Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("bar"))
+            .andExpect(jsonPath("$.data[0].marker.color").value("#1f77b4"))
+            .andExpect(jsonPath("$.data[0].x").isArray())
+            .andExpect(jsonPath("$.data[0].x").isEmpty())
+            .andExpect(jsonPath("$.data[0].y").isArray())
+            .andExpect(jsonPath("$.data[0].y").isEmpty())
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(false))
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(1, sections.size());
+        assertEquals(1L, ((Number) sections.getFirst().get("section_id")).longValue());
+        assertEquals(List.of(511L), sections.getFirst().get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void deleteLocationGraphRemovesItFromSectionLayoutThroughPipeline() throws Exception {
+        Long userId = 49L;
+        Long locationId = 85L;
+        Long graphId = 512L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(graphId, 300L)),
+                Map.of("section_id", 2, "graph_ids", List.of(301L))
+            )
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+        Graph graph = new Graph();
+        graph.setId(graphId);
+        graph.setName("Delete me");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, graphId))
+            .thenReturn(Optional.of(graph));
+        when(locationGraphRepository.findByIdGraphId(graphId)).thenReturn(List.of());
+
+        mockMvc.perform(
+                delete("/core/locations/{locationId}/graphs/{graphId}", locationId, graphId)
+                    .with(csrf().asHeader())
+            )
+            .andExpect(status().isNoContent());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(300L), sections.get(0).get("graph_ids"));
+        assertEquals(List.of(301L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).deleteById(new com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId(locationId, graphId));
+        verify(graphRepository).delete(graph);
+        verify(locationRepository).saveAndFlush(location);
     }
 
     @Test

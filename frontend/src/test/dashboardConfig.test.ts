@@ -1,5 +1,10 @@
 import {describe, expect, it} from "vitest";
-import {dashboardNavForAccount, isDashboardPathAllowed} from "../pages/authenticated/dashboardConfig";
+import {
+  dashboardNavForAccount,
+  isDashboardNavItemActive,
+  isDashboardPathAllowed,
+  normalizeDashboardPathname
+} from "../pages/authenticated/dashboardConfig";
 
 describe("dashboardConfig", () => {
   it("allows location paths for verified users with role access", () => {
@@ -47,5 +52,16 @@ describe("dashboardConfig", () => {
     expect(adminNav.find((item) => item.href === "/dashboard/management")?.label).toBe("User Management");
     expect(dashboardNavForAccount("partner", true).map((item) => item.href)).not.toContain("/dashboard/management");
     expect(dashboardNavForAccount("client", true).map((item) => item.href)).not.toContain("/dashboard/management");
+  });
+
+  it("normalizes location detail paths for dashboard navigation matching", () => {
+    expect(normalizeDashboardPathname("/dashboard/locations/42")).toBe("/dashboard/locations");
+    expect(normalizeDashboardPathname("/dashboard/profile/")).toBe("/dashboard/profile");
+  });
+
+  it("marks the locations entry active for location detail routes", () => {
+    expect(isDashboardNavItemActive("/dashboard/locations", "/dashboard/locations/42")).toBe(true);
+    expect(isDashboardNavItemActive("/dashboard/profile", "/dashboard/locations/42")).toBe(false);
+    expect(isDashboardNavItemActive("/dashboard/profile", "/dashboard/profile/")).toBe(true);
   });
 });

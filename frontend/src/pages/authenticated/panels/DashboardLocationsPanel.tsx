@@ -10,7 +10,7 @@ import {
   runCreateLocationAction,
   runRenameLocationAction,
   sortLocationsByName
-} from "./dashboardLocationsActions";
+} from "../../../util/location/dashboardLocationsActions";
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();

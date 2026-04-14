@@ -1,15 +1,16 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.LocationController;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateBatchRequest;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphDataUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.requests.LocationGraphNameUpdateRequest;
-import com.aphinity.client_analytics_core.api.core.requests.LocationRequest;
-import com.aphinity.client_analytics_core.api.core.response.GraphResponse;
-import com.aphinity.client_analytics_core.api.core.response.GraphNameUpdateResponse;
-import com.aphinity.client_analytics_core.api.core.response.LocationResponse;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateBatchRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphCreateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.requests.location.LocationRequest;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
+import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -152,6 +153,48 @@ class LocationControllerTest {
     }
 
     @Test
+    void createLocationGraphDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationGraphCreateRequest request = new LocationGraphCreateRequest(null, true, "scatter");
+        GraphResponse expected = new GraphResponse(
+            55L,
+            "New Plot Graph",
+            scatterGraphData(),
+            scatterGraphLayout(),
+            Map.of("displayModeBar", false, "responsive", false),
+            scatterGraphStyle(),
+            Instant.parse("2026-01-03T00:00:00Z"),
+            Instant.parse("2026-01-03T00:00:00Z")
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.createLocationGraph(42L, 8L, null, true, "scatter")).thenReturn(expected);
+
+        GraphResponse actual = locationController.createLocationGraph(jwt, 8L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).createLocationGraph(42L, 8L, null, true, "scatter");
+    }
+
+    @Test
+    void deleteLocationGraphDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationController.deleteLocationGraph(jwt, 8L, 31L);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).deleteLocationGraph(42L, 8L, 31L);
+    }
+
+    @Test
     void updateLocationGraphNameDelegatesToServiceForAuthenticatedUser() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")
@@ -185,5 +228,48 @@ class LocationControllerTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
         verifyNoInteractions(locationService);
+    }
+
+    private static List<Map<String, Object>> scatterGraphData() {
+        return List.of(
+            Map.of(
+                "type", "scatter",
+                "name", "Trace 1",
+                "x", List.of(),
+                "y", List.of(),
+                "line", Map.of(
+                    "color", "#1f77b4",
+                    "width", 2
+                ),
+                "mode", "lines+markers",
+                "marker", Map.of("size", 6)
+            )
+        );
+    }
+
+    private static Map<String, Object> scatterGraphLayout() {
+        return Map.of(
+            "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
+            "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "% Compliance", "ticksuffix", "%"),
+            "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
+            "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+        );
+    }
+
+    private static Map<String, Object> scatterGraphStyle() {
+        return Map.of(
+            "theme", Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 320
+        );
     }
 }

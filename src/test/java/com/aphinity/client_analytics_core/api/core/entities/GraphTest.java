@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import org.junit.jupiter.api.Test;
 

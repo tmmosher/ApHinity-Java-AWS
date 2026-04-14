@@ -12,12 +12,13 @@ export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
 };
 
 export const TRACE_COLOR_OPTIONS: Record<string, string> = {
-  "Ocean Blue": "#2563eb",
-  "Forest Green": "#16a34a",
-  "Sunset Orange": "#ea580c",
-  "Crimson Red": "#dc2626",
-  "Deep Violet": "#7c3aed",
-  "Slate Gray": "#475569"
+  "Legacy Blue": "#1f77b4",
+  "Legacy Green": "#2ca02c",
+  "Legacy Red": "#d62728",
+  "Legacy Orange": "#ff7f0e",
+  "Legacy Purple": "#9467bd",
+  "Legacy Cyan": "#17becf",
+  "Legacy Gray": "#7f7f7f"
 };
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -70,6 +71,11 @@ export const coerceInputValue = (
   return rawValue;
 };
 
+export const parseNumericInput = (rawValue: string): number | null => {
+  const parsedValue = coerceInputValue(rawValue, 0, true);
+  return typeof parsedValue === "number" ? parsedValue : null;
+};
+
 export const getTraceArray = (trace: Record<string, unknown>, field: string): unknown[] => {
   const value = trace[field];
   return Array.isArray(value) ? [...value] : [];
@@ -105,6 +111,32 @@ export const getTraceColor = (trace: Record<string, unknown>): string | null => 
   return null;
 };
 
+const getDefaultTraceColor = (): string =>
+  Object.values(TRACE_COLOR_OPTIONS)[0];
+
+export const getPieRowColor = (
+  trace: Record<string, unknown>,
+  rowIndex: number
+): string => {
+  const marker = isRecord(trace.marker) ? trace.marker : null;
+  if (marker && Array.isArray(marker.colors)) {
+    const rowColor = marker.colors[rowIndex];
+    if (typeof rowColor === "string") {
+      return rowColor;
+    }
+    const firstColor = marker.colors.find((entry) => typeof entry === "string");
+    if (typeof firstColor === "string") {
+      return firstColor;
+    }
+  }
+
+  if (marker && typeof marker.color === "string") {
+    return marker.color;
+  }
+
+  return getDefaultTraceColor();
+};
+
 export const buildTraceLabel = (trace: Record<string, unknown>, index: number): string => {
   const traceName = typeof trace.name === "string" ? trace.name.trim() : "";
   const traceType = typeof trace.type === "string" ? trace.type : "trace";
@@ -121,7 +153,7 @@ export const createTrace = (
   existingTraceCount: number
 ): Record<string, unknown> => {
   const traceType = preferredType ?? "bar";
-  const defaultColor = Object.values(TRACE_COLOR_OPTIONS)[0];
+  const defaultColor = getDefaultTraceColor();
   const traceName = buildDefaultTraceName(existingTraceCount);
 
   if (traceType === "pie") {
@@ -129,8 +161,13 @@ export const createTrace = (
       {
         type: "pie",
         name: traceName,
-        labels: ["Slice 1"],
-        values: [0]
+        hole: 0.72,
+        sort: false,
+        labels: ["fill"],
+        values: [30],
+        textinfo: "none",
+        direction: "clockwise",
+        hovertemplate: "%{label}: %{value}<extra></extra>"
       },
       defaultColor
     );
@@ -138,21 +175,21 @@ export const createTrace = (
 
   if (traceType === "scatter") {
     return {
-      type: "scatter",
+      x: [],
+      y: [],
+      line: {color: defaultColor, width: 2},
       mode: "lines+markers",
       name: traceName,
-      x: [1],
-      y: [0],
-      marker: {color: defaultColor},
-      line: {color: defaultColor}
+      type: "scatter",
+      marker: {size: 6}
     };
   }
 
   return {
     type: "bar",
     name: traceName,
-    x: ["Point 1"],
-    y: [0],
+    x: [],
+    y: [],
     marker: {color: defaultColor}
   };
 };
@@ -259,16 +296,52 @@ const syncPieMarkerColors = (
     preferredColor ??
     (typeof marker.color === "string" ? marker.color : undefined) ??
     existingColors.find((entry) => typeof entry === "string") ??
-    Object.values(TRACE_COLOR_OPTIONS)[0];
+    getDefaultTraceColor();
+  const shouldReplaceExistingColors = typeof preferredColor === "string" && preferredColor.length > 0;
 
-  marker.color = fallbackColor;
-  marker.colors = Array.from({length: colorCount}, (_, index) => {
+  const nextColors = Array.from({length: colorCount}, (_, index) => {
+    if (shouldReplaceExistingColors) {
+      return fallbackColor;
+    }
     const existing = existingColors[index];
     return typeof existing === "string" ? existing : fallbackColor;
   });
+  marker.color = typeof nextColors[0] === "string" ? nextColors[0] : fallbackColor;
+  marker.colors = nextColors;
 
   return {
     ...trace,
+    marker
+  };
+};
+
+export const setPieRowColor = (
+  trace: Record<string, unknown>,
+  rowIndex: number,
+  colorHex: string
+): Record<string, unknown> => {
+  if (!Number.isInteger(rowIndex) || rowIndex < 0) {
+    return trace;
+  }
+
+  const syncedTrace = syncPieMarkerColors(trace);
+  const marker = isRecord(syncedTrace.marker) ? {...syncedTrace.marker} : {};
+  const colors = Array.isArray(marker.colors)
+    ? marker.colors.map((entry, index) =>
+        typeof entry === "string" ? entry : getPieRowColor(syncedTrace, index)
+      )
+    : [];
+
+  if (rowIndex >= colors.length) {
+    return syncedTrace;
+  }
+
+  colors[rowIndex] = colorHex;
+  marker.color = colors[0] ?? colorHex;
+  marker.colors = colors;
+
+  return {
+    ...syncedTrace,
     marker
   };
 };

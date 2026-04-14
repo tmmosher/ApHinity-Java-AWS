@@ -160,6 +160,21 @@ export const applyDonutCenterValueToLayout = (
     };
 };
 
+export const purgePlotlyChart = (
+    plotly: Partial<Pick<typeof Plotly, "purge">> | null | undefined,
+    el: HTMLDivElement
+) => {
+    if (!plotly || typeof plotly.purge !== "function") {
+        return;
+    }
+
+    try {
+        plotly.purge(el);
+    } catch {
+        // Plotly cleanup should never block graph teardown.
+    }
+};
+
 export const renderPlotlyChart = async (
     plotly: PlotlyReactTarget,
     el: HTMLDivElement,
@@ -168,13 +183,12 @@ export const renderPlotlyChart = async (
     config?: PlotlyConfig,
     themePreference: ThemePreference = getDocumentThemePreference()
 ) => {
-    const layoutWithDonutCenter = applyDonutCenterValueToLayout(data, layout);
-    await plotly.react(
-        el,
-        data as any,
-        buildPlotlyLayout(layoutWithDonutCenter, themePreference) as any,
-        buildPlotlyConfig(config) as any
+    const finalLayout = buildPlotlyLayout(
+        applyDonutCenterValueToLayout(data, layout),
+        themePreference
     );
+    const finalConfig = buildPlotlyConfig(config);
+    await plotly.react(el, data as any, finalLayout as any, finalConfig as any);
 };
 
 export const attachPlotlyResizeListener = (
@@ -246,12 +260,24 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
                 }
 
                 try {
-                    await renderPlotlyChart(module, el, data, layout, config, activeTheme);
+                    await renderPlotlyChart(
+                        module,
+                        el,
+                        data,
+                        layout,
+                        config,
+                        activeTheme
+                    );
                 } catch (error) {
+                    purgePlotlyChart(module, el);
                     console.error(`Failed to render graph "${props.name}"`, error);
                     return;
                 }
-                if (!disposed && !cleanupResize) {
+                if (disposed) {
+                    purgePlotlyChart(module, el);
+                    return;
+                }
+                if (!cleanupResize) {
                     cleanupResize = attachPlotlyResizeListener(window, module, el);
                 }
             });
@@ -261,6 +287,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         disposed = true;
         cleanupResize?.();
         disconnectThemeObserver?.();
+        purgePlotlyChart(plotlyModule(), el);
     });
 
     return <div ref={el} class={props.class} />;

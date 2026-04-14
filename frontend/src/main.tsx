@@ -73,18 +73,18 @@ const DashboardLocationDetailPanel = lazy(() =>
   }))
 );
 const DashboardLocationDashboardPanel = lazy(() =>
-  import("./pages/authenticated/panels/location/DashboardLocationDashboardPanel").then((module) => ({
-    default: module.DashboardLocationDashboardPanel
+  import("./pages/authenticated/panels/location/LocationDashboardPanel").then((module) => ({
+    default: module.LocationDashboardPanel
   }))
 );
 const DashboardLocationServiceSchedulePanel = lazy(() =>
-  import("./pages/authenticated/panels/location/DashboardLocationServiceSchedulePanel").then((module) => ({
-    default: module.DashboardLocationServiceSchedulePanel
+  import("./pages/authenticated/panels/location/LocationServiceCalendarPanel").then((module) => ({
+    default: module.LocationServiceCalendarPanel
   }))
 );
 const DashboardLocationGanttChartPanel = lazy(() =>
-  import("./pages/authenticated/panels/location/DashboardLocationGanttChartPanel").then((module) => ({
-    default: module.DashboardLocationGanttChartPanel
+  import("./pages/authenticated/panels/location/LocationGanttChartPanel").then((module) => ({
+    default: module.LocationGanttChartPanel
   }))
 );
 const DashboardInvitesPanel = lazy(() =>

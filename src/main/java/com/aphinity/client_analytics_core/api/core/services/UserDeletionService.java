@@ -3,7 +3,7 @@ package com.aphinity.client_analytics_core.api.core.services;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
-import com.aphinity.client_analytics_core.api.core.response.AccountRole;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

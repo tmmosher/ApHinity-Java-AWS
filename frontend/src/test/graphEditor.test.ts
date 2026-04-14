@@ -6,8 +6,12 @@ import {
   buildGraphBaselineIndex,
   buildLocationGraphUpdates,
   createEditableGraphPayload,
+  getEditableGraphTitle,
   parseEditableGraphPayload,
+  pruneDeletedLocationGraphState,
+  reconcileLocationGraphs,
   serializeEditableGraphPayload,
+  updateEditableGraphTitle,
   undoGraphPayloadEdit
 } from "../util/graph/graphEditor";
 
@@ -41,7 +45,7 @@ describe("graphEditor", () => {
 
     expect(parsed).toEqual({
       data: [{type: "bar", x: ["A"], y: [9]}],
-      layout: {title: {text: "Newport Beach"}},
+      layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
       config: {displayModeBar: false},
       style: {height: 320}
     });
@@ -65,7 +69,7 @@ describe("graphEditor", () => {
     expect(result.changed).toBe(true);
     expect(result.nextUndoStack).toHaveLength(1);
     expect(result.nextGraphs[0].data).toEqual([{type: "bar", x: ["A"], y: [11]}]);
-    expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated"}});
+    expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated", x: 0.02, xanchor: "left"}});
   });
 
   it("does not push undo snapshots when payload is unchanged", () => {
@@ -97,7 +101,7 @@ describe("graphEditor", () => {
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [9]}],
-        layout: {title: {text: "Newport Beach"}},
+        layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 320}
       },
@@ -123,7 +127,7 @@ describe("graphEditor", () => {
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [15]}],
-        layout: {title: {text: "Updated"}},
+        layout: {title: {text: "Updated", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 360},
         expectedUpdatedAt: "2026-01-02T00:00:00Z"
@@ -133,6 +137,75 @@ describe("graphEditor", () => {
 
   it("returns no save payloads when there are no graph changes", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
+  });
+
+  it("prunes deleted graphs from the local dashboard caches", () => {
+    const baselineIndex = buildGraphBaselineIndex(baseGraphs);
+    const cleanupResult = pruneDeletedLocationGraphState(
+      baseGraphs,
+      [baseGraphs],
+      baselineIndex,
+      11
+    );
+
+    expect(cleanupResult.nextGraphs).toHaveLength(1);
+    expect(cleanupResult.nextGraphs[0]).toBe(baseGraphs[0]);
+    expect(cleanupResult.nextUndoStack).toEqual([]);
+    expect(cleanupResult.nextBaselineIndex.has(11)).toBe(false);
+    expect(cleanupResult.nextBaselineIndex.get(10)).toMatchObject({
+      expectedUpdatedAt: "2026-01-02T00:00:00Z"
+    });
+  });
+
+  it("reconciles refreshed graphs without replacing unchanged graph objects", () => {
+    const refreshedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        layout: {title: "Newport Beach"}
+      },
+      {
+        ...baseGraphs[1],
+        name: "Updated Non-Compliances"
+      },
+      {
+        ...baseGraphs[0],
+        id: 12,
+        name: "New Plot",
+        createdAt: "2026-01-05T00:00:00Z",
+        updatedAt: "2026-01-05T00:00:00Z"
+      }
+    ];
+
+    const reconciled = reconcileLocationGraphs(baseGraphs, refreshedGraphs);
+
+    expect(reconciled).toHaveLength(3);
+    expect(reconciled[0]).toBe(baseGraphs[0]);
+    expect(reconciled[1]).toBe(refreshedGraphs[1]);
+    expect(reconciled[2]).toBe(refreshedGraphs[2]);
+  });
+
+  it("reads graph titles from string and object Plotly layout shapes", () => {
+    expect(getEditableGraphTitle({title: "Legacy title"})).toBe("Legacy title");
+    expect(getEditableGraphTitle({title: {text: "Current title", x: 0.02}})).toBe("Current title");
+    expect(getEditableGraphTitle({showlegend: false})).toBe("");
+  });
+
+  it("updates graph titles while preserving existing layout title metadata", () => {
+    expect(updateEditableGraphTitle({showlegend: false}, "Updated title")).toEqual({
+      showlegend: false,
+      title: {text: "Updated title", x: 0.02, xanchor: "left"}
+    });
+
+    expect(updateEditableGraphTitle({title: {text: "Old title", x: 0.5, y: 0.9}}, "Next title")).toEqual({
+      title: {text: "Next title", x: 0.02, xanchor: "left", y: 0.9}
+    });
+  });
+
+  it("removes the graph title when the draft is cleared", () => {
+    expect(updateEditableGraphTitle({title: {text: "Old"}, showlegend: false}, "   ")).toEqual({
+      showlegend: false
+    });
+    expect(updateEditableGraphTitle({title: {text: "Old"}}, "")).toBeNull();
   });
 
   it("uses precomputed baseline signatures when building changed graph updates", () => {

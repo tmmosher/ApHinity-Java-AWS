@@ -5,9 +5,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -16,9 +21,11 @@ import java.util.regex.Pattern;
 @Component
 public class IndexHtmlTemplateRenderer {
     static final String NONCE_PLACEHOLDER = "__CSP_NONCE__";
+    private static final Path DOCKER_STATIC_INDEX_HTML_PATH = Path.of("/app", "static", "index.html");
     private static final Path RUNTIME_STATIC_INDEX_HTML_PATH = Path.of("src", "main", "resources", "static", "index.html");
     private static final String CLASSPATH_INDEX_HTML_PATH = "static/index.html";
     private static final Path FALLBACK_FRONTEND_INDEX_PATH = Path.of("frontend", "index.html");
+    private static final String STATIC_LOCATIONS_ENV = "SPRING_WEB_RESOURCES_STATIC_LOCATIONS";
     private static final Pattern NONCELESS_SCRIPT_TAG_PATTERN = Pattern.compile("<script(?![^>]*\\bnonce=)");
     private static final Pattern NONCELESS_STYLESHEET_LINK_PATTERN = Pattern.compile(
         "<link(?![^>]*\\bnonce=)(?=[^>]*\\brel=(\"|')stylesheet\\1)"
@@ -89,14 +96,17 @@ public class IndexHtmlTemplateRenderer {
     }
 
     private String readRuntimeStaticTemplate() {
-        if (!Files.exists(RUNTIME_STATIC_INDEX_HTML_PATH)) {
-            return null;
+        for (Path candidate : runtimeIndexTemplateCandidates()) {
+            if (!Files.exists(candidate)) {
+                continue;
+            }
+            try {
+                return Files.readString(candidate, StandardCharsets.UTF_8);
+            } catch (IOException ex) {
+                throw new IllegalStateException("Unable to load runtime static index template from " + candidate, ex);
+            }
         }
-        try {
-            return Files.readString(RUNTIME_STATIC_INDEX_HTML_PATH, StandardCharsets.UTF_8);
-        } catch (IOException ex) {
-            throw new IllegalStateException("Unable to load runtime static index template", ex);
-        }
+        return null;
     }
 
     private String readClasspathTemplate() {
@@ -119,6 +129,36 @@ public class IndexHtmlTemplateRenderer {
             return Files.readString(FALLBACK_FRONTEND_INDEX_PATH, StandardCharsets.UTF_8);
         } catch (IOException ex) {
             throw new IllegalStateException("Unable to load frontend index template fallback", ex);
+        }
+    }
+
+    private List<Path> runtimeIndexTemplateCandidates() {
+        List<Path> candidates = new ArrayList<>();
+        candidates.add(DOCKER_STATIC_INDEX_HTML_PATH);
+
+        String configuredStaticLocations = System.getenv(STATIC_LOCATIONS_ENV);
+        if (configuredStaticLocations != null && !configuredStaticLocations.isBlank()) {
+            for (String location : configuredStaticLocations.split(",")) {
+                Path candidate = toIndexPath(location.trim());
+                if (candidate != null) {
+                    candidates.add(candidate);
+                }
+            }
+        }
+
+        candidates.add(RUNTIME_STATIC_INDEX_HTML_PATH);
+        return candidates;
+    }
+
+    private Path toIndexPath(String location) {
+        if (location.isBlank() || !location.startsWith("file:")) {
+            return null;
+        }
+        try {
+            Path basePath = Paths.get(new URI(location));
+            return basePath.resolve("index.html");
+        } catch (IllegalArgumentException | URISyntaxException ex) {
+            return null;
         }
     }
 
