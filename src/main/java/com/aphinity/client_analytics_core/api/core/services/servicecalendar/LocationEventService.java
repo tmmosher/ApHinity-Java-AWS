@@ -137,14 +137,14 @@ public class LocationEventService {
     }
 
     @Transactional
-    public void deleteLocationEvent(Long userId, Long locationId, Long eventId) {
+    public void deleteLocationEvent(Long userId, Long locationId, Long eventId, String actorIpAddress) {
         AppUser user = authorizationService.requireUser(userId);
         authorizationService.requireDeletePermission(user);
 
         ServiceEvent serviceEvent = serviceEventRepository.findByIdAndLocation_Id(eventId, locationId).orElse(null);
         if (serviceEvent != null) {
             try {
-                auditService.recordDeleted(userId, serviceEvent);
+                auditService.recordDeleted(userId, actorIpAddress, serviceEvent);
                 serviceEventRepository.delete(serviceEvent);
                 locationRepository.touchUpdatedAt(locationId, Instant.now());
             } catch (RuntimeException ex) {

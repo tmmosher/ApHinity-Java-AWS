@@ -19,22 +19,28 @@ public class ServiceEventAuditService {
     }
 
     public void recordCreated(Long actorUserId, ServiceEvent serviceEvent) {
-        record(actorUserId, serviceEvent, ServiceEventAuditAction.CREATED);
+        record(actorUserId, null, serviceEvent, ServiceEventAuditAction.CREATED);
     }
 
     public void recordUpdated(Long actorUserId, ServiceEvent serviceEvent) {
-        record(actorUserId, serviceEvent, ServiceEventAuditAction.UPDATED);
+        record(actorUserId, null, serviceEvent, ServiceEventAuditAction.UPDATED);
     }
 
-    public void recordDeleted(Long actorUserId, ServiceEvent serviceEvent) {
-        record(actorUserId, serviceEvent, ServiceEventAuditAction.DELETED);
+    public void recordDeleted(Long actorUserId, String actorIpAddress, ServiceEvent serviceEvent) {
+        record(actorUserId, actorIpAddress, serviceEvent, ServiceEventAuditAction.DELETED);
     }
 
-    private void record(Long actorUserId, ServiceEvent serviceEvent, ServiceEventAuditAction action) {
+    private void record(
+        Long actorUserId,
+        String actorIpAddress,
+        ServiceEvent serviceEvent,
+        ServiceEventAuditAction action
+    ) {
         ServiceEventAuditLog auditLog = new ServiceEventAuditLog();
         auditLog.setServiceEventId(serviceEvent.getId());
         auditLog.setLocationId(serviceEvent.getLocation().getId());
         auditLog.setActorUserId(actorUserId);
+        auditLog.setActorIpAddress(actorIpAddress);
         auditLog.setAction(action);
         auditLog.setTitle(serviceEvent.getTitle());
         auditLog.setResponsibility(serviceEvent.getResponsibility());
@@ -49,9 +55,10 @@ public class ServiceEventAuditService {
         serviceEventAuditLogRepository.save(auditLog);
 
         log.info(
-            "Recorded service event audit actorUserId={} action={} eventId={} locationId={} title={} responsibility={} " +
-                "eventDate={} eventTime={} endEventDate={} endEventTime={} status={} description={}",
+            "Recorded service event audit actorUserId={} actorIpAddress={} action={} eventId={} locationId={} title={} " +
+                "responsibility={} eventDate={} eventTime={} endEventDate={} endEventTime={} status={} description={}",
             actorUserId,
+            actorIpAddress,
             action,
             serviceEvent.getId(),
             serviceEvent.getLocation().getId(),

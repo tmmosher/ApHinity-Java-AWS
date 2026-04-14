@@ -5,6 +5,7 @@ import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import {
   createLocationEventById,
+  deleteLocationEventById,
   fetchLocationEventsById,
   getLocationEventTemplateDownloadUrl,
   uploadLocationEventCalendarById,
@@ -14,6 +15,7 @@ import {formatLocationEventMonth, normalizeMonthStart} from "../../../../util/lo
 import type {CreateLocationServiceEventRequest, LocationServiceEvent} from "../../../../types/Types";
 import {
   canCompleteLocationServiceEvent,
+  canDeleteLocationServiceEvent,
   canEditLocationServiceEvent,
   createLocationServiceEventRequestFromEvent
 } from "../../../../util/location/serviceEventForm";
@@ -28,9 +30,9 @@ import {
   editStagedServiceCalendarEvent,
   isStagedServiceCalendarEvent,
   stageImportedServiceCalendarEvents,
-  type StagedLocationServiceEvent,
-  undoStagedServiceCalendarMutation
+  type StagedLocationServiceEvent
 } from "../../../../util/location/stagedServiceCalendar";
+import {applyStateSnapshot, undoStateSnapshot} from "../../../../util/common/stateHistory";
 import ServiceScheduleCalendar from "./ServiceScheduleCalendar";
 import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
 import ServiceCalendarPanelToolbar from "../../../../components/service-editor/ServiceCalendarPanelToolbar";
@@ -41,13 +43,50 @@ type ServiceEventCalendarResource = {
   value: LocationServiceEvent[];
 };
 
+type StagedServiceCalendarState = {
+  importedEvents: StagedLocationServiceEvent[];
+  deletedEvents: LocationServiceEvent[];
+};
+
+const cloneStagedServiceCalendarState = (state: StagedServiceCalendarState): StagedServiceCalendarState => (
+  JSON.parse(JSON.stringify(state)) as StagedServiceCalendarState
+);
+
+const stagedServiceCalendarStateSignature = (state: StagedServiceCalendarState): string => (
+  JSON.stringify({
+    importedEvents: state.importedEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      responsibility: event.responsibility,
+      date: event.date,
+      time: event.time,
+      endDate: event.endDate,
+      endTime: event.endTime,
+      description: event.description,
+      status: event.status
+    })),
+    deletedEvents: state.deletedEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      responsibility: event.responsibility,
+      date: event.date,
+      time: event.time,
+      endDate: event.endDate,
+      endTime: event.endTime,
+      description: event.description,
+      status: event.status
+    }))
+  })
+);
+
 export const LocationServiceCalendarPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const params = useParams<{ locationId: string }>();
   const [calendarMonth, setCalendarMonth] = createSignal(normalizeMonthStart(new Date()));
   const [stagedImportedEvents, setStagedImportedEvents] = createSignal<StagedLocationServiceEvent[]>([]);
-  const [stagedImportUndoStack, setStagedImportUndoStack] = createSignal<StagedLocationServiceEvent[][]>([]);
+  const [stagedDeletedEvents, setStagedDeletedEvents] = createSignal<LocationServiceEvent[]>([]);
+  const [stagedCalendarUndoStack, setStagedCalendarUndoStack] = createSignal<StagedServiceCalendarState[]>([]);
   const [isImportingSpreadsheet, setIsImportingSpreadsheet] = createSignal(false);
   const [isApplyingImportedEvents, setIsApplyingImportedEvents] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
@@ -59,11 +98,50 @@ export const LocationServiceCalendarPanel = () => {
   const serviceCalendarTemplateHref = createMemo(() =>
     getLocationEventTemplateDownloadUrl(host, params.locationId)
   );
-  const hasPendingImportedEventChanges = createMemo(() => stagedImportUndoStack().length > 0);
+  const hasPendingImportedEventChanges = createMemo(() => stagedCalendarUndoStack().length > 0);
   const hasStagedImportedEvents = createMemo(() => stagedImportedEvents().length > 0);
   const isImportedEventMutationBusy = createMemo(() => (
     isImportingSpreadsheet() || isApplyingImportedEvents()
   ));
+  const currentStagedCalendarState = (): StagedServiceCalendarState => ({
+    importedEvents: stagedImportedEvents(),
+    deletedEvents: stagedDeletedEvents()
+  });
+  const applyStagedCalendarState = (nextState: StagedServiceCalendarState): boolean => {
+    const result = applyStateSnapshot(
+      currentStagedCalendarState(),
+      stagedCalendarUndoStack(),
+      nextState,
+      cloneStagedServiceCalendarState,
+      (left, right) => stagedServiceCalendarStateSignature(left) === stagedServiceCalendarStateSignature(right)
+    );
+    if (!result.changed) {
+      return false;
+    }
+
+    setStagedImportedEvents(result.nextState.importedEvents);
+    setStagedDeletedEvents(result.nextState.deletedEvents);
+    setStagedCalendarUndoStack(result.nextUndoStack);
+    return true;
+  };
+  const undoLastCalendarMutation = (): void => {
+    if (isImportedEventMutationBusy()) {
+      return;
+    }
+
+    const result = undoStateSnapshot(
+      currentStagedCalendarState(),
+      stagedCalendarUndoStack(),
+      cloneStagedServiceCalendarState
+    );
+    if (!result.undone) {
+      return;
+    }
+
+    setStagedImportedEvents(result.nextState.importedEvents);
+    setStagedDeletedEvents(result.nextState.deletedEvents);
+    setStagedCalendarUndoStack(result.nextUndoStack);
+  };
   const serviceEventRequest = createMemo(() => ({
     locationId: params.locationId,
     month: viewedMonth()
@@ -85,8 +163,12 @@ export const LocationServiceCalendarPanel = () => {
     }
     return resource.value;
   });
+  const visibleServiceEvents = createMemo<LocationServiceEvent[]>(() => {
+    const deletedIds = new Set(stagedDeletedEvents().map((event) => event.id));
+    return (serviceEvents() ?? []).filter((event) => !deletedIds.has(event.id));
+  });
   const calendarEvents = createMemo<LocationServiceEvent[]>(() => [
-    ...(serviceEvents() ?? []),
+    ...visibleServiceEvents(),
     ...stagedImportedEvents()
   ]);
 
@@ -115,7 +197,8 @@ export const LocationServiceCalendarPanel = () => {
 
     setCalendarMonth(normalizeMonthStart(new Date()));
     setStagedImportedEvents([]);
-    setStagedImportUndoStack([]);
+    setStagedDeletedEvents([]);
+    setStagedCalendarUndoStack([]);
     setIsImportingSpreadsheet(false);
     setIsApplyingImportedEvents(false);
     setLocationSessionToken((token) => token + 1);
@@ -161,15 +244,17 @@ export const LocationServiceCalendarPanel = () => {
       const parsedRequests = await parseServiceCalendarSpreadsheetFile(file, role());
       const result = stageImportedServiceCalendarEvents(
         stagedImportedEvents(),
-        stagedImportUndoStack(),
+        [],
         parsedRequests
       );
       if (!result.changed) {
         return;
       }
 
-      setStagedImportedEvents(result.nextEvents);
-      setStagedImportUndoStack(result.nextUndoStack);
+      applyStagedCalendarState({
+        importedEvents: result.nextEvents,
+        deletedEvents: stagedDeletedEvents()
+      });
       toast.success(
         `${parsedRequests.length} service event${parsedRequests.length === 1 ? "" : "s"} staged from spreadsheet.`
       );
@@ -181,48 +266,57 @@ export const LocationServiceCalendarPanel = () => {
     }
   };
 
-  const undoLastImportedEventMutation = (): void => {
-    if (isImportedEventMutationBusy()) {
-      return;
-    }
-
-    const result = undoStagedServiceCalendarMutation(
-      stagedImportedEvents(),
-      stagedImportUndoStack()
-    );
-    if (!result.undone) {
-      return;
-    }
-
-    setStagedImportedEvents(result.nextEvents);
-    setStagedImportUndoStack(result.nextUndoStack);
-  };
-
   const applyImportedEvents = async (): Promise<void> => {
-    if (isImportedEventMutationBusy() || stagedImportedEvents().length === 0) {
+    if (
+      isImportedEventMutationBusy()
+      || (stagedImportedEvents().length === 0 && stagedDeletedEvents().length === 0)
+    ) {
       return;
     }
 
     const uploadLocationId = params.locationId;
     const uploadSessionToken = locationSessionToken();
+    const importedEvents = stagedImportedEvents();
+    const deletedEvents = stagedDeletedEvents();
     setIsApplyingImportedEvents(true);
 
     try {
-      const blob = await buildServiceCalendarSpreadsheetBlob(
-        buildServiceCalendarRequestsFromStagedEvents(stagedImportedEvents())
-      );
-      const file = new File([blob], "service_calendar_upload.xlsx", {type: blob.type});
-      const response = await uploadLocationEventCalendarById(host, uploadLocationId, file);
+      for (const deletedEvent of deletedEvents) {
+        await deleteLocationEventById(host, uploadLocationId, deletedEvent.id);
+      }
+
+      let importedCount = 0;
+      if (importedEvents.length > 0) {
+        const blob = await buildServiceCalendarSpreadsheetBlob(
+          buildServiceCalendarRequestsFromStagedEvents(importedEvents)
+        );
+        const file = new File([blob], "service_calendar_upload.xlsx", {type: blob.type});
+        const response = await uploadLocationEventCalendarById(host, uploadLocationId, file);
+        importedCount = response.importedCount;
+      }
+
       if (uploadLocationId !== params.locationId || uploadSessionToken !== locationSessionToken()) {
         return;
       }
 
       setStagedImportedEvents([]);
-      setStagedImportUndoStack([]);
+      setStagedDeletedEvents([]);
+      setStagedCalendarUndoStack([]);
       clearSpreadsheetUploadInput();
-      toast.success(
-        `Imported ${response.importedCount} service event${response.importedCount === 1 ? "" : "s"}.`
-      );
+
+      if (importedCount > 0 && deletedEvents.length > 0) {
+        toast.success(
+          `Imported ${importedCount} service event${importedCount === 1 ? "" : "s"} and deleted ${deletedEvents.length} service event${deletedEvents.length === 1 ? "" : "s"}.`
+        );
+      } else if (importedCount > 0) {
+        toast.success(
+          `Imported ${importedCount} service event${importedCount === 1 ? "" : "s"}.`
+        );
+      } else {
+        toast.success(
+          `Deleted ${deletedEvents.length} service event${deletedEvents.length === 1 ? "" : "s"}.`
+        );
+      }
 
       try {
         await refetchServiceEvents();
@@ -275,7 +369,7 @@ export const LocationServiceCalendarPanel = () => {
 
     const result = editStagedServiceCalendarEvent(
       stagedImportedEvents(),
-      stagedImportUndoStack(),
+      [],
       event.id,
       request
     );
@@ -283,8 +377,10 @@ export const LocationServiceCalendarPanel = () => {
       return;
     }
 
-    setStagedImportedEvents(result.nextEvents);
-    setStagedImportUndoStack(result.nextUndoStack);
+    applyStagedCalendarState({
+      importedEvents: result.nextEvents,
+      deletedEvents: stagedDeletedEvents()
+    });
     toast.success("Staged service event updated.");
   };
 
@@ -299,42 +395,63 @@ export const LocationServiceCalendarPanel = () => {
 
     const result = completeStagedServiceCalendarEvent(
       stagedImportedEvents(),
-      stagedImportUndoStack(),
+      [],
       event.id
     );
     if (!result.changed) {
       return;
     }
 
-    setStagedImportedEvents(result.nextEvents);
-    setStagedImportUndoStack(result.nextUndoStack);
+    applyStagedCalendarState({
+      importedEvents: result.nextEvents,
+      deletedEvents: stagedDeletedEvents()
+    });
     toast.success("Staged service event marked complete.");
   };
 
   const deleteCalendarEvent = async (event: LocationServiceEvent): Promise<void> => {
-    if (!isStagedServiceCalendarEvent(event)) {
-      throw new Error("Only staged service events can be deleted here.");
-    }
     if (isImportedEventMutationBusy()) {
       throw new Error("Imported service events are currently busy.");
     }
 
-    const result = deleteStagedServiceCalendarEvent(
-      stagedImportedEvents(),
-      stagedImportUndoStack(),
-      event.id
-    );
-    if (!result.changed) {
+    if (isStagedServiceCalendarEvent(event)) {
+      const result = deleteStagedServiceCalendarEvent(
+        stagedImportedEvents(),
+        [],
+        event.id
+      );
+      if (!result.changed) {
+        return;
+      }
+
+      applyStagedCalendarState({
+        importedEvents: result.nextEvents,
+        deletedEvents: stagedDeletedEvents()
+      });
+      toast.success("Staged service event deleted.");
       return;
     }
 
-    setStagedImportedEvents(result.nextEvents);
-    setStagedImportUndoStack(result.nextUndoStack);
-    toast.success("Staged service event deleted.");
+    if (!canDeleteLocationServiceEvent(role())) {
+      throw new Error("Only partners and admins can delete persisted service events.");
+    }
+    if (stagedDeletedEvents().some((deletedEvent) => deletedEvent.id === event.id)) {
+      return;
+    }
+
+    applyStagedCalendarState({
+      importedEvents: stagedImportedEvents(),
+      deletedEvents: [...stagedDeletedEvents(), event]
+    });
+    toast.success("Service event queued for deletion.");
   };
 
   const canDeleteCalendarEvent = (event: LocationServiceEvent): boolean => (
-    isStagedServiceCalendarEvent(event) && !isImportedEventMutationBusy()
+    !isImportedEventMutationBusy()
+    && (isStagedServiceCalendarEvent(event) || (
+      canDeleteLocationServiceEvent(role())
+      && !stagedDeletedEvents().some((deletedEvent) => deletedEvent.id === event.id)
+    ))
   );
   const canEditCalendarEvent = (event: LocationServiceEvent): boolean => (
     canEditLocationServiceEvent(role(), event.responsibility)
@@ -355,17 +472,17 @@ export const LocationServiceCalendarPanel = () => {
           }}
           isMutationBusy={isImportedEventMutationBusy()}
           isApplyingImportedEvents={isApplyingImportedEvents()}
-          hasStagedImportedEvents={hasStagedImportedEvents()}
+          hasStagedImportedEvents={hasStagedImportedEvents() || stagedDeletedEvents().length > 0}
           hasPendingImportedEventChanges={hasPendingImportedEventChanges()}
-          stagedEventCount={stagedImportedEvents().length}
-          pendingMutationCount={stagedImportUndoStack().length}
+          stagedEventCount={stagedImportedEvents().length + stagedDeletedEvents().length}
+          pendingMutationCount={stagedCalendarUndoStack().length}
           onSpreadsheetInputChange={(event: Event) => {
             void stageSpreadsheetImport(event);
           }}
           onApply={() => {
             void applyImportedEvents();
           }}
-          onUndo={undoLastImportedEventMutation}
+          onUndo={undoLastCalendarMutation}
         />
       </section>
 

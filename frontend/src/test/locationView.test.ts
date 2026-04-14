@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import type {DashboardLocationView} from "../pages/authenticated/panels/location/locationView";
+import type {DashboardLocationView} from "../util/location/locationView";
 import {
   createDashboardLocationResetGuard,
   createLocationViewActive,
@@ -10,7 +10,7 @@ import {
   getLocationViewHref,
   isFreshLocationScopedResource,
   normalizeLocationPathname
-} from "../pages/authenticated/panels/location/locationView";
+} from "../util/location/locationView";
 
 describe("locationView helpers", () => {
   it("keeps the selector views ordered left-to-right", () => {

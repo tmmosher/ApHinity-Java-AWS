@@ -103,6 +103,16 @@ describe("serviceCalendarSpreadsheet", () => {
       .rejects.toThrowError("Row 2: End date and time must be on or after the start date and time.");
   });
 
+  it("rejects all-day rows when the end date is before the start date", async () => {
+    const file = createSpreadsheetFile([
+      ["Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"],
+      ["Backwards all-day visit", "", "2026-04-14", "2026-04-13", "", "", "True", "Partner"]
+    ]);
+
+    await expect(parseServiceCalendarSpreadsheetFile(file, "partner"))
+      .rejects.toThrowError("Row 2: End date and time must be on or after the start date and time.");
+  });
+
   it("rejects rows when the end time is before the start time on the same day", async () => {
     const file = createSpreadsheetFile([
       ["Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"],

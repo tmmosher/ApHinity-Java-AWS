@@ -31,6 +31,9 @@ public class ServiceEventAuditLog {
     @Column(name = "actor_user_id", nullable = false)
     private Long actorUserId;
 
+    @Column(name = "actor_ip_address", length = 64)
+    private String actorIpAddress;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private ServiceEventAuditAction action;
@@ -75,6 +78,12 @@ public class ServiceEventAuditLog {
         if (recordedAt == null) {
             recordedAt = Instant.now();
         }
+        if (actorIpAddress != null) {
+            actorIpAddress = actorIpAddress.strip();
+            if (actorIpAddress.isBlank()) {
+                actorIpAddress = null;
+            }
+        }
         if (title != null) {
             title = title.strip();
         }
@@ -116,6 +125,14 @@ public class ServiceEventAuditLog {
 
     public void setActorUserId(Long actorUserId) {
         this.actorUserId = actorUserId;
+    }
+
+    public String getActorIpAddress() {
+        return actorIpAddress;
+    }
+
+    public void setActorIpAddress(String actorIpAddress) {
+        this.actorIpAddress = actorIpAddress;
     }
 
     public ServiceEventAuditAction getAction() {

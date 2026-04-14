@@ -6,7 +6,9 @@ import com.aphinity.client_analytics_core.api.core.response.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
+import com.aphinity.client_analytics_core.api.security.ClientRequestMetadataResolver;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -44,13 +46,16 @@ public class LocationEventController {
 
     private final LocationEventService locationEventService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final ClientRequestMetadataResolver requestMetadataResolver;
 
     public LocationEventController(
         LocationEventService locationEventService,
-        AuthenticatedUserService authenticatedUserService
+        AuthenticatedUserService authenticatedUserService,
+        ClientRequestMetadataResolver requestMetadataResolver
     ) {
         this.locationEventService = locationEventService;
         this.authenticatedUserService = authenticatedUserService;
+        this.requestMetadataResolver = requestMetadataResolver;
     }
 
     @GetMapping("/locations/{locationId}/events")
@@ -229,27 +234,32 @@ public class LocationEventController {
     public void deleteLocationEvent(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable Long locationId,
-        @PathVariable Long eventId
+        @PathVariable Long eventId,
+        HttpServletRequest request
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        String clientIpAddress = requestMetadataResolver.resolveClientIp(request);
         log.info(
-            "Received location event delete request actorUserId={} locationId={} eventId={}",
+            "Received location event delete request actorUserId={} actorIpAddress={} locationId={} eventId={}",
             userId,
+            clientIpAddress,
             locationId,
             eventId
         );
         try {
-            locationEventService.deleteLocationEvent(userId, locationId, eventId);
+            locationEventService.deleteLocationEvent(userId, locationId, eventId, clientIpAddress);
             log.info(
-                "Completed location event delete request actorUserId={} locationId={} eventId={}",
+                "Completed location event delete request actorUserId={} actorIpAddress={} locationId={} eventId={}",
                 userId,
+                clientIpAddress,
                 locationId,
                 eventId
             );
         } catch (ResponseStatusException ex) {
             log.warn(
-                "Rejected location event delete request actorUserId={} locationId={} eventId={} status={} reason={}",
+                "Rejected location event delete request actorUserId={} actorIpAddress={} locationId={} eventId={} status={} reason={}",
                 userId,
+                clientIpAddress,
                 locationId,
                 eventId,
                 ex.getStatusCode().value(),
@@ -258,8 +268,9 @@ public class LocationEventController {
             throw ex;
         } catch (RuntimeException ex) {
             log.error(
-                "Failed location event delete request actorUserId={} locationId={} eventId={}",
+                "Failed location event delete request actorUserId={} actorIpAddress={} locationId={} eventId={}",
                 userId,
+                clientIpAddress,
                 locationId,
                 eventId,
                 ex

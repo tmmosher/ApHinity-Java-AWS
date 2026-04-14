@@ -3,6 +3,7 @@ create table if not exists service_event_audit_log (
     service_event_id bigint not null,
     location_id bigint not null,
     actor_user_id bigint not null,
+    actor_ip_address varchar(64),
     action varchar(16) not null,
     title varchar(42) not null,
     responsibility varchar(16) not null,
@@ -16,6 +17,9 @@ create table if not exists service_event_audit_log (
     service_event_updated_at timestamp with time zone not null,
     recorded_at timestamp with time zone not null default current_timestamp
 );
+
+alter table if exists service_event_audit_log
+    add column if not exists actor_ip_address varchar(64);
 
 create index if not exists service_event_audit_log_service_event_idx
     on service_event_audit_log (service_event_id, recorded_at);

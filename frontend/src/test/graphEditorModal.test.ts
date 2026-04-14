@@ -123,6 +123,17 @@ const getTraceControlsProps = () => {
   };
 };
 
+const waitForTraceControlsProps = async (maxTicks = 10) => {
+  for (let tick = 0; tick < maxTicks; tick += 1) {
+    if (latestTraceControlsProps) {
+      return getTraceControlsProps();
+    }
+    await Promise.resolve();
+  }
+
+  return getTraceControlsProps();
+};
+
 const getPieTraceEditorProps = () => {
   if (!latestPieTraceEditorProps) {
     throw new Error("PieTraceEditor mock was not rendered.");
@@ -349,7 +360,7 @@ describe("GraphEditorModal trace controls", () => {
     await Promise.resolve();
 
     expect(() => getPieTraceEditorProps()).toThrowError("PieTraceEditor mock was not rendered.");
-    const traceControls = getTraceControlsProps();
+    const traceControls = await waitForTraceControlsProps();
     expect(traceControls.traceOptions).toEqual([{index: 0, label: "1. Bar Trace (bar)"}]);
     expect(traceControls.traceNameDraft).toBe("Bar Trace");
 

@@ -258,14 +258,15 @@ class LocationEventServiceTest {
     void deleteLocationEventDeletesExistingEvent() {
         AppUser user = verifiedUser(5L);
         ServiceEvent serviceEvent = serviceEvent(44L, "Delete me");
+        String clientIpAddress = "203.0.113.8";
 
         when(authorizationService.requireUser(5L)).thenReturn(user);
         doNothing().when(authorizationService).requireDeletePermission(user);
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(serviceEvent));
 
-        locationEventService.deleteLocationEvent(5L, 99L, 44L);
+        locationEventService.deleteLocationEvent(5L, 99L, 44L, clientIpAddress);
 
-        verify(auditService).recordDeleted(5L, serviceEvent);
+        verify(auditService).recordDeleted(5L, clientIpAddress, serviceEvent);
         verify(serviceEventRepository).delete(serviceEvent);
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
@@ -279,7 +280,7 @@ class LocationEventServiceTest {
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationEventService.deleteLocationEvent(5L, 99L, 44L)
+            locationEventService.deleteLocationEvent(5L, 99L, 44L, "203.0.113.8")
         );
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());

@@ -23,11 +23,11 @@ const introTriggerClass =
 export const ServiceCalendarIntroPopoverContent: Component<ServiceCalendarIntroPopoverContentProps> = (props) => (
   <div class="space-y-4 p-4" data-service-calendar-intro-content="">
     <div class="space-y-1">
-      <h3 class="text-sm font-semibold">How Service Calendar Works</h3>
+      <h3 class="text-sm font-semibold">How the service calendar works</h3>
       <p class="text-sm leading-6 text-base-content/70">
-        View previous, current, and upcoming service events. The calendar loads the previous,
-        current, and next month relative to the month you are viewing. Click an empty day cell to
-        create a service event.
+        With the service calendar, you can view previous, current, and upcoming events.
+        To add new events, use the Excel file below or click an empty day cell to create a service event.
+        ApHinity partners manage service events, but users are more than welcome to create their own.
       </p>
     </div>
 

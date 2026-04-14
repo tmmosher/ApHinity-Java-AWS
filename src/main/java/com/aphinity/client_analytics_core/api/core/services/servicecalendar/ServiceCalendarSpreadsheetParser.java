@@ -58,30 +58,32 @@ public class ServiceCalendarSpreadsheetParser {
             .appendPattern("M/d/")
             .appendValueReduced(ChronoField.YEAR, 2, 4, 2000)
             .toFormatter(Locale.US)
-            .withResolverStyle(ResolverStyle.SMART),
+            .withResolverStyle(ResolverStyle.STRICT),
         new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
             .appendPattern("M/d/uuuu")
             .toFormatter(Locale.US)
-            .withResolverStyle(ResolverStyle.SMART)
+            .withResolverStyle(ResolverStyle.STRICT)
     );
     private static final List<DateTimeFormatter> TIME_FORMATTERS = List.of(
-        DateTimeFormatter.ofPattern("H:mm", Locale.US),
-        DateTimeFormatter.ofPattern("H:mm:ss", Locale.US),
+        DateTimeFormatter.ofPattern("H:mm", Locale.US).withResolverStyle(ResolverStyle.STRICT),
+        DateTimeFormatter.ofPattern("H:mm:ss", Locale.US).withResolverStyle(ResolverStyle.STRICT),
         new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
             .appendPattern("h:mm a")
-            .toFormatter(Locale.US),
+            .toFormatter(Locale.US)
+            .withResolverStyle(ResolverStyle.STRICT),
         new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
             .appendPattern("h:mm:ss a")
             .toFormatter(Locale.US)
+            .withResolverStyle(ResolverStyle.STRICT)
     );
 
     public List<ParsedServiceCalendarRow> parse(MultipartFile file) {
         requireSpreadsheet(file);
         try (InputStream inputStream = file.getInputStream();
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
+            Workbook workbook = WorkbookFactory.create(inputStream)) {
             Sheet sheet = workbook.getNumberOfSheets() > 0 ? workbook.getSheetAt(0) : null;
             if (sheet == null) {
                 throw invalidSpreadsheet("Spreadsheet does not contain any worksheets.");
@@ -224,6 +226,7 @@ public class ServiceCalendarSpreadsheetParser {
         }
 
         if (allDay) {
+            validateDateRange(rowNumber, startDate, ALL_DAY_START_TIME, endDate == null ? startDate : endDate, ALL_DAY_END_TIME);
             return new LocationEventRequest(
                 title,
                 responsibility,
@@ -243,6 +246,14 @@ public class ServiceCalendarSpreadsheetParser {
             throw rowInvalid(rowNumber, "Start Time is required.");
         }
 
+        validateDateRange(
+            rowNumber,
+            startDate,
+            startTime,
+            endDate == null ? startDate : endDate,
+            endTime == null ? startTime : endTime
+        );
+
         return new LocationEventRequest(
             title,
             responsibility,
@@ -253,6 +264,20 @@ public class ServiceCalendarSpreadsheetParser {
             description.isBlank() ? null : description,
             status
         );
+    }
+
+    private void validateDateRange(
+        int rowNumber,
+        LocalDate startDate,
+        LocalTime startTime,
+        LocalDate endDate,
+        LocalTime endTime
+    ) {
+        LocalDateTime startDateTime = LocalDateTime.of(startDate, startTime);
+        LocalDateTime endDateTime = LocalDateTime.of(endDate, endTime);
+        if (endDateTime.isBefore(startDateTime)) {
+            throw rowInvalid(rowNumber, "End date and time must be on or after the start date and time.");
+        }
     }
 
     private LocalDate parseDateCell(Cell cell, int rowNumber, String label, FormulaEvaluator evaluator) {

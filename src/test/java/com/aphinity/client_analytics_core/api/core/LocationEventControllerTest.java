@@ -7,6 +7,7 @@ import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.Loca
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
+import com.aphinity.client_analytics_core.api.security.ClientRequestMetadataResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +18,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
@@ -37,6 +39,9 @@ class LocationEventControllerTest {
 
     @Mock
     private AuthenticatedUserService authenticatedUserService;
+
+    @Mock
+    private ClientRequestMetadataResolver requestMetadataResolver;
 
     @InjectMocks
     private LocationEventController locationEventController;
@@ -158,13 +163,17 @@ class LocationEventControllerTest {
             .header("alg", "HS256")
             .subject("42")
             .build();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("203.0.113.8");
 
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(requestMetadataResolver.resolveClientIp(request)).thenReturn("203.0.113.8");
 
-        locationEventController.deleteLocationEvent(jwt, 8L, 19L);
+        locationEventController.deleteLocationEvent(jwt, 8L, 19L, request);
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
-        verify(locationEventService).deleteLocationEvent(42L, 8L, 19L);
+        verify(requestMetadataResolver).resolveClientIp(request);
+        verify(locationEventService).deleteLocationEvent(42L, 8L, 19L, "203.0.113.8");
     }
 
     private LocationEventRequest request(String title) {

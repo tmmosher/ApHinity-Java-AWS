@@ -40,6 +40,10 @@ const formatDateValue = (date: Date): string => (
   `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`
 );
 
+const formatDateValueUtc = (date: Date): string => (
+  `${date.getUTCFullYear()}-${padNumber(date.getUTCMonth() + 1)}-${padNumber(date.getUTCDate())}`
+);
+
 const formatTimeValue = (hours: number, minutes: number, seconds: number): string => (
   `${padNumber(hours)}:${padNumber(minutes)}:${padNumber(seconds)}`
 );
@@ -114,16 +118,31 @@ const parseDateString = (value: string): Date | null => {
   const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
   if (isoMatch) {
     const [, yearText, monthText, dayText] = isoMatch;
-    const parsed = new Date(Number(yearText), Number(monthText) - 1, Number(dayText));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return Number.isNaN(parsed.getTime())
+      || parsed.getUTCFullYear() !== year
+      || parsed.getUTCMonth() !== month - 1
+      || parsed.getUTCDate() !== day
+      ? null
+      : parsed;
   }
 
   const usMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(value);
   if (usMatch) {
     const [, monthText, dayText, yearText] = usMatch;
     const normalizedYear = yearText.length === 2 ? 2000 + Number(yearText) : Number(yearText);
-    const parsed = new Date(normalizedYear, Number(monthText) - 1, Number(dayText));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const parsed = new Date(Date.UTC(normalizedYear, month - 1, day));
+    return Number.isNaN(parsed.getTime())
+      || parsed.getUTCFullYear() !== normalizedYear
+      || parsed.getUTCMonth() !== month - 1
+      || parsed.getUTCDate() !== day
+      ? null
+      : parsed;
   }
 
   return null;
@@ -137,13 +156,13 @@ const parseDateCell = (value: unknown, rowNumber: number, label: "Start Date" | 
     if (Number.isNaN(value.getTime())) {
       throw new Error(`Row ${rowNumber}: ${label} is invalid.`);
     }
-    return formatDateValue(value);
+    return formatDateValueUtc(value);
   }
   if (typeof value === "number") {
     if (value < 1) {
       throw new Error(`Row ${rowNumber}: ${label} is invalid.`);
     }
-    return formatDateValue(createExcelSerialDate(value));
+    return formatDateValueUtc(createExcelSerialDate(value));
   }
   if (typeof value === "string") {
     const normalized = value.trim();
@@ -152,7 +171,7 @@ const parseDateCell = (value: unknown, rowNumber: number, label: "Start Date" | 
     }
     const parsed = parseDateString(normalized);
     if (parsed) {
-      return formatDateValue(parsed);
+      return formatDateValueUtc(parsed);
     }
   }
 
@@ -223,6 +242,23 @@ const parseTimeCell = (value: unknown, rowNumber: number, label: "Start Time" | 
   throw new Error(`Row ${rowNumber}: ${label} is invalid.`);
 };
 
+const validateDateRange = (
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+  rowNumber: number
+): void => {
+  const startDateTime = new Date(`${startDate}T${startTime}`);
+  const endDateTime = new Date(`${endDate}T${endTime}`);
+  if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
+    throw new Error(`Row ${rowNumber}: Start and end date/time are invalid.`);
+  }
+  if (endDateTime.getTime() < startDateTime.getTime()) {
+    throw new Error(`Row ${rowNumber}: End date and time must be on or after the start date and time.`);
+  }
+};
+
 const parseSheetRows = (sheet: WorkSheet, xlsx: XlsxModule): SpreadsheetRowRecord[] => (
   xlsx.utils.sheet_to_json<SpreadsheetRowRecord>(sheet, {
     defval: null,
@@ -238,6 +274,10 @@ const validateHeaders = (sheet: WorkSheet, xlsx: XlsxModule): void => {
     blankrows: false,
     range: 0
   });
+
+  if (headerRow.length === 0 || headerRow.every((value) => normalizeCellString(value) === "")) {
+    throw new Error("Spreadsheet is missing the header row.");
+  }
 
   const normalizedHeaders = new Set(headerRow.map((value) => normalizeCellString(value)));
   const missingHeaders = SERVICE_CALENDAR_HEADERS.filter((header) => !normalizedHeaders.has(header));
@@ -284,13 +324,22 @@ const parseSpreadsheetRow = (
   }
 
   if (allDay) {
+    const resolvedEndDate = endDate ?? startDate;
+    validateDateRange(
+      startDate,
+      ALL_DAY_START_TIME,
+      resolvedEndDate,
+      ALL_DAY_END_TIME,
+      rowNumber
+    );
+
     return {
       title,
       description: description || null,
       responsibility,
       date: startDate,
       time: ALL_DAY_START_TIME,
-      endDate: endDate ?? startDate,
+      endDate: resolvedEndDate,
       endTime: ALL_DAY_END_TIME,
       status
     };
@@ -304,25 +353,18 @@ const parseSpreadsheetRow = (
 
   const resolvedEndDate = endDate ?? startDate;
   const resolvedEndTime = endTime ?? startTime;
-  const startDateTime = new Date(`${startDate}T${startTime}`);
-  const endDateTime = new Date(`${resolvedEndDate}T${resolvedEndTime}`);
-  if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
-    throw new Error(`Row ${rowNumber}: Start and end date/time are invalid.`);
-  }
-  if (endDateTime.getTime() < startDateTime.getTime()) {
-    throw new Error(`Row ${rowNumber}: End date and time must be on or after the start date and time.`);
-  }
+  validateDateRange(startDate, startTime, resolvedEndDate, resolvedEndTime, rowNumber);
 
   return {
     title,
     description: description || null,
     responsibility,
     date: startDate,
-      time: startTime,
-      endDate: resolvedEndDate,
-      endTime: resolvedEndTime,
-      status
-    };
+    time: startTime,
+    endDate: resolvedEndDate,
+    endTime: resolvedEndTime,
+    status
+  };
 };
 
 export const parseServiceCalendarSpreadsheetFile = async (

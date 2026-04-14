@@ -10,8 +10,8 @@ describe("ServiceCalendarIntroPopoverContent", () => {
       />
     ));
 
-    expect(html).toContain("How Service Calendar Works");
-    expect(html).toContain("View previous, current, and upcoming service events.");
+    expect(html).toContain("How the service calendar works");
+    expect(html).toContain("With the service calendar, you can view previous, current, and upcoming events.");
     expect(html).toContain("Get a copy of the Excel template");
     expect(html).toContain("https://example.test/api/core/locations/42/events/template");
     expect(html).toContain("Legend");

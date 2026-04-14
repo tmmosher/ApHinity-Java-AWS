@@ -5,7 +5,9 @@ import type {LocationServiceEvent} from "../types/Types";
 const mocks = vi.hoisted(() => ({
   currentRole: "partner" as "partner" | "client",
   latestCalendarProps: null as Record<string, unknown> | null,
+  latestToolbarProps: null as Record<string, unknown> | null,
   createLocationEventById: vi.fn(),
+  deleteLocationEventById: vi.fn(),
   fetchLocationEventsById: vi.fn(async () => []),
   uploadLocationEventCalendarById: vi.fn(),
   updateLocationEventById: vi.fn(async () => undefined),
@@ -34,6 +36,7 @@ vi.mock("solid-toast", () => ({
 
 vi.mock("../util/location/locationEventApi", () => ({
   createLocationEventById: mocks.createLocationEventById,
+  deleteLocationEventById: mocks.deleteLocationEventById,
   fetchLocationEventsById: mocks.fetchLocationEventsById,
   getLocationEventTemplateDownloadUrl: vi.fn((host: string, locationId: string) =>
     host + "/api/core/locations/" + locationId + "/events/template"
@@ -45,6 +48,13 @@ vi.mock("../util/location/locationEventApi", () => ({
 vi.mock("../pages/authenticated/panels/location/ServiceScheduleCalendar", () => ({
   default: (props: Record<string, unknown>) => {
     mocks.latestCalendarProps = props;
+    return null;
+  }
+}));
+
+vi.mock("../components/service-editor/ServiceCalendarPanelToolbar", () => ({
+  default: (props: Record<string, unknown>) => {
+    mocks.latestToolbarProps = props;
     return null;
   }
 }));
@@ -68,6 +78,7 @@ const createEvent = (overrides?: Partial<LocationServiceEvent>): LocationService
 
 const renderPanel = () => {
   mocks.latestCalendarProps = null;
+  mocks.latestToolbarProps = null;
   renderToString(LocationServiceCalendarPanel);
 
   if (!mocks.latestCalendarProps) {
@@ -76,7 +87,9 @@ const renderPanel = () => {
 
   return mocks.latestCalendarProps as {
     canCompleteEvent: (event: LocationServiceEvent) => boolean;
+    canDeleteEvent: (event: LocationServiceEvent) => boolean;
     onCompleteEvent: (event: LocationServiceEvent) => Promise<void>;
+    onDeleteEvent: (event: LocationServiceEvent) => Promise<void>;
   };
 };
 
@@ -84,7 +97,9 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
   beforeEach(() => {
     mocks.currentRole = "partner";
     mocks.latestCalendarProps = null;
+    mocks.latestToolbarProps = null;
     mocks.createLocationEventById.mockReset();
+    mocks.deleteLocationEventById.mockReset();
     mocks.fetchLocationEventsById.mockReset();
     mocks.fetchLocationEventsById.mockResolvedValue([]);
     mocks.uploadLocationEventCalendarById.mockReset();
@@ -123,5 +138,30 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
       status: "completed"
     });
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Service event marked complete.");
+  });
+
+  it("queues persisted deletes until apply and restores them on undo", async () => {
+    mocks.fetchLocationEventsById.mockResolvedValue([
+      createEvent({responsibility: "partner"})
+    ]);
+    const props = renderPanel();
+    const event = createEvent({responsibility: "partner"});
+
+    expect(props.canDeleteEvent(event)).toBe(true);
+
+    await props.onDeleteEvent(event);
+
+    expect(mocks.deleteLocationEventById).not.toHaveBeenCalled();
+    expect(props.canDeleteEvent(event)).toBe(false);
+
+    (mocks.latestToolbarProps?.onUndo as (() => void) | undefined)?.();
+
+    expect(props.canDeleteEvent(event)).toBe(true);
+
+    await props.onDeleteEvent(event);
+    (mocks.latestToolbarProps?.onApply as (() => void) | undefined)?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mocks.deleteLocationEventById).toHaveBeenCalledWith("https://example.test", "42", 8);
   });
 });
