@@ -5,7 +5,6 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
-import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;

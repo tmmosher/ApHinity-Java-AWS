@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -104,7 +105,7 @@ class LocationEventControllerTest {
         assertSame(template, actual.getBody());
         assertEquals(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            actual.getHeaders().getContentType().toString()
+            Objects.requireNonNull(actual.getHeaders().getContentType()).toString()
         );
         assertEquals(3L, actual.getHeaders().getContentLength());
         assertEquals(

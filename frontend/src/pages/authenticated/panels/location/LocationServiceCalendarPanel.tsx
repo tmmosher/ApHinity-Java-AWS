@@ -1,5 +1,5 @@
 import {useParams} from "@solidjs/router";
-import {Show, createEffect, createMemo, createResource, createSignal} from "solid-js";
+import {createEffect, createMemo, createResource, createSignal} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";

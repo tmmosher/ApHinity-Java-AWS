@@ -141,7 +141,8 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
   });
 
   it("queues persisted deletes until apply and restores them on undo", async () => {
-    mocks.fetchLocationEventsById.mockResolvedValue([
+      mocks.fetchLocationEventsById.mockResolvedValue([
+      // @ts-ignore I CAN assign something to never!!!
       createEvent({responsibility: "partner"})
     ]);
     const props = renderPanel();
