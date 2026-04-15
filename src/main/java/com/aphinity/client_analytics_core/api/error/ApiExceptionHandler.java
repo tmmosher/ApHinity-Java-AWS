@@ -88,6 +88,18 @@ public class ApiExceptionHandler {
         Map.entry("Event time is required", new ErrorDefinition("event_time_required", "Event time is required")),
         Map.entry("Event status is required", new ErrorDefinition("event_status_required", "Event status is required")),
         Map.entry("Event end must be on or after the start date and time", new ErrorDefinition("event_range_invalid", "Event end must be on or after the start date and time")),
+        Map.entry("Task title is required", new ErrorDefinition("task_title_required", "Task title is required")),
+        Map.entry(
+            "Task title must be between 3 and 60 characters",
+            new ErrorDefinition("task_title_invalid_length", "Task title must be between 3 and 60 characters")
+        ),
+        Map.entry("Task start date is required", new ErrorDefinition("task_start_date_required", "Task start date is required")),
+        Map.entry("Task end date is required", new ErrorDefinition("task_end_date_required", "Task end date is required")),
+        Map.entry(
+            "Task end date must be on or after the start date",
+            new ErrorDefinition("task_date_range_invalid", "Task end date must be on or after the start date")
+        ),
+        Map.entry("Location gantt task not found", new ErrorDefinition("location_gantt_task_not_found", "Location gantt task not found")),
         Map.entry(
             "Service calendar template unavailable",
             new ErrorDefinition("service_calendar_template_unavailable", "Service calendar template unavailable")

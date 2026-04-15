@@ -118,6 +118,23 @@ export interface CreateLocationServiceEventRequest {
     status: ServiceEventStatus;
 }
 
+export interface LocationGanttTask {
+    id: number;
+    title: string;
+    startDate: string;
+    endDate: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLocationGanttTaskRequest {
+    title: string;
+    startDate: string;
+    endDate: string;
+    description: string | null;
+}
+
 export interface ManagedUser {
   id: number;
   name: string;
