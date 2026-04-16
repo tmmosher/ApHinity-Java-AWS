@@ -1,28 +1,27 @@
-import Popover from "corvu/popover";
+import Gantt from "frappe-gantt";
 import {useParams} from "@solidjs/router";
-import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-  type JSX
-} from "solid-js";
+import {Show, createEffect, createMemo, createResource, createSignal, onCleanup, type JSX} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import type {CreateLocationGanttTaskRequest, LocationGanttTask} from "../../../../types/Types";
+import {GanttChartShell} from "../../../../components/location/GanttChartShell";
+import {GanttTaskPopover} from "../../../../components/location/GanttTaskPopover";
 import {applyStateSnapshot, undoStateSnapshot} from "../../../../util/common/stateHistory";
-import {formatDisplayDate} from "../../../../util/location/dateUtility";
+import {
+  GANTT_CHART_HOST_ID,
+  createFrappeGanttOptions,
+  isStagedGanttTask,
+  resolveFrappeGanttContainerHeight,
+  toFrappeGanttTask,
+  type TimelineTaskLike
+} from "../../../../util/location/frappeGanttChart";
 import {parseGanttTaskCsvFile} from "../../../../util/location/ganttTaskCsv";
 import {
   canEditLocationGanttTask,
   createDefaultGanttTaskDraft,
-  createGanttTaskDraftFromTask,
   createLocationGanttTaskRequestFromDraft,
-  GANTT_TASK_TITLE_MAX_LENGTH,
-  type GanttTaskDraft
+  GANTT_TASK_TITLE_MAX_LENGTH
 } from "../../../../util/location/ganttTaskForm";
 import {
   createLocationGanttTaskById,
@@ -32,7 +31,7 @@ import {
 } from "../../../../util/location/locationGanttTaskApi";
 import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
 import {createLocationReactiveSearchControl} from "../../../../util/location/locationReactiveSearchControl";
-import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "../../../../util/location/serviceEventPopoverPosition";
+import "../../../../styles/frappe-gantt.css";
 
 type GanttTaskResource = {
   locationId: string;
@@ -40,22 +39,11 @@ type GanttTaskResource = {
   value: LocationGanttTask[];
 };
 
-type StagedLocationGanttTask = LocationGanttTask & {
+type StagedLocationGanttTask = TimelineTaskLike & {
   isStaged: true;
 };
 
-type TimelineTask = LocationGanttTask | StagedLocationGanttTask;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-const parseUtcDate = (value: string): number => {
-  const [year, month, day] = value.split("-").map(Number);
-  return Date.UTC(year, month - 1, day);
-};
-
-const isStagedGanttTask = (task: TimelineTask): task is StagedLocationGanttTask => (
-  "isStaged" in task && task.isStaged === true
-);
+type TimelineTask = TimelineTaskLike;
 
 const cloneStagedTasks = (tasks: StagedLocationGanttTask[]): StagedLocationGanttTask[] => (
   JSON.parse(JSON.stringify(tasks)) as StagedLocationGanttTask[]
@@ -101,206 +89,6 @@ const createStagedTask = (
   };
 };
 
-const taskBarStyle = (task: TimelineTask, startUtc: number, totalDays: number): JSX.CSSProperties => {
-  const taskStart = parseUtcDate(task.startDate);
-  const taskEnd = parseUtcDate(task.endDate);
-  const offsetDays = Math.max(0, Math.floor((taskStart - startUtc) / DAY_MS));
-  const durationDays = Math.max(1, Math.floor((taskEnd - taskStart) / DAY_MS) + 1);
-  const leftPercent = (offsetDays / totalDays) * 100;
-  const widthPercent = (durationDays / totalDays) * 100;
-  const clampedWidth = Math.min(Math.max(widthPercent, 3), Math.max(100 - leftPercent, 0));
-  return {left: `${leftPercent}%`, width: `${clampedWidth}%`};
-};
-
-const TaskPopover = (props: {
-  task: TimelineTask;
-  canEdit: boolean;
-  canDelete: boolean;
-  onSave?: (task: TimelineTask, request: CreateLocationGanttTaskRequest) => Promise<void>;
-  onDelete?: (task: TimelineTask) => Promise<void>;
-  children: JSX.Element;
-}) => {
-  const [isEditing, setIsEditing] = createSignal(false);
-  const [isSaving, setIsSaving] = createSignal(false);
-  const [isDeleting, setIsDeleting] = createSignal(false);
-  const [submissionError, setSubmissionError] = createSignal<string>();
-  const [deletionError, setDeletionError] = createSignal<string>();
-  const [draft, setDraft] = createSignal<GanttTaskDraft>(createGanttTaskDraftFromTask(props.task));
-
-  const resetEditor = (): void => {
-    setIsEditing(false);
-    setIsSaving(false);
-    setIsDeleting(false);
-    setSubmissionError(undefined);
-    setDeletionError(undefined);
-    setDraft(createGanttTaskDraftFromTask(props.task));
-  };
-
-  const save = async (closePopover: () => void): Promise<void> => {
-    if (!props.canEdit || !props.onSave || isSaving()) {
-      return;
-    }
-    setIsSaving(true);
-    setSubmissionError(undefined);
-    setDeletionError(undefined);
-    try {
-      await props.onSave(props.task, createLocationGanttTaskRequestFromDraft(draft()));
-      closePopover();
-      resetEditor();
-    } catch (error) {
-      setSubmissionError(error instanceof Error ? error.message : "Unable to save gantt task.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const remove = async (closePopover: () => void): Promise<void> => {
-    if (!props.canDelete || !props.onDelete || isDeleting()) {
-      return;
-    }
-    setIsDeleting(true);
-    setSubmissionError(undefined);
-    setDeletionError(undefined);
-    try {
-      await props.onDelete(props.task);
-      closePopover();
-      resetEditor();
-    } catch (error) {
-      setDeletionError(error instanceof Error ? error.message : "Unable to delete gantt task.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <Popover
-      {...SERVICE_EVENT_POPOVER_POSITION_PROPS}
-      trapFocus={false}
-      restoreFocus={false}
-      closeOnOutsideFocus={false}
-      onOpenChange={(open) => {
-        if (!open) {
-          resetEditor();
-        }
-      }}
-    >
-      {(popover) => (
-        <>
-          {props.children}
-
-          <Popover.Portal>
-            <Popover.Content class="z-50 w-[min(96vw,28rem)] rounded-2xl border border-base-300 bg-base-100 shadow-2xl">
-              <Show
-                when={isEditing()}
-                fallback={
-                  <div class="space-y-4 p-4 md:p-5">
-                    <div class="flex items-start justify-between gap-3">
-                      <Popover.Label class="text-base font-semibold leading-tight">
-                        {props.task.title}
-                      </Popover.Label>
-                      <div class="flex items-center gap-2">
-                        <Show when={props.canEdit}>
-                          <button type="button" class="btn btn-primary btn-xs" onClick={() => setIsEditing(true)}>
-                            Edit
-                          </button>
-                        </Show>
-                      </div>
-                    </div>
-
-                    <p class="text-sm text-base-content/75">
-                      {formatDisplayDate(props.task.startDate)} - {formatDisplayDate(props.task.endDate)}
-                    </p>
-                    <p class="text-sm leading-6 text-base-content/80">
-                      {props.task.description ?? "No description provided."}
-                    </p>
-
-                    <Show when={deletionError()}>
-                      {(message) => <p class="text-sm text-error">{message()}</p>}
-                    </Show>
-
-                    <Show when={props.canDelete}>
-                      <div class="flex justify-end">
-                        <button
-                          type="button"
-                          class="btn btn-error btn-outline btn-sm"
-                          disabled={isDeleting()}
-                          onClick={() => {
-                            void remove(() => popover.setOpen(false));
-                          }}
-                        >
-                          {isDeleting() ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    </Show>
-                  </div>
-                }
-              >
-                <form
-                  class="space-y-3 p-4 md:p-5"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void save(() => popover.setOpen(false));
-                  }}
-                >
-                  <Popover.Label class="text-base font-semibold">Edit Task</Popover.Label>
-                  <input
-                    type="text"
-                    class="input input-bordered h-10 w-full"
-                    maxlength={GANTT_TASK_TITLE_MAX_LENGTH}
-                    value={draft().title}
-                    onInput={(event) => {
-                      setDraft((current) => ({...current, title: event.currentTarget.value}));
-                    }}
-                    required
-                  />
-                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <input
-                      type="date"
-                      class="input input-bordered h-10"
-                      value={draft().startDate}
-                      onInput={(event) => {
-                        setDraft((current) => ({...current, startDate: event.currentTarget.value}));
-                      }}
-                      required
-                    />
-                    <input
-                      type="date"
-                      class="input input-bordered h-10"
-                      value={draft().endDate}
-                      onInput={(event) => {
-                        setDraft((current) => ({...current, endDate: event.currentTarget.value}));
-                      }}
-                      required
-                    />
-                  </div>
-                  <textarea
-                    class="textarea textarea-bordered min-h-[5rem] w-full"
-                    value={draft().description}
-                    onInput={(event) => {
-                      setDraft((current) => ({...current, description: event.currentTarget.value}));
-                    }}
-                  />
-                  <Show when={submissionError()}>
-                    {(message) => <p class="text-sm text-error">{message()}</p>}
-                  </Show>
-                  <div class="flex justify-end gap-2">
-                    <button type="button" class="btn btn-ghost btn-sm" disabled={isSaving()} onClick={resetEditor}>
-                      Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary btn-sm" disabled={isSaving()}>
-                      {isSaving() ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                </form>
-              </Show>
-            </Popover.Content>
-          </Popover.Portal>
-        </>
-      )}
-    </Popover>
-  );
-};
-
 export const LocationGanttChartPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
@@ -317,7 +105,53 @@ export const LocationGanttChartPanel = () => {
   const [isImportingCsv, setIsImportingCsv] = createSignal(false);
   const [isApplyingImports, setIsApplyingImports] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
+  const [selectedTask, setSelectedTask] = createSignal<TimelineTask>();
+  const [selectedTaskAnchorStyle, setSelectedTaskAnchorStyle] = createSignal<JSX.CSSProperties>();
+  const [ganttContainerHeight, setGanttContainerHeight] = createSignal(1);
+  let ganttChart: Gantt | undefined;
+  let ganttResizeObserver: ResizeObserver | undefined;
   let csvUploadInput: HTMLInputElement | undefined;
+
+  onCleanup(() => {
+    ganttResizeObserver?.disconnect();
+    ganttResizeObserver = undefined;
+    ganttChart = undefined;
+  });
+
+  const clearSelectedTask = () => {
+    setSelectedTask(undefined);
+    setSelectedTaskAnchorStyle(undefined);
+  };
+
+  const setSelectedTaskAnchorFromBar = (taskId: number): void => {
+    if (!ganttChart) {
+      return;
+    }
+
+    const bar = ganttChart.get_bar(String(taskId));
+    const target = bar?.$bar ?? bar?.group;
+    if (!target) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    setSelectedTaskAnchorStyle({
+      position: "fixed",
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`
+    });
+  };
+
+  const syncSelectedTaskAnchor = () => {
+    const task = selectedTask();
+    if (!task) {
+      return;
+    }
+
+    setSelectedTaskAnchorFromBar(task.id);
+  };
 
   const ganttTaskRequest = createMemo(() => ({
     locationId: params.locationId,
@@ -351,24 +185,11 @@ export const LocationGanttChartPanel = () => {
 
   const timelineTasks = createMemo<TimelineTask[]>(() => (
     [...(persistedTasks() ?? []), ...filteredStagedTasks()].sort((left, right) => (
-      parseUtcDate(left.startDate) - parseUtcDate(right.startDate)
-      || parseUtcDate(left.endDate) - parseUtcDate(right.endDate)
+      left.startDate.localeCompare(right.startDate)
+      || left.endDate.localeCompare(right.endDate)
       || left.id - right.id
     ))
   ));
-
-  const timelineMetrics = createMemo(() => {
-    const tasks = timelineTasks();
-    if (tasks.length === 0) {
-      const now = new Date();
-      const startUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-      const endUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0);
-      return {startUtc, totalDays: Math.max(1, Math.floor((endUtc - startUtc) / DAY_MS) + 1)};
-    }
-    const startUtc = Math.min(...tasks.map((task) => parseUtcDate(task.startDate)));
-    const endUtc = Math.max(...tasks.map((task) => parseUtcDate(task.endDate)));
-    return {startUtc, totalDays: Math.max(1, Math.floor((endUtc - startUtc) / DAY_MS) + 1)};
-  });
 
   const taskLoadError = createMemo(() => {
     if (ganttTaskResource.loading || !ganttTaskResource.error) {
@@ -399,6 +220,7 @@ export const LocationGanttChartPanel = () => {
     setIsImportingCsv(false);
     setIsApplyingImports(false);
     setLocationSessionToken((token) => token + 1);
+    clearSelectedTask();
     clearUploadInput();
   });
 
@@ -499,15 +321,6 @@ export const LocationGanttChartPanel = () => {
     }
   };
 
-  const undoLastStagedMutation = (): void => {
-    const result = undoStateSnapshot(stagedTasks(), stagedUndoStack(), cloneStagedTasks);
-    if (!result.undone) {
-      return;
-    }
-    setStagedTasks(result.nextState);
-    setStagedUndoStack(result.nextUndoStack);
-  };
-
   const saveTask = async (task: TimelineTask, request: CreateLocationGanttTaskRequest): Promise<void> => {
     if (!canEditTasks()) {
       throw new Error("Only partners and admins can update gantt tasks.");
@@ -541,6 +354,75 @@ export const LocationGanttChartPanel = () => {
     toast.success("Gantt task deleted.");
   };
 
+  createEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const hostElement = document.getElementById(GANTT_CHART_HOST_ID);
+    if (!(hostElement instanceof HTMLElement)) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setGanttContainerHeight(
+        resolveFrappeGanttContainerHeight(hostElement.getBoundingClientRect().height)
+      );
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    ganttResizeObserver?.disconnect();
+    ganttResizeObserver = new ResizeObserver(() => {
+      updateHeight();
+      syncSelectedTaskAnchor();
+    });
+    ganttResizeObserver.observe(hostElement);
+
+    onCleanup(() => {
+      ganttResizeObserver?.disconnect();
+      ganttResizeObserver = undefined;
+    });
+  });
+
+  createEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const hostElement = document.getElementById(GANTT_CHART_HOST_ID);
+    if (!(hostElement instanceof HTMLElement)) {
+      return;
+    }
+
+    const measuredHeight = resolveFrappeGanttContainerHeight(hostElement.getBoundingClientRect().height);
+    const chartHeight = Math.max(ganttContainerHeight(), measuredHeight);
+    const tasks = timelineTasks();
+    const chartTasks = tasks.map(toFrappeGanttTask);
+    const chartOptions = createFrappeGanttOptions(chartHeight, (chartTask) => {
+      const task = timelineTasks().find((candidate) => String(candidate.id) === String(chartTask.id));
+      if (task) {
+        setSelectedTaskAnchorFromBar(task.id);
+        setSelectedTask(task);
+      }
+    });
+
+    if (!ganttChart) {
+      ganttChart = new Gantt(hostElement, chartTasks, chartOptions);
+    } else {
+      ganttChart.update_options({
+        container_height: chartOptions.container_height
+      });
+      ganttChart.refresh(chartTasks);
+    }
+
+    syncSelectedTaskAnchor();
+  });
+
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
@@ -557,6 +439,18 @@ export const LocationGanttChartPanel = () => {
               }}
             />
           </label>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-base-content/70">
+          <span class="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-200/60 px-2.5 py-1">
+            <span class="h-2.5 w-5 rounded-full border border-[#86efac] bg-[#dcfce7]" />
+            Persisted
+          </span>
+          <span class="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-200/60 px-2.5 py-1">
+            <span class="h-2.5 w-5 rounded-full border border-primary/55 bg-primary/20" />
+            Staged
+          </span>
+          <span class="text-base-content/55">Click a bar to inspect or edit a task.</span>
         </div>
 
         <Show when={canEditTasks()}>
@@ -594,7 +488,14 @@ export const LocationGanttChartPanel = () => {
               type="button"
               class={"btn btn-outline btn-sm " + ((!stagedUndoStack().length || isApplyingImports()) ? "btn-disabled" : "")}
               disabled={!stagedUndoStack().length || isApplyingImports()}
-              onClick={undoLastStagedMutation}
+              onClick={() => {
+                const result = undoStateSnapshot(stagedTasks(), stagedUndoStack(), cloneStagedTasks);
+                if (!result.undone) {
+                  return;
+                }
+                setStagedTasks(result.nextState);
+                setStagedUndoStack(result.nextUndoStack);
+              }}
             >
               Undo
             </button>
@@ -671,66 +572,45 @@ export const LocationGanttChartPanel = () => {
         </section>
       </Show>
 
-      <section class="flex min-h-[44rem] flex-1 flex-col rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">
-        <Show when={!ganttTaskResource.loading || persistedTasks() !== undefined} fallback={<p>Loading gantt tasks...</p>}>
-          <Show when={taskLoadError()}>
-            {(message) => (
-              <div class="mb-3 rounded-xl border border-error/25 bg-error/10 px-3 py-2 text-sm text-error">
-                {message()}
-              </div>
-            )}
-          </Show>
-
-          <Show when={timelineTasks().length > 0} fallback={
-            <p class="text-sm text-base-content/70">
-              {searchControl.searchQuery() ? "No gantt tasks match your search." : "No gantt tasks available for this location."}
-            </p>
-          }>
-            <div class="space-y-3">
-              <For each={timelineTasks()}>
-                {(task) => (
-                  <div class="rounded-xl border border-base-300/80 bg-base-100/80 p-3">
-                    <div class="mb-2 flex items-center justify-between gap-2 text-xs">
-                      <span class="truncate font-semibold">
-                        {task.title}
-                        <Show when={isStagedGanttTask(task)}>
-                          <span class="ml-2 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
-                            Staged
-                          </span>
-                        </Show>
-                      </span>
-                      <span class="text-base-content/65">
-                        {formatDisplayDate(task.startDate)} - {formatDisplayDate(task.endDate)}
-                      </span>
-                    </div>
-
-                    <div class="relative h-10 rounded-xl border border-base-300 bg-base-200/55">
-                      <TaskPopover
-                        task={task}
-                        canEdit={canEditTasks()}
-                        canDelete={canEditTasks()}
-                        onSave={saveTask}
-                        onDelete={deleteTask}
-                      >
-                        <Popover.Trigger
-                          type="button"
-                          style={taskBarStyle(task, timelineMetrics().startUtc, timelineMetrics().totalDays)}
-                          class={"absolute top-1/2 h-7 -translate-y-1/2 truncate rounded-lg border px-2 text-left text-xs font-semibold shadow-sm " +
-                            (isStagedGanttTask(task)
-                              ? "border-dashed border-primary/55 bg-primary/20 text-primary"
-                              : "border-[#86efac] bg-[#dcfce7] text-[#166534]")}
-                        >
-                          {task.title}
-                        </Popover.Trigger>
-                      </TaskPopover>
-                    </div>
-                  </div>
-                )}
-              </For>
+      <section class="flex flex-col rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">
+        <Show when={taskLoadError()}>
+          {(message) => (
+            <div class="mb-3 rounded-xl border border-error/25 bg-error/10 px-3 py-2 text-sm text-error">
+              {message()}
             </div>
-          </Show>
+          )}
+        </Show>
+
+        <Show when={ganttTaskResource.loading && persistedTasks() === undefined}>
+          <p class="mb-3 text-sm text-base-content/70">Loading gantt tasks...</p>
+        </Show>
+
+        <div class="self-center w-fit max-w-full overflow-x-auto rounded-2xl border border-base-300 bg-base-100/80">
+          <GanttChartShell
+            hostId={GANTT_CHART_HOST_ID}
+            class="w-max min-h-[32rem]"
+          />
+        </div>
+
+        <Show when={!ganttTaskResource.loading && timelineTasks().length === 0}>
+          <p class="mt-3 text-sm text-base-content/70">
+            {searchControl.searchQuery() ? "No gantt tasks match your search." : "No gantt tasks available for this location."}
+          </p>
         </Show>
       </section>
+
+      <Show when={selectedTask()}>
+        {(task) => (
+          <GanttTaskPopover
+            task={task()}
+            canEdit={canEditTasks()}
+            anchorStyle={selectedTaskAnchorStyle()}
+            onSave={saveTask}
+            onDelete={deleteTask}
+            onClose={clearSelectedTask}
+          />
+        )}
+      </Show>
     </div>
   );
 };

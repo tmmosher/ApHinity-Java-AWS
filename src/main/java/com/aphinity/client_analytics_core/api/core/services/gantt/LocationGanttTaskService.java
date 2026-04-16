@@ -45,7 +45,12 @@ public class LocationGanttTaskService {
         AppUser user = authorizationService.requireUser(userId);
         authorizationService.requireReadableLocationAccess(user, locationId);
 
-        return ganttTaskRepository.findVisibleByLocationIdAndTitleSearch(locationId, normalizeSearchTerm(searchTerm)).stream()
+        String normalizedSearchTerm = normalizeSearchTerm(searchTerm);
+        List<GanttTask> tasks = normalizedSearchTerm == null
+            ? ganttTaskRepository.findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(locationId)
+            : ganttTaskRepository.findVisibleByLocationIdAndTitleSearch(locationId, normalizedSearchTerm);
+
+        return tasks.stream()
             .map(requestMapper::toResponse)
             .toList();
     }

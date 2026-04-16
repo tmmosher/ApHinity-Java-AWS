@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface GanttTaskRepository extends JpaRepository<GanttTask, Long> {
+    List<GanttTask> findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(Long locationId);
+
     @Query("""
         select ganttTask from GanttTask ganttTask
         where ganttTask.location.id = :locationId

@@ -75,6 +75,24 @@ class LocationGanttTaskServiceTest {
     }
 
     @Test
+    void getAccessibleLocationTasksUsesUnfilteredQueryWhenSearchTermIsNull() {
+        AppUser user = verifiedUser(5L);
+        GanttTask first = ganttTask(31L, "OPS");
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
+        when(ganttTaskRepository.findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(99L)).thenReturn(List.of(first));
+
+        List<GanttTaskResponse> response = locationGanttTaskService.getAccessibleLocationTasks(5L, 99L, null);
+
+        assertEquals(List.of("OPS"), response.stream().map(GanttTaskResponse::title).toList());
+        verify(authorizationService).requireUser(5L);
+        verify(authorizationService).requireReadableLocationAccess(user, 99L);
+        verify(ganttTaskRepository).findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(99L);
+        verify(ganttTaskRepository, never()).findVisibleByLocationIdAndTitleSearch(any(), any());
+    }
+
+    @Test
     void createLocationTaskPersistsNormalizedFieldsAndTouchesLocation() {
         AppUser user = verifiedUser(5L);
         Location location = new Location();

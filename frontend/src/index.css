@@ -89,3 +89,22 @@
     animation: none;
   }
 }
+
+.gantt-container .bar-wrapper.gantt-task-persisted .bar {
+  fill: #dcfce7;
+  stroke: #86efac;
+}
+
+.gantt-container .bar-wrapper.gantt-task-persisted .bar-label {
+  fill: #166534;
+}
+
+.gantt-container .bar-wrapper.gantt-task-staged .bar {
+  fill: rgb(233 213 255 / 0.36);
+  stroke: rgb(192 132 252 / 0.75);
+  stroke-dasharray: 6 4;
+}
+
+.gantt-container .bar-wrapper.gantt-task-staged .bar-label {
+  fill: rgb(126 34 206);
+}
