@@ -25,6 +25,7 @@ import {
   toFrappeGanttTask,
   type TimelineTaskLike
 } from "../../../../util/location/frappeGanttChart";
+import {fitGanttTaskLabels} from "../../../../util/location/ganttTaskLabelTruncation";
 import {canEditLocationGanttTask} from "../../../../util/location/ganttTaskForm";
 import {
   createLocationGanttTaskById,
@@ -279,6 +280,10 @@ export const LocationGanttChartPanel = () => {
       });
       ganttChart.refresh(chartTasks);
     }
+
+    // Frappe positions SVG labels after drawing the bars, so truncate them here
+    // to keep long titles inside the task bounds.
+    fitGanttTaskLabels(hostElement);
 
     const selected = untrack(selectedTask);
     if (selected) {

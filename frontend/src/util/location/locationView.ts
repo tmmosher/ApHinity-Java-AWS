@@ -13,9 +13,9 @@ export const dashboardLocationViews: Array<{
   name: string;
   label: JSX.Element;
 }> = [
+  {view: "dashboard", name: "Dashboard", label: dashboard_icon},
   {view: "service-calendar", name: "Service Calendar", label: service_icon},
   {view: "gantt-chart", name: "Gantt Chart", label: gantt_icon},
-  {view: "dashboard", name: "Dashboard", label: dashboard_icon}
 ];
 
 export const createLocationViewActive = (
@@ -60,7 +60,7 @@ export const getLocationViewFromPathname = (pathname: string, locationId: string
   if (normalizedPathname === `${basePath}/dashboard`) {
     return "dashboard";
   }
-  return "service-calendar";
+  return "dashboard";
 };
 
 export const getLocationViewHref = (locationId: string, view: DashboardLocationView): string => {

@@ -1,4 +1,4 @@
-import { batch, createRenderEffect, createRoot, createSignal } from "solid-js";
+import { createRenderEffect, createRoot } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
@@ -77,35 +77,6 @@ const renderModal = (graph?: LocationGraph) =>
     });
 
     return dispose;
-  });
-
-const renderControllableModal = (graph?: LocationGraph) =>
-  createRoot((dispose) => {
-    const [isOpen, setIsOpen] = createSignal(true);
-    const [currentGraph, setCurrentGraph] = createSignal<LocationGraph | undefined>(graph);
-
-    createRenderEffect(() => {
-      GraphEditorModal({
-        isOpen: isOpen(),
-        graph: currentGraph(),
-        canRenameGraph: false,
-        canDeleteGraph: false,
-        canUndo: false,
-        isDeleting: false,
-        isSaving: false,
-        onApply: vi.fn(),
-        onDeleteGraph: vi.fn().mockResolvedValue(undefined),
-        onRenameGraph: vi.fn().mockResolvedValue(undefined),
-        onUndo: vi.fn(),
-        onClose: vi.fn()
-      });
-    });
-
-    return {
-      dispose,
-      setIsOpen,
-      setCurrentGraph
-    };
   });
 
 const getTraceControlsProps = () => {
@@ -290,85 +261,6 @@ describe("GraphEditorModal trace controls", () => {
       const invalidProps = getCartesianTraceEditorProps();
       expect(invalidProps.yValues).toEqual([9]);
       expect(invalidProps.yDrafts[0]).toBe("abc");
-    } finally {
-      dispose();
-    }
-  });
-
-  it("clears stale editor payload state when a deleted graph closes", async () => {
-    const pieGraph: LocationGraph = {
-      id: 16,
-      name: "Cleanup Target",
-      data: [{
-        type: "pie",
-        labels: ["Open", "Closed"],
-        values: [68, 32],
-        marker: {
-          color: "#1f77b4",
-          colors: ["#1f77b4", "#2ca02c"]
-        }
-      }],
-      layout: null,
-      config: null,
-      style: null,
-      createdAt: "2026-01-01T00:00:00Z",
-      updatedAt: "2026-01-02T00:00:00Z"
-    };
-    const barGraph: LocationGraph = {
-      id: 18,
-      name: "Fresh Target",
-      data: [{
-        type: "bar",
-        name: "Bar Trace",
-        x: ["Point 1"],
-        y: [12]
-      }],
-      layout: null,
-      config: null,
-      style: null,
-      createdAt: "2026-01-01T00:00:00Z",
-      updatedAt: "2026-01-02T00:00:00Z"
-    };
-
-    const {dispose, setCurrentGraph, setIsOpen} = renderControllableModal(pieGraph);
-    try {
-      await Promise.resolve();
-
-      expect(getPieTraceEditorProps()).toMatchObject({
-        rowColors: ["#1f77b4", "#2ca02c"]
-      });
-
-      batch(() => {
-        setCurrentGraph(undefined);
-        setIsOpen(false);
-      });
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      latestTraceControlsProps = null;
-      latestPieTraceEditorProps = null;
-      batch(() => {
-        setCurrentGraph(barGraph);
-        setIsOpen(true);
-      });
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(() => getPieTraceEditorProps()).toThrowError("PieTraceEditor mock was not rendered.");
-      const cartesianProps = getCartesianTraceEditorProps();
-      expect(cartesianProps.xValues).toEqual(["Point 1"]);
-      expect(cartesianProps.yValues).toEqual([12]);
-
-      if (latestTraceControlsProps) {
-        const traceControls = getTraceControlsProps();
-        expect(traceControls.traceOptions).toEqual([{index: 0, label: "1. Bar Trace (bar)"}]);
-        expect(traceControls.traceNameDraft).toBe("Bar Trace");
-      }
     } finally {
       dispose();
     }

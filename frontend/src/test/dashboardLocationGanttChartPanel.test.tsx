@@ -54,5 +54,6 @@ describe("LocationGanttChartPanel", () => {
     expect(html).toContain("Undo");
     expect(html).toContain("data-gantt-task-create-trigger");
     expect(html).toContain("id=\"location-gantt-chart-host\"");
+    expect(html).toContain("w-max min-h-[32rem]");
   });
 });

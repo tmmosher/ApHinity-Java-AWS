@@ -85,7 +85,7 @@ export const GanttTaskCreatePopover = (props: GanttTaskCreatePopoverProps) => {
       <Popover.Trigger
         as="button"
         type="button"
-        class="btn btn-primary btn-sm"
+        class="btn btn-primary btn-sm rounded-2xl"
         data-gantt-task-create-trigger=""
       >
         Add Task

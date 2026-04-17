@@ -12,9 +12,9 @@ type ServiceCalendarIntroPopoverContentProps = {
 export const ServiceCalendarIntroPopoverContent: Component<ServiceCalendarIntroPopoverContentProps> = (props) => (
   <div class="space-y-4 p-4" data-service-calendar-intro-content="">
     <div class="space-y-1">
-      <h3 class="text-sm font-semibold">How to use the service calendar</h3>
+      <h3 class="text-sm font-semibold">How the service calendar works</h3>
       <p class="text-sm leading-6 text-base-content/70">
-        Users can view previous, current, and upcoming events on the service calendar.
+        With the service calendar, you can view previous, current, and upcoming events.
         To add new events, fill out the Excel file below and upload. Alternatively, click an empty day cell to create a service event.
       </p>
     </div>

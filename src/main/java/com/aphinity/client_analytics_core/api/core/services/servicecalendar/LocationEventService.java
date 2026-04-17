@@ -92,8 +92,9 @@ public class LocationEventService {
         try {
             ServiceEvent persisted = serviceEventRepository.saveAndFlush(serviceEvent);
             auditService.recordCreated(userId, persisted);
+            ServiceEventResponse response = requestMapper.toResponse(persisted);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            return requestMapper.toResponse(persisted);
+            return response;
         } catch (RuntimeException ex) {
             log.error(
                 "Location event creation persistence failed actorUserId={} locationId={}",
@@ -136,8 +137,9 @@ public class LocationEventService {
                 );
             }
 
+            ServiceEventResponse response = requestMapper.toResponse(persisted);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            return requestMapper.toResponse(persisted);
+            return response;
         } catch (RuntimeException ex) {
             log.error(
                 "Corrective action creation persistence failed actorUserId={} locationId={} sourceEventId={}",
@@ -170,8 +172,11 @@ public class LocationEventService {
         try {
             ServiceEvent persisted = serviceEventRepository.saveAndFlush(serviceEvent);
             auditService.recordUpdated(userId, persisted);
+            // touchUpdatedAt() clears the persistence context, so map the response first while
+            // any lazy corrective-action source proxy is still attached.
+            ServiceEventResponse response = requestMapper.toResponse(persisted);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            return requestMapper.toResponse(persisted);
+            return response;
         } catch (RuntimeException ex) {
             log.error(
                 "Location event update persistence failed actorUserId={} locationId={} eventId={}",

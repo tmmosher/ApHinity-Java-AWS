@@ -19,6 +19,7 @@ import com.aphinity.client_analytics_core.api.core.services.servicecalendar.Serv
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -319,6 +321,67 @@ class LocationEventServiceTest {
     }
 
     @Test
+    void updateCorrectiveActionMapsResponseBeforeTouchingLocation() {
+        AppUser user = verifiedUser(5L);
+        LocationEventRequest request = new LocationEventRequest(
+            "Completed corrective action",
+            ServiceEventResponsibility.CLIENT,
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("09:30:00"),
+            LocalDate.parse("2026-04-01"),
+            LocalTime.parse("11:00:00"),
+            "Fix the issue",
+            ServiceEventStatus.COMPLETED
+        );
+
+        GuardedServiceEvent sourceEvent = new GuardedServiceEvent();
+        sourceEvent.setId(3L);
+        sourceEvent.setTitle("Source Event");
+        sourceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
+        sourceEvent.setEventDate(LocalDate.parse("2026-04-01"));
+        sourceEvent.setEventTime(LocalTime.parse("08:00:00"));
+        sourceEvent.setEndEventDate(LocalDate.parse("2026-04-01"));
+        sourceEvent.setEndEventTime(LocalTime.parse("09:00:00"));
+        sourceEvent.setDescription("Original issue");
+        sourceEvent.setStatus(ServiceEventStatus.UPCOMING);
+        sourceEvent.setCorrectiveAction(false);
+        sourceEvent.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+        sourceEvent.setUpdatedAt(Instant.parse("2026-03-02T00:00:00Z"));
+
+        ServiceEvent correctiveAction = serviceEvent(44L, "Corrective Action");
+        correctiveAction.setResponsibility(ServiceEventResponsibility.CLIENT);
+        correctiveAction.setCorrectiveAction(true);
+        correctiveAction.setCorrectiveActionSourceEvent(sourceEvent);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireLocationExists(99L);
+        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(correctiveAction));
+        doNothing().when(authorizationService).requireUpdatePermission(
+            user,
+            99L,
+            correctiveAction,
+            ServiceEventResponsibility.CLIENT
+        );
+        when(serviceEventRepository.saveAndFlush(correctiveAction)).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            sourceEvent.markDetached();
+            return 1;
+        }).when(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+
+        InOrder inOrder = org.mockito.Mockito.inOrder(serviceEventRepository, requestMapper, locationRepository);
+
+        ServiceEventResponse response = locationEventService.updateLocationEvent(5L, 99L, 44L, request);
+
+        assertTrue(response.correctiveAction());
+        assertEquals(ServiceEventStatus.COMPLETED, response.status());
+        assertEquals(3L, response.correctiveActionSourceEventId());
+        assertEquals("Source Event", response.correctiveActionSourceEventTitle());
+        inOrder.verify(serviceEventRepository).saveAndFlush(correctiveAction);
+        inOrder.verify(requestMapper).toResponse(correctiveAction);
+        inOrder.verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
     void updateLocationEventRejectsMissingEvent() {
         AppUser user = verifiedUser(5L);
         when(authorizationService.requireUser(5L)).thenReturn(user);
@@ -430,5 +493,21 @@ class LocationEventServiceTest {
         user.setEmail("verified@example.com");
         user.setEmailVerifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
         return user;
+    }
+
+    private static final class GuardedServiceEvent extends ServiceEvent {
+        private boolean detached;
+
+        void markDetached() {
+            detached = true;
+        }
+
+        @Override
+        public String getTitle() {
+            if (detached) {
+                throw new RuntimeException("Could not initialize proxy [ServiceEvent#3] - no session");
+            }
+            return super.getTitle();
+        }
     }
 }
