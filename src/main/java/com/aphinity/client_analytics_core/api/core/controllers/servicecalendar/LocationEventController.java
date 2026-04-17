@@ -184,6 +184,58 @@ public class LocationEventController {
         }
     }
 
+    @PostMapping("/locations/{locationId}/events/{sourceEventId}/corrective-actions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ServiceEventResponse createCorrectiveAction(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @PathVariable Long sourceEventId,
+        @Valid @RequestBody LocationEventRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received corrective action create request actorUserId={} locationId={} sourceEventId={}",
+            userId,
+            locationId,
+            sourceEventId
+        );
+        try {
+            ServiceEventResponse response = locationEventService.createCorrectiveActionForLocationEvent(
+                userId,
+                locationId,
+                sourceEventId,
+                request
+            );
+            log.info(
+                "Completed corrective action create request actorUserId={} locationId={} sourceEventId={} eventId={}",
+                userId,
+                locationId,
+                sourceEventId,
+                response.id()
+            );
+            return response;
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected corrective action create request actorUserId={} locationId={} sourceEventId={} status={} reason={}",
+                userId,
+                locationId,
+                sourceEventId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed corrective action create request actorUserId={} locationId={} sourceEventId={}",
+                userId,
+                locationId,
+                sourceEventId,
+                ex
+            );
+            throw ex;
+        }
+    }
+
     @PutMapping("/locations/{locationId}/events/{eventId}")
     public ServiceEventResponse updateLocationEvent(
         @AuthenticationPrincipal Jwt jwt,

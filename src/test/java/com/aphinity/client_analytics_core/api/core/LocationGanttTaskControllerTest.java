@@ -74,6 +74,28 @@ class LocationGanttTaskControllerTest {
     }
 
     @Test
+    void createGanttTasksBulkDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        List<LocationGanttTaskRequest> requests = List.of(
+            request("OPS"),
+            request("QMS")
+        );
+        List<GanttTaskResponse> expected = List.of(response(19L, "OPS"), response(20L, "QMS"));
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationGanttTaskService.createLocationTasksBulk(42L, 8L, requests)).thenReturn(expected);
+
+        List<GanttTaskResponse> actual = locationGanttTaskController.createGanttTasksBulk(jwt, 8L, requests);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationGanttTaskService).createLocationTasksBulk(42L, 8L, requests);
+    }
+
+    @Test
     void updateGanttTaskDelegatesToServiceForAuthenticatedUser() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")

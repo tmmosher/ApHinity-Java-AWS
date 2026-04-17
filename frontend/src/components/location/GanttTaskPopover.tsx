@@ -6,7 +6,6 @@ import {
   createDefaultGanttTaskDraft,
   createGanttTaskDraftFromTask,
   createLocationGanttTaskRequestFromDraft,
-  GANTT_TASK_TITLE_MAX_LENGTH,
   type GanttTaskDraft
 } from "../../util/location/ganttTaskForm";
 import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "../../util/location/serviceEventPopoverPosition";
@@ -14,6 +13,7 @@ import {
   isStagedGanttTask,
   type TimelineTaskLike
 } from "../../util/location/frappeGanttChart";
+import {GanttTaskEditorBody, type UpdateGanttTaskDraftFn} from "./GanttTaskEditor";
 
 type GanttTaskPopoverProps = {
   task: TimelineTaskLike;
@@ -217,6 +217,13 @@ export const GanttTaskPopover = (props: ParentProps<GanttTaskPopoverProps>) => {
     }
   };
 
+  const updateDraft: UpdateGanttTaskDraftFn = (key, value) => {
+    setDraft((current) => ({...current, [key]: value}));
+    if (submissionError()) {
+      setSubmissionError(undefined);
+    }
+  };
+
   return (
     <Popover
       {...POPOVER_PROPS}
@@ -269,105 +276,23 @@ export const GanttTaskPopover = (props: ParentProps<GanttTaskPopoverProps>) => {
                 </Popover.Description>
               </div>
 
-              <form
-                class="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
+              <GanttTaskEditorBody
+                draft={draft()}
+                isSaving={isSaving()}
+                isDeleting={isDeleting()}
+                submissionError={submissionError()}
+                deletionError={deletionError()}
+                saveLabel="Save"
+                deleteLabel="Delete"
+                onCancel={close}
+                onSubmit={() => {
                   void save();
                 }}
-              >
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <label class="form-control w-full sm:col-span-2">
-                    <span class="label-text text-sm">Title</span>
-                    <input
-                      type="text"
-                      class="input input-bordered w-full"
-                      maxlength={GANTT_TASK_TITLE_MAX_LENGTH}
-                      value={draft().title}
-                      disabled={isSaving() || isDeleting()}
-                      onInput={(event) => {
-                        setDraft((current) => ({...current, title: event.currentTarget.value}));
-                      }}
-                      required
-                    />
-                  </label>
-
-                  <label class="form-control w-full">
-                    <span class="label-text text-sm">Start date</span>
-                    <input
-                      type="date"
-                      class="input input-bordered w-full"
-                      value={draft().startDate}
-                      disabled={isSaving() || isDeleting()}
-                      onInput={(event) => {
-                        setDraft((current) => ({...current, startDate: event.currentTarget.value}));
-                      }}
-                      required
-                    />
-                  </label>
-
-                  <label class="form-control w-full">
-                    <span class="label-text text-sm">End date</span>
-                    <input
-                      type="date"
-                      class="input input-bordered w-full"
-                      value={draft().endDate}
-                      disabled={isSaving() || isDeleting()}
-                      onInput={(event) => {
-                        setDraft((current) => ({...current, endDate: event.currentTarget.value}));
-                      }}
-                      required
-                    />
-                  </label>
-
-                  <label class="form-control w-full sm:col-span-2">
-                    <span class="label-text text-sm">Description</span>
-                    <textarea
-                      class="textarea textarea-bordered min-h-[6rem] w-full"
-                      value={draft().description}
-                      disabled={isSaving() || isDeleting()}
-                      onInput={(event) => {
-                        setDraft((current) => ({...current, description: event.currentTarget.value}));
-                      }}
-                    />
-                  </label>
-                </div>
-
-                <Show when={submissionError()}>
-                  {(message) => <p class="text-sm text-error">{message()}</p>}
-                </Show>
-
-                <Show when={deletionError()}>
-                  {(message) => <p class="text-sm text-error">{message()}</p>}
-                </Show>
-
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    class="btn btn-error btn-outline btn-sm"
-                    disabled={isSaving() || isDeleting()}
-                    onClick={() => {
-                      void remove();
-                    }}
-                  >
-                    {isDeleting() ? "Deleting..." : "Delete"}
-                  </button>
-
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      disabled={isSaving() || isDeleting()}
-                      onClick={close}
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary btn-sm" disabled={isSaving() || isDeleting()}>
-                      {isSaving() ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                </div>
-              </form>
+                onDelete={() => {
+                  void remove();
+                }}
+                updateDraft={updateDraft}
+              />
             </div>
           </Show>
         </Popover.Content>

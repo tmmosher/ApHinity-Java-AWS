@@ -1,12 +1,13 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {renderToString} from "solid-js/web";
-import type {LocationServiceEvent} from "../types/Types";
+import type {CreateLocationServiceEventRequest, LocationServiceEvent} from "../types/Types";
 
 const mocks = vi.hoisted(() => ({
   currentRole: "partner" as "partner" | "client",
   latestCalendarProps: null as Record<string, unknown> | null,
   latestToolbarProps: null as Record<string, unknown> | null,
   createLocationEventById: vi.fn(),
+  createLocationCorrectiveActionById: vi.fn(),
   deleteLocationEventById: vi.fn(),
   fetchLocationEventsById: vi.fn(async () => []),
   uploadLocationEventCalendarById: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("solid-toast", () => ({
 
 vi.mock("../util/location/locationEventApi", () => ({
   createLocationEventById: mocks.createLocationEventById,
+  createLocationCorrectiveActionById: mocks.createLocationCorrectiveActionById,
   deleteLocationEventById: mocks.deleteLocationEventById,
   fetchLocationEventsById: mocks.fetchLocationEventsById,
   getLocationEventTemplateDownloadUrl: vi.fn((host: string, locationId: string) =>
@@ -88,6 +90,10 @@ const renderPanel = () => {
   return mocks.latestCalendarProps as {
     canCompleteEvent: (event: LocationServiceEvent) => boolean;
     canDeleteEvent: (event: LocationServiceEvent) => boolean;
+    onCreateCorrectiveAction: (
+      sourceEvent: LocationServiceEvent,
+      request: CreateLocationServiceEventRequest
+    ) => Promise<void>;
     onCompleteEvent: (event: LocationServiceEvent) => Promise<void>;
     onDeleteEvent: (event: LocationServiceEvent) => Promise<void>;
   };
@@ -99,6 +105,7 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
     mocks.latestCalendarProps = null;
     mocks.latestToolbarProps = null;
     mocks.createLocationEventById.mockReset();
+    mocks.createLocationCorrectiveActionById.mockReset();
     mocks.deleteLocationEventById.mockReset();
     mocks.fetchLocationEventsById.mockReset();
     mocks.fetchLocationEventsById.mockResolvedValue([]);
@@ -138,6 +145,60 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
       status: "completed"
     });
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Service event marked complete.");
+  });
+
+  it("creates corrective actions from persisted service events", async () => {
+    const props = renderPanel();
+    const sourceEvent = createEvent({id: 19, responsibility: "partner"});
+
+    await props.onCreateCorrectiveAction(sourceEvent, {
+      title: "Corrective Action: Client kickoff",
+      responsibility: "partner",
+      date: "2026-04-08",
+      time: "10:00:00",
+      endDate: "2026-04-08",
+      endTime: "12:00:00",
+      description: "Replace failed valve",
+      status: "upcoming"
+    });
+
+    expect(mocks.createLocationCorrectiveActionById).toHaveBeenCalledWith(
+      "https://example.test",
+      "42",
+      19,
+      {
+        title: "Corrective Action: Client kickoff",
+        responsibility: "partner",
+        date: "2026-04-08",
+        time: "10:00:00",
+        endDate: "2026-04-08",
+        endTime: "12:00:00",
+        description: "Replace failed valve",
+        status: "upcoming"
+      }
+    );
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Corrective action created.");
+  });
+
+  it("rejects corrective actions for staged events", async () => {
+    const props = renderPanel();
+    const stagedEvent = {
+      ...createEvent({id: -5, responsibility: "client"}),
+      isStaged: true as const
+    };
+
+    await expect(props.onCreateCorrectiveAction(stagedEvent, {
+      title: "Corrective Action: Client kickoff",
+      responsibility: "client",
+      date: "2026-04-08",
+      time: "10:00:00",
+      endDate: "2026-04-08",
+      endTime: "12:00:00",
+      description: "Client action",
+      status: "upcoming"
+    })).rejects.toThrowError("Corrective actions can only be created from persisted service events.");
+
+    expect(mocks.createLocationCorrectiveActionById).not.toHaveBeenCalled();
   });
 
   it("queues persisted deletes until apply and restores them on undo", async () => {

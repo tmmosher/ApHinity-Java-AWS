@@ -11,6 +11,7 @@ import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.Loca
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarAuthorizationService;
+import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCorrectiveActionEmailService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarImportService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarTemplateService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventAuditService;
@@ -68,6 +69,9 @@ class LocationEventServiceTest {
 
     @Mock
     private ServiceEventAuditService auditService;
+
+    @Mock
+    private ServiceCorrectiveActionEmailService correctiveActionEmailService;
 
     @InjectMocks
     private LocationEventService locationEventService;
@@ -209,6 +213,82 @@ class LocationEventServiceTest {
     }
 
     @Test
+    void createCorrectiveActionPersistsWithBacklinkAndSendsWorkOrderEmailForPartnerAdmin() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Austin");
+        ServiceEvent sourceEvent = serviceEvent(44L, "Source Event");
+        sourceEvent.setLocation(location);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
+        doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.PARTNER);
+        when(authorizationService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
+            ServiceEvent event = invocation.getArgument(0);
+            event.setId(45L);
+            event.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            event.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return event;
+        });
+
+        ServiceEventResponse response = locationEventService.createCorrectiveActionForLocationEvent(
+            5L,
+            99L,
+            44L,
+            request("Corrective Action", "Fix it", ServiceEventResponsibility.PARTNER)
+        );
+
+        assertEquals(45L, response.id());
+        assertEquals("Corrective Action", response.title());
+        assertTrue(response.correctiveAction());
+        assertEquals(44L, response.correctiveActionSourceEventId());
+        assertEquals("Source Event", response.correctiveActionSourceEventTitle());
+        verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
+        verify(auditService).recordCreated(eq(5L), any(ServiceEvent.class));
+        verify(correctiveActionEmailService).sendCorrectiveActionWorkOrderEmail(
+            eq(99L),
+            eq(sourceEvent),
+            any(ServiceEvent.class),
+            eq(user)
+        );
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void createCorrectiveActionSkipsEmailForClients() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+        ServiceEvent sourceEvent = serviceEvent(44L, "Source Event");
+        sourceEvent.setLocation(location);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
+        doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.CLIENT);
+        when(authorizationService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
+            ServiceEvent event = invocation.getArgument(0);
+            event.setId(45L);
+            event.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            event.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            return event;
+        });
+
+        ServiceEventResponse response = locationEventService.createCorrectiveActionForLocationEvent(
+            5L,
+            99L,
+            44L,
+            request("Corrective Action", "Fix it", ServiceEventResponsibility.CLIENT)
+        );
+
+        assertTrue(response.correctiveAction());
+        assertEquals(44L, response.correctiveActionSourceEventId());
+        verify(correctiveActionEmailService, never()).sendCorrectiveActionWorkOrderEmail(any(), any(), any(), any());
+    }
+
+    @Test
     void updateLocationEventPersistsUpdatedFieldsAndTouchesLocation() {
         AppUser user = verifiedUser(5L);
         LocationEventRequest request = request(
@@ -337,6 +417,8 @@ class LocationEventServiceTest {
         serviceEvent.setEndEventTime(LocalTime.parse("11:00:00"));
         serviceEvent.setDescription("Inspect line");
         serviceEvent.setStatus(ServiceEventStatus.UPCOMING);
+        serviceEvent.setCorrectiveAction(false);
+        serviceEvent.setCorrectiveActionSourceEvent(null);
         serviceEvent.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
         serviceEvent.setUpdatedAt(Instant.parse("2026-03-02T00:00:00Z"));
         return serviceEvent;

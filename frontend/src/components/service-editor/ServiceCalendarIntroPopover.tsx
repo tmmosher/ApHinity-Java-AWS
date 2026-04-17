@@ -1,5 +1,5 @@
-import Popover from "corvu/popover";
 import type {Component} from "solid-js";
+import {GetStartedPopover} from "../help/GetStartedPopover";
 
 type ServiceCalendarIntroPopoverProps = {
   templateHref: string;
@@ -9,25 +9,13 @@ type ServiceCalendarIntroPopoverContentProps = {
   templateHref: string;
 };
 
-const INTRO_POPOVER_PROPS = {
-  placement: "bottom-start" as const,
-  trapFocus: false,
-  restoreFocus: false,
-  closeOnOutsideFocus: false
-};
-
-const introTriggerClass =
-  "btn btn-primary h-11 min-h-11 rounded-2xl px-4 text-sm font-medium shadow-sm transition duration-150 ease-out " +
-  "motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px active:translate-y-px active:scale-[0.98]";
-
 export const ServiceCalendarIntroPopoverContent: Component<ServiceCalendarIntroPopoverContentProps> = (props) => (
   <div class="space-y-4 p-4" data-service-calendar-intro-content="">
     <div class="space-y-1">
-      <h3 class="text-sm font-semibold">How the service calendar works</h3>
+      <h3 class="text-sm font-semibold">How to use the service calendar</h3>
       <p class="text-sm leading-6 text-base-content/70">
-        With the service calendar, you can view previous, current, and upcoming events.
-        To add new events, use the Excel file below or click an empty day cell to create a service event.
-        ApHinity partners manage service events, but users are more than welcome to create their own.
+        Users can view previous, current, and upcoming events on the service calendar.
+        To add new events, fill out the Excel file below and upload. Alternatively, click an empty day cell to create a service event.
       </p>
     </div>
 
@@ -60,22 +48,9 @@ export const ServiceCalendarIntroPopoverContent: Component<ServiceCalendarIntroP
 );
 
 export const ServiceCalendarIntroPopover: Component<ServiceCalendarIntroPopoverProps> = (props) => (
-  <Popover {...INTRO_POPOVER_PROPS}>
-    <Popover.Trigger
-      type="button"
-      class={introTriggerClass}
-      aria-label="Open service calendar guide"
-      data-service-calendar-intro-trigger=""
-    >
-      Get started
-    </Popover.Trigger>
-
-    <Popover.Portal>
-      <Popover.Content class="z-50 w-[min(92vw,28rem)] rounded-2xl border border-base-300 bg-base-100 shadow-xl">
-        <ServiceCalendarIntroPopoverContent templateHref={props.templateHref} />
-      </Popover.Content>
-    </Popover.Portal>
-  </Popover>
+   <GetStartedPopover>
+     <ServiceCalendarIntroPopoverContent templateHref={props.templateHref} />
+   </GetStartedPopover>
 );
 
 export default ServiceCalendarIntroPopover;

@@ -103,6 +103,9 @@ export interface LocationServiceEvent {
     endTime: string;
     description: string | null;
     status: ServiceEventStatus;
+    isCorrectiveAction?: boolean;
+    correctiveActionSourceEventId?: number | null;
+    correctiveActionSourceEventTitle?: string | null;
     createdAt: string;
     updatedAt: string;
 }

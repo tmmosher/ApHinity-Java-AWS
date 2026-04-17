@@ -1,32 +1,16 @@
 import {apiFetch} from "../common/apiFetch";
+import {parseApiErrorPayload, throwAuthenticationOrSecurityError} from "../common/apiError";
+import {parsePositiveRouteId, parseRouteLocationId} from "../common/routeParams";
 import type {
   CreateLocationGanttTaskRequest,
   LocationGanttTask
 } from "../../types/Types";
 import {
-  apiErrorPayloadSchema,
   locationGanttTaskListSchema,
   locationGanttTaskSchema
 } from "./locationGanttTaskApiSchemas";
 
-type ApiErrorPayload = ReturnType<typeof parseApiErrorPayload>;
-
-const parsePositiveRouteId = (value: string | number, label: string): number => {
-  const parsedId = Number(value);
-  if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    throw new Error(`Invalid ${label}`);
-  }
-  return parsedId;
-};
-
-const parseRouteLocationId = (locationId: string): number => parsePositiveRouteId(locationId, "location id");
-
 const parseRouteTaskId = (taskId: number): number => parsePositiveRouteId(taskId, "task id");
-
-const parseApiErrorPayload = (value: unknown) => {
-  const parsed = apiErrorPayloadSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
-};
 
 const parseLocationGanttTask = (value: unknown): LocationGanttTask => {
   const parsed = locationGanttTaskSchema.safeParse(value);
@@ -52,32 +36,10 @@ const throwLocationGanttTaskLoadError = async (response: Response): Promise<neve
   throw new Error("Unable to load gantt tasks");
 };
 
-const throwAuthenticationOrSecurityError = (
+const throwLocationGanttTaskMutationError = async (
   response: Response,
-  errorPayload: ApiErrorPayload
-): void => {
-  if (
-    errorPayload?.code === "authentication_required"
-    || errorPayload?.code === "invalid_refresh_token"
-    || errorPayload?.code === "missing_refresh_token"
-  ) {
-    throw new Error("Authentication required");
-  }
-  if (errorPayload?.code === "csrf_invalid") {
-    throw new Error("CSRF invalid");
-  }
-  if (errorPayload?.code === "forbidden") {
-    throw new Error("Insufficient permissions");
-  }
-  if (
-    (response.status === 403 || errorPayload?.status === 403)
-    && errorPayload?.error === "Forbidden"
-  ) {
-    throw new Error("Security token rejected");
-  }
-};
-
-const throwLocationGanttTaskMutationError = async (response: Response, action: "create" | "update"): Promise<never> => {
+  action: "create" | "update" | "bulk-create"
+): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
   throwAuthenticationOrSecurityError(response, errorPayload);
 
@@ -87,7 +49,13 @@ const throwLocationGanttTaskMutationError = async (response: Response, action: "
   if (response.status === 403) {
     throw new Error("Insufficient permissions");
   }
-  throw new Error(action === "create" ? "Unable to create gantt task" : "Unable to update gantt task");
+  if (action === "create") {
+    throw new Error("Unable to create gantt task");
+  }
+  if (action === "bulk-create") {
+    throw new Error("Unable to import gantt tasks");
+  }
+  throw new Error("Unable to update gantt task");
 };
 
 const throwLocationGanttTaskDeletionError = async (response: Response): Promise<never> => {
@@ -147,6 +115,31 @@ export const createLocationGanttTaskById = async (
   }
 
   return parseLocationGanttTask(await response.json());
+};
+
+export const createLocationGanttTasksBulkById = async (
+  host: string,
+  locationId: string,
+  requests: readonly CreateLocationGanttTaskRequest[]
+): Promise<LocationGanttTask[]> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  if (requests.length === 0) {
+    return [];
+  }
+
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/gantt-tasks/bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(requests)
+  });
+
+  if (!response.ok) {
+    await throwLocationGanttTaskMutationError(response, "bulk-create");
+  }
+
+  return parseLocationGanttTaskList(await response.json());
 };
 
 export const updateLocationGanttTaskById = async (

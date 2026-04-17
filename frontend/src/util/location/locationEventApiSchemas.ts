@@ -1,16 +1,11 @@
 import {z} from "zod";
+import {apiErrorPayloadSchema} from "../common/apiSchemas";
+
+export {apiErrorPayloadSchema};
 
 export const serviceEventResponsibilitySchema = z.enum(["client", "partner"]);
 
 export const serviceEventStatusSchema = z.enum(["upcoming", "current", "overdue", "completed"]);
-
-export const apiErrorPayloadSchema = z.object({
-  code: z.string().optional(),
-  message: z.string().optional(),
-  error: z.string().optional(),
-  status: z.number().optional(),
-  path: z.string().optional()
-});
 
 export const locationServiceEventSchema = z.object({
   id: z.number(),
@@ -20,11 +15,30 @@ export const locationServiceEventSchema = z.object({
   time: z.string(),
   endDate: z.string(),
   endTime: z.string(),
-  description: z.string().nullable().optional().transform((value) => value ?? null),
+  description: z.string().nullable().optional(),
   status: serviceEventStatusSchema,
+  isCorrectiveAction: z.boolean().optional(),
+  correctiveAction: z.boolean().optional(),
+  correctiveActionSourceEventId: z.number().nullable().optional(),
+  correctiveActionSourceEventTitle: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string()
-});
+}).transform((value) => ({
+  id: value.id,
+  title: value.title,
+  responsibility: value.responsibility,
+  date: value.date,
+  time: value.time,
+  endDate: value.endDate,
+  endTime: value.endTime,
+  description: value.description ?? null,
+  status: value.status,
+  isCorrectiveAction: value.isCorrectiveAction ?? value.correctiveAction === true,
+  correctiveActionSourceEventId: value.correctiveActionSourceEventId ?? null,
+  correctiveActionSourceEventTitle: value.correctiveActionSourceEventTitle ?? null,
+  createdAt: value.createdAt,
+  updatedAt: value.updatedAt
+}));
 
 export const locationServiceEventListSchema = z.array(locationServiceEventSchema);
 

@@ -93,6 +93,50 @@ public class LocationGanttTaskController {
         }
     }
 
+    @PostMapping("/locations/{locationId}/gantt-tasks/bulk")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<GanttTaskResponse> createGanttTasksBulk(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @Valid @RequestBody List<@Valid LocationGanttTaskRequest> requests
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received gantt task bulk create request actorUserId={} locationId={} taskCount={}",
+            userId,
+            locationId,
+            requests == null ? 0 : requests.size()
+        );
+        try {
+            List<GanttTaskResponse> response = locationGanttTaskService.createLocationTasksBulk(userId, locationId, requests);
+            log.info(
+                "Completed gantt task bulk create request actorUserId={} locationId={} importedCount={}",
+                userId,
+                locationId,
+                response.size()
+            );
+            return response;
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected gantt task bulk create request actorUserId={} locationId={} status={} reason={}",
+                userId,
+                locationId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed gantt task bulk create request actorUserId={} locationId={} taskCount={}",
+                userId,
+                locationId,
+                requests == null ? 0 : requests.size(),
+                ex
+            );
+            throw ex;
+        }
+    }
+
     @PutMapping("/locations/{locationId}/gantt-tasks/{taskId}")
     public GanttTaskResponse updateGanttTask(
         @AuthenticationPrincipal Jwt jwt,

@@ -123,17 +123,6 @@ const getTraceControlsProps = () => {
   };
 };
 
-const waitForTraceControlsProps = async (maxTicks = 10) => {
-  for (let tick = 0; tick < maxTicks; tick += 1) {
-    if (latestTraceControlsProps) {
-      return getTraceControlsProps();
-    }
-    await Promise.resolve();
-  }
-
-  return getTraceControlsProps();
-};
-
 const getPieTraceEditorProps = () => {
   if (!latestPieTraceEditorProps) {
     throw new Error("PieTraceEditor mock was not rendered.");
@@ -174,30 +163,34 @@ describe("GraphEditorModal trace controls", () => {
 
   it("passes the trace-control contract from modal to controls", () => {
     const dispose = renderModal();
-    const props = getTraceControlsProps();
+    try {
+      const props = getTraceControlsProps();
 
-    expect(Array.isArray(props.traceOptions)).toBe(true);
-    expect(props.selectedTraceIndex).toBe(0);
-    expect(props.traceNameDraft).toBe("");
-    expect(props.disableRenameTrace).toBe(true);
-    expect(typeof props.onAddTrace).toBe("function");
-    expect(typeof props.onChangeTraceName).toBe("function");
-    expect(typeof props.onRenameTrace).toBe("function");
-
-    dispose();
+      expect(Array.isArray(props.traceOptions)).toBe(true);
+      expect(props.selectedTraceIndex).toBe(0);
+      expect(props.traceNameDraft).toBe("");
+      expect(props.disableRenameTrace).toBe(true);
+      expect(typeof props.onAddTrace).toBe("function");
+      expect(typeof props.onChangeTraceName).toBe("function");
+      expect(typeof props.onRenameTrace).toBe("function");
+    } finally {
+      dispose();
+    }
   });
 
   it("invokes add/rename handlers without relying on window.prompt", () => {
     const dispose = renderModal();
-    const props = getTraceControlsProps();
+    try {
+      const props = getTraceControlsProps();
 
-    expect(() => {
-      props.onAddTrace();
-      props.onChangeTraceName("Renamed Trace");
-      props.onRenameTrace();
-    }).not.toThrow();
-
-    dispose();
+      expect(() => {
+        props.onAddTrace();
+        props.onChangeTraceName("Renamed Trace");
+        props.onRenameTrace();
+      }).not.toThrow();
+    } finally {
+      dispose();
+    }
   });
 
   it("hides trace controls for pie graphs and passes row color editing props", async () => {
@@ -221,14 +214,16 @@ describe("GraphEditorModal trace controls", () => {
     };
 
     const dispose = renderModal(pieGraph);
-    await Promise.resolve();
-    const pieProps = getPieTraceEditorProps();
+    try {
+      await Promise.resolve();
+      const pieProps = getPieTraceEditorProps();
 
-    expect(latestTraceControlsProps).toBeNull();
-    expect(pieProps.rowColors).toEqual(["#1f77b4", "#2ca02c"]);
-    expect(() => pieProps.onUpdateColor(1, "#d62728")).not.toThrow();
-
-    dispose();
+      expect(latestTraceControlsProps).toBeNull();
+      expect(pieProps.rowColors).toEqual(["#1f77b4", "#2ca02c"]);
+      expect(() => pieProps.onUpdateColor(1, "#d62728")).not.toThrow();
+    } finally {
+      dispose();
+    }
   });
 
   it("stages invalid pie values in the modal instead of mutating graph data", async () => {
@@ -252,17 +247,19 @@ describe("GraphEditorModal trace controls", () => {
     };
 
     const dispose = renderModal(pieGraph);
-    await Promise.resolve();
+    try {
+      await Promise.resolve();
 
-    const pieProps = getPieTraceEditorProps();
-    pieProps.onUpdateValue(0, "abc");
-    await Promise.resolve();
+      const pieProps = getPieTraceEditorProps();
+      pieProps.onUpdateValue(0, "abc");
+      await Promise.resolve();
 
-    const updatedPieProps = getPieTraceEditorProps();
-    expect(updatedPieProps.values).toEqual([3, 7]);
-    expect(updatedPieProps.valueDrafts[0]).toBe("abc");
-
-    dispose();
+      const updatedPieProps = getPieTraceEditorProps();
+      expect(updatedPieProps.values).toEqual([3, 7]);
+      expect(updatedPieProps.valueDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
   });
 
   it("rejects invalid cartesian values while the modal is open", async () => {
@@ -283,17 +280,19 @@ describe("GraphEditorModal trace controls", () => {
     };
 
     const dispose = renderModal(scatterGraph);
-    await Promise.resolve();
+    try {
+      await Promise.resolve();
 
-    const cartesianProps = getCartesianTraceEditorProps();
-    cartesianProps.onUpdateY(0, "abc");
-    await Promise.resolve();
+      const cartesianProps = getCartesianTraceEditorProps();
+      cartesianProps.onUpdateY(0, "abc");
+      await Promise.resolve();
 
-    const invalidProps = getCartesianTraceEditorProps();
-    expect(invalidProps.yValues).toEqual([9]);
-    expect(invalidProps.yDrafts[0]).toBe("abc");
-
-    dispose();
+      const invalidProps = getCartesianTraceEditorProps();
+      expect(invalidProps.yValues).toEqual([9]);
+      expect(invalidProps.yDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
   });
 
   it("clears stale editor payload state when a deleted graph closes", async () => {
@@ -332,39 +331,47 @@ describe("GraphEditorModal trace controls", () => {
     };
 
     const {dispose, setCurrentGraph, setIsOpen} = renderControllableModal(pieGraph);
-    await Promise.resolve();
+    try {
+      await Promise.resolve();
 
-    expect(getPieTraceEditorProps()).toMatchObject({
-      rowColors: ["#1f77b4", "#2ca02c"]
-    });
+      expect(getPieTraceEditorProps()).toMatchObject({
+        rowColors: ["#1f77b4", "#2ca02c"]
+      });
 
-    batch(() => {
-      setCurrentGraph(undefined);
-      setIsOpen(false);
-    });
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+      batch(() => {
+        setCurrentGraph(undefined);
+        setIsOpen(false);
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
-    latestTraceControlsProps = null;
-    latestPieTraceEditorProps = null;
-    batch(() => {
-      setCurrentGraph(barGraph);
-      setIsOpen(true);
-    });
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+      latestTraceControlsProps = null;
+      latestPieTraceEditorProps = null;
+      batch(() => {
+        setCurrentGraph(barGraph);
+        setIsOpen(true);
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
-    expect(() => getPieTraceEditorProps()).toThrowError("PieTraceEditor mock was not rendered.");
-    const traceControls = await waitForTraceControlsProps();
-    expect(traceControls.traceOptions).toEqual([{index: 0, label: "1. Bar Trace (bar)"}]);
-    expect(traceControls.traceNameDraft).toBe("Bar Trace");
+      expect(() => getPieTraceEditorProps()).toThrowError("PieTraceEditor mock was not rendered.");
+      const cartesianProps = getCartesianTraceEditorProps();
+      expect(cartesianProps.xValues).toEqual(["Point 1"]);
+      expect(cartesianProps.yValues).toEqual([12]);
 
-    dispose();
+      if (latestTraceControlsProps) {
+        const traceControls = getTraceControlsProps();
+        expect(traceControls.traceOptions).toEqual([{index: 0, label: "1. Bar Trace (bar)"}]);
+        expect(traceControls.traceNameDraft).toBe("Bar Trace");
+      }
+    } finally {
+      dispose();
+    }
   });
 
   it("keeps the delete confirmation rendered while a delete is in progress", () => {

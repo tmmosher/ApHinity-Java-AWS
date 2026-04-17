@@ -4,6 +4,7 @@ import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import {
+  createLocationCorrectiveActionById,
   createLocationEventById,
   deleteLocationEventById,
   fetchLocationEventsById,
@@ -63,7 +64,10 @@ const stagedServiceCalendarStateSignature = (state: StagedServiceCalendarState):
       endDate: event.endDate,
       endTime: event.endTime,
       description: event.description,
-      status: event.status
+      status: event.status,
+      isCorrectiveAction: event.isCorrectiveAction ?? false,
+      correctiveActionSourceEventId: event.correctiveActionSourceEventId ?? null,
+      correctiveActionSourceEventTitle: event.correctiveActionSourceEventTitle ?? null
     })),
     deletedEvents: state.deletedEvents.map((event) => ({
       id: event.id,
@@ -74,7 +78,10 @@ const stagedServiceCalendarStateSignature = (state: StagedServiceCalendarState):
       endDate: event.endDate,
       endTime: event.endTime,
       description: event.description,
-      status: event.status
+      status: event.status,
+      isCorrectiveAction: event.isCorrectiveAction ?? false,
+      correctiveActionSourceEventId: event.correctiveActionSourceEventId ?? null,
+      correctiveActionSourceEventTitle: event.correctiveActionSourceEventTitle ?? null
     }))
   })
 );
@@ -218,6 +225,19 @@ export const LocationServiceCalendarPanel = () => {
     await updateLocationEventById(host, params.locationId, event.id, request);
     await refetchServiceEvents();
     toast.success("Service event updated.");
+  };
+
+  const createCorrectiveActionFromEvent = async (
+    sourceEvent: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ): Promise<void> => {
+    if (isStagedServiceCalendarEvent(sourceEvent)) {
+      throw new Error("Corrective actions can only be created from persisted service events.");
+    }
+
+    await createLocationCorrectiveActionById(host, params.locationId, sourceEvent.id, request);
+    await refetchServiceEvents();
+    toast.success("Corrective action created.");
   };
 
   const completeServiceEvent = async (event: LocationServiceEvent): Promise<void> => {
@@ -496,6 +516,7 @@ export const LocationServiceCalendarPanel = () => {
           onRetry={() => void refetchServiceEvents()}
           eventEditorRole={role()}
           onCreateEventSave={saveServiceEvent}
+          onCreateCorrectiveAction={createCorrectiveActionFromEvent}
           canEditEvent={canEditCalendarEvent}
           onEditEventSave={saveCalendarEvent}
           canCompleteEvent={canCompleteCalendarEvent}

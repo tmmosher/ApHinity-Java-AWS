@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class LocationGanttTaskServiceTest {
@@ -137,6 +139,62 @@ class LocationGanttTaskServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Task title must be between 3 and 60 characters", ex.getReason());
         verifyNoInteractions(ganttTaskRepository);
+    }
+
+    @Test
+    void createLocationTasksBulkPersistsAllTasksAndTouchesLocationOnce() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireWritePermission(user, 99L);
+        when(authorizationService.requireLocation(99L)).thenReturn(location);
+        when(ganttTaskRepository.saveAllAndFlush(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<GanttTask> tasks = invocation.getArgument(0, List.class);
+            List<GanttTask> persisted = new ArrayList<>(tasks);
+            for (int index = 0; index < persisted.size(); index += 1) {
+                GanttTask task = persisted.get(index);
+                task.setId(100L + index);
+                task.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+                task.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+            }
+            return persisted;
+        });
+
+        List<GanttTaskResponse> response = locationGanttTaskService.createLocationTasksBulk(
+            5L,
+            99L,
+            List.of(
+                request("OPS", "Ops update"),
+                request("QMS", "Quality update")
+            )
+        );
+
+        assertEquals(2, response.size());
+        assertEquals(List.of("OPS", "QMS"), response.stream().map(GanttTaskResponse::title).toList());
+        verify(ganttTaskRepository).saveAllAndFlush(any());
+        verify(auditService, times(2)).recordCreated(eq(5L), any(GanttTask.class));
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void createLocationTasksBulkRejectsEmptyPayload() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireWritePermission(user, 99L);
+        when(authorizationService.requireLocation(99L)).thenReturn(location);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationGanttTaskService.createLocationTasksBulk(5L, 99L, List.of())
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("At least one gantt task is required", ex.getReason());
+        verify(ganttTaskRepository, never()).saveAllAndFlush(any());
     }
 
     @Test

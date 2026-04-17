@@ -32,7 +32,10 @@ const stagedEventSignature = (event: StagedLocationServiceEvent): string => JSON
   endDate: event.endDate,
   endTime: event.endTime,
   description: event.description,
-  status: event.status
+  status: event.status,
+  isCorrectiveAction: event.isCorrectiveAction ?? false,
+  correctiveActionSourceEventId: event.correctiveActionSourceEventId ?? null,
+  correctiveActionSourceEventTitle: event.correctiveActionSourceEventTitle ?? null
 });
 
 const stagedEventListSignature = (events: readonly StagedLocationServiceEvent[]): string => (
@@ -58,6 +61,9 @@ const createStagedEventFromRequest = (
     endTime: request.endTime,
     description: request.description,
     status: request.status,
+    isCorrectiveAction: false,
+    correctiveActionSourceEventId: null,
+    correctiveActionSourceEventTitle: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     isStaged: true
@@ -126,6 +132,9 @@ export const editStagedServiceCalendarEvent = (
           endTime: request.endTime,
           description: request.description,
           status: request.status,
+          isCorrectiveAction: event.isCorrectiveAction ?? false,
+          correctiveActionSourceEventId: event.correctiveActionSourceEventId ?? null,
+          correctiveActionSourceEventTitle: event.correctiveActionSourceEventTitle ?? null,
           updatedAt: new Date().toISOString()
         }
       : event

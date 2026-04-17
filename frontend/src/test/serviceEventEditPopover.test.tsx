@@ -97,4 +97,38 @@ describe("ServiceEventEditPopover", () => {
 
     expect(html).not.toContain("data-service-event-complete");
   });
+
+  it("renders a corrective-action button when creation is available", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: baseEvent,
+      canEdit: false,
+      canComplete: false,
+      role: "partner",
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).toContain("Create Corrective Action");
+    expect(html).toContain("data-service-event-create-corrective-action");
+  });
+
+  it("hides the corrective-action button for corrective-action events", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        isCorrectiveAction: true,
+        correctiveActionSourceEventId: 4,
+        correctiveActionSourceEventTitle: "Monthly maintenance"
+      },
+      canEdit: false,
+      canComplete: false,
+      role: "partner",
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).not.toContain("data-service-event-create-corrective-action");
+    expect(html).toContain("Source Event");
+    expect(html).toContain("Monthly maintenance");
+  });
 });

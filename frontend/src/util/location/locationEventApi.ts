@@ -1,34 +1,18 @@
 import {apiFetch} from "../common/apiFetch";
+import {parseApiErrorPayload, throwAuthenticationOrSecurityError} from "../common/apiError";
+import {parsePositiveRouteId, parseRouteLocationId} from "../common/routeParams";
 import {normalizeYearMonth} from "./dateUtility";
 import type {
   CreateLocationServiceEventRequest,
   LocationServiceEvent
 } from "../../types/Types";
 import {
-  apiErrorPayloadSchema,
   locationServiceEventListSchema,
   locationServiceEventSchema,
   serviceCalendarUploadResponseSchema
 } from "./locationEventApiSchemas";
 
-type ApiErrorPayload = ReturnType<typeof parseApiErrorPayload>;
-
-const parsePositiveRouteId = (value: string | number, label: string): number => {
-  const parsedId = Number(value);
-  if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    throw new Error(`Invalid ${label}`);
-  }
-  return parsedId;
-};
-
-const parseRouteLocationId = (locationId: string): number => parsePositiveRouteId(locationId, "location id");
-
 const parseRouteEventId = (eventId: number): number => parsePositiveRouteId(eventId, "event id");
-
-const parseApiErrorPayload = (value: unknown) => {
-  const parsed = apiErrorPayloadSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
-};
 
 const parseLocationServiceEvent = (value: unknown): LocationServiceEvent => {
   const parsed = locationServiceEventSchema.safeParse(value);
@@ -63,35 +47,10 @@ const throwLocationEventLoadError = async (response: Response): Promise<never> =
   throw new Error("Unable to load service events");
 };
 
-const throwAuthenticationOrSecurityError = (
-  response: Response,
-  errorPayload: ApiErrorPayload
-): void => {
-  if (
-    errorPayload?.code === "authentication_required"
-    || errorPayload?.code === "invalid_refresh_token"
-    || errorPayload?.code === "missing_refresh_token"
-  ) {
-    throw new Error("Authentication required");
-  }
-  if (errorPayload?.code === "csrf_invalid") {
-    throw new Error("CSRF invalid");
-  }
-  if (errorPayload?.code === "forbidden") {
-    throw new Error("Insufficient permissions");
-  }
-  if (
-    (response.status === 403 || errorPayload?.status === 403)
-    && errorPayload?.error === "Forbidden"
-  ) {
-    throw new Error("Security token rejected");
-  }
-};
-
 const logLocationEventError = (
   operation: string,
   response: Response,
-  errorPayload: ApiErrorPayload
+  errorPayload: ReturnType<typeof parseApiErrorPayload>
 ): void => {
   console.warn(operation, {
     status: response.status,
@@ -104,7 +63,7 @@ const logLocationEventError = (
 
 const throwLocationEventMutationError = async (
   response: Response,
-  action: "create" | "update" | "delete"
+  action: "create" | "update" | "delete" | "corrective-action"
 ): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
   logLocationEventError(`${action}LocationEvent failed`, response, errorPayload);
@@ -119,6 +78,8 @@ const throwLocationEventMutationError = async (
   throw new Error(
     action === "create"
       ? "Unable to create service event"
+      : action === "corrective-action"
+        ? "Unable to create corrective action"
       : action === "update"
         ? "Unable to update service event"
         : "Unable to delete service event"
@@ -225,6 +186,33 @@ export const updateLocationEventById = async (
 
   if (!response.ok) {
     await throwLocationEventMutationError(response, "update");
+  }
+
+  return parseLocationServiceEvent(await response.json());
+};
+
+export const createLocationCorrectiveActionById = async (
+  host: string,
+  locationId: string,
+  sourceEventId: number,
+  request: CreateLocationServiceEventRequest
+): Promise<LocationServiceEvent> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedEventId = parseRouteEventId(sourceEventId);
+
+  const response = await apiFetch(
+    host + "/api/core/locations/" + parsedLocationId + "/events/" + parsedEventId + "/corrective-actions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(request)
+    }
+  );
+
+  if (!response.ok) {
+    await throwLocationEventMutationError(response, "corrective-action");
   }
 
   return parseLocationServiceEvent(await response.json());

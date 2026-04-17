@@ -1,6 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
 import {
+  createLocationCorrectiveActionById,
   createLocationEventById,
   deleteLocationEventById,
   fetchLocationEventsById,
@@ -66,6 +67,9 @@ describe("locationEventApi", () => {
         endTime: "11:30",
         description: "Initial kickoff meeting",
         status: "upcoming",
+        isCorrectiveAction: false,
+        correctiveActionSourceEventId: null,
+        correctiveActionSourceEventTitle: null,
         createdAt: "2026-03-25T00:00:00Z",
         updatedAt: "2026-03-25T00:00:00Z"
       }
@@ -151,6 +155,72 @@ describe("locationEventApi", () => {
       endTime: "11:30",
       description: "Initial kickoff meeting",
       status: "upcoming",
+      isCorrectiveAction: false,
+      correctiveActionSourceEventId: null,
+      correctiveActionSourceEventTitle: null,
+      createdAt: "2026-03-25T00:00:00Z",
+      updatedAt: "2026-03-25T00:00:00Z"
+    });
+  });
+
+  it("posts a corrective-action create request and parses the response", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 11,
+      title: "Corrective Action: Client kickoff",
+      responsibility: "partner",
+      date: "2026-03-30",
+      time: "09:00",
+      endDate: "2026-03-30",
+      endTime: "11:30",
+      description: "Replace failed component",
+      status: "upcoming",
+      correctiveAction: true,
+      correctiveActionSourceEventId: 8,
+      correctiveActionSourceEventTitle: "Client kickoff",
+      createdAt: "2026-03-25T00:00:00Z",
+      updatedAt: "2026-03-25T00:00:00Z"
+    }));
+
+    const event = await createLocationCorrectiveActionById(host, "42", 8, {
+      title: "Corrective Action: Client kickoff",
+      responsibility: "partner",
+      date: "2026-03-30",
+      time: "09:00",
+      endDate: "2026-03-30",
+      endTime: "11:30",
+      description: "Replace failed component",
+      status: "upcoming"
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/42/events/8/corrective-actions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: "Corrective Action: Client kickoff",
+        responsibility: "partner",
+        date: "2026-03-30",
+        time: "09:00",
+        endDate: "2026-03-30",
+        endTime: "11:30",
+        description: "Replace failed component",
+        status: "upcoming"
+      })
+    });
+    expect(event).toEqual({
+      id: 11,
+      title: "Corrective Action: Client kickoff",
+      responsibility: "partner",
+      date: "2026-03-30",
+      time: "09:00",
+      endDate: "2026-03-30",
+      endTime: "11:30",
+      description: "Replace failed component",
+      status: "upcoming",
+      isCorrectiveAction: true,
+      correctiveActionSourceEventId: 8,
+      correctiveActionSourceEventTitle: "Client kickoff",
       createdAt: "2026-03-25T00:00:00Z",
       updatedAt: "2026-03-25T00:00:00Z"
     });
@@ -208,6 +278,9 @@ describe("locationEventApi", () => {
       endTime: "12:00",
       description: "Updated details",
       status: "current",
+      isCorrectiveAction: false,
+      correctiveActionSourceEventId: null,
+      correctiveActionSourceEventTitle: null,
       createdAt: "2026-03-25T00:00:00Z",
       updatedAt: "2026-03-26T00:00:00Z"
     });
@@ -242,6 +315,21 @@ describe("locationEventApi", () => {
     await expect(updateLocationEventById(host, "42", 0, {
       title: "Client kickoff",
       responsibility: "client",
+      date: "2026-03-28",
+      time: "09:00",
+      endDate: "2026-03-28",
+      endTime: "11:30",
+      description: null,
+      status: "upcoming"
+    })).rejects.toThrowError("Invalid event id");
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid source event ids before corrective-action create dispatch", async () => {
+    await expect(createLocationCorrectiveActionById(host, "42", 0, {
+      title: "Corrective Action: Client kickoff",
+      responsibility: "partner",
       date: "2026-03-28",
       time: "09:00",
       endDate: "2026-03-28",

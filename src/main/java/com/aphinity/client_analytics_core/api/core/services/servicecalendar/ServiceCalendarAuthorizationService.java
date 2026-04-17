@@ -92,6 +92,10 @@ public class ServiceCalendarAuthorizationService {
         }
     }
 
+    public boolean isPartnerOrAdmin(AppUser user) {
+        return accountRoleService.isPartnerOrAdmin(user);
+    }
+
     private void requireVerified(AppUser user) {
         if (user.getEmailVerifiedAt() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account email is not verified");

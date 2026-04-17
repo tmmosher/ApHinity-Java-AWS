@@ -9,11 +9,13 @@ import com.aphinity.client_analytics_core.api.core.requests.gantt.LocationGanttT
 import com.aphinity.client_analytics_core.api.core.response.gantt.GanttTaskResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -72,6 +74,46 @@ public class LocationGanttTaskService {
                 "Gantt task creation persistence failed actorUserId={} locationId={}",
                 userId,
                 locationId,
+                ex
+            );
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public List<GanttTaskResponse> createLocationTasksBulk(
+        Long userId,
+        Long locationId,
+        List<LocationGanttTaskRequest> requests
+    ) {
+        AppUser user = authorizationService.requireUser(userId);
+        authorizationService.requireWritePermission(user, locationId);
+        Location location = authorizationService.requireLocation(locationId);
+
+        if (requests == null || requests.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one gantt task is required");
+        }
+
+        List<GanttTask> tasks = new ArrayList<>(requests.size());
+        for (LocationGanttTaskRequest request : requests) {
+            tasks.add(requestMapper.createTask(location, request));
+        }
+
+        try {
+            List<GanttTask> persisted = ganttTaskRepository.saveAllAndFlush(tasks);
+            for (GanttTask task : persisted) {
+                auditService.recordCreated(userId, task);
+            }
+            locationRepository.touchUpdatedAt(locationId, Instant.now());
+            return persisted.stream()
+                .map(requestMapper::toResponse)
+                .toList();
+        } catch (RuntimeException ex) {
+            log.error(
+                "Gantt task bulk creation persistence failed actorUserId={} locationId={} taskCount={}",
+                userId,
+                locationId,
+                requests.size(),
                 ex
             );
             throw ex;

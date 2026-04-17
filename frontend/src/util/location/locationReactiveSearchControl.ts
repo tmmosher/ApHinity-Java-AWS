@@ -10,11 +10,16 @@ export const createLocationReactiveSearchControl = (
   const [searchQuery, setSearchQuery] = createSignal(initialSearchDraft.trim());
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
 
-  const updateSearchDraft = (nextSearchDraft: string) => {
-    setSearchDraft(nextSearchDraft);
+  const clearSearchDebounce = (): void => {
     if (timeoutId !== undefined) {
       globalThis.clearTimeout(timeoutId);
+      timeoutId = undefined;
     }
+  };
+
+  const updateSearchDraft = (nextSearchDraft: string) => {
+    setSearchDraft(nextSearchDraft);
+    clearSearchDebounce();
 
     timeoutId = globalThis.setTimeout(() => {
       batch(() => {
@@ -25,9 +30,7 @@ export const createLocationReactiveSearchControl = (
   };
 
   onCleanup(() => {
-    if (timeoutId !== undefined) {
-      globalThis.clearTimeout(timeoutId);
-    }
+    clearSearchDebounce();
   });
 
   return {
