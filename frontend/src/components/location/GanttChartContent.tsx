@@ -1,9 +1,11 @@
-import {Show} from "solid-js";
+import {type JSX, Show} from "solid-js";
 import {GanttChartShell} from "./GanttChartShell";
 import {GanttTaskCreatePopover} from "./GanttTaskCreatePopover";
 import type {CreateLocationGanttTaskRequest} from "../../types/Types";
 
 type GanttChartContentProps = {
+  onSearchInput: JSX.EventHandler<HTMLInputElement, InputEvent>;
+  searchDraft: string;
   taskLoadError?: string;
   isLoading: boolean;
   canEdit: boolean;
@@ -23,12 +25,17 @@ export const GanttChartContent = (props: GanttChartContentProps) => (
       )}
     </Show>
 
-    <Show when={props.isLoading}>
-      <p class="mb-3 text-sm text-base-content/70">Loading gantt tasks...</p>
-    </Show>
-
     <Show when={props.canEdit}>
-      <div class="mb-3 flex justify-end">
+      <div class="p-4 mb-3 flex justify-end">
+        <label class="input input-bordered ml-auto flex h-10 min-h-10 w-full items-center gap-2 md:w-72">
+          <input
+            type="search"
+            class="grow"
+            placeholder="Search title..."
+            value={props.searchDraft}
+            onInput={props.onSearchInput}
+          />
+        </label>
         <GanttTaskCreatePopover onCreate={props.onCreateTask} />
       </div>
     </Show>
@@ -39,12 +46,6 @@ export const GanttChartContent = (props: GanttChartContentProps) => (
         class="w-max min-h-[32rem]"
       />
     </div>
-
-    <Show when={!props.isLoading && props.timelineTaskCount === 0}>
-      <p class="mt-3 text-sm text-base-content/70">
-        {props.searchQuery ? "No gantt tasks match your search." : "No gantt tasks available for this location."}
-      </p>
-    </Show>
   </section>
 );
 

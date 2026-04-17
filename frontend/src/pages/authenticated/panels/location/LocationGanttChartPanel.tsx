@@ -300,10 +300,6 @@ export const LocationGanttChartPanel = () => {
   return (
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <GanttChartToolbar
-        searchDraft={searchControl.searchDraft()}
-        onSearchInput={(event) => {
-          searchControl.updateSearchDraft(event.currentTarget.value);
-        }}
         canEdit={canEditTasks()}
         isImportingCsv={importController.isImportingCsv()}
         isApplyingImports={importController.isApplyingImports()}
@@ -330,6 +326,10 @@ export const LocationGanttChartPanel = () => {
       />
 
       <GanttChartContent
+        searchDraft={searchControl.searchDraft()}
+        onSearchInput={(event) => {
+          searchControl.updateSearchDraft(event.currentTarget.value);
+        }}
         taskLoadError={taskLoadError()}
         isLoading={ganttTaskResource.loading && persistedTasks() === undefined}
         canEdit={canEditTasks()}

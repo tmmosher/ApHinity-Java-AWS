@@ -2,8 +2,6 @@ import {Show, type JSX} from "solid-js";
 import {GanttChartToolbarContent} from "../gantt/GanttChartToolbarContent";
 
 type GanttChartToolbarProps = {
-  searchDraft: string;
-  onSearchInput: JSX.EventHandler<HTMLInputElement, InputEvent>;
   canEdit: boolean;
   isImportingCsv: boolean;
   isApplyingImports: boolean;
@@ -19,15 +17,6 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => (
   <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
     <div class="flex flex-wrap items-center gap-3">
       <h2 class="text-xl font-semibold tracking-tight">Gantt Chart</h2>
-      <label class="input input-bordered ml-auto flex h-10 min-h-10 w-full items-center gap-2 md:w-72">
-        <input
-          type="search"
-          class="grow"
-          placeholder="Search title..."
-          value={props.searchDraft}
-          onInput={props.onSearchInput}
-        />
-      </label>
     </div>
 
     <div class="flex flex-col gap-4 md:flex-row md:items-centered md:justify-between">
