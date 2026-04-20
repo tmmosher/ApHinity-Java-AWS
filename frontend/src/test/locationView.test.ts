@@ -17,9 +17,9 @@ describe("locationView helpers", () => {
     expect(
       dashboardLocationViews.map(({view, name}) => ({view, name}))
     ).toEqual([
+      {view: "dashboard", name: "Dashboard"},
       {view: "service-calendar", name: "Service Calendar"},
       {view: "gantt-chart", name: "Gantt Chart"},
-      {view: "dashboard", name: "Dashboard"}
     ]);
   });
 
@@ -55,16 +55,16 @@ describe("locationView helpers", () => {
   });
 
   it("maps location routes to the expected selector view", () => {
-    expect(getLocationViewFromPathname("/dashboard/locations/42", "42")).toBe("service-calendar");
+    expect(getLocationViewFromPathname("/dashboard/locations/42", "42")).toBe("dashboard");
     expect(getLocationViewFromPathname("/dashboard/locations/42/service-schedule/", "42")).toBe("service-calendar");
     expect(getLocationViewFromPathname("/dashboard/locations/42/gantt-chart", "42")).toBe("gantt-chart");
     expect(getLocationViewFromPathname("/dashboard/locations/42/dashboard", "42")).toBe("dashboard");
   });
 
   it("builds location view hrefs for each selector tab", () => {
-    expect(getLocationViewHref("42", "service-calendar")).toBe("/dashboard/locations/42");
+    expect(getLocationViewHref("42", "service-calendar")).toBe("/dashboard/locations/42/service-calendar");
     expect(getLocationViewHref("42", "gantt-chart")).toBe("/dashboard/locations/42/gantt-chart");
-    expect(getLocationViewHref("42", "dashboard")).toBe("/dashboard/locations/42/dashboard");
+    expect(getLocationViewHref("42", "dashboard")).toBe("/dashboard/locations/42");
   });
 
   it("retains the graph request key across tab switches until a different location dashboard is opened", () => {

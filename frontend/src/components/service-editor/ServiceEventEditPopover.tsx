@@ -86,17 +86,17 @@ const ServiceEventDetailItem = (props: {label: string; value: string}) => (
 
 const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
   <div class="space-y-4 p-4 md:p-5">
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0">
+    <div class="flex items-start gap-4">
+      <div class="min-w-0 flex-1">
         <Popover.Label class="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight">
           <Show when={isCorrectiveActionServiceEvent(props.event)}>
             <CorrectiveActionIcon class="size-4 shrink-0 text-warning" />
           </Show>
-          <span class="truncate">{props.event.title}</span>
+          <span class="min-w-0 flex-1 truncate">{props.event.title}</span>
         </Popover.Label>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <Show when={props.canCreateCorrectiveAction}>
           <button
             type="button"

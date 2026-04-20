@@ -51,20 +51,20 @@ export const getLocationViewFromPathname = (pathname: string, locationId: string
   const normalizedPathname = normalizeLocationPathname(pathname);
   const basePath = `/dashboard/locations/${locationId}`;
 
-  if (normalizedPathname === basePath || normalizedPathname === `${basePath}/service-schedule`) {
+  if (normalizedPathname === basePath || normalizedPathname === `${basePath}/dashboard`) {
+    return "dashboard";
+  }
+  if (normalizedPathname === `${basePath}/service-schedule`) {
     return "service-calendar";
   }
   if (normalizedPathname === `${basePath}/gantt-chart`) {
     return "gantt-chart";
   }
-  if (normalizedPathname === `${basePath}/dashboard`) {
-    return "dashboard";
-  }
   return "dashboard";
 };
 
 export const getLocationViewHref = (locationId: string, view: DashboardLocationView): string => {
-  if (view === "service-calendar") {
+  if (view === "dashboard") {
     return `/dashboard/locations/${locationId}`;
   }
   return `/dashboard/locations/${locationId}/${view}`;

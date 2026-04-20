@@ -131,4 +131,24 @@ describe("ServiceEventEditPopover", () => {
     expect(html).toContain("Source Event");
     expect(html).toContain("Monthly maintenance");
   });
+
+  it("keeps the title column constrained so action buttons stay visible", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        title: "This is a very long service event title that should not push the action buttons away"
+      },
+      canEdit: true,
+      canComplete: false,
+      role: "partner",
+      onSave: async () => undefined,
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).toContain("data-service-event-create-corrective-action");
+    expect(html).toContain("data-service-event-edit");
+    expect(html).toContain("class=\"min-w-0 flex-1\"");
+    expect(html).toContain("class=\"flex shrink-0 items-center gap-2\"");
+  });
 });
