@@ -49,7 +49,7 @@ describe("LocationDashboardPanel", () => {
   it("renders the dashboard toolbar with the updated title and action buttons", () => {
     const html = renderToString(LocationDashboardPanel);
 
-    expect(html).toContain("How the dashboard works");
+    expect(html).toContain("Dashboard");
     expect(html).toContain("Add Graph");
     expect(html).toContain("Apply");
     expect(html).toContain("Undo");

@@ -119,14 +119,16 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
             <label class="form-control w-full">
               <span class="label-text text-sm">Graph type</span>
               <select
-                class="select select-bordered w-full"
+                class="select flex items-center justify-center select-bordered w-full"
                 value={selectedGraphType()}
                 disabled={props.isCreating}
                 onChange={(event) => setSelectedGraphType(event.currentTarget.value as LocationGraphType)}
               >
                 <For each={GRAPH_TYPE_OPTIONS}>
                   {(option) => (
-                    <option value={option.value}>{option.label}</option>
+                    <option
+                      value={option.value}>{option.label}
+                    </option>
                   )}
                 </For>
               </select>
@@ -135,14 +137,16 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
             <label class="form-control w-full">
               <span class="label-text text-sm">Section</span>
               <select
-                class="select select-bordered w-full"
+                class="select select-bordered w-full flex items-center justify-center"
                 value={selectedSectionId()}
                 disabled={props.isCreating}
                 onChange={(event) => setSelectedSectionId(event.currentTarget.value)}
               >
                 <For each={props.sectionOptions}>
                   {(option) => (
-                    <option value={option.id}>{option.label}</option>
+                    <option value={option.id}>
+                      {option.label}
+                    </option>
                   )}
                 </For>
                 <option value={NEW_SECTION_VALUE}>

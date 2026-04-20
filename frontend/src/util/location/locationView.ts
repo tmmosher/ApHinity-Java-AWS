@@ -54,7 +54,7 @@ export const getLocationViewFromPathname = (pathname: string, locationId: string
   if (normalizedPathname === basePath || normalizedPathname === `${basePath}/dashboard`) {
     return "dashboard";
   }
-  if (normalizedPathname === `${basePath}/service-schedule`) {
+  if (normalizedPathname === `${basePath}/service-calendar`) {
     return "service-calendar";
   }
   if (normalizedPathname === `${basePath}/gantt-chart`) {

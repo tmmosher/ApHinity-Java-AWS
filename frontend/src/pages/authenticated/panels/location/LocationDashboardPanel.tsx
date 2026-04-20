@@ -33,6 +33,7 @@ import {
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "../../../../context/LocationDetailContext";
 import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
+import GraphLoadingPlaceholder from "../../../../components/graph/GraphLoadingPlaceholder";
 
 const toolbarActionButtonClass =
   "btn h-11 min-h-11 rounded-2xl px-4 text-sm font-medium shadow-sm transition duration-150 ease-out " +
@@ -540,7 +541,7 @@ export const LocationDashboardPanel = () => {
       <section class="rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div class="space-y-1">
-            <h3 class="text-sm font-semibold">How the dashboard works</h3>
+            <h2 class="text-xl flex items-center tracking-tight h-11 font-semibold">Dashboard</h2>
             <p class="text-xs text-base-content/70">
               Last updated {updatedAtLabel()}
             </p>
@@ -647,7 +648,11 @@ export const LocationDashboardPanel = () => {
                                 when={!plotlyModule.error}
                                 fallback={<p class="h-72 w-full rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">Unable to load graph renderer.</p>}
                               >
-                                <Suspense fallback={<div class="h-72 w-full rounded-lg border border-base-300 bg-base-100 p-4 text-sm text-base-content/70">Loading graph {graph.name}...</div>}>
+                                <Suspense fallback={
+                                  <div class="w-full overflow-hidden rounded-lg">
+                                    <GraphLoadingPlaceholder graphName={graph.name} />
+                                  </div>
+                                }>
                                   <Show when={plotlyModule()}>
                                     <div class="w-full" style={{height: resolveGraphHeight(graph.style)}}>
                                       <PlotlyChart

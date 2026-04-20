@@ -27,7 +27,7 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
     <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div class="space-y-1">
-          <h2 class="flex h-11 items-center text-xl font-semibold tracking-tight">Gantt Chart</h2>
+          <h2 class="flex h-11 items-center text-xl font-semibold tracking-tight ">Gantt Chart</h2>
         </div>
 
         <div class="flex flex-col gap-3 md:items-end">

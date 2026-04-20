@@ -26,15 +26,15 @@ describe("locationView helpers", () => {
   it("recomputes the active selector state when the route view changes", () => {
     let currentView: DashboardLocationView = "service-calendar";
     const getCurrentView = () => currentView;
-    const serviceScheduleActive = createLocationViewActive(getCurrentView, "service-calendar");
+    const serviceCalendarActive = createLocationViewActive(getCurrentView, "service-calendar");
     const dashboardActive = createLocationViewActive(getCurrentView, "dashboard");
 
-    expect(serviceScheduleActive()).toBe(true);
+    expect(serviceCalendarActive()).toBe(true);
     expect(dashboardActive()).toBe(false);
 
     currentView = "dashboard";
 
-    expect(serviceScheduleActive()).toBe(false);
+    expect(serviceCalendarActive()).toBe(false);
     expect(dashboardActive()).toBe(true);
   });
 
@@ -56,7 +56,7 @@ describe("locationView helpers", () => {
 
   it("maps location routes to the expected selector view", () => {
     expect(getLocationViewFromPathname("/dashboard/locations/42", "42")).toBe("dashboard");
-    expect(getLocationViewFromPathname("/dashboard/locations/42/service-schedule/", "42")).toBe("service-calendar");
+    expect(getLocationViewFromPathname("/dashboard/locations/42/service-calendar/", "42")).toBe("service-calendar");
     expect(getLocationViewFromPathname("/dashboard/locations/42/gantt-chart", "42")).toBe("gantt-chart");
     expect(getLocationViewFromPathname("/dashboard/locations/42/dashboard", "42")).toBe("dashboard");
   });
