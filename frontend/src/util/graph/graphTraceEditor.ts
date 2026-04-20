@@ -1,24 +1,23 @@
 import type * as Plotly from "plotly.js";
+import {
+  createTraceTemplate,
+  parseIndicatorValueInput,
+  isIncompleteNumericInput,
+  syncPieMarkerColors,
+  TRACE_COLOR_OPTIONS,
+  type TraceType
+} from "./graphTemplateFactory";
 import type { EditableGraphPayload } from "./graphEditor";
 
-export type TraceType = "pie" | "bar" | "scatter";
+export type {TraceType};
 export const AUTO_SIZE_TRACE_FLAG = "autoSize";
 
 export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
   pie: "pie",
   bar: "bar",
   scatter: "scatter",
+  indicator: "indicator",
   scattergl: "scatter"
-};
-
-export const TRACE_COLOR_OPTIONS: Record<string, string> = {
-  "Legacy Blue": "#1f77b4",
-  "Legacy Green": "#2ca02c",
-  "Legacy Red": "#d62728",
-  "Legacy Orange": "#ff7f0e",
-  "Legacy Purple": "#9467bd",
-  "Legacy Cyan": "#17becf",
-  "Legacy Gray": "#7f7f7f"
 };
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -35,19 +34,12 @@ export const coerceInputValue = (
   preferNumeric: boolean
 ): unknown => {
   const normalized = rawValue.trim();
-  const isIncompleteNumericInput =
-    normalized === "-" ||
-    normalized === "+" ||
-    normalized === "." ||
-    normalized === "-." ||
-    normalized === "+." ||
-    /^[+-]?\d+\.$/.test(normalized);
 
   if (typeof previousValue === "number") {
     if (normalized.length === 0) {
       return "";
     }
-    if (isIncompleteNumericInput) {
+    if (isIncompleteNumericInput(rawValue)) {
       return rawValue;
     }
     const numeric = Number(rawValue);
@@ -60,7 +52,7 @@ export const coerceInputValue = (
     if (normalized.length === 0) {
       return rawValue;
     }
-    if (isIncompleteNumericInput) {
+    if (isIncompleteNumericInput(rawValue)) {
       return rawValue;
     }
     const numeric = Number(rawValue);
@@ -90,6 +82,13 @@ export const isAutoSizingPieTrace = (trace: Record<string, unknown>): boolean =>
   getTraceType(trace) === "pie" && trace[AUTO_SIZE_TRACE_FLAG] === true;
 
 export const getTraceColor = (trace: Record<string, unknown>): string | null => {
+  if (getTraceType(trace) === "indicator") {
+    const gauge = isRecord(trace.gauge) ? trace.gauge : null;
+    if (gauge && isRecord(gauge.bar) && typeof gauge.bar.color === "string") {
+      return gauge.bar.color;
+    }
+  }
+
   const marker = isRecord(trace.marker) ? trace.marker : null;
   if (marker) {
     if (typeof marker.color === "string") {
@@ -152,46 +151,8 @@ export const createTrace = (
   preferredType: TraceType | null,
   existingTraceCount: number
 ): Record<string, unknown> => {
-  const traceType = preferredType ?? "bar";
-  const defaultColor = getDefaultTraceColor();
   const traceName = buildDefaultTraceName(existingTraceCount);
-
-  if (traceType === "pie") {
-    return syncPieMarkerColors(
-      {
-        type: "pie",
-        name: traceName,
-        hole: 0.72,
-        sort: false,
-        labels: ["fill"],
-        values: [30],
-        textinfo: "none",
-        direction: "clockwise",
-        hovertemplate: "%{label}: %{value}<extra></extra>"
-      },
-      defaultColor
-    );
-  }
-
-  if (traceType === "scatter") {
-    return {
-      x: [],
-      y: [],
-      line: {color: defaultColor, width: 2},
-      mode: "lines+markers",
-      name: traceName,
-      type: "scatter",
-      marker: {size: 6}
-    };
-  }
-
-  return {
-    type: "bar",
-    name: traceName,
-    x: [],
-    y: [],
-    marker: {color: defaultColor}
-  };
+  return createTraceTemplate(preferredType, traceName);
 };
 
 export const renameTrace = (
@@ -283,38 +244,6 @@ export const updateTraceYAxisRange = (
   return Object.keys(nextLayout).length > 0 ? nextLayout : null;
 };
 
-const syncPieMarkerColors = (
-  trace: Record<string, unknown>,
-  preferredColor?: string
-): Record<string, unknown> => {
-  const marker = isRecord(trace.marker) ? {...trace.marker} : {};
-  const labelCount = getTraceArray(trace, "labels").length;
-  const valueCount = getTraceArray(trace, "values").length;
-  const colorCount = Math.max(labelCount, valueCount, 1);
-  const existingColors = Array.isArray(marker.colors) ? [...marker.colors] : [];
-  const fallbackColor =
-    preferredColor ??
-    (typeof marker.color === "string" ? marker.color : undefined) ??
-    existingColors.find((entry) => typeof entry === "string") ??
-    getDefaultTraceColor();
-  const shouldReplaceExistingColors = typeof preferredColor === "string" && preferredColor.length > 0;
-
-  const nextColors = Array.from({length: colorCount}, (_, index) => {
-    if (shouldReplaceExistingColors) {
-      return fallbackColor;
-    }
-    const existing = existingColors[index];
-    return typeof existing === "string" ? existing : fallbackColor;
-  });
-  marker.color = typeof nextColors[0] === "string" ? nextColors[0] : fallbackColor;
-  marker.colors = nextColors;
-
-  return {
-    ...trace,
-    marker
-  };
-};
-
 export const setPieRowColor = (
   trace: Record<string, unknown>,
   rowIndex: number,
@@ -355,6 +284,18 @@ export const setTraceColor = (
     return syncPieMarkerColors(trace, colorHex);
   }
 
+  if (traceType === "indicator") {
+    const gauge = isRecord(trace.gauge) ? {...trace.gauge} : {};
+    const bar = isRecord(gauge.bar) ? {...gauge.bar} : {};
+    bar.color = colorHex;
+    gauge.bar = bar;
+
+    return {
+      ...trace,
+      gauge
+    };
+  }
+
   const marker = isRecord(trace.marker) ? {...trace.marker} : {};
   marker.color = colorHex;
   let nextTrace: Record<string, unknown> = {
@@ -372,6 +313,21 @@ export const setTraceColor = (
   }
 
   return nextTrace;
+};
+
+export const updateIndicatorValue = (
+  trace: Record<string, unknown>,
+  rawValue: string
+): Record<string, unknown> => {
+  const parsedValue = parseIndicatorValueInput(rawValue);
+  if (parsedValue === null) {
+    return trace;
+  }
+
+  return {
+    ...trace,
+    value: parsedValue
+  };
 };
 
 export const addPieRow = (trace: Record<string, unknown>): Record<string, unknown> => {

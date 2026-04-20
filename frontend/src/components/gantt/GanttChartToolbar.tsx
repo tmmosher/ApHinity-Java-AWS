@@ -1,5 +1,5 @@
 import {Show, type JSX} from "solid-js";
-import {GanttChartToolbarContent} from "../gantt/GanttChartToolbarContent";
+import {GanttChartToolbarContent} from "./GanttChartToolbarContent";
 
 type GanttChartToolbarProps = {
   canEdit: boolean;

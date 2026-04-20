@@ -87,7 +87,7 @@ export interface LocationGraphRenameResult {
     updatedAt: string;
 }
 
-export type LocationGraphType = "pie" | "bar" | "scatter";
+export type LocationGraphType = "pie" | "indicator" | "bar" | "scatter";
 
 export type ServiceEventResponsibility = "client" | "partner";
 

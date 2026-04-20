@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
 import {renderToString} from "solid-js/web";
-import {GanttChartShell} from "../components/location/GanttChartShell";
+import {GanttChartShell} from "../components/gantt/GanttChartShell";
 
 describe("GanttChartShell", () => {
   it("renders a neutral host that the Frappe Gantt library can own", () => {

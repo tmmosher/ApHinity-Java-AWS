@@ -14,9 +14,9 @@ import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import type {CreateLocationGanttTaskRequest, LocationGanttTask} from "../../../../types/Types";
-import {GanttChartContent} from "../../../../components/location/GanttChartContent";
-import {GanttChartToolbar} from "../../../../components/location/GanttChartToolbar";
-import {GanttTaskPopover} from "../../../../components/location/GanttTaskPopover";
+import {GanttChartContent} from "../../../../components/gantt/GanttChartContent";
+import {GanttChartToolbar} from "../../../../components/gantt/GanttChartToolbar";
+import {GanttTaskPopover} from "../../../../components/gantt/GanttTaskPopover";
 import {
   GANTT_CHART_HOST_ID,
   createFrappeGanttOptions,

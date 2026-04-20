@@ -12,7 +12,7 @@ vi.mock("corvu/popover", () => {
   return {default: Popover};
 });
 
-import {GanttTaskPopover, requestGanttTaskEdit} from "../components/location/GanttTaskPopover";
+import {GanttTaskPopover, requestGanttTaskEdit} from "../components/gantt/GanttTaskPopover";
 
 const baseTask = {
   id: 42,

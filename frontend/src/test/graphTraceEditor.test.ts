@@ -11,10 +11,17 @@ import {
   removePieRow,
   renameTrace,
   setPieRowColor,
+  getTraceColor,
   setTraceColor,
   updateTraceYAxisRange,
-  updatePieValue
+  updatePieValue,
+  updateIndicatorValue
 } from "../util/graph/graphTraceEditor";
+import {
+  INDICATOR_VALUE_MAX,
+  INDICATOR_VALUE_MIN,
+  parseIndicatorValueInput
+} from "../util/graph/graphTemplateFactory";
 
 describe("graphTraceEditor", () => {
   it("keeps intermediate numeric input instead of coercing to zero", () => {
@@ -99,6 +106,27 @@ describe("graphTraceEditor", () => {
     expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#d62728", "#d62728"]);
   });
 
+  it("applies indicator color to the gauge bar", () => {
+    const trace: Record<string, unknown> = {
+      type: "indicator",
+      value: 68,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"}
+      }
+    };
+
+    const nextTrace = setTraceColor(trace, "indicator", "#d62728");
+
+    expect(getTraceColor(nextTrace)).toBe("#d62728");
+    expect(nextTrace.gauge).toEqual({
+      shape: "angular",
+      axis: {range: [0, 100]},
+      bar: {color: "#d62728"}
+    });
+  });
+
   it("keeps invalid pie value text for in-progress editing", () => {
     const trace: Record<string, unknown> = {
       type: "pie",
@@ -179,6 +207,56 @@ describe("graphTraceEditor", () => {
         colors: ["#1f77b4"]
       }
     });
+  });
+
+  it("creates indicator traces with gauge defaults", () => {
+    const nextTrace = createTrace("indicator", 0);
+
+    expect(nextTrace).toEqual({
+      type: "indicator",
+      name: "Trace 1",
+      mode: "gauge+number",
+      value: 0,
+      number: {
+        suffix: "%",
+        font: {
+          size: 22
+        }
+      },
+      gauge: {
+        shape: "angular",
+        axis: {
+          range: [0, 100]
+        },
+        bar: {
+          color: "#1f77b4"
+        }
+      }
+    });
+  });
+
+  it("parses only bounded indicator values", () => {
+    expect(parseIndicatorValueInput(String(INDICATOR_VALUE_MIN))).toBe(INDICATOR_VALUE_MIN);
+    expect(parseIndicatorValueInput(String(INDICATOR_VALUE_MAX))).toBe(INDICATOR_VALUE_MAX);
+    expect(parseIndicatorValueInput(String(INDICATOR_VALUE_MIN - 1))).toBeNull();
+    expect(parseIndicatorValueInput(String(INDICATOR_VALUE_MAX + 1))).toBeNull();
+    expect(parseIndicatorValueInput("1.")).toBeNull();
+  });
+
+  it("keeps the previous indicator value when the input is outside the allowed range", () => {
+    const trace: Record<string, unknown> = {
+      type: "indicator",
+      value: 68,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"}
+      }
+    };
+
+    expect(updateIndicatorValue(trace, "150")).toEqual(trace);
+    expect(updateIndicatorValue(trace, "-5")).toEqual(trace);
+    expect(updateIndicatorValue(trace, "1.")).toEqual(trace);
   });
 
   it("renames traces and clears names when blank input is provided", () => {

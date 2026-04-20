@@ -16,7 +16,7 @@ vi.mock("corvu/popover", () => {
   return {default: Popover};
 });
 
-import {GanttTaskCreatePopover} from "../components/location/GanttTaskCreatePopover";
+import {GanttTaskCreatePopover} from "../components/gantt/GanttTaskCreatePopover";
 
 describe("GanttTaskCreatePopover", () => {
   it("renders a trigger and create form with the expected task fields", () => {

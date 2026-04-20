@@ -5,6 +5,7 @@ import type { LocationGraph } from "../types/Types";
 
 let latestTraceControlsProps: Record<string, unknown> | null = null;
 let latestPieTraceEditorProps: Record<string, unknown> | null = null;
+let latestIndicatorTraceEditorProps: Record<string, unknown> | null = null;
 let latestCartesianTraceEditorProps: Record<string, unknown> | null = null;
 
 vi.mock("corvu/dialog", () => {
@@ -44,6 +45,13 @@ vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
 vi.mock("../components/graph-editor/PieTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
     latestPieTraceEditorProps = props;
+    return null;
+  }
+}));
+
+vi.mock("../components/graph-editor/IndicatorTraceEditor", () => ({
+  default: (props: Record<string, unknown>) => {
+    latestIndicatorTraceEditorProps = props;
     return null;
   }
 }));
@@ -107,6 +115,19 @@ const getPieTraceEditorProps = () => {
   };
 };
 
+const getIndicatorTraceEditorProps = () => {
+  if (!latestIndicatorTraceEditorProps) {
+    throw new Error("IndicatorTraceEditor mock was not rendered.");
+  }
+  return latestIndicatorTraceEditorProps as {
+    value: unknown;
+    valueDraft?: string;
+    color: string;
+    onUpdateValue: (rawValue: string) => void;
+    onUpdateColor: (colorHex: string) => void;
+  };
+};
+
 const getCartesianTraceEditorProps = () => {
   if (!latestCartesianTraceEditorProps) {
     throw new Error("CartesianTraceEditor mock was not rendered.");
@@ -129,6 +150,7 @@ describe("GraphEditorModal trace controls", () => {
   afterEach(() => {
     latestTraceControlsProps = null;
     latestPieTraceEditorProps = null;
+    latestIndicatorTraceEditorProps = null;
     latestCartesianTraceEditorProps = null;
   });
 
@@ -228,6 +250,73 @@ describe("GraphEditorModal trace controls", () => {
       const updatedPieProps = getPieTraceEditorProps();
       expect(updatedPieProps.values).toEqual([3, 7]);
       expect(updatedPieProps.valueDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("hides trace controls for indicator graphs and passes value editing props", async () => {
+    const indicatorGraph: LocationGraph = {
+      id: 18,
+      name: "Resolution Percent",
+      data: [{
+        type: "indicator",
+        name: "Trace 1",
+        mode: "gauge+number",
+        value: 68,
+        number: {
+          suffix: "%",
+          font: {
+            size: 22
+          }
+        },
+        gauge: {
+          shape: "angular",
+          axis: {
+            range: [0, 100]
+          },
+          bar: {
+            color: "#1f77b4"
+          }
+        }
+      }],
+      layout: {showlegend: false},
+      config: {displayModeBar: false, responsive: false},
+      style: {height: 160},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(indicatorGraph);
+    try {
+      await Promise.resolve();
+
+      const indicatorProps = getIndicatorTraceEditorProps();
+
+      expect(latestTraceControlsProps).toBeNull();
+      expect(indicatorProps.value).toBe(68);
+      expect(indicatorProps.color).toBe("#1f77b4");
+
+      indicatorProps.onUpdateValue("abc");
+      await Promise.resolve();
+
+      const updatedIndicatorProps = getIndicatorTraceEditorProps();
+      expect(updatedIndicatorProps.value).toBe(68);
+      expect(updatedIndicatorProps.valueDraft).toBe("abc");
+
+      indicatorProps.onUpdateValue("150");
+      await Promise.resolve();
+
+      const boundedIndicatorProps = getIndicatorTraceEditorProps();
+      expect(boundedIndicatorProps.value).toBe(68);
+      expect(boundedIndicatorProps.valueDraft).toBe("150");
+
+      indicatorProps.onUpdateValue("1.");
+      await Promise.resolve();
+
+      const incompleteIndicatorProps = getIndicatorTraceEditorProps();
+      expect(incompleteIndicatorProps.value).toBe(68);
+      expect(incompleteIndicatorProps.valueDraft).toBe("1.");
     } finally {
       dispose();
     }
