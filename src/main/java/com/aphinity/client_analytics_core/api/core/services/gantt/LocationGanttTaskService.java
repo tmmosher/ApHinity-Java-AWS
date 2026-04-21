@@ -7,6 +7,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.gantt.GanttTaskR
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.requests.gantt.LocationGanttTaskRequest;
 import com.aphinity.client_analytics_core.api.core.response.gantt.GanttTaskResponse;
+import org.springframework.core.io.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ public class LocationGanttTaskService {
     private final GanttTaskRepository ganttTaskRepository;
     private final GanttTaskAuthorizationService authorizationService;
     private final GanttTaskRequestMapper requestMapper;
+    private final GanttChartTemplateService templateService;
     private final GanttTaskAuditService auditService;
 
     public LocationGanttTaskService(
@@ -33,12 +35,14 @@ public class LocationGanttTaskService {
         GanttTaskRepository ganttTaskRepository,
         GanttTaskAuthorizationService authorizationService,
         GanttTaskRequestMapper requestMapper,
+        GanttChartTemplateService templateService,
         GanttTaskAuditService auditService
     ) {
         this.locationRepository = locationRepository;
         this.ganttTaskRepository = ganttTaskRepository;
         this.authorizationService = authorizationService;
         this.requestMapper = requestMapper;
+        this.templateService = templateService;
         this.auditService = auditService;
     }
 
@@ -55,6 +59,13 @@ public class LocationGanttTaskService {
         return tasks.stream()
             .map(requestMapper::toResponse)
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Resource getGanttChartTemplate(Long userId, Long locationId) {
+        AppUser user = authorizationService.requireUser(userId);
+        authorizationService.requireReadableLocationAccess(user, locationId);
+        return templateService.getTemplate();
     }
 
     @Transactional

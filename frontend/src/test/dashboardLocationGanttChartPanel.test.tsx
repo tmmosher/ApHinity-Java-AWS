@@ -30,6 +30,9 @@ vi.mock("../util/location/locationGanttTaskApi", () => ({
   createLocationGanttTasksBulkById: vi.fn(),
   deleteLocationGanttTaskById: vi.fn(),
   fetchLocationGanttTasksById: vi.fn(async () => []),
+  getLocationGanttTaskTemplateDownloadUrl: vi.fn(() => (
+    "https://example.test/api/core/locations/42/gantt-tasks/template"
+  )),
   updateLocationGanttTaskById: vi.fn()
 }));
 
@@ -52,6 +55,8 @@ describe("LocationGanttChartPanel", () => {
     expect(html).toContain("Upload CSV");
     expect(html).toContain("Apply");
     expect(html).toContain("Undo");
+    expect(html).toContain("https://example.test/api/core/locations/42/gantt-tasks/template");
+    expect(html).toContain("Get a copy of the Excel template");
     expect(html).toContain("data-gantt-task-create-trigger");
     expect(html).toContain("id=\"location-gantt-chart-host\"");
     expect(html).toContain("w-max min-h-[32rem]");

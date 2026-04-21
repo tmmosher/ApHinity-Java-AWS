@@ -7,6 +7,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.gantt.GanttTaskR
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.requests.gantt.LocationGanttTaskRequest;
 import com.aphinity.client_analytics_core.api.core.response.gantt.GanttTaskResponse;
+import com.aphinity.client_analytics_core.api.core.services.gantt.GanttChartTemplateService;
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskAuditService;
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskAuthorizationService;
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskRequestMapper;
@@ -17,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -55,6 +57,9 @@ class LocationGanttTaskServiceTest {
     @Spy
     private GanttTaskRequestMapper requestMapper = new GanttTaskRequestMapper();
 
+    @Spy
+    private GanttChartTemplateService templateService = new GanttChartTemplateService();
+
     @InjectMocks
     private LocationGanttTaskService locationGanttTaskService;
 
@@ -74,6 +79,20 @@ class LocationGanttTaskServiceTest {
         verify(authorizationService).requireUser(5L);
         verify(authorizationService).requireReadableLocationAccess(user, 99L);
         verify(ganttTaskRepository).findVisibleByLocationIdAndTitleSearch(99L, "ops");
+    }
+
+    @Test
+    void getGanttChartTemplateReturnsClassPathResourceForAuthorizedClient() throws Exception {
+        AppUser user = verifiedUser(5L);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
+
+        Resource resource = locationGanttTaskService.getGanttChartTemplate(5L, 99L);
+
+        assertEquals("gantt_chart_template.xlsx", resource.getFilename());
+        assertTrue(resource.exists());
+        assertTrue(resource.contentLength() > 0);
     }
 
     @Test

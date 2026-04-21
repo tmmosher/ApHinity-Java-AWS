@@ -95,6 +95,14 @@ export const fetchLocationGanttTasksById = async (
   return parseLocationGanttTaskList(await response.json());
 };
 
+export const getLocationGanttTaskTemplateDownloadUrl = (
+  host: string,
+  locationId: string
+): string => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  return host + "/api/core/locations/" + parsedLocationId + "/gantt-tasks/template";
+};
+
 export const createLocationGanttTaskById = async (
   host: string,
   locationId: string,

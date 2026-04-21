@@ -5,6 +5,7 @@ import {
   createLocationGanttTasksBulkById,
   deleteLocationGanttTaskById,
   fetchLocationGanttTasksById,
+  getLocationGanttTaskTemplateDownloadUrl,
   updateLocationGanttTaskById
 } from "../util/location/locationGanttTaskApi";
 
@@ -45,6 +46,11 @@ describe("locationGanttTaskApi", () => {
       {method: "GET"}
     );
     expect(tasks[0].title).toBe("OPS");
+  });
+
+  it("builds the gantt chart template download URL", () => {
+    expect(getLocationGanttTaskTemplateDownloadUrl(host, "42"))
+      .toBe(host + "/api/core/locations/42/gantt-tasks/template");
   });
 
   it("creates a single gantt task", async () => {

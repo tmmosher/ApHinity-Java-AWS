@@ -11,13 +11,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,6 +58,38 @@ class LocationGanttTaskControllerTest {
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationGanttTaskService).getAccessibleLocationTasks(7L, 14L, "ops");
+    }
+
+    @Test
+    void downloadLocationGanttTaskTemplateDelegatesToServiceAndReturnsAttachmentHeaders() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        Resource template = new ByteArrayResource(new byte[]{1, 2, 3}) {
+            @Override
+            public String getFilename() {
+                return "gantt_chart_template.xlsx";
+            }
+        };
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationGanttTaskService.getGanttChartTemplate(42L, 8L)).thenReturn(template);
+
+        ResponseEntity<Resource> actual = locationGanttTaskController.downloadLocationGanttTaskTemplate(jwt, 8L);
+
+        assertSame(template, actual.getBody());
+        assertEquals(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Objects.requireNonNull(actual.getHeaders().getContentType()).toString()
+        );
+        assertEquals(3L, actual.getHeaders().getContentLength());
+        assertEquals(
+            "attachment; filename=\"gantt_chart_template.xlsx\"",
+            actual.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)
+        );
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationGanttTaskService).getGanttChartTemplate(42L, 8L);
     }
 
     @Test

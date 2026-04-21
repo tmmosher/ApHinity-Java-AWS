@@ -31,6 +31,7 @@ import {
   createLocationGanttTaskById,
   deleteLocationGanttTaskById,
   fetchLocationGanttTasksById,
+  getLocationGanttTaskTemplateDownloadUrl,
   updateLocationGanttTaskById
 } from "../../../../util/location/locationGanttTaskApi";
 import {createDashboardLocationResetGuard, getFreshLocationScopedValue, type LocationScopedResource} from "../../../../util/location/locationView";
@@ -52,6 +53,9 @@ export const LocationGanttChartPanel = () => {
   const canEditTasks = createMemo(() => canEditLocationGanttTask(role()));
   const searchControl = createLocationReactiveSearchControl();
   const shouldResetState = createDashboardLocationResetGuard(params.locationId);
+  const ganttChartTemplateHref = createMemo(() =>
+    getLocationGanttTaskTemplateDownloadUrl(host, params.locationId)
+  );
 
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
   const [selectedTask, setSelectedTask] = createSignal<TimelineTask>();
@@ -306,6 +310,7 @@ export const LocationGanttChartPanel = () => {
     <div class="flex min-h-[calc(100vh-16rem)] flex-col gap-4">
       <GanttChartToolbar
         canEdit={canEditTasks()}
+        templateHref={ganttChartTemplateHref()}
         isImportingCsv={importController.isImportingCsv()}
         isApplyingImports={importController.isApplyingImports()}
         hasStagedTasks={importController.hasStagedTasks()}

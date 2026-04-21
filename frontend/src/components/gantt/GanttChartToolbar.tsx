@@ -3,6 +3,7 @@ import {GanttChartToolbarContent} from "./GanttChartToolbarContent";
 
 type GanttChartToolbarProps = {
   canEdit: boolean;
+  templateHref: string;
   isImportingCsv: boolean;
   isApplyingImports: boolean;
   hasStagedTasks: boolean;
@@ -33,7 +34,7 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
         <div class="flex flex-col gap-3 md:items-end">
           <div class="flex flex-wrap items-center gap-3">
             <GanttChartToolbarContent
-              templateHref="gantt_chart_template.xlsx"
+              templateHref={props.templateHref}
               canEdit={props.canEdit}
             />
 
