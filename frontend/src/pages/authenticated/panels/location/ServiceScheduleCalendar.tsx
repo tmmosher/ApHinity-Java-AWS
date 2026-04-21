@@ -592,42 +592,46 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
             <div class="min-h-0 overflow-hidden rounded-2xl border border-base-300/80 bg-base-300/70 shadow-inner">
               <Show when={transitionCycle() + 1} keyed>
                   {/*this works at runtime. ignore the TS error it is majorly buggin*/}
-                {() => (
-                  <div
-                    class="service-calendar-transition-surface h-full min-h-0"
-                    data-service-calendar-transition-surface=""
-                    data-service-calendar-transition={transitionDirection()}
-                  >
-                    <div role="grid" aria-label="Service schedule calendar" class="grid h-full grid-rows-[auto_1fr] gap-px">
-                      <div role="row" class="grid grid-cols-7 gap-px bg-base-300/70">
-                        <For each={calendar.weekdays}>
-                          {(weekday) => <WeekdayHeaderCell day={weekday} />}
-                        </For>
-                      </div>
+                {(): JSX.Element => {
+                  return (
+                    <>
+                      <div
+                        class="service-calendar-transition-surface h-full min-h-0"
+                        data-service-calendar-transition-surface=""
+                        data-service-calendar-transition={transitionDirection()}
+                      >
+                        <div role="grid" aria-label="Service schedule calendar" class="grid h-full grid-rows-[auto_1fr] gap-px">
+                          <div role="row" class="grid grid-cols-7 gap-px bg-base-300/70">
+                            <For each={calendar.weekdays}>
+                              {(weekday) => <WeekdayHeaderCell day={weekday} />}
+                            </For>
+                          </div>
 
-                      <div class="grid min-h-0 gap-px bg-base-300/70">
-                        <For each={calendar.weeks}>
-                          {(week, weekIndex) => (
-                            <ServiceCalendarWeekRow
-                              week={week}
-                              month={calendar.month}
-                              layout={weekLayouts()[weekIndex()]}
-                              eventEditorRole={props.eventEditorRole}
-                              onCreateEventSave={props.onCreateEventSave}
-                              canEditEvent={props.canEditEvent}
-                              canCompleteEvent={props.canCompleteEvent}
-                              onEditEventSave={props.onEditEventSave}
-                              onCreateCorrectiveAction={props.onCreateCorrectiveAction}
-                              onCompleteEvent={props.onCompleteEvent}
-                              canDeleteEvent={props.canDeleteEvent}
-                              onDeleteEvent={props.onDeleteEvent}
-                            />
-                          )}
-                        </For>
+                          <div class="grid min-h-0 gap-px bg-base-300/70">
+                            <For each={calendar.weeks}>
+                              {(week, weekIndex) => (
+                                <ServiceCalendarWeekRow
+                                  week={week}
+                                  month={calendar.month}
+                                  layout={weekLayouts()[weekIndex()]}
+                                  eventEditorRole={props.eventEditorRole}
+                                  onCreateEventSave={props.onCreateEventSave}
+                                  canEditEvent={props.canEditEvent}
+                                  canCompleteEvent={props.canCompleteEvent}
+                                  onEditEventSave={props.onEditEventSave}
+                                  onCreateCorrectiveAction={props.onCreateCorrectiveAction}
+                                  onCompleteEvent={props.onCompleteEvent}
+                                  canDeleteEvent={props.canDeleteEvent}
+                                  onDeleteEvent={props.onDeleteEvent}
+                                />
+                              )}
+                            </For>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
+                }
               </Show>
             </div>
           </div>
