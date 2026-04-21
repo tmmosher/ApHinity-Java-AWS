@@ -163,8 +163,8 @@ if (root) {
             <Route path="/" component={DashboardHomePanel} />
             <Route path="/locations" component={DashboardLocationsPanelRoute} />
             <Route path="/locations/:locationId" component={DashboardLocationDetailPanelRoute}>
-              <Route path="/" component={DashboardLocationServiceSchedulePanel} />
-              <Route path="/service-schedule" component={DashboardLocationServiceSchedulePanel} />
+              <Route path="/" component={DashboardLocationDashboardPanelRoute} />
+              <Route path="/service-calendar" component={DashboardLocationServiceSchedulePanel} />
               <Route path="/gantt-chart" component={DashboardLocationGanttChartPanel} />
               <Route path="/dashboard" component={DashboardLocationDashboardPanelRoute} />
             </Route>

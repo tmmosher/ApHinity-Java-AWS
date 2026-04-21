@@ -18,25 +18,27 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameU
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -67,6 +69,13 @@ class LocationServiceTest {
 
     @Mock
     private AccountRoleService accountRoleService;
+
+    @Spy
+    private LocationGraphTemplateFactory locationGraphTemplateFactory = new LocationGraphTemplateFactory();
+
+    @Spy
+    private LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory =
+        new LocationGraphUpdatePayloadValidationFactory();
 
     @InjectMocks
     private LocationService locationService;
@@ -577,6 +586,84 @@ class LocationServiceTest {
     }
 
     @Test
+    void createLocationGraphBuildsIndicatorTemplate() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of()))
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(34L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, 1L, false, "indicator");
+
+        assertEquals(34L, response.id());
+        assertEquals("New Indicator Graph", response.name());
+        assertEquals(
+            Map.of(
+                "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
+                "showlegend", false
+            ),
+            response.layout()
+        );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
+        assertEquals(expectedIndicatorStyle(), response.style());
+        assertEquals(expectedIndicatorStyle(), savedGraphHolder[0].getStyle());
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
+        assertEquals(1, traces.size());
+        assertEquals("indicator", traces.getFirst().get("type"));
+        assertEquals("Trace 1", traces.getFirst().get("name"));
+        assertEquals("gauge+number", traces.getFirst().get("mode"));
+        assertEquals(0L, ((Number) traces.getFirst().get("value")).longValue());
+        assertEquals(
+            Map.of(
+                "suffix", "%",
+                "font", Map.of("size", 22L)
+            ),
+            traces.getFirst().get("number")
+        );
+        assertEquals(
+            Map.of(
+                "shape", "angular",
+                "axis", Map.of("range", List.of(0L, 100L)),
+                "bar", Map.of("color", LEGACY_GRAPH_COLOR),
+                "borderwidth", 0L,
+                "steps", List.of(
+                    Map.of("color", "#80000030", "range", List.of(0L, 30L)),
+                    Map.of("color", "#FF000030", "range", List.of(30L, 60L)),
+                    Map.of("color", "#FFFF0030", "range", List.of(60L, 90L)),
+                    Map.of("color", "#00800030", "range", List.of(90L, 100L))
+                ),
+                "threshold", Map.of(
+                    "line", Map.of("color", "red", "width", 2L),
+                    "thickness", new BigDecimal("0.75"),
+                    "value", 90L
+                )
+            ),
+            traces.getFirst().get("gauge")
+        );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
     void createLocationGraphCreatesAndAppendsANewSectionWhenRequested() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
@@ -631,6 +718,47 @@ class LocationServiceTest {
         assertEquals(3, sections.size());
         assertEquals(5L, sections.get(2).get("section_id"));
         assertEquals(List.of(45L), sections.get(2).get("graph_ids"));
+    }
+
+    private Map<String, Object> expectedIndicatorStyle() {
+        return Map.of(
+            "theme",
+            Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ),
+            "height", 160
+        );
+    }
+
+    private Map<String, Object> indicatorTrace(int value) {
+        return Map.of(
+            "type", "indicator",
+            "mode", "gauge+number",
+            "value", value,
+            "number", Map.of(
+                "suffix", "%",
+                "font", Map.of("size", 22)
+            ),
+            "gauge", Map.of(
+                "shape", "angular",
+                "axis", Map.of("range", List.of(0, 100)),
+                "bar", Map.of("color", LEGACY_GRAPH_COLOR),
+                "borderwidth", 0,
+                "steps", List.of(
+                    Map.of("color", "#80000030", "range", List.of(0, 30)),
+                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
+                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
+                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                )
+            )
+        );
     }
 
     @Test
@@ -736,14 +864,6 @@ class LocationServiceTest {
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
         when(locationRepository.existsById(99L)).thenReturn(true);
 
-        Graph graph = new Graph();
-        graph.setId(31L);
-        graph.setName("Invalid test graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
-
-        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
-            .thenReturn(List.of(graph));
-
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             locationService.updateLocationGraphData(
                 5L,
@@ -755,6 +875,151 @@ class LocationServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Graph data is invalid", ex.getReason());
         verify(graphRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsNullGraphDataPayload() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(35L, null))
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph data is invalid", ex.getReason());
+        verify(graphRepository, never()).saveAll(anyList());
+        verify(locationRepository, never()).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void updateLocationGraphDataPersistsIndicatorPayloadAndLayout() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(32L);
+        graph.setName("Resolution Percent");
+        graph.setData(List.of(indicatorTrace(68)));
+        graph.setLayout(Map.of("showlegend", false));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                32L,
+                List.of(indicatorTrace(72)),
+                Map.of("showlegend", true)
+            ))
+        );
+
+        verify(graphRepository).saveAll(List.of(graph));
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("indicator", traces.getFirst().get("type"));
+        assertEquals(72L, ((Number) traces.getFirst().get("value")).longValue());
+        assertEquals(Map.of("showlegend", true), graph.getLayout());
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsOutOfRangeIndicatorPayload() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(33L);
+        graph.setName("Resolution Percent");
+        graph.setData(List.of(indicatorTrace(68)));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(
+                    33L,
+                    List.of(indicatorTrace(101))
+                ))
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph data is invalid", ex.getReason());
+        verify(graphRepository, never()).saveAll(anyList());
+        verify(locationRepository, never()).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsMalformedStoredIndicatorGraph() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(34L);
+        graph.setName("Resolution Percent");
+        graph.setData(List.of(indicatorTrace(101)));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(
+                    34L,
+                    List.of(indicatorTrace(72))
+                ))
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph data is invalid", ex.getReason());
+        verify(graphRepository, never()).saveAll(anyList());
+        verify(locationRepository, never()).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsNonObjectLayoutPayload() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(
+                    34L,
+                    List.of(indicatorTrace(72)),
+                    List.of("invalid")
+                ))
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Graph data is invalid", ex.getReason());
+        verifyNoInteractions(graphRepository);
+        verify(locationRepository, never()).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
     @Test

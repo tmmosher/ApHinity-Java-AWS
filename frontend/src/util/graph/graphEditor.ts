@@ -21,12 +21,27 @@ type GraphUndoResult = {
   undone: boolean;
 };
 
+/**
+ * Captures the server-side signature for a graph at the moment it was loaded.
+ *
+ * The dashboard uses this to detect changed graphs without diffing the entire
+ * object tree on every render.
+ */
 export type GraphBaselineEntry = {
   payloadSignature: string;
   expectedUpdatedAt: string | null;
 };
 
+/**
+ * Result object returned after pruning a deleted graph out of the local state.
+ */
 export type DeletedGraphCleanupResult = {
+  nextGraphs: LocationGraph[];
+  nextUndoStack: LocationGraph[][];
+  nextBaselineIndex: Map<number, GraphBaselineEntry>;
+};
+
+export type GraphRefreshStateResult = {
   nextGraphs: LocationGraph[];
   nextUndoStack: LocationGraph[][];
   nextBaselineIndex: Map<number, GraphBaselineEntry>;
@@ -119,6 +134,16 @@ const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayl
 const graphPayloadSignature = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload));
 
+const buildGraphBaselineEntry = (graph: LocationGraph): GraphBaselineEntry => ({
+  payloadSignature: graphPayloadSignature(createEditableGraphPayload(graph)),
+  expectedUpdatedAt: graph.updatedAt ?? null
+});
+
+const isGraphDirty = (
+  graph: LocationGraph,
+  baseline: GraphBaselineEntry | undefined
+): boolean => baseline !== undefined && graphPayloadSignature(createEditableGraphPayload(graph)) !== baseline.payloadSignature;
+
 function graphStateSignature(graph: LocationGraph): string {
   return JSON.stringify({
     name: graph.name,
@@ -210,14 +235,15 @@ export const buildLocationGraphUpdates = (graphs: LocationGraph[]): LocationGrap
 export const buildGraphBaselineIndex = (graphs: LocationGraph[]): Map<number, GraphBaselineEntry> => {
   const baselineById = new Map<number, GraphBaselineEntry>();
   for (const graph of graphs) {
-    baselineById.set(graph.id, {
-      payloadSignature: graphPayloadSignature(createEditableGraphPayload(graph)),
-      expectedUpdatedAt: graph.updatedAt ?? null
-    });
+    baselineById.set(graph.id, buildGraphBaselineEntry(graph));
   }
   return baselineById;
 };
 
+/**
+ * Removes a deleted graph from the live graph list and invalidates any stale
+ * baseline or undo state that still points at it.
+ */
 export const pruneDeletedLocationGraphState = (
   currentGraphs: LocationGraph[],
   currentUndoStack: LocationGraph[][],
@@ -238,6 +264,13 @@ export const pruneDeletedLocationGraphState = (
   };
 };
 
+/**
+ * Produces minimal PUT payloads for graphs whose serialized payload changed.
+ *
+ * The baseline can be either the original graph list or a precomputed index;
+ * accepting both keeps the dashboard from rebuilding the signature map on
+ * every save attempt.
+ */
 export const buildChangedLocationGraphUpdates = (
   currentGraphs: LocationGraph[],
   baselineSource: LocationGraph[] | Map<number, GraphBaselineEntry>
@@ -263,6 +296,99 @@ export const buildChangedLocationGraphUpdates = (
   return changedUpdates;
 };
 
+/**
+ * Reconciles a refreshed graph list with the local working copy.
+ *
+ * Clean graphs adopt the latest server state, while dirty graphs keep the
+ * local edits and retain their original baseline so later saves still detect
+ * conflicts correctly. Undo history is rebased in the same way so pending
+ * edits remain undoable after an unrelated refresh.
+ */
+export const reconcileLocationGraphRefreshState = (
+  currentGraphs: LocationGraph[],
+  currentUndoStack: LocationGraph[][],
+  currentBaselineIndex: Map<number, GraphBaselineEntry>,
+  nextGraphs: LocationGraph[]
+): GraphRefreshStateResult => {
+  const currentById = new Map(currentGraphs.map((graph) => [graph.id, graph]));
+  const nextById = new Map(nextGraphs.map((graph) => [graph.id, graph]));
+  const dirtyGraphIds = new Set<number>();
+
+  for (const currentGraph of currentGraphs) {
+    if (isGraphDirty(currentGraph, currentBaselineIndex.get(currentGraph.id))) {
+      dirtyGraphIds.add(currentGraph.id);
+    }
+  }
+
+  const nextWorkingGraphs: LocationGraph[] = [];
+  for (const nextGraph of nextGraphs) {
+    const currentGraph = currentById.get(nextGraph.id);
+    if (!currentGraph) {
+      nextWorkingGraphs.push(nextGraph);
+      continue;
+    }
+
+    const baseline = currentBaselineIndex.get(nextGraph.id);
+    if (!baseline || dirtyGraphIds.has(nextGraph.id)) {
+      nextWorkingGraphs.push(currentGraph);
+      continue;
+    }
+
+    nextWorkingGraphs.push(nextGraph);
+  }
+
+  for (const currentGraph of currentGraphs) {
+    if (nextById.has(currentGraph.id)) {
+      continue;
+    }
+
+    const baseline = currentBaselineIndex.get(currentGraph.id);
+    if (!baseline || dirtyGraphIds.has(currentGraph.id)) {
+      nextWorkingGraphs.push(currentGraph);
+    }
+  }
+
+  const nextWorkingGraphsById = new Map(nextWorkingGraphs.map((graph) => [graph.id, graph]));
+  const nextBaselineIndex = new Map<number, GraphBaselineEntry>();
+  for (const graph of nextWorkingGraphs) {
+    const currentGraph = currentById.get(graph.id);
+    const baseline = currentGraph ? currentBaselineIndex.get(graph.id) : undefined;
+    if (currentGraph && baseline && dirtyGraphIds.has(graph.id)) {
+      nextBaselineIndex.set(graph.id, baseline);
+      continue;
+    }
+
+    const refreshedGraph = nextById.get(graph.id) ?? graph;
+    nextBaselineIndex.set(graph.id, buildGraphBaselineEntry(refreshedGraph));
+  }
+
+  const nextUndoStack = currentUndoStack.map((snapshot) => {
+    const rebasedSnapshot: LocationGraph[] = [];
+    for (const snapshotGraph of snapshot) {
+      if (dirtyGraphIds.has(snapshotGraph.id)) {
+        rebasedSnapshot.push(snapshotGraph);
+        continue;
+      }
+
+      const refreshedGraph = nextById.get(snapshotGraph.id) ?? nextWorkingGraphsById.get(snapshotGraph.id);
+      if (refreshedGraph) {
+        rebasedSnapshot.push(refreshedGraph);
+      }
+    }
+    return rebasedSnapshot;
+  });
+
+  return {
+    nextGraphs: nextWorkingGraphs,
+    nextUndoStack,
+    nextBaselineIndex
+  };
+};
+
+/**
+ * Applies a graph edit to the current working set and records an undo snapshot
+ * only when the effective payload actually changes.
+ */
 export const applyGraphPayloadEdit = (
   currentGraphs: LocationGraph[],
   undoStack: LocationGraph[][],

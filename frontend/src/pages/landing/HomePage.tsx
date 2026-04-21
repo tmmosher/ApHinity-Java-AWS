@@ -37,11 +37,12 @@ const PORTAL_CAPABILITIES = [
   {
     title: "Operations-to-Action Loop",
     description:
-      "The platform tracks operational events and turns them into measurable summaries for client communication and follow-up."
+      "The platform tracks operational events and turns them into measurable summaries for client communication" +
+      " and follow-up. "
   }
 ];
 
-const CLIENT_EXAMPLES = ["TSMC", "HelloFresh", "Dexcom", "Leprino Foods"];
+const CLIENT_EXAMPLES = ["Hoag Hospital", "TSMC", "HelloFresh", "Dexcom", "Leprino Foods"];
 
 const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
   {
@@ -50,8 +51,7 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
     tagline: "Engineered Resin, Forward Osmosis, and membrane process programs.",
     paragraphs: [
       "ApHinity Technology solutions include water and air treatment technologies fit for wide applications. Trusted by a variety of technology, healthcare, food preparation, and agricultural systems.",
-      "With the ApHinity Management System, partner teams can map performance metrics for utilization, reliability, water conservation, and compliance exceptions.",
-      "Our visualizations allow client teams to evaluate treatment outcomes with a bird's eye view to support plant-level decisions."
+      "With AIM, partner teams can map performance metrics for reliability, water conservation, and compliance exceptions.",
     ]
   },
   {
@@ -127,7 +127,7 @@ export const HomePage = () => {
               Visual Reporting for Management Partners and Client Teams
             </h1>
             <p class="text-base md:text-lg text-base-content/80">
-              AMS supports ApHinity management partners in communicating key performance indicators to
+              AIM supports ApHinity management partners in communicating key performance indicators to
               clients through structured dashboards, validation workflows, and clear operational context.
             </p>
             <p class="text-sm text-base-content/70">

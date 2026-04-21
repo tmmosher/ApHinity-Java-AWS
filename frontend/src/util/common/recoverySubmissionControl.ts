@@ -1,5 +1,5 @@
-import { createSignal, onCleanup, type Accessor } from "solid-js";
-import { ActionResult } from "../types/Types";
+import {createSignal, onCleanup, type Accessor} from "solid-js";
+import type {ActionResult} from "../../types/Types";
 
 export const RECOVERY_SUBMIT_COOLDOWN_MS = 10_000;
 export const RECOVERY_SUBMIT_COOLDOWN_SECONDS = RECOVERY_SUBMIT_COOLDOWN_MS / 1_000;
@@ -22,14 +22,19 @@ export const createRecoverySubmissionControl = (
 ): RecoverySubmissionControl => {
   const [recoveryCooldownActive, setRecoveryCooldownActive] = createSignal(false);
   const [turnstileInstance, setTurnstileInstance] = createSignal(1);
-  let recoveryCooldownTimer: ReturnType<typeof setTimeout> | undefined;
+  let recoveryCooldownTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+
+  const clearRecoveryCooldownTimer = (): void => {
+    if (recoveryCooldownTimer !== undefined) {
+      globalThis.clearTimeout(recoveryCooldownTimer);
+      recoveryCooldownTimer = undefined;
+    }
+  };
 
   const startRecoveryCooldown = () => {
     setRecoveryCooldownActive(true);
-    if (recoveryCooldownTimer) {
-      clearTimeout(recoveryCooldownTimer);
-    }
-    recoveryCooldownTimer = setTimeout(() => {
+    clearRecoveryCooldownTimer();
+    recoveryCooldownTimer = globalThis.setTimeout(() => {
       setRecoveryCooldownActive(false);
       recoveryCooldownTimer = undefined;
     }, cooldownMs);
@@ -40,9 +45,7 @@ export const createRecoverySubmissionControl = (
   };
 
   onCleanup(() => {
-    if (recoveryCooldownTimer) {
-      clearTimeout(recoveryCooldownTimer);
-    }
+    clearRecoveryCooldownTimer();
   });
 
   return {

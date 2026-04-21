@@ -87,7 +87,7 @@ export interface LocationGraphRenameResult {
     updatedAt: string;
 }
 
-export type LocationGraphType = "pie" | "bar" | "scatter";
+export type LocationGraphType = "pie" | "indicator" | "bar" | "scatter";
 
 export type ServiceEventResponsibility = "client" | "partner";
 
@@ -103,6 +103,9 @@ export interface LocationServiceEvent {
     endTime: string;
     description: string | null;
     status: ServiceEventStatus;
+    isCorrectiveAction?: boolean;
+    correctiveActionSourceEventId?: number | null;
+    correctiveActionSourceEventTitle?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -116,6 +119,25 @@ export interface CreateLocationServiceEventRequest {
     endTime: string;
     description: string | null;
     status: ServiceEventStatus;
+}
+
+export interface LocationGanttTask {
+    id: number;
+    title: string;
+    startDate: string;
+    endDate: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+    dependencyTaskIds: number[];
+}
+
+export interface CreateLocationGanttTaskRequest {
+    title: string;
+    startDate: string;
+    endDate: string;
+    description: string | null;
+    dependencyTaskIds: number[];
 }
 
 export interface ManagedUser {

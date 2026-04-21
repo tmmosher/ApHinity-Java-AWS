@@ -13,9 +13,9 @@ export const dashboardLocationViews: Array<{
   name: string;
   label: JSX.Element;
 }> = [
+  {view: "dashboard", name: "Dashboard", label: dashboard_icon},
   {view: "service-calendar", name: "Service Calendar", label: service_icon},
   {view: "gantt-chart", name: "Gantt Chart", label: gantt_icon},
-  {view: "dashboard", name: "Dashboard", label: dashboard_icon}
 ];
 
 export const createLocationViewActive = (
@@ -23,6 +23,12 @@ export const createLocationViewActive = (
   view: DashboardLocationView
 ): Accessor<boolean> => () => currentView() === view;
 
+/**
+ * Returns a guard that reports `true` only when the location id changes.
+ *
+ * This is used to reset local dashboard state after route transitions without
+ * re-running the reset logic on every render.
+ */
 export const createDashboardLocationResetGuard = (initialLocationId: string) => {
   let previousLocationId = initialLocationId;
 
@@ -35,6 +41,13 @@ export const createDashboardLocationResetGuard = (initialLocationId: string) => 
   };
 };
 
+/**
+ * Keeps a nested location detail request aligned with the active view.
+ *
+ * Only the dashboard view swaps the location id directly; the calendar and
+ * gantt views keep the previous request identity so async responses do not
+ * overwrite the active subpanel.
+ */
 export const getNextLocationGraphRequestId = (
   currentRequestedLocationId: string | undefined,
   currentLocationId: string,
@@ -51,25 +64,31 @@ export const getLocationViewFromPathname = (pathname: string, locationId: string
   const normalizedPathname = normalizeLocationPathname(pathname);
   const basePath = `/dashboard/locations/${locationId}`;
 
-  if (normalizedPathname === basePath || normalizedPathname === `${basePath}/service-schedule`) {
+  if (normalizedPathname === basePath || normalizedPathname === `${basePath}/dashboard`) {
+    return "dashboard";
+  }
+  if (normalizedPathname === `${basePath}/service-calendar`) {
     return "service-calendar";
   }
   if (normalizedPathname === `${basePath}/gantt-chart`) {
     return "gantt-chart";
   }
-  if (normalizedPathname === `${basePath}/dashboard`) {
-    return "dashboard";
-  }
-  return "service-calendar";
+  return "dashboard";
 };
 
 export const getLocationViewHref = (locationId: string, view: DashboardLocationView): string => {
-  if (view === "service-calendar") {
+  if (view === "dashboard") {
     return `/dashboard/locations/${locationId}`;
   }
   return `/dashboard/locations/${locationId}/${view}`;
 };
 
+/**
+ * Checks whether a resource still belongs to the current location.
+ *
+ * The detail panels use this to discard stale async results when the user
+ * navigates between locations while a request is still in flight.
+ */
 export const isFreshLocationScopedResource = <T>(
   currentLocationId: string,
   resource: LocationScopedResource<T> | undefined

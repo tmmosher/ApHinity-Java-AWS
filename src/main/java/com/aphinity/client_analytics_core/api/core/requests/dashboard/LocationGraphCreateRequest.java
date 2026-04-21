@@ -16,7 +16,7 @@ public record LocationGraphCreateRequest(
     Long sectionId,
     Boolean createNewSection,
     @NotBlank
-    @Pattern(regexp = "pie|bar|scatter")
+    @Pattern(regexp = "pie|indicator|bar|scatter")
     String graphType
 ) {
 }

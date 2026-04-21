@@ -201,6 +201,12 @@ export const attachPlotlyResizeListener = (
     return () => eventTarget.removeEventListener("resize", onResize);
 };
 
+/**
+ * Loads Plotly once and reuses the same module instance for every chart.
+ *
+ * The dynamic import keeps Plotly out of the initial bundle, while the cached
+ * promise prevents duplicate downloads when several charts mount together.
+ */
 export const loadPlotlyModule = async (): Promise<PlotlyModule> => {
     if (!plotlyModulePromise) {
         plotlyModulePromise = import("plotly.js-dist-min").then((module) => {
@@ -212,6 +218,12 @@ export const loadPlotlyModule = async (): Promise<PlotlyModule> => {
     return plotlyModulePromise;
 };
 
+/**
+ * Mounts a Plotly chart and keeps it in sync with theme changes.
+ *
+ * Rendering is queued so stale async updates do not overwrite a newer chart
+ * state after the component has already been disposed or re-rendered.
+ */
 const PlotlyChart = (props: PlotlyChartProps)=> {
     let el!: HTMLDivElement;
     let disposed = false;

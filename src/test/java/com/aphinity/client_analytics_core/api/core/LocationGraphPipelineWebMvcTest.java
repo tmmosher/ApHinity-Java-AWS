@@ -13,7 +13,9 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.Locatio
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +64,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     )
 )
 @Import({
+    LocationGraphTemplateFactory.class,
+    LocationGraphUpdatePayloadValidationFactory.class,
     LocationService.class,
     LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class
 })
@@ -152,6 +156,78 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$[0].layout.annotations[0].text").value("<b>Test</b>"))
             .andExpect(jsonPath("$[0].config.displayModeBar").value(false))
             .andExpect(jsonPath("$[0].style.height").value(240));
+
+        verify(locationRepository).existsById(locationId);
+        verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
+        verify(locationGraphRepository).findByLocationIdWithGraph(locationId);
+    }
+
+    @Test
+    void locationGraphsCoversIndicatorDataFormationAndClientTransmission() throws Exception {
+        Long userId = 9L;
+        Long locationId = 13L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(35L);
+        graph.setName("Resolution Percent");
+        graph.setData(Map.of(
+            "type", "indicator",
+            "name", "Trace 1",
+            "mode", "gauge+number",
+            "value", 68,
+            "number", Map.of(
+                "suffix", "%",
+                "font", Map.of("size", 22)
+            ),
+            "gauge", Map.of(
+                "shape", "angular",
+                "axis", Map.of("range", List.of(0, 100)),
+                "bar", Map.of("color", "#1f77b4"),
+                "borderwidth", 0,
+                "steps", List.of(
+                    Map.of("color", "#80000030", "range", List.of(0, 30)),
+                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
+                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
+                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                )
+            )
+        ));
+        graph.setLayout(Map.of(
+            "margin", Map.of("b", 10, "l", 10, "r", 10, "t", 10),
+            "showlegend", false
+        ));
+        graph.setConfig(Map.of("displayModeBar", false, "responsive", false));
+        graph.setStyle(Map.of("height", 160));
+        graph.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(locationId)).thenReturn(List.of(locationGraph));
+
+        mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(35))
+            .andExpect(jsonPath("$[0].name").value("Resolution Percent"))
+            .andExpect(jsonPath("$[0].data[0].type").value("indicator"))
+            .andExpect(jsonPath("$[0].data[0].value").value(68))
+            .andExpect(jsonPath("$[0].data[0].number.suffix").value("%"))
+            .andExpect(jsonPath("$[0].data[0].gauge.axis.range[0]").value(0))
+            .andExpect(jsonPath("$[0].data[0].gauge.axis.range[1]").value(100))
+            .andExpect(jsonPath("$[0].data[0].gauge.bar.color").value("#1f77b4"))
+            .andExpect(jsonPath("$[0].data[0].gauge.steps[0].color").value("#80000030"))
+            .andExpect(jsonPath("$[0].data[0].gauge.steps[3].range[1]").value(100))
+            .andExpect(jsonPath("$[0].layout.showlegend").value(false))
+            .andExpect(jsonPath("$[0].config.displayModeBar").value(false))
+            .andExpect(jsonPath("$[0].config.responsive").value(false))
+            .andExpect(jsonPath("$[0].style.height").value(160));
 
         verify(locationRepository).existsById(locationId);
         verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
@@ -376,6 +452,71 @@ class LocationGraphPipelineWebMvcTest {
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
         assertEquals(List.of(300L), sections.get(0).get("graph_ids"));
         assertEquals(List.of(510L), sections.get(1).get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void createLocationGraphBuildsIndicatorTemplateWithAGaugeTrace() throws Exception {
+        Long userId = 53L;
+        Long locationId = 87L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of()))
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(513L);
+            graph.setCreatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "sectionId": 1,
+                          "graphType": "indicator"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(513))
+            .andExpect(jsonPath("$.name").value("New Indicator Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("indicator"))
+            .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
+            .andExpect(jsonPath("$.data[0].mode").value("gauge+number"))
+            .andExpect(jsonPath("$.data[0].value").value(0))
+            .andExpect(jsonPath("$.data[0].number.suffix").value("%"))
+            .andExpect(jsonPath("$.data[0].number.font.size").value(22))
+            .andExpect(jsonPath("$.data[0].gauge.shape").value("angular"))
+            .andExpect(jsonPath("$.data[0].gauge.axis.range[0]").value(0))
+            .andExpect(jsonPath("$.data[0].gauge.axis.range[1]").value(100))
+            .andExpect(jsonPath("$.data[0].gauge.bar.color").value("#1f77b4"))
+            .andExpect(jsonPath("$.data[0].gauge.steps[0].color").value("#80000030"))
+            .andExpect(jsonPath("$.data[0].gauge.steps[3].range[1]").value(100))
+            .andExpect(jsonPath("$.layout.margin.t").value(10))
+            .andExpect(jsonPath("$.layout.showlegend").value(false))
+            .andExpect(jsonPath("$.config.displayModeBar").value(false))
+            .andExpect(jsonPath("$.config.responsive").value(false))
+            .andExpect(jsonPath("$.style.height").value(160));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(513L), sections.getFirst().get("graph_ids"));
         verify(locationGraphRepository).save(any(LocationGraph.class));
         verify(locationRepository).saveAndFlush(location);
     }
@@ -649,6 +790,86 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("graph_update_conflict"))
             .andExpect(jsonPath("$.message").value("Graph update conflict"));
+    }
+
+    @Test
+    void updateLocationGraphDataReturnsBadRequestForInvalidIndicatorPayload() throws Exception {
+        Long userId = 50L;
+        Long locationId = 86L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(313L);
+        graph.setName("Resolution Percent");
+        graph.setData(List.of(Map.of(
+            "type", "indicator",
+            "mode", "gauge+number",
+            "value", 68,
+            "number", Map.of(
+                "suffix", "%",
+                "font", Map.of("size", 22)
+            ),
+            "gauge", Map.of(
+                "shape", "angular",
+                "axis", Map.of("range", List.of(0, 100)),
+                "bar", Map.of("color", "#1f77b4"),
+                "borderwidth", 0,
+                "steps", List.of(
+                    Map.of("color", "#80000030", "range", List.of(0, 30)),
+                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
+                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
+                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                )
+            )
+        )));
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": 313,
+                              "data": [
+                                {
+                                  "type": "indicator",
+                                  "mode": "gauge+number",
+                                  "value": 150,
+                                  "number": {
+                                    "suffix": "%",
+                                    "font": {"size": 22}
+                                  },
+                                  "gauge": {
+                                    "shape": "angular",
+                                    "axis": {"range": [0, 100]},
+                                    "bar": {"color": "#1f77b4"},
+                                    "borderwidth": 0,
+                                    "steps": [
+                                      {"color": "#80000030", "range": [0, 30]},
+                                      {"color": "#FF000030", "range": [30, 60]},
+                                      {"color": "#FFFF0030", "range": [60, 90]},
+                                      {"color": "#00800030", "range": [90, 100]}
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("graph_data_invalid"))
+            .andExpect(jsonPath("$.message").value("Graph data is invalid"));
     }
 
     @Test

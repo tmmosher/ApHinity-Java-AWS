@@ -68,6 +68,20 @@ public class ServiceCalendarAuthorizationService {
         throw forbidden();
     }
 
+    public void requireCreateCorrectiveActionPermission(
+        AppUser user,
+        Long locationId,
+        ServiceEvent sourceEvent
+    ) {
+        if (accountRoleService.isPartnerOrAdmin(user)) {
+            return;
+        }
+        if (sourceEvent.getResponsibility() == ServiceEventResponsibility.CLIENT && hasLocationAccess(user, locationId)) {
+            return;
+        }
+        throw forbidden();
+    }
+
     public void requireUpdatePermission(
         AppUser user,
         Long locationId,
@@ -90,6 +104,10 @@ public class ServiceCalendarAuthorizationService {
         if (!accountRoleService.isPartnerOrAdmin(user)) {
             throw forbidden();
         }
+    }
+
+    public boolean isPartnerOrAdmin(AppUser user) {
+        return accountRoleService.isPartnerOrAdmin(user);
     }
 
     private void requireVerified(AppUser user) {

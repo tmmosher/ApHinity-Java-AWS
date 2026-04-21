@@ -85,6 +85,25 @@ class LocationEventControllerTest {
     }
 
     @Test
+    void createCorrectiveActionDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationEventRequest request = request("Corrective Action - Service visit");
+        ServiceEventResponse expected = response(21L, "Corrective Action - Service visit", true, 19L, "Service visit");
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationEventService.createCorrectiveActionForLocationEvent(42L, 8L, 19L, request)).thenReturn(expected);
+
+        ServiceEventResponse actual = locationEventController.createCorrectiveAction(jwt, 8L, 19L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationEventService).createCorrectiveActionForLocationEvent(42L, 8L, 19L, request);
+    }
+
+    @Test
     void downloadLocationEventTemplateDelegatesToServiceAndReturnsAttachmentHeaders() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")
@@ -191,6 +210,16 @@ class LocationEventControllerTest {
     }
 
     private ServiceEventResponse response(Long id, String title) {
+        return response(id, title, false, null, null);
+    }
+
+    private ServiceEventResponse response(
+        Long id,
+        String title,
+        boolean correctiveAction,
+        Long correctiveActionSourceEventId,
+        String correctiveActionSourceEventTitle
+    ) {
         return new ServiceEventResponse(
             id,
             title,
@@ -201,6 +230,9 @@ class LocationEventControllerTest {
             LocalTime.parse("11:00:00"),
             "Inspect service line",
             ServiceEventStatus.UPCOMING,
+            correctiveAction,
+            correctiveActionSourceEventId,
+            correctiveActionSourceEventTitle,
             Instant.parse("2026-03-01T00:00:00Z"),
             Instant.parse("2026-03-02T00:00:00Z")
         );

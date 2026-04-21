@@ -97,4 +97,74 @@ describe("ServiceEventEditPopover", () => {
 
     expect(html).not.toContain("data-service-event-complete");
   });
+
+  it("renders a corrective-action button when creation is available", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: baseEvent,
+      canEdit: false,
+      canComplete: false,
+      role: "partner",
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).toContain("Create Corrective Action");
+    expect(html).toContain("data-service-event-create-corrective-action");
+  });
+
+  it("hides corrective-action creation for clients viewing partner-responsibility events", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        responsibility: "partner"
+      },
+      canEdit: false,
+      canComplete: false,
+      role: "client",
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).not.toContain("data-service-event-create-corrective-action");
+  });
+
+  it("hides the corrective-action button for corrective-action events", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        isCorrectiveAction: true,
+        correctiveActionSourceEventId: 4,
+        correctiveActionSourceEventTitle: "Monthly maintenance"
+      },
+      canEdit: false,
+      canComplete: false,
+      role: "partner",
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).not.toContain("data-service-event-create-corrective-action");
+    expect(html).toContain("Source Event");
+    expect(html).toContain("Monthly maintenance");
+  });
+
+  it("keeps the title column constrained so action buttons stay visible", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        title: "This is a very long service event title that should not push the action buttons away"
+      },
+      canEdit: true,
+      canComplete: false,
+      role: "partner",
+      onSave: async () => undefined,
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).toContain("data-service-event-create-corrective-action");
+    expect(html).toContain("data-service-event-edit");
+    expect(html).toContain("class=\"min-w-0 flex-1\"");
+    expect(html).toContain("class=\"flex shrink-0 items-center gap-2\"");
+  });
 });

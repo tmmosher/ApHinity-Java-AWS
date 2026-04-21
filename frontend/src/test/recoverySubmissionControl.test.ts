@@ -1,81 +1,106 @@
-import { createRoot } from "solid-js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {createRoot} from "solid-js";
+import {describe, expect, it, vi} from "vitest";
 import {
   createRecoverySubmissionControl,
   getRecoveryCooldownActionResult,
   getRecoverySubmitButtonClass,
   isRecoverySubmitDisabled,
-  RECOVERY_COOLDOWN_MESSAGE,
-  RECOVERY_SUBMIT_COOLDOWN_MS
+  RECOVERY_COOLDOWN_MESSAGE
 } from "../util/common/recoverySubmissionControl";
 
 describe("recoverySubmissionControl", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("starts with no cooldown and the initial turnstile instance", () => {
-    createRoot((dispose) => {
-      const control = createRecoverySubmissionControl();
+    vi.useFakeTimers();
+    try {
+      createRoot((dispose) => {
+        try {
+          const control = createRecoverySubmissionControl();
 
-      expect(control.recoveryCooldownActive()).toBe(false);
-      expect(control.turnstileInstance()).toBe(1);
-      expect(isRecoverySubmitDisabled(control.recoveryCooldownActive(), false)).toBe(false);
-
-      dispose();
-    });
+          expect(control.recoveryCooldownActive()).toBe(false);
+          expect(control.turnstileInstance()).toBe(1);
+          expect(isRecoverySubmitDisabled(control.recoveryCooldownActive(), false)).toBe(false);
+        } finally {
+          dispose();
+        }
+      });
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
-  it("activates cooldown immediately and clears it after 10 seconds", () => {
-    createRoot((dispose) => {
-      const control = createRecoverySubmissionControl(RECOVERY_SUBMIT_COOLDOWN_MS);
+  it("activates cooldown immediately and clears it after the configured duration", () => {
+    vi.useFakeTimers();
+    try {
+      createRoot((dispose) => {
+        try {
+          const cooldownMs = 100;
+          const control = createRecoverySubmissionControl(cooldownMs);
 
-      control.startRecoveryCooldown();
-      expect(control.recoveryCooldownActive()).toBe(true);
+          control.startRecoveryCooldown();
+          expect(control.recoveryCooldownActive()).toBe(true);
 
-      vi.advanceTimersByTime(RECOVERY_SUBMIT_COOLDOWN_MS - 1);
-      expect(control.recoveryCooldownActive()).toBe(true);
+          vi.advanceTimersByTime(cooldownMs - 1);
+          expect(control.recoveryCooldownActive()).toBe(true);
 
-      vi.advanceTimersByTime(1);
-      expect(control.recoveryCooldownActive()).toBe(false);
-
-      dispose();
-    });
+          vi.advanceTimersByTime(1);
+          expect(control.recoveryCooldownActive()).toBe(false);
+        } finally {
+          dispose();
+        }
+      });
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it("restarts cooldown when submission happens again before timeout", () => {
-    createRoot((dispose) => {
-      const control = createRecoverySubmissionControl(RECOVERY_SUBMIT_COOLDOWN_MS);
+    vi.useFakeTimers();
+    try {
+      createRoot((dispose) => {
+        try {
+          const cooldownMs = 100;
+          const control = createRecoverySubmissionControl(cooldownMs);
 
-      control.startRecoveryCooldown();
-      vi.advanceTimersByTime(5_000);
-      control.startRecoveryCooldown();
+          control.startRecoveryCooldown();
+          vi.advanceTimersByTime(50);
+          control.startRecoveryCooldown();
 
-      vi.advanceTimersByTime(RECOVERY_SUBMIT_COOLDOWN_MS - 1);
-      expect(control.recoveryCooldownActive()).toBe(true);
+          vi.advanceTimersByTime(cooldownMs - 1);
+          expect(control.recoveryCooldownActive()).toBe(true);
 
-      vi.advanceTimersByTime(1);
-      expect(control.recoveryCooldownActive()).toBe(false);
-
-      dispose();
-    });
+          vi.advanceTimersByTime(1);
+          expect(control.recoveryCooldownActive()).toBe(false);
+        } finally {
+          dispose();
+        }
+      });
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it("increments turnstile instance when captcha is reset", () => {
-    createRoot((dispose) => {
-      const control = createRecoverySubmissionControl();
+    vi.useFakeTimers();
+    try {
+      createRoot((dispose) => {
+        try {
+          const control = createRecoverySubmissionControl();
 
-      control.resetRecoveryCaptcha();
-      control.resetRecoveryCaptcha();
+          control.resetRecoveryCaptcha();
+          control.resetRecoveryCaptcha();
 
-      expect(control.turnstileInstance()).toBe(3);
-
-      dispose();
-    });
+          expect(control.turnstileInstance()).toBe(3);
+        } finally {
+          dispose();
+        }
+      });
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it("returns expected cooldown action payload", () => {

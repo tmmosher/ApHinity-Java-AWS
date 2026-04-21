@@ -89,3 +89,54 @@
     animation: none;
   }
 }
+
+.gantt-container .bar-wrapper.gantt-task-persisted .bar {
+  fill: #dcfce7;
+  stroke: #86efac;
+}
+
+.gantt-container .bar-wrapper.gantt-task-persisted .bar-label {
+  fill: #166534;
+}
+
+.gantt-container .bar-wrapper.gantt-task-staged .bar {
+  fill: rgb(233 213 255 / 0.36);
+  stroke: rgb(192 132 252 / 0.75);
+  stroke-dasharray: 6 4;
+}
+
+.gantt-container .bar-wrapper.gantt-task-staged .bar-label {
+  fill: rgb(126 34 206);
+}
+
+@keyframes graph-loading-shine {
+  0% {
+    transform: translate3d(-120%, 0, 0) skewX(-22deg);
+  }
+
+  100% {
+    transform: translate3d(120%, 0, 0) skewX(-22deg);
+  }
+}
+
+.graph-loading-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(135deg, rgb(209 213 219) 0%, rgb(229 231 235) 48%, rgb(243 244 246) 100%);
+}
+
+.graph-loading-shine::before {
+  content: "";
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(135deg, transparent 38%, rgb(255 255 255 / 0.95) 50%, transparent 62%);
+  animation: graph-loading-shine 1.45s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-loading-shine::before {
+    animation: none;
+  }
+}

@@ -27,6 +27,8 @@ import {
 } from "../../../../util/location/serviceCalendarLayout";
 import ServiceEventCreatePopover from "../../../../components/service-editor/ServiceEventCreatePopover";
 import ServiceEventEditPopover from "../../../../components/service-editor/ServiceEventEditPopover";
+import CorrectiveActionIcon from "../../../../components/service-editor/CorrectiveActionIcon";
+import {isCorrectiveActionServiceEvent} from "../../../../util/location/serviceEventCorrectiveAction";
 
 type ServiceScheduleCalendarProps = {
   month?: Date;
@@ -40,6 +42,10 @@ type ServiceScheduleCalendarProps = {
   canEditEvent?: (event: LocationServiceEvent) => boolean;
   onEditEventSave?: (
     event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
+  onCreateCorrectiveAction?: (
+    sourceEvent: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   canCompleteEvent?: (event: LocationServiceEvent) => boolean;
@@ -57,6 +63,10 @@ type ServiceEventSegmentProps = {
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  onCreateCorrectiveAction?: (
+    sourceEvent: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
   canDeleteEvent?: (event: LocationServiceEvent) => boolean;
   onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
@@ -70,6 +80,10 @@ type HiddenDayEventsPopoverProps = {
   canCompleteEvent?: (event: LocationServiceEvent) => boolean;
   onEditEventSave?: (
     event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
+  onCreateCorrectiveAction?: (
+    sourceEvent: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
@@ -95,6 +109,10 @@ type ServiceCalendarWeekRowProps = {
   canCompleteEvent?: (event: LocationServiceEvent) => boolean;
   onEditEventSave?: (
     event: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
+  onCreateCorrectiveAction?: (
+    sourceEvent: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
@@ -210,6 +228,18 @@ const formatEventDateRange = (event: LocationServiceEvent): string => (
     : `${formatDisplayDate(event.date)} - ${formatDisplayDate(event.endDate)}`
 );
 
+const ServiceCalendarEventLabel = (props: {event: LocationServiceEvent; titleClass: string; iconClass: string}) => (
+  <span class="flex min-w-0 items-center gap-1">
+    <Show when={isCorrectiveActionServiceEvent(props.event)}>
+      <CorrectiveActionIcon
+        class={props.iconClass}
+        data-service-event-corrective-action-icon=""
+      />
+    </Show>
+    <span class={props.titleClass}>{props.event.title}</span>
+  </span>
+);
+
 export const resolveServiceCalendarTransitionDirection = (
   currentMonth: Date | undefined,
   nextMonth: Date
@@ -235,6 +265,7 @@ const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
     canDelete={props.canDeleteEvent?.(props.segment.event) ?? false}
     role={props.editRole}
     onSave={props.onEditEventSave}
+    onCreateCorrectiveAction={props.onCreateCorrectiveAction}
     onComplete={props.onCompleteEvent}
     onDelete={props.onDeleteEvent}
     deleteLabel="Delete"
@@ -247,7 +278,11 @@ const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
       data-service-event-bar=""
       onClick={(event) => event.stopPropagation()}
     >
-      {props.segment.event.title}
+      <ServiceCalendarEventLabel
+        event={props.segment.event}
+        iconClass="size-3 shrink-0"
+        titleClass="min-w-0 truncate"
+      />
     </Popover.Trigger>
   </ServiceEventEditPopover>
 );
@@ -261,6 +296,10 @@ const HiddenDayEventListItem = (props: {
     event: LocationServiceEvent,
     request: CreateLocationServiceEventRequest
   ) => Promise<void>;
+  onCreateCorrectiveAction?: (
+    sourceEvent: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
   onCompleteEvent?: (event: LocationServiceEvent) => Promise<void>;
   canDeleteEvent?: (event: LocationServiceEvent) => boolean;
   onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
@@ -272,6 +311,7 @@ const HiddenDayEventListItem = (props: {
     canDelete={props.canDeleteEvent?.(props.event) ?? false}
     role={props.editRole}
     onSave={props.onEditEventSave}
+    onCreateCorrectiveAction={props.onCreateCorrectiveAction}
     onComplete={props.onCompleteEvent}
     onDelete={props.onDeleteEvent}
     deleteLabel="Delete"
@@ -283,9 +323,11 @@ const HiddenDayEventListItem = (props: {
       data-service-event-overflow-item=""
       onClick={(event) => event.stopPropagation()}
     >
-      <span class="truncate text-xs font-semibold leading-4">
-        {props.event.title}
-      </span>
+      <ServiceCalendarEventLabel
+        event={props.event}
+        iconClass="size-3.5 shrink-0"
+        titleClass="min-w-0 truncate text-xs font-semibold leading-4"
+      />
       <span class="truncate text-[10px] font-medium leading-4 text-base-content/60">
         {formatEventDateRange(props.event)}
       </span>
@@ -327,6 +369,7 @@ const HiddenDayEventsPopover = (props: HiddenDayEventsPopoverProps) => (
                   canComplete={props.canCompleteEvent?.(event) ?? false}
                   editRole={props.editRole}
                   onEditEventSave={props.onEditEventSave}
+                  onCreateCorrectiveAction={props.onCreateCorrectiveAction}
                   onCompleteEvent={props.onCompleteEvent}
                   canDeleteEvent={props.canDeleteEvent}
                   onDeleteEvent={props.onDeleteEvent}
@@ -397,6 +440,7 @@ const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
           canComplete={props.canCompleteEvent?.(segment.event) ?? false}
           editRole={props.eventEditorRole}
           onEditEventSave={props.onEditEventSave}
+          onCreateCorrectiveAction={props.onCreateCorrectiveAction}
           onCompleteEvent={props.onCompleteEvent}
           canDeleteEvent={props.canDeleteEvent}
           onDeleteEvent={props.onDeleteEvent}
@@ -414,6 +458,7 @@ const ServiceCalendarWeekRow = (props: ServiceCalendarWeekRowProps) => (
             canEditEvent={props.canEditEvent}
             canCompleteEvent={props.canCompleteEvent}
             onEditEventSave={props.onEditEventSave}
+            onCreateCorrectiveAction={props.onCreateCorrectiveAction}
             onCompleteEvent={props.onCompleteEvent}
             canDeleteEvent={props.canDeleteEvent}
             onDeleteEvent={props.onDeleteEvent}
@@ -572,6 +617,7 @@ export const ServiceScheduleCalendar: Component<ServiceScheduleCalendarProps> = 
                               canEditEvent={props.canEditEvent}
                               canCompleteEvent={props.canCompleteEvent}
                               onEditEventSave={props.onEditEventSave}
+                              onCreateCorrectiveAction={props.onCreateCorrectiveAction}
                               onCompleteEvent={props.onCompleteEvent}
                               canDeleteEvent={props.canDeleteEvent}
                               onDeleteEvent={props.onDeleteEvent}

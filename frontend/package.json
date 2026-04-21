@@ -12,6 +12,7 @@
   "dependencies": {
     "@nerimity/solid-turnstile": "^1.1.0",
     "@solidjs/router": "^0.13.6",
+    "frappe-gantt": "^1.0.3",
     "plotly.js-dist-min": "^3.4.0",
     "solid-js": "^1.8.0",
     "solid-motionone": "^1.0.4",

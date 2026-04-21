@@ -42,6 +42,7 @@ public class ServiceEventRequestMapper {
     }
 
     public ServiceEventResponse toResponse(ServiceEvent serviceEvent) {
+        ServiceEvent sourceEvent = serviceEvent.getCorrectiveActionSourceEvent();
         return new ServiceEventResponse(
             serviceEvent.getId(),
             serviceEvent.getTitle(),
@@ -52,6 +53,9 @@ public class ServiceEventRequestMapper {
             serviceEvent.getEndEventTime(),
             serviceEvent.getDescription(),
             serviceEvent.getStatus(),
+            serviceEvent.isCorrectiveAction(),
+            sourceEvent == null ? null : sourceEvent.getId(),
+            sourceEvent == null ? null : sourceEvent.getTitle(),
             serviceEvent.getCreatedAt(),
             serviceEvent.getUpdatedAt()
         );

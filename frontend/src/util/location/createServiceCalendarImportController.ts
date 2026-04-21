@@ -1,4 +1,4 @@
-import {createMemo, createSignal, type Accessor} from "solid-js";
+import {createSignal, type Accessor} from "solid-js";
 import {toast} from "solid-toast";
 import type {AccountRole, CreateLocationServiceEventRequest} from "../../types/Types";
 import {
@@ -51,11 +51,11 @@ export const createServiceCalendarImportController = (props: ServiceCalendarImpo
   const [isImportingSpreadsheet, setIsImportingSpreadsheet] = createSignal(false);
   const [isApplyingImportedEvents, setIsApplyingImportedEvents] = createSignal(false);
 
-  const hasPendingImportedEventChanges = createMemo(() => stagedImportUndoStack().length > 0);
-  const hasStagedImportedEvents = createMemo(() => stagedImportedEvents().length > 0);
-  const isImportedEventMutationBusy = createMemo(() => (
+  const hasPendingImportedEventChanges = () => stagedImportUndoStack().length > 0;
+  const hasStagedImportedEvents = () => stagedImportedEvents().length > 0;
+  const isImportedEventMutationBusy = () => (
     isImportingSpreadsheet() || isApplyingImportedEvents()
-  ));
+  );
 
   const reset = (): void => {
     setStagedImportedEvents([]);

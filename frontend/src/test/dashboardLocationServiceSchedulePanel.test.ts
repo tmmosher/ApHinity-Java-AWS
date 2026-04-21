@@ -17,6 +17,7 @@ vi.mock("../context/ProfileContext", () => ({
 
 vi.mock("../util/location/locationEventApi", () => ({
   createLocationEventById: vi.fn(),
+  createLocationCorrectiveActionById: vi.fn(),
   fetchLocationEventsById: vi.fn(async () => []),
   getLocationEventTemplateDownloadUrl: vi.fn((host: string, locationId: string) =>
     host + "/api/core/locations/" + locationId + "/events/template"

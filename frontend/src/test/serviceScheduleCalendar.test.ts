@@ -40,6 +40,9 @@ describe("ServiceScheduleCalendar", () => {
           endTime: "11:30:00",
           description: "Initial kickoff meeting",
           status: "upcoming",
+          isCorrectiveAction: true,
+          correctiveActionSourceEventId: 3,
+          correctiveActionSourceEventTitle: "Monthly maintenance",
           createdAt: "2026-03-25T00:00:00Z",
           updatedAt: "2026-03-25T00:00:00Z"
         },
@@ -87,6 +90,7 @@ describe("ServiceScheduleCalendar", () => {
     expect((html.match(/data-service-calendar-week-row/g) ?? [])).toHaveLength(6);
     expect((html.match(/data-service-event-bar/g) ?? [])).toHaveLength(2);
     expect((html.match(/data-service-event-overflow-trigger/g) ?? [])).toHaveLength(1);
+    expect((html.match(/data-service-event-corrective-action-icon/g) ?? []).length).toBeGreaterThan(0);
     expect(html).toContain("Client kickoff");
     expect(html).toContain("Partner inspection");
     expect(html).toContain("grid-column:3 / 5");

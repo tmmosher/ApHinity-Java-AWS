@@ -2,9 +2,11 @@ package com.aphinity.client_analytics_core.api.core.entities.servicecalendar;
 
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -56,6 +58,16 @@ public class ServiceEvent {
     @Convert(converter = ServiceEventStatusConverter.class)
     @Column(nullable = false)
     private ServiceEventStatus status = ServiceEventStatus.UPCOMING;
+
+    @Column(name = "is_corrective_action", nullable = false)
+    private boolean correctiveAction;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+        name = "corrective_action_source_event_id",
+        foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT)
+    )
+    private ServiceEvent correctiveActionSourceEvent;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -180,6 +192,22 @@ public class ServiceEvent {
 
     public void setStatus(ServiceEventStatus status) {
         this.status = status;
+    }
+
+    public boolean isCorrectiveAction() {
+        return correctiveAction;
+    }
+
+    public void setCorrectiveAction(boolean correctiveAction) {
+        this.correctiveAction = correctiveAction;
+    }
+
+    public ServiceEvent getCorrectiveActionSourceEvent() {
+        return correctiveActionSourceEvent;
+    }
+
+    public void setCorrectiveActionSourceEvent(ServiceEvent correctiveActionSourceEvent) {
+        this.correctiveActionSourceEvent = correctiveActionSourceEvent;
     }
 
     public Instant getCreatedAt() {

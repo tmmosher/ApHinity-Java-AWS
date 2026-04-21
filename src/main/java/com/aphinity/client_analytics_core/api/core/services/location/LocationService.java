@@ -20,6 +20,9 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameU
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory.GraphTemplate;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,7 +36,6 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -45,22 +47,6 @@ import java.util.Objects;
 @Service
 public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
-    private static final String DEFAULT_GRAPH_COLOR = "#1f77b4";
-
-    private enum GraphTemplateType {
-        PIE,
-        BAR,
-        SCATTER
-    }
-
-    private record GraphTemplate(
-        String name,
-        List<Map<String, Object>> data,
-        Map<String, Object> layout,
-        Map<String, Object> config,
-        Map<String, Object> style
-    ) {
-    }
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -68,6 +54,8 @@ public class LocationService {
     private final LocationGraphRepository locationGraphRepository;
     private final LocationUserRepository locationUserRepository;
     private final AccountRoleService accountRoleService;
+    private final LocationGraphTemplateFactory locationGraphTemplateFactory;
+    private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
 
     public LocationService(
         AppUserRepository appUserRepository,
@@ -75,7 +63,9 @@ public class LocationService {
         GraphRepository graphRepository,
         LocationGraphRepository locationGraphRepository,
         LocationUserRepository locationUserRepository,
-        AccountRoleService accountRoleService
+        AccountRoleService accountRoleService,
+        LocationGraphTemplateFactory locationGraphTemplateFactory,
+        LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
@@ -83,6 +73,8 @@ public class LocationService {
         this.locationGraphRepository = locationGraphRepository;
         this.locationUserRepository = locationUserRepository;
         this.accountRoleService = accountRoleService;
+        this.locationGraphTemplateFactory = locationGraphTemplateFactory;
+        this.locationGraphUpdatePayloadValidationFactory = locationGraphUpdatePayloadValidationFactory;
     }
 
     /**
@@ -188,8 +180,12 @@ public class LocationService {
 
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
         Long targetSectionId = resolveTargetSectionId(location.getSectionLayout(), sectionId, createNewSection);
-        GraphTemplateType templateType = parseGraphTemplateType(graphType);
-        GraphTemplate template = buildGraphTemplate(templateType, location.getName());
+        GraphTemplate template;
+        try {
+            template = locationGraphTemplateFactory.create(graphType, location.getName());
+        } catch (IllegalArgumentException ex) {
+            throw invalidGraphType();
+        }
 
         Graph graph = new Graph();
         graph.setName(template.name());
@@ -366,15 +362,19 @@ public class LocationService {
             throw locationGraphNotFound();
         }
 
+        Map<Long, ValidatedGraphPayload> validatedPayloads = new LinkedHashMap<>();
         for (Graph graph : graphs) {
             LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
-            Object nextData = update.data();
             try {
                 validateExpectedGraphTimestamp(update, graph, locationId, userId);
-                if (update.layout() != null) {
-                    graph.setLayout(asObjectMap(update.layout()));
-                }
-                graph.setData(nextData);
+                validatedPayloads.put(
+                    graph.getId(),
+                    locationGraphUpdatePayloadValidationFactory.validateForUpdate(
+                        graph.getData(),
+                        update.data(),
+                        update.layout()
+                    )
+                );
             } catch (IllegalArgumentException ex) {
                 log.warn(
                     "Rejected invalid graph data update locationId={} graphId={} actorUserId={}",
@@ -385,6 +385,18 @@ public class LocationService {
                 );
                 throw invalidGraphData();
             }
+        }
+
+        for (Graph graph : graphs) {
+            ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
+            if (validatedPayload == null) {
+                throw new IllegalStateException("Validated graph payload was missing");
+            }
+            LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
+            if (update.layout() != null) {
+                graph.setLayout(validatedPayload.layout());
+            }
+            graph.setData(validatedPayload.data());
         }
 
         try {
@@ -738,178 +750,6 @@ public class LocationService {
         );
     }
 
-    private GraphTemplateType parseGraphTemplateType(String rawGraphType) {
-        if (rawGraphType == null) {
-            throw invalidGraphType();
-        }
-
-        return switch (rawGraphType.strip().toLowerCase(Locale.ROOT)) {
-            case "pie" -> GraphTemplateType.PIE;
-            case "bar" -> GraphTemplateType.BAR;
-            case "scatter" -> GraphTemplateType.SCATTER;
-            default -> throw invalidGraphType();
-        };
-    }
-
-    private GraphTemplate buildGraphTemplate(GraphTemplateType graphType, String locationName) {
-        Map<String, Object> config = Map.of(
-            "displayModeBar", false,
-            "responsive", false
-        );
-
-        return switch (graphType) {
-            case PIE -> new GraphTemplate(
-                "New Pie Graph",
-                List.of(Map.of(
-                    "type", "pie",
-                    "name", "Trace 1",
-                    "hole", 0.72,
-                    "sort", false,
-                    "labels", List.of("fill"),
-                    "values", List.of(0),
-                    "marker", Map.of(
-                        "color", DEFAULT_GRAPH_COLOR,
-                        "colors", List.of(DEFAULT_GRAPH_COLOR)
-                    ),
-                    "textinfo", "none",
-                    "direction", "clockwise",
-                    "hovertemplate", "%{label}: %{value}<extra></extra>"
-                )),
-                Map.of(
-                    "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
-                    "showlegend", false,
-                    "annotations", List.of(Map.of(
-                        "x", 0.5,
-                        "y", 0.5,
-                        "text", "<b>0</b>",
-                        "xref", "paper",
-                        "yref", "paper",
-                        "showarrow", false,
-                        "font", Map.of("size", 22)
-                    ))
-                ),
-                config,
-                buildPieGraphStyle()
-            );
-            case BAR -> new GraphTemplate(
-                "New Bar Graph",
-                List.of(Map.of(
-                    "type", "bar",
-                    "name", "Trace 1",
-                    "x", List.of(),
-                    "y", List.of(),
-                    "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
-                )),
-                Map.of(
-                    "title", buildLegacyGraphTitle(locationName),
-                    "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
-                    "showlegend", false
-                ),
-                config,
-                Map.of("height", 320)
-            );
-            case SCATTER -> new GraphTemplate(
-                "New Plot Graph",
-                buildScatterTemplateData(),
-                buildScatterTemplateLayout(locationName),
-                buildScatterTemplateConfig(),
-                buildScatterTemplateStyle()
-            );
-        };
-    }
-
-    private Map<String, Object> buildLegacyGraphTitle(String locationName) {
-        return Map.of(
-            "x", 0.02,
-            "text", locationName == null ? "" : locationName,
-            "xanchor", "left"
-        );
-    }
-
-    private Map<String, Object> buildPieGraphStyle() {
-        return Map.of(
-            "theme",
-            Map.of(
-                "dark", Map.of(
-                    "gridColor", "rgba(148, 163, 184, 0.3)",
-                    "textColor", "#e5e7eb"
-                ),
-                "light", Map.of(
-                    "gridColor", "rgba(15, 23, 42, 0.15)",
-                    "textColor", "#111827"
-                )
-            ),
-            "height", 160
-        );
-    }
-
-    private List<Map<String, Object>> buildScatterTemplateData() {
-        return List.of(
-            Map.of(
-                "type", "scatter",
-                "name", "Trace 1",
-                "x", List.of(),
-                "y", List.of(),
-                "line", Map.of(
-                    "color", DEFAULT_GRAPH_COLOR,
-                    "width", 2
-                ),
-                "mode", "lines+markers",
-                "marker", Map.of("size", 6)
-            )
-        );
-    }
-
-    private Map<String, Object> buildScatterTemplateLayout(String locationName) {
-        Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("title", buildLegacyGraphTitle(locationName));
-        layout.put("xaxis", Map.of(
-            "type", "date",
-            "tickformat", "%b %Y"
-        ));
-        layout.put("yaxis", Map.of(
-            "range", List.of(0, 100),
-            "title", "% Compliance",
-            "ticksuffix", "%"
-        ));
-        layout.put("legend", Map.of(
-            "x", 0,
-            "y", -0.3,
-            "orientation", "h"
-        ));
-        layout.put("margin", Map.of(
-            "b", 60,
-            "l", 50,
-            "r", 20,
-            "t", 50
-        ));
-        return layout;
-    }
-
-    private Map<String, Object> buildScatterTemplateConfig() {
-        return Map.of(
-            "displayModeBar", false,
-            "responsive", false
-        );
-    }
-
-    private Map<String, Object> buildScatterTemplateStyle() {
-        return Map.of(
-            "theme",
-            Map.of(
-                "dark", Map.of(
-                    "gridColor", "rgba(148, 163, 184, 0.3)",
-                    "textColor", "#e5e7eb"
-                ),
-                "light", Map.of(
-                    "gridColor", "rgba(15, 23, 42, 0.15)",
-                    "textColor", "#111827"
-                )
-            ),
-            "height", 320
-        );
-    }
-
     private Long resolveTargetSectionId(
         Map<String, Object> sectionLayout,
         Long sectionId,
@@ -1200,23 +1040,26 @@ public class LocationService {
                 );
                 throw invalidGraphData();
             }
-            if (updatesById.putIfAbsent(update.graphId(), update) != null) {
+            if (update.data() == null) {
                 log.warn(
-                    "Rejected graph update payload due to duplicate graph id actorUserId={} locationId={} duplicateGraphId={} rowIndex={}",
+                    "Rejected graph update row because graph data payload was null actorUserId={} locationId={} graphId={} rowIndex={}",
                     actorUserId,
                     locationId,
                     update.graphId(),
                     index
                 );
-                throw duplicateGraphUpdates();
+                throw invalidGraphData();
             }
-            if (Objects.isNull(update.data())) {
+            try {
+                GraphPayloadMapper.toTraceList(update.data());
+            } catch (IllegalArgumentException ex) {
                 log.warn(
-                    "Rejected graph update row because data payload was null actorUserId={} locationId={} graphId={} rowIndex={}",
+                    "Rejected graph update row because graph data payload was invalid actorUserId={} locationId={} graphId={} rowIndex={}",
                     actorUserId,
                     locationId,
                     update.graphId(),
-                    index
+                    index,
+                    ex
                 );
                 throw invalidGraphData();
             }
@@ -1229,6 +1072,16 @@ public class LocationService {
                     index
                 );
                 throw invalidGraphData();
+            }
+            if (updatesById.putIfAbsent(update.graphId(), update) != null) {
+                log.warn(
+                    "Rejected graph update payload due to duplicate graph id actorUserId={} locationId={} duplicateGraphId={} rowIndex={}",
+                    actorUserId,
+                    locationId,
+                    update.graphId(),
+                    index
+                );
+                throw duplicateGraphUpdates();
             }
         }
         return Map.copyOf(updatesById);
@@ -1266,16 +1119,4 @@ public class LocationService {
         }
     }
 
-    private Map<String, Object> asObjectMap(Object layoutPayload) {
-        if (!(layoutPayload instanceof Map<?, ?> map)) {
-            throw new IllegalArgumentException("Graph layout payload must be an object");
-        }
-        Map<String, Object> copy = new LinkedHashMap<>();
-        map.forEach((key, value) -> {
-            if (key != null) {
-                copy.put(String.valueOf(key), value);
-            }
-        });
-        return copy;
-    }
 }

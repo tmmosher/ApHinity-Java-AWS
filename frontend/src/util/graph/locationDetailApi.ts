@@ -1,5 +1,7 @@
 import {parseLocationGraph, parseLocationGraphList, parseLocationSummary} from "../common/coreApi";
 import {apiFetch} from "../common/apiFetch";
+import {parseApiErrorPayload, throwAuthenticationOrSecurityError} from "../common/apiError";
+import {parsePositiveRouteId, parseRouteLocationId} from "../common/routeParams";
 import {
   LocationGraph,
   LocationGraphRenameResult,
@@ -11,40 +13,10 @@ import {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-type ApiErrorPayload = {
-  code?: string;
-  message?: string;
-  error?: string;
-  status?: number;
-  path?: string;
-};
-
-const parseApiErrorPayload = (value: unknown): ApiErrorPayload | null => {
-  if (!isRecord(value)) {
-    return null;
-  }
-  return {
-    code: typeof value.code === "string" ? value.code : undefined,
-    message: typeof value.message === "string" ? value.message : undefined,
-    error: typeof value.error === "string" ? value.error : undefined,
-    status: typeof value.status === "number" ? value.status : undefined,
-    path: typeof value.path === "string" ? value.path : undefined
-  };
-};
-
-export const parseRouteLocationId = (locationId: string): number => {
-  const parsedId = Number(locationId);
-  if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    throw new Error("Invalid location id");
-  }
-  return parsedId;
-};
+export {parseRouteLocationId};
 
 export const parseGraphId = (graphId: number): number => {
-  if (!Number.isFinite(graphId) || graphId <= 0) {
-    throw new Error("Invalid graph id");
-  }
-  return graphId;
+  return parsePositiveRouteId(graphId, "graph id");
 };
 
 const parseLocationGraphRenameResult = (value: unknown): LocationGraphRenameResult => {
@@ -83,21 +55,13 @@ const throwGraphMutationError = async (
     error: errorPayload?.error ?? null,
     path: errorPayload?.path ?? null
   });
-// using throw / catch for flow control here is pretty stupid imo but it works
-  try {
-    if (errorPayload?.code) {
-      errorCheck(errorPayload.code);
-    }
-    if (
-      (response.status === 403 || errorPayload?.status === 403)
-      && errorPayload?.error === "Forbidden"
-    ) {
-      throw new Error("Security token rejected");
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
+
+  throwAuthenticationOrSecurityError(response, errorPayload);
+  if (errorPayload?.code) {
+    throwKnownGraphMutationError(errorPayload.code);
+  }
+  if (errorPayload?.message) {
+    throw new Error(errorPayload.message);
   }
 
   if (operation === "rename") {
@@ -112,36 +76,23 @@ const throwGraphMutationError = async (
   throw new Error("Unable to save location graphs");
 };
 
-const errorCheck = (code: string) => {
-    if (code === "location_section_not_found") {
-        throw new Error("Location section not found");
-    }
-    if (code === "location_graph_not_found") {
-        throw new Error("Location graph not found");
-    }
-    if (code === "graph_type_invalid") {
-        throw new Error("Graph type is invalid");
-    }
-    if (code === "graph_update_conflict") {
-        throw new Error("Graph update conflict");
-    }
-    if (code === "graph_name_required") {
-        throw new Error("Graph name is required");
-    }
-    if (code === "csrf_invalid") {
-        throw new Error("CSRF invalid");
-    }
-    if (code === "forbidden") {
-        throw new Error("Insufficient permissions");
-    }
-    if (
-        code === "authentication_required"
-        || code === "invalid_refresh_token"
-        || code === "missing_refresh_token"
-    ) {
-        throw new Error("Authentication required");
-    }
-}
+const throwKnownGraphMutationError = (code: string): void => {
+  if (code === "location_section_not_found") {
+    throw new Error("Location section not found");
+  }
+  if (code === "location_graph_not_found") {
+    throw new Error("Location graph not found");
+  }
+  if (code === "graph_type_invalid") {
+    throw new Error("Graph type is invalid");
+  }
+  if (code === "graph_update_conflict") {
+    throw new Error("Graph update conflict");
+  }
+  if (code === "graph_name_required") {
+    throw new Error("Graph name is required");
+  }
+};
 
 /**
  * Loads a single location by id.

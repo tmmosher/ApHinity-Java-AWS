@@ -1,5 +1,5 @@
 import Popover from "corvu/popover";
-import {Show, createSignal, type ParentProps} from "solid-js";
+import {Match, Show, Switch, createMemo, createSignal, type ParentProps} from "solid-js";
 import type {AccountRole, CreateLocationServiceEventRequest, LocationServiceEvent} from "../../types/Types";
 import {
   formatDisplayDate,
@@ -7,10 +7,17 @@ import {
 } from "../../util/location/dateUtility";
 import {createServiceEventDraftFromEvent} from "../../util/location/serviceEventForm";
 import {
+  canCreateCorrectiveActionForSourceEvent,
+  createCorrectiveActionDraftFromSourceEvent,
+  getCorrectiveActionSourceLabel,
+  isCorrectiveActionServiceEvent
+} from "../../util/location/serviceEventCorrectiveAction";
+import {
   createServiceEventEditorController,
   ServiceEventEditorBody
 } from "./ServiceEventEditor";
 import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "../../util/location/serviceEventPopoverPosition";
+import CorrectiveActionIcon from "./CorrectiveActionIcon";
 
 type ServiceEventEditPopoverProps = {
   event: LocationServiceEvent;
@@ -19,6 +26,10 @@ type ServiceEventEditPopoverProps = {
   canDelete?: boolean;
   role: AccountRole | undefined;
   onSave?: (event: LocationServiceEvent, request: CreateLocationServiceEventRequest) => Promise<void>;
+  onCreateCorrectiveAction?: (
+    sourceEvent: LocationServiceEvent,
+    request: CreateLocationServiceEventRequest
+  ) => Promise<void>;
   onComplete?: (event: LocationServiceEvent) => Promise<void>;
   onDelete?: (event: LocationServiceEvent) => Promise<void>;
   deleteLabel?: string;
@@ -29,11 +40,14 @@ type ServiceEventPopoverContentProps = {
   canEdit: boolean;
   canComplete: boolean;
   canDelete: boolean;
+  canCreateCorrectiveAction: boolean;
   isCompleting: boolean;
   isDeleting: boolean;
   completionError?: string;
   deletionError?: string;
+  sourceEventLabel?: string;
   onEdit: () => void;
+  onCreateCorrectiveAction: () => void;
   onComplete: () => void;
   onDelete: () => void;
   deleteLabel: string;
@@ -58,6 +72,10 @@ const formatEventDateTime = (date: string, time: string): string => (
   `${formatDisplayDate(date)} at ${formatDisplayTime(time)}`
 );
 
+const isStagedCalendarEvent = (event: LocationServiceEvent): boolean => (
+  "isStaged" in event && event.isStaged === true
+);
+
 const ServiceEventDetailItem = (props: {label: string; value: string}) => (
   <div class="space-y-1">
     <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
@@ -69,27 +87,46 @@ const ServiceEventDetailItem = (props: {label: string; value: string}) => (
 
 const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
   <div class="space-y-4 p-4 md:p-5">
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0">
-        <Popover.Label class="text-base font-semibold leading-tight">
-          {props.event.title}
+    <div class="flex items-start gap-4">
+      <div class="min-w-0 flex-1">
+        <Popover.Label class="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight">
+          <Show when={isCorrectiveActionServiceEvent(props.event)}>
+            <CorrectiveActionIcon class="size-4 shrink-0 text-warning" />
+          </Show>
+          <span class="min-w-0 flex-1 truncate">{props.event.title}</span>
         </Popover.Label>
       </div>
 
-      <Show when={props.canEdit}>
-        <button
-          type="button"
-          class="btn btn-primary btn-xs"
-          data-service-event-edit=""
-          disabled={props.isCompleting}
-          onClick={(event) => {
-            event.stopPropagation();
-            props.onEdit();
-          }}
-        >
-          Edit
-        </button>
-      </Show>
+      <div class="flex shrink-0 items-center gap-2">
+        <Show when={props.canCreateCorrectiveAction}>
+          <button
+            type="button"
+            class="btn btn-warning btn-outline btn-xs"
+            data-service-event-create-corrective-action=""
+            disabled={props.isCompleting || props.isDeleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onCreateCorrectiveAction();
+            }}
+          >
+            Create Corrective Action
+          </button>
+        </Show>
+        <Show when={props.canEdit}>
+          <button
+            type="button"
+            class="btn btn-primary btn-xs"
+            data-service-event-edit=""
+            disabled={props.isCompleting || props.isDeleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onEdit();
+            }}
+          >
+            Edit
+          </button>
+        </Show>
+      </div>
     </div>
 
     <dl class="grid gap-3 text-sm md:grid-cols-2">
@@ -109,6 +146,14 @@ const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
         label="Status"
         value={formatStatusLabel(props.event.status)}
       />
+      <Show when={props.sourceEventLabel}>
+        {(sourceEventLabel) => (
+          <ServiceEventDetailItem
+            label="Source Event"
+            value={sourceEventLabel()}
+          />
+        )}
+      </Show>
     </dl>
 
     <div class="space-y-1">
@@ -184,6 +229,7 @@ export const requestServiceEventEdit = (setIsEditing: (isEditing: boolean) => vo
 
 export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopoverProps>) => {
   const [isEditing, setIsEditing] = createSignal(false);
+  const [isCreatingCorrectiveAction, setIsCreatingCorrectiveAction] = createSignal(false);
   const [isCompleting, setIsCompleting] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
   const [completionError, setCompletionError] = createSignal<string>();
@@ -198,19 +244,53 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
       return props.onSave(props.event, request);
     }
   });
+  const correctiveActionController = createServiceEventEditorController({
+    role: () => props.role,
+    getInitialDraft: () => createCorrectiveActionDraftFromSourceEvent(props.event, props.role),
+    onSave: (request) => {
+      if (!props.onCreateCorrectiveAction) {
+        throw new Error("Corrective action creation is unavailable.");
+      }
+      return props.onCreateCorrectiveAction(props.event, request);
+    }
+  });
+  const sourceEventLabel = createMemo(() => getCorrectiveActionSourceLabel(props.event));
 
   const resetToDetailView = () => {
     controller.reset();
+    correctiveActionController.reset();
     setIsCompleting(false);
     setIsDeleting(false);
     setCompletionError(undefined);
     setDeletionError(undefined);
     setIsEditing(false);
+    setIsCreatingCorrectiveAction(false);
   };
 
   const canEdit = () => props.canEdit && props.onSave !== undefined;
   const canComplete = () => props.canComplete && props.onComplete !== undefined && props.event.status !== "completed";
   const canDelete = () => (props.canDelete ?? false) && props.onDelete !== undefined;
+  const canCreateCorrectiveAction = () => (
+    props.onCreateCorrectiveAction !== undefined
+    && !isStagedCalendarEvent(props.event)
+    && canCreateCorrectiveActionForSourceEvent(props.role, props.event)
+  );
+  const openEditMode = () => {
+    setCompletionError(undefined);
+    setDeletionError(undefined);
+    setIsCreatingCorrectiveAction(false);
+    requestServiceEventEdit(setIsEditing);
+  };
+  const openCorrectiveActionMode = () => {
+    if (!canCreateCorrectiveAction()) {
+      return;
+    }
+    setCompletionError(undefined);
+    setDeletionError(undefined);
+    setIsEditing(false);
+    correctiveActionController.reset();
+    setIsCreatingCorrectiveAction(true);
+  };
   const handleComplete = async (closePopover: () => void): Promise<void> => {
     if (!canComplete() || isCompleting()) {
       return;
@@ -272,23 +352,21 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
               class="z-50 w-[min(96vw,28rem)] rounded-2xl border border-base-300 bg-base-100 shadow-2xl"
               data-service-event-popover=""
             >
-              <Show
-                when={isEditing()}
+              <Switch
                 fallback={
                   <ServiceEventPopoverContent
                     event={props.event}
                     canEdit={canEdit()}
+                    canCreateCorrectiveAction={canCreateCorrectiveAction()}
                     canComplete={canComplete()}
                     canDelete={canDelete()}
                     isCompleting={isCompleting()}
                     isDeleting={isDeleting()}
                     completionError={completionError()}
                     deletionError={deletionError()}
-                    onEdit={() => {
-                      setCompletionError(undefined);
-                      setDeletionError(undefined);
-                      requestServiceEventEdit(setIsEditing);
-                    }}
+                    sourceEventLabel={sourceEventLabel()}
+                    onEdit={openEditMode}
+                    onCreateCorrectiveAction={openCorrectiveActionMode}
                     onComplete={() => {
                       void handleComplete(() => popover.setOpen(false));
                     }}
@@ -299,34 +377,65 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
                   />
                 }
               >
-                <div class="flex max-h-[min(80vh,38rem)] min-h-0 flex-col gap-4 p-4">
-                  <div class="space-y-1">
-                    <Popover.Label class="text-lg font-semibold">Edit Service Event</Popover.Label>
-                    <Popover.Description class="text-sm text-base-content/70">
-                      Update the service event details for this location.
-                    </Popover.Description>
-                  </div>
+                <Match when={isEditing()}>
+                  <div class="flex max-h-[min(80vh,38rem)] min-h-0 flex-col gap-4 p-4">
+                    <div class="space-y-1">
+                      <Popover.Label class="text-lg font-semibold">Edit Service Event</Popover.Label>
+                      <Popover.Description class="text-sm text-base-content/70">
+                        Update the service event details for this location.
+                      </Popover.Description>
+                    </div>
 
-                  <ServiceEventEditorBody
-                    draft={controller.draft()}
-                    isSaving={controller.isSaving()}
-                    allowStatusEditing={true}
-                    canChooseResponsibility={controller.canChooseResponsibility()}
-                    updateDraft={controller.updateDraft}
-                    submissionError={controller.submissionError()}
-                    saveLabel="Save Changes"
-                    onCancel={resetToDetailView}
-                    onSubmit={() => {
-                      void controller.submit().then((didSave) => {
-                        if (didSave) {
-                          resetToDetailView();
-                          popover.setOpen(false);
-                        }
-                      });
-                    }}
-                  />
-                </div>
-              </Show>
+                    <ServiceEventEditorBody
+                      draft={controller.draft()}
+                      isSaving={controller.isSaving()}
+                      allowStatusEditing={true}
+                      canChooseResponsibility={controller.canChooseResponsibility()}
+                      updateDraft={controller.updateDraft}
+                      submissionError={controller.submissionError()}
+                      saveLabel="Save Changes"
+                      onCancel={resetToDetailView}
+                      onSubmit={() => {
+                        void controller.submit().then((didSave) => {
+                          if (didSave) {
+                            resetToDetailView();
+                            popover.setOpen(false);
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                </Match>
+                <Match when={isCreatingCorrectiveAction()}>
+                  <div class="flex max-h-[min(80vh,38rem)] min-h-0 flex-col gap-4 p-4">
+                    <div class="space-y-1">
+                      <Popover.Label class="text-lg font-semibold">Create Corrective Action</Popover.Label>
+                      <Popover.Description class="text-sm text-base-content/70">
+                        Draft the corrective action work order for this service event.
+                      </Popover.Description>
+                    </div>
+
+                    <ServiceEventEditorBody
+                      draft={correctiveActionController.draft()}
+                      isSaving={correctiveActionController.isSaving()}
+                      allowStatusEditing={false}
+                      canChooseResponsibility={correctiveActionController.canChooseResponsibility()}
+                      updateDraft={correctiveActionController.updateDraft}
+                      submissionError={correctiveActionController.submissionError()}
+                      saveLabel="Create Corrective Action"
+                      onCancel={resetToDetailView}
+                      onSubmit={() => {
+                        void correctiveActionController.submit().then((didSave) => {
+                          if (didSave) {
+                            resetToDetailView();
+                            popover.setOpen(false);
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                </Match>
+              </Switch>
             </Popover.Content>
           </Popover.Portal>
         </>

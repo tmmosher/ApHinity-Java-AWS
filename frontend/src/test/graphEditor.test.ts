@@ -9,6 +9,7 @@ import {
   getEditableGraphTitle,
   parseEditableGraphPayload,
   pruneDeletedLocationGraphState,
+  reconcileLocationGraphRefreshState,
   reconcileLocationGraphs,
   serializeEditableGraphPayload,
   updateEditableGraphTitle,
@@ -182,6 +183,46 @@ describe("graphEditor", () => {
     expect(reconciled[0]).toBe(baseGraphs[0]);
     expect(reconciled[1]).toBe(refreshedGraphs[1]);
     expect(reconciled[2]).toBe(refreshedGraphs[2]);
+  });
+
+  it("rebases refreshed graph state without discarding local undo history", () => {
+    const editedGraphs = applyGraphPayloadEdit(baseGraphs, [], 10, {
+      data: [{type: "bar", x: ["A"], y: [15]}],
+      layout: {title: {text: "Updated"}},
+      config: {displayModeBar: false},
+      style: {height: 360}
+    }).nextGraphs;
+    const currentUndoStack = [baseGraphs];
+    const refreshedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        updatedAt: "2026-01-03T00:00:00Z"
+      },
+      {
+        ...baseGraphs[1],
+        name: "Updated Non-Compliances",
+        updatedAt: "2026-01-04T00:00:00Z"
+      }
+    ];
+
+    const refreshResult = reconcileLocationGraphRefreshState(
+      editedGraphs,
+      currentUndoStack,
+      buildGraphBaselineIndex(baseGraphs),
+      refreshedGraphs
+    );
+
+    expect(refreshResult.nextGraphs[0]).toBe(editedGraphs[0]);
+    expect(refreshResult.nextGraphs[1]).toBe(refreshedGraphs[1]);
+    expect(refreshResult.nextUndoStack).toHaveLength(1);
+    expect(refreshResult.nextUndoStack[0][0]).toEqual(baseGraphs[0]);
+    expect(refreshResult.nextUndoStack[0][1]).toEqual(refreshedGraphs[1]);
+    expect(refreshResult.nextBaselineIndex.get(10)).toMatchObject({
+      expectedUpdatedAt: "2026-01-02T00:00:00Z"
+    });
+    expect(refreshResult.nextBaselineIndex.get(11)).toMatchObject({
+      expectedUpdatedAt: "2026-01-04T00:00:00Z"
+    });
   });
 
   it("reads graph titles from string and object Plotly layout shapes", () => {

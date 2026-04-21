@@ -27,6 +27,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class UserDeletionService {
+    // doesn't use the async logger. This was written before the async logger existed so :shrug:
+    // it is very unlikely that a small synchronous logging operation will negatively affect
+    // performance at midnight local time.
     private static final Logger log = LoggerFactory.getLogger(UserDeletionService.class);
     private static final int MAX_QUEUE_SIZE = 50;
 
