@@ -1,4 +1,5 @@
 import {Show} from "solid-js";
+import {GanttTaskDependenciesDialog} from "./GanttTaskDependenciesDialog";
 import {
   GANTT_TASK_TITLE_MAX_LENGTH,
   type GanttTaskDraft
@@ -20,6 +21,10 @@ type GanttTaskEditorBodyProps = {
   onCancel: () => void;
   onSubmit: () => void;
   onDelete?: () => void;
+  dependencyDialogApiHost: string;
+  dependencyDialogLocationId: string;
+  dependencyDialogCurrentTaskId?: number;
+  dependencyDialogCurrentTaskTitle: string;
   updateDraft: UpdateGanttTaskDraftFn;
 };
 
@@ -37,7 +42,20 @@ export const GanttTaskEditorBody = (props: GanttTaskEditorBodyProps) => {
     >
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label class="form-control w-full sm:col-span-2">
-          <span class="label-text text-sm">Title</span>
+          <div class="mb-1 flex items-center justify-between gap-2">
+            <span class="label-text text-sm">Title</span>
+            <GanttTaskDependenciesDialog
+              apiHost={props.dependencyDialogApiHost}
+              locationId={props.dependencyDialogLocationId}
+              currentTaskId={props.dependencyDialogCurrentTaskId}
+              currentTaskTitle={props.dependencyDialogCurrentTaskTitle}
+              selectedDependencyTaskIds={props.draft.dependencyTaskIds}
+              disabled={isBusy()}
+              onApply={(dependencyTaskIds) => {
+                props.updateDraft("dependencyTaskIds", dependencyTaskIds);
+              }}
+            />
+          </div>
           <input
             type="text"
             class="input input-bordered w-full"

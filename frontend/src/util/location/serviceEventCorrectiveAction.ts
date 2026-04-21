@@ -18,6 +18,18 @@ export const isCorrectiveActionServiceEvent = (event: LocationServiceEvent): boo
   event.isCorrectiveAction === true
 );
 
+export const canCreateCorrectiveActionForSourceEvent = (
+  role: AccountRole | undefined,
+  sourceEvent: LocationServiceEvent
+): boolean => (
+  !isCorrectiveActionServiceEvent(sourceEvent)
+  && (
+    role === "admin"
+    || role === "partner"
+    || (role === "client" && sourceEvent.responsibility === "client")
+  )
+);
+
 export const createCorrectiveActionTitle = (sourceTitle: string): string => {
   const normalizedSourceTitle = sourceTitle.trim();
   const prefixedTitle = normalizedSourceTitle.toLowerCase().startsWith("corrective action:")

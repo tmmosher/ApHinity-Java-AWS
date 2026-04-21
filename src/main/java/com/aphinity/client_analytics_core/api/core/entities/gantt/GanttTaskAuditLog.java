@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core.entities.gantt;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -18,6 +19,7 @@ public record GanttTaskAuditLog(
     LocalDate startDate,
     LocalDate endDate,
     String description,
+    List<Long> dependencyTaskIds,
     Instant taskCreatedAt,
     Instant taskUpdatedAt,
     Instant recordedAt
@@ -26,6 +28,7 @@ public record GanttTaskAuditLog(
         Long actorUserId,
         String actorIpAddress,
         GanttTask task,
+        List<Long> dependencyTaskIds,
         GanttTaskAuditAction action
     ) {
         Objects.requireNonNull(task, "task");
@@ -40,6 +43,7 @@ public record GanttTaskAuditLog(
             task.getStartDate(),
             task.getEndDate(),
             normalizeNullable(task.getDescription()),
+            normalizeDependencyTaskIds(dependencyTaskIds),
             task.getCreatedAt(),
             task.getUpdatedAt(),
             Instant.now()
@@ -57,6 +61,7 @@ public record GanttTaskAuditLog(
             + " startDate=" + valueOrNull(startDate)
             + " endDate=" + valueOrNull(endDate)
             + " description=" + quoteOrNull(description)
+            + " dependencyTaskIds=" + valueOrNull(dependencyTaskIds)
             + " taskCreatedAt=" + valueOrNull(taskCreatedAt)
             + " taskUpdatedAt=" + valueOrNull(taskUpdatedAt)
             + " recordedAt=" + valueOrNull(recordedAt);
@@ -72,6 +77,17 @@ public record GanttTaskAuditLog(
 
     private static String normalizeNullable(String value) {
         return normalize(value);
+    }
+
+    private static List<Long> normalizeDependencyTaskIds(List<Long> dependencyTaskIds) {
+        if (dependencyTaskIds == null || dependencyTaskIds.isEmpty()) {
+            return List.of();
+        }
+        return dependencyTaskIds.stream()
+            .filter(id -> id != null && id > 0)
+            .distinct()
+            .sorted()
+            .toList();
     }
 
     private static String valueOrNull(Object value) {

@@ -36,12 +36,14 @@ vi.mock("../util/location/locationGanttTaskApi", () => ({
   updateLocationGanttTaskById: vi.fn()
 }));
 
-vi.mock("../components/location/GanttTaskCreatePopover", () => ({
-  GanttTaskCreatePopover: () => <button data-gantt-task-create-trigger="">Add Task</button>
+vi.mock("../components/gantt/GanttTaskCreatePopover", () => ({
+  GanttTaskCreatePopover: (_props: Record<string, unknown>) => (
+    <button data-gantt-task-create-trigger="">Add Task</button>
+  )
 }));
 
-vi.mock("../components/location/GanttTaskPopover", () => ({
-  GanttTaskPopover: () => null
+vi.mock("../components/gantt/GanttTaskPopover", () => ({
+  GanttTaskPopover: (_props: Record<string, unknown>) => null
 }));
 
 import {LocationGanttChartPanel} from "../pages/authenticated/panels/location/LocationGanttChartPanel";
@@ -52,7 +54,9 @@ describe("LocationGanttChartPanel", () => {
 
     expect(html).toContain("Gantt Chart");
     expect(html).toContain("placeholder=\"Search title...\"");
-    expect(html).toContain("Upload CSV");
+    expect(html).toContain("Upload Excel spreadsheet");
+    expect(html).not.toContain("Upload CSV");
+    expect(html).toContain("accept=\".xlsx\"");
     expect(html).toContain("Apply");
     expect(html).toContain("Undo");
     expect(html).toContain("https://example.test/api/core/locations/42/gantt-tasks/template");

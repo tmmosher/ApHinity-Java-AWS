@@ -1,4 +1,5 @@
 import type {CreateLocationGanttTaskRequest} from "../../types/Types";
+import {normalizeGanttTaskDependencyTaskIds} from "./ganttTaskForm";
 import {applyStateSnapshot, undoStateSnapshot} from "../common/stateHistory";
 import type {TimelineTaskLike} from "./frappeGanttChart";
 
@@ -29,7 +30,8 @@ const stagedTaskSignature = (task: StagedLocationGanttTask): string => JSON.stri
   title: task.title,
   startDate: task.startDate,
   endDate: task.endDate,
-  description: task.description
+  description: task.description,
+  dependencyTaskIds: normalizeGanttTaskDependencyTaskIds(task.dependencyTaskIds)
 });
 
 const stagedTaskListSignature = (tasks: readonly StagedLocationGanttTask[]): string => (
@@ -51,6 +53,7 @@ const createStagedTaskFromRequest = (
     startDate: request.startDate,
     endDate: request.endDate,
     description: request.description,
+    dependencyTaskIds: normalizeGanttTaskDependencyTaskIds(request.dependencyTaskIds),
     createdAt: timestamp,
     updatedAt: timestamp,
     isStaged: true
@@ -109,6 +112,7 @@ export const editStagedGanttTask = (
           startDate: request.startDate,
           endDate: request.endDate,
           description: request.description,
+          dependencyTaskIds: normalizeGanttTaskDependencyTaskIds(request.dependencyTaskIds),
           updatedAt: new Date().toISOString()
         }
       : task
@@ -145,6 +149,7 @@ export const buildGanttTaskRequestsFromStagedTasks = (
     title: task.title,
     startDate: task.startDate,
     endDate: task.endDate,
-    description: task.description ?? null
+    description: task.description ?? null,
+    dependencyTaskIds: normalizeGanttTaskDependencyTaskIds(task.dependencyTaskIds)
   }))
 );

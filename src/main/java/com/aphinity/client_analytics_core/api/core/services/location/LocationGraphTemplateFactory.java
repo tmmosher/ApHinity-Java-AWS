@@ -118,28 +118,35 @@ public class LocationGraphTemplateFactory {
     }
 
     private List<Map<String, Object>> buildIndicatorTemplateData() {
-        return List.of(Map.of(
-            "type", "indicator",
-            "name", "Trace 1",
-            "mode", "gauge+number",
-            "value", 0,
-            "number", Map.of(
-                "suffix", "%",
-                "font", Map.of("size", 22)
-            ),
-            "gauge", Map.of(
-                "shape", "angular",
-                "axis", Map.of("range", List.of(0, 100)),
-                "bar", Map.of("color", DEFAULT_GRAPH_COLOR),
-                "borderwidth", 0,
-                "steps", List.of(
-                    Map.of("color", "#80000030", "range", List.of(0, 30)),
-                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
-                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
-                    Map.of("color", "#00800030", "range", List.of(90, 100))
+        return List.of(
+            Map.of(
+                "type", "indicator",
+                "name", "Trace 1",
+                "mode", "gauge+number",
+                "value", 0,
+                "number", Map.of(
+                    "suffix", "%",
+                    "font", Map.of("size", 22)
+                    ),
+                "gauge", Map.of(
+                    "shape", "angular",
+                    "axis", Map.of("range", List.of(0, 100)),
+                    "bar", Map.of("color", DEFAULT_GRAPH_COLOR),
+                    "borderwidth", 0,
+                    "steps", List.of(
+                        Map.of("color", "#80000030", "range", List.of(0, 30)),
+                        Map.of("color", "#FF000030", "range", List.of(30, 60)),
+                        Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
+                        Map.of("color", "#00800030", "range", List.of(90, 100))
+                        ),
+                    "threshold", Map.of(
+                        "line", Map.of("color", "red", "width", 2),
+                        "thickness", 0.75,
+                        "value", 90
+                        )
+                    )
                 )
-            )
-        ));
+        );
     }
 
     private Map<String, Object> buildIndicatorTemplateLayout() {

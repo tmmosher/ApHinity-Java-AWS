@@ -14,13 +14,15 @@ describe("stagedGanttTasks", () => {
         title: "OPS",
         startDate: "2026-04-01",
         endDate: "2026-04-04",
-        description: null
+        description: null,
+        dependencyTaskIds: [7, 2, 7]
       },
       {
         title: "QMS",
         startDate: "2026-04-05",
         endDate: "2026-04-06",
-        description: "Validation"
+        description: "Validation",
+        dependencyTaskIds: []
       }
     ]);
 
@@ -28,6 +30,8 @@ describe("stagedGanttTasks", () => {
     expect(result.nextTasks).toHaveLength(2);
     expect(result.nextTasks[0].id).toBe(-1);
     expect(result.nextTasks[1].id).toBe(-2);
+    expect(result.nextTasks[0].dependencyTaskIds).toEqual([2, 7]);
+    expect(result.nextTasks[1].dependencyTaskIds).toEqual([]);
     expect(result.nextUndoStack).toEqual([[]]);
   });
 
@@ -36,16 +40,19 @@ describe("stagedGanttTasks", () => {
       title: "OPS",
       startDate: "2026-04-01",
       endDate: "2026-04-04",
-      description: null
+      description: null,
+      dependencyTaskIds: [9]
     }]);
 
     const edited = editStagedGanttTask(staged.nextTasks, staged.nextUndoStack, -1, {
       title: "OPS Updated",
       startDate: "2026-04-02",
       endDate: "2026-04-05",
-      description: "Updated"
+      description: "Updated",
+      dependencyTaskIds: [4, 1, 4]
     });
     expect(edited.nextTasks[0].title).toBe("OPS Updated");
+    expect(edited.nextTasks[0].dependencyTaskIds).toEqual([1, 4]);
     expect(edited.nextUndoStack).toHaveLength(2);
 
     const deleted = deleteStagedGanttTask(edited.nextTasks, edited.nextUndoStack, -1);
@@ -63,14 +70,16 @@ describe("stagedGanttTasks", () => {
       title: "OPS",
       startDate: "2026-04-01",
       endDate: "2026-04-04",
-      description: "Desc"
+      description: "Desc",
+      dependencyTaskIds: [11, 7, 11]
     }]).nextTasks;
 
     expect(buildGanttTaskRequestsFromStagedTasks(staged)).toEqual([{
       title: "OPS",
       startDate: "2026-04-01",
       endDate: "2026-04-04",
-      description: "Desc"
+      description: "Desc",
+      dependencyTaskIds: [7, 11]
     }]);
   });
 });

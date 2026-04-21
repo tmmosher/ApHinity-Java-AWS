@@ -99,6 +99,14 @@ public class ApiExceptionHandler {
             "Task end date must be on or after the start date",
             new ErrorDefinition("task_date_range_invalid", "Task end date must be on or after the start date")
         ),
+        Map.entry(
+            "Task cannot depend on itself",
+            new ErrorDefinition("task_dependency_self_reference", "Task cannot depend on itself")
+        ),
+        Map.entry(
+            "Task dependencies must belong to this location",
+            new ErrorDefinition("task_dependency_invalid_location", "Task dependencies must belong to this location")
+        ),
         Map.entry("Location gantt task not found", new ErrorDefinition("location_gantt_task_not_found", "Location gantt task not found")),
         Map.entry(
             "Service calendar template unavailable",

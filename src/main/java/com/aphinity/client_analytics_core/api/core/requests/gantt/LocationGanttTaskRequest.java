@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public record LocationGanttTaskRequest(
     @NotBlank(message = "Task title is required")
@@ -22,6 +23,20 @@ public record LocationGanttTaskRequest(
     @NotNull(message = "Task end date is required")
     LocalDate endDate,
 
-    String description
+    String description,
+
+    List<Long> dependencyTaskIds
 ) {
+    public LocationGanttTaskRequest(
+        String title,
+        LocalDate startDate,
+        LocalDate endDate,
+        String description
+    ) {
+        this(title, startDate, endDate, description, List.of());
+    }
+
+    public LocationGanttTaskRequest {
+        dependencyTaskIds = dependencyTaskIds == null ? List.of() : List.copyOf(dependencyTaskIds);
+    }
 }

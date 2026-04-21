@@ -7,6 +7,7 @@ import {
 } from "../../util/location/dateUtility";
 import {createServiceEventDraftFromEvent} from "../../util/location/serviceEventForm";
 import {
+  canCreateCorrectiveActionForSourceEvent,
   createCorrectiveActionDraftFromSourceEvent,
   getCorrectiveActionSourceLabel,
   isCorrectiveActionServiceEvent
@@ -272,7 +273,7 @@ export const ServiceEventEditPopover = (props: ParentProps<ServiceEventEditPopov
   const canCreateCorrectiveAction = () => (
     props.onCreateCorrectiveAction !== undefined
     && !isStagedCalendarEvent(props.event)
-    && !isCorrectiveActionServiceEvent(props.event)
+    && canCreateCorrectiveActionForSourceEvent(props.role, props.event)
   );
   const openEditMode = () => {
     setCompletionError(undefined);

@@ -2,7 +2,8 @@ import {describe, expect, it} from "vitest";
 import {
   canEditLocationGanttTask,
   createDefaultGanttTaskDraft,
-  createLocationGanttTaskRequestFromDraft
+  createLocationGanttTaskRequestFromDraft,
+  normalizeGanttTaskDependencyTaskIds
 } from "../util/location/ganttTaskForm";
 
 describe("ganttTaskForm", () => {
@@ -20,6 +21,7 @@ describe("ganttTaskForm", () => {
     expect(draft.startDate).toBe("2026-04-15");
     expect(draft.endDate).toBe("2026-04-15");
     expect(draft.title).toBe("");
+    expect(draft.dependencyTaskIds).toEqual([]);
   });
 
   it("normalizes a valid draft to a create request", () => {
@@ -27,15 +29,21 @@ describe("ganttTaskForm", () => {
       title: "  OPS  ",
       startDate: "2026-04-10",
       endDate: "2026-04-12",
-      description: "  Operational update  "
+      description: "  Operational update  ",
+      dependencyTaskIds: []
     });
 
     expect(request).toEqual({
       title: "OPS",
       startDate: "2026-04-10",
       endDate: "2026-04-12",
-      description: "Operational update"
+      description: "Operational update",
+      dependencyTaskIds: []
     });
+  });
+
+  it("normalizes gantt dependency ids by filtering invalid values and duplicates", () => {
+    expect(normalizeGanttTaskDependencyTaskIds([7, 2, 7, 0, -3, Number.NaN, 5])).toEqual([2, 5, 7]);
   });
 
   it("rejects task ranges where end date is before start date", () => {
@@ -43,7 +51,8 @@ describe("ganttTaskForm", () => {
       title: "OPS",
       startDate: "2026-04-12",
       endDate: "2026-04-10",
-      description: ""
+      description: "",
+      dependencyTaskIds: []
     })).toThrow("Task end date must be on or after the start date.");
   });
 });

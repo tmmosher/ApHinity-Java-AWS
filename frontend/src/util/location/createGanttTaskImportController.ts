@@ -1,6 +1,6 @@
-import {createMemo, createSignal, type Accessor} from "solid-js";
+import {createSignal, type Accessor} from "solid-js";
 import {toast} from "solid-toast";
-import {parseGanttTaskCsvFile} from "./ganttTaskCsv";
+import {parseGanttTaskSpreadsheetFile} from "./ganttTaskSpreadsheet";
 import {
   buildGanttTaskRequestsFromStagedTasks,
   deleteStagedGanttTask,
@@ -43,39 +43,39 @@ const applyStagedMutation = (
 export const createGanttTaskImportController = (props: GanttTaskImportControllerProps) => {
   const [stagedTasks, setStagedTasks] = createSignal<StagedLocationGanttTask[]>([]);
   const [stagedUndoStack, setStagedUndoStack] = createSignal<StagedLocationGanttTask[][]>([]);
-  const [isImportingCsv, setIsImportingCsv] = createSignal(false);
+  const [isImportingSpreadsheet, setIsImportingSpreadsheet] = createSignal(false);
   const [isApplyingImports, setIsApplyingImports] = createSignal(false);
 
-  const hasStagedTasks = createMemo(() => stagedTasks().length > 0);
-  const hasPendingTaskChanges = createMemo(() => stagedUndoStack().length > 0);
-  const isTaskMutationBusy = createMemo(() => isImportingCsv() || isApplyingImports());
+  const hasStagedTasks = () => stagedTasks().length > 0;
+  const hasPendingTaskChanges = () => stagedUndoStack().length > 0;
+  const isSpreadsheetMutationBusy = () => isImportingSpreadsheet() || isApplyingImports();
 
   const reset = (): void => {
     setStagedTasks([]);
     setStagedUndoStack([]);
-    setIsImportingCsv(false);
+    setIsImportingSpreadsheet(false);
     setIsApplyingImports(false);
   };
 
-  const stageCsvImportFile = async (file: File): Promise<void> => {
-    setIsImportingCsv(true);
+  const stageSpreadsheetImportFile = async (file: File): Promise<void> => {
+    setIsImportingSpreadsheet(true);
     try {
-      const requests = await parseGanttTaskCsvFile(file);
+      const requests = await parseGanttTaskSpreadsheetFile(file);
       const result = stageImportedGanttTasks(stagedTasks(), stagedUndoStack(), requests);
       if (!applyStagedMutation(result, setStagedTasks, setStagedUndoStack)) {
         return;
       }
 
-      toast.success(`${requests.length} gantt task${requests.length === 1 ? "" : "s"} staged.`);
+      toast.success(`${requests.length} gantt task${requests.length === 1 ? "" : "s"} staged from spreadsheet.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to import gantt tasks.");
+      toast.error(error instanceof Error ? error.message : "Unable to import gantt spreadsheet.");
     } finally {
-      setIsImportingCsv(false);
+      setIsImportingSpreadsheet(false);
     }
   };
 
   const undoLastTaskMutation = (): void => {
-    if (isTaskMutationBusy()) {
+    if (isSpreadsheetMutationBusy()) {
       return;
     }
 
@@ -89,7 +89,7 @@ export const createGanttTaskImportController = (props: GanttTaskImportController
   };
 
   const applyStagedImports = async (): Promise<void> => {
-    if (isTaskMutationBusy() || stagedTasks().length === 0) {
+    if (isSpreadsheetMutationBusy() || stagedTasks().length === 0) {
       return;
     }
 
@@ -170,11 +170,11 @@ export const createGanttTaskImportController = (props: GanttTaskImportController
     stagedUndoStack,
     hasStagedTasks,
     hasPendingTaskChanges,
-    isImportingCsv,
+    isImportingSpreadsheet,
     isApplyingImports,
-    isTaskMutationBusy,
+    isSpreadsheetMutationBusy,
     reset,
-    stageCsvImportFile,
+    stageSpreadsheetImportFile,
     undoLastTaskMutation,
     applyStagedImports,
     editStagedTask,

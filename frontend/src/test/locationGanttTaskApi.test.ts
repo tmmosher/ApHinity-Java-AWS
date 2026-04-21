@@ -1,6 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {apiFetch} from "../util/common/apiFetch";
 import {
+  type CreateLocationGanttTaskRequest,
   createLocationGanttTaskById,
   createLocationGanttTasksBulkById,
   deleteLocationGanttTaskById,
@@ -36,7 +37,8 @@ describe("locationGanttTaskApi", () => {
       endDate: "2026-04-03",
       description: "Operational update",
       createdAt: "2026-03-01T00:00:00Z",
-      updatedAt: "2026-03-01T00:00:00Z"
+      updatedAt: "2026-03-01T00:00:00Z",
+      dependencyTaskIds: []
     }]));
 
     const tasks = await fetchLocationGanttTasksById(host, "42", "ops");
@@ -61,14 +63,16 @@ describe("locationGanttTaskApi", () => {
       endDate: "2026-04-04",
       description: null,
       createdAt: "2026-03-01T00:00:00Z",
-      updatedAt: "2026-03-01T00:00:00Z"
+      updatedAt: "2026-03-01T00:00:00Z",
+      dependencyTaskIds: []
     }, 201));
 
     const created = await createLocationGanttTaskById(host, "42", {
       title: "QMS",
       startDate: "2026-04-02",
       endDate: "2026-04-04",
-      description: null
+      description: null,
+      dependencyTaskIds: []
     });
 
     expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/42/gantt-tasks", {
@@ -78,7 +82,8 @@ describe("locationGanttTaskApi", () => {
         title: "QMS",
         startDate: "2026-04-02",
         endDate: "2026-04-04",
-        description: null
+        description: null,
+        dependencyTaskIds: []
       })
     });
     expect(created.id).toBe(9);
@@ -93,7 +98,8 @@ describe("locationGanttTaskApi", () => {
         endDate: "2026-04-03",
         description: null,
         createdAt: "2026-03-01T00:00:00Z",
-        updatedAt: "2026-03-01T00:00:00Z"
+        updatedAt: "2026-03-01T00:00:00Z",
+        dependencyTaskIds: []
       },
       {
         id: 11,
@@ -102,24 +108,27 @@ describe("locationGanttTaskApi", () => {
         endDate: "2026-04-08",
         description: "Validation",
         createdAt: "2026-03-01T00:00:00Z",
-        updatedAt: "2026-03-01T00:00:00Z"
+        updatedAt: "2026-03-01T00:00:00Z",
+        dependencyTaskIds: []
       }
     ], 201));
 
-    const requests = [
+    const requests: readonly CreateLocationGanttTaskRequest[] = [
       {
         title: "OPS",
         startDate: "2026-04-01",
         endDate: "2026-04-03",
-        description: null
+        description: null,
+        dependencyTaskIds: []
       },
       {
         title: "QMS",
         startDate: "2026-04-05",
         endDate: "2026-04-08",
-        description: "Validation"
+        description: "Validation",
+        dependencyTaskIds: []
       }
-    ] as const;
+    ];
 
     const created = await createLocationGanttTasksBulkById(host, "42", requests);
 
@@ -146,7 +155,8 @@ describe("locationGanttTaskApi", () => {
         endDate: "2026-04-04",
         description: "Updated",
         createdAt: "2026-03-01T00:00:00Z",
-        updatedAt: "2026-03-02T00:00:00Z"
+        updatedAt: "2026-03-02T00:00:00Z",
+        dependencyTaskIds: []
       }))
       .mockResolvedValueOnce(createMockResponse(true, null, 204));
 
@@ -154,7 +164,8 @@ describe("locationGanttTaskApi", () => {
       title: "OPS Updated",
       startDate: "2026-04-02",
       endDate: "2026-04-04",
-      description: "Updated"
+      description: "Updated",
+      dependencyTaskIds: []
     });
     await deleteLocationGanttTaskById(host, "42", 8);
 
@@ -166,7 +177,8 @@ describe("locationGanttTaskApi", () => {
         title: "OPS Updated",
         startDate: "2026-04-02",
         endDate: "2026-04-04",
-        description: "Updated"
+        description: "Updated",
+        dependencyTaskIds: []
       })
     });
     expect(apiFetchMock).toHaveBeenNthCalledWith(2, host + "/api/core/locations/42/gantt-tasks/8", {
@@ -177,11 +189,12 @@ describe("locationGanttTaskApi", () => {
   it("rejects invalid route ids before network calls", async () => {
     await expect(fetchLocationGanttTasksById(host, "0")).rejects.toThrowError("Invalid location id");
     await expect(updateLocationGanttTaskById(host, "42", 0, {
-      title: "OPS",
-      startDate: "2026-04-01",
-      endDate: "2026-04-02",
-      description: null
-    })).rejects.toThrowError("Invalid task id");
+        title: "OPS",
+        startDate: "2026-04-01",
+        endDate: "2026-04-02",
+        description: null,
+        dependencyTaskIds: []
+      })).rejects.toThrowError("Invalid task id");
     expect(apiFetchMock).not.toHaveBeenCalled();
   });
 });

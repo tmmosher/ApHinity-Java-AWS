@@ -4,6 +4,8 @@ import {GanttTaskCreatePopover} from "./GanttTaskCreatePopover";
 import type {CreateLocationGanttTaskRequest} from "../../types/Types";
 
 type GanttChartContentProps = {
+  apiHost: string;
+  locationId: string;
   onSearchInput: JSX.EventHandler<HTMLInputElement, InputEvent>;
   searchDraft: string;
   taskLoadError?: string;
@@ -36,7 +38,11 @@ export const GanttChartContent = (props: GanttChartContentProps) => (
             onInput={props.onSearchInput}
           />
         </label>
-        <GanttTaskCreatePopover onCreate={props.onCreateTask} />
+        <GanttTaskCreatePopover
+          apiHost={props.apiHost}
+          locationId={props.locationId}
+          onCreate={props.onCreateTask}
+        />
       </div>
     </Show>
 

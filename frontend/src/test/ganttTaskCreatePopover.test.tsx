@@ -22,6 +22,8 @@ import {JSX} from "solid-js";
 describe("GanttTaskCreatePopover", () => {
   it("renders a trigger and create form with the expected task fields", () => {
     const html = renderToString(() => GanttTaskCreatePopover({
+      apiHost: "https://example.test",
+      locationId: "42",
       onCreate: async () => undefined
     }));
 
@@ -31,12 +33,16 @@ describe("GanttTaskCreatePopover", () => {
     expect(html).toContain("Start date");
     expect(html).toContain("End date");
     expect(html).toContain("Description");
+    expect(html).toContain("Dependencies");
     expect(html).toContain("data-gantt-task-create-trigger");
     expect(html).toContain("data-gantt-task-create-popover");
+    expect(html).toContain("data-gantt-task-dependencies");
   });
 
   it("uses fixed positioning and cross-axis shift-friendly popover defaults", () => {
     renderToString(() => GanttTaskCreatePopover({
+      apiHost: "https://example.test",
+      locationId: "42",
       onCreate: async () => undefined
     }));
 

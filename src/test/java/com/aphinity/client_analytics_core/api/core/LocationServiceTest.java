@@ -31,6 +31,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -648,6 +649,11 @@ class LocationServiceTest {
                     Map.of("color", "#FF000030", "range", List.of(30L, 60L)),
                     Map.of("color", "#FFFF0030", "range", List.of(60L, 90L)),
                     Map.of("color", "#00800030", "range", List.of(90L, 100L))
+                ),
+                "threshold", Map.of(
+                    "line", Map.of("color", "red", "width", 2L),
+                    "thickness", new BigDecimal("0.75"),
+                    "value", 90L
                 )
             ),
             traces.getFirst().get("gauge")

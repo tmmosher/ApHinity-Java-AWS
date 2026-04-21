@@ -13,6 +13,7 @@ export type FrappeGanttChartTask = {
   progress: number;
   custom_class?: string;
   description: string | null;
+  dependencies: string[];
 };
 
 export type TimelineTaskLike = LocationGanttTask & {
@@ -30,7 +31,8 @@ export const toFrappeGanttTask = (task: TimelineTaskLike): FrappeGanttChartTask 
   end: task.endDate,
   progress: 0,
   custom_class: isStagedGanttTask(task) ? "gantt-task-staged" : "gantt-task-persisted",
-  description: task.description
+  description: task.description,
+  dependencies: task.dependencyTaskIds.map((dependencyTaskId) => String(dependencyTaskId))
 });
 
 export const resolveFrappeGanttContainerHeight = (height: number): number => (
@@ -46,7 +48,7 @@ export const createFrappeGanttOptions = (
   popup: () => false,
   view_mode: "Day",
   date_format: "YYYY-MM-DD",
-  scroll_to: "start",
+  scroll_to: "today",
   infinite_padding: true,
   container_height: resolveFrappeGanttContainerHeight(containerHeight),
   on_click: onClick

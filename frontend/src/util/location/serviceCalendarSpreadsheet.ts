@@ -4,8 +4,17 @@ import type {
   ServiceEventResponsibility,
   ServiceEventStatus
 } from "../../types/Types";
-import type {WorkSheet} from "xlsx";
 import {SERVICE_EVENT_TITLE_MAX_LENGTH, canChooseServiceEventResponsibility} from "./serviceEventForm";
+import {
+  getFirstWorksheetFromWorkbook,
+  isEmptyXlsxRow as isEmptySpreadsheetRow,
+  loadXlsxModule,
+  loadXlsxWorkbookFromFile,
+  normalizeXlsxCellString as normalizeCellString,
+  parseXlsxDateCell as parseDateCell,
+  parseXlsxSheetRows as parseSheetRows,
+  validateXlsxHeaders as validateHeaders
+} from "./xlsxSpreadsheet";
 
 const SERVICE_CALENDAR_HEADERS = [
   "Title",
@@ -22,34 +31,16 @@ const OPTIONAL_SERVICE_CALENDAR_HEADERS = ["Status"] as const;
 const ALL_DAY_START_TIME = "00:00:00";
 const ALL_DAY_END_TIME = "23:59:59";
 const DEFAULT_STATUS = "upcoming" as const;
-const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type SpreadsheetHeader = (typeof SERVICE_CALENDAR_HEADERS)[number];
 type OptionalSpreadsheetHeader = (typeof OPTIONAL_SERVICE_CALENDAR_HEADERS)[number];
 
 type SpreadsheetRowRecord = Partial<Record<SpreadsheetHeader | OptionalSpreadsheetHeader, unknown>>;
 
-type XlsxModule = typeof import("xlsx");
-
-const loadXlsxModule = async (): Promise<XlsxModule> => import("xlsx");
-
 const padNumber = (value: number): string => value.toString().padStart(2, "0");
-
-const formatDateValue = (date: Date): string => (
-  `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`
-);
-
-const formatDateValueUtc = (date: Date): string => (
-  `${date.getUTCFullYear()}-${padNumber(date.getUTCMonth() + 1)}-${padNumber(date.getUTCDate())}`
-);
 
 const formatTimeValue = (hours: number, minutes: number, seconds: number): string => (
   `${padNumber(hours)}:${padNumber(minutes)}:${padNumber(seconds)}`
-);
-
-const normalizeCellString = (value: unknown): string => (
-  typeof value === "string" ? value.trim() : ""
 );
 
 const parseBooleanCell = (value: unknown, rowNumber: number): boolean => {
@@ -108,74 +99,6 @@ const parseStatusCell = (value: unknown, rowNumber: number): ServiceEventStatus 
     return normalized;
   }
   throw new Error(`Row ${rowNumber}: Status must be Upcoming, Current, Overdue, or Completed.`);
-};
-
-const createExcelSerialDate = (value: number): Date => (
-  new Date(EXCEL_EPOCH_UTC + Math.round(value * MILLISECONDS_PER_DAY))
-);
-
-const parseDateString = (value: string): Date | null => {
-  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
-  if (isoMatch) {
-    const [, yearText, monthText, dayText] = isoMatch;
-    const year = Number(yearText);
-    const month = Number(monthText);
-    const day = Number(dayText);
-    const parsed = new Date(Date.UTC(year, month - 1, day));
-    return Number.isNaN(parsed.getTime())
-      || parsed.getUTCFullYear() !== year
-      || parsed.getUTCMonth() !== month - 1
-      || parsed.getUTCDate() !== day
-      ? null
-      : parsed;
-  }
-
-  const usMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(value);
-  if (usMatch) {
-    const [, monthText, dayText, yearText] = usMatch;
-    const normalizedYear = yearText.length === 2 ? 2000 + Number(yearText) : Number(yearText);
-    const month = Number(monthText);
-    const day = Number(dayText);
-    const parsed = new Date(Date.UTC(normalizedYear, month - 1, day));
-    return Number.isNaN(parsed.getTime())
-      || parsed.getUTCFullYear() !== normalizedYear
-      || parsed.getUTCMonth() !== month - 1
-      || parsed.getUTCDate() !== day
-      ? null
-      : parsed;
-  }
-
-  return null;
-};
-
-const parseDateCell = (value: unknown, rowNumber: number, label: "Start Date" | "End Date"): string | null => {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) {
-      throw new Error(`Row ${rowNumber}: ${label} is invalid.`);
-    }
-    return formatDateValueUtc(value);
-  }
-  if (typeof value === "number") {
-    if (value < 1) {
-      throw new Error(`Row ${rowNumber}: ${label} is invalid.`);
-    }
-    return formatDateValueUtc(createExcelSerialDate(value));
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim();
-    if (!normalized) {
-      return null;
-    }
-    const parsed = parseDateString(normalized);
-    if (parsed) {
-      return formatDateValueUtc(parsed);
-    }
-  }
-
-  throw new Error(`Row ${rowNumber}: ${label} is invalid.`);
 };
 
 const parseTimeString = (value: string): string | null => {
@@ -259,46 +182,6 @@ const validateDateRange = (
   }
 };
 
-const parseSheetRows = (sheet: WorkSheet, xlsx: XlsxModule): SpreadsheetRowRecord[] => (
-  xlsx.utils.sheet_to_json<SpreadsheetRowRecord>(sheet, {
-    defval: null,
-    raw: true,
-    blankrows: false
-  })
-);
-
-const validateHeaders = (sheet: WorkSheet, xlsx: XlsxModule): void => {
-  const [headerRow = []] = xlsx.utils.sheet_to_json<unknown[]>(sheet, {
-    header: 1,
-    raw: false,
-    blankrows: false,
-    range: 0
-  });
-
-  if (headerRow.length === 0 || headerRow.every((value) => normalizeCellString(value) === "")) {
-    throw new Error("Spreadsheet is missing the header row.");
-  }
-
-  const normalizedHeaders = new Set(headerRow.map((value) => normalizeCellString(value)));
-  const missingHeaders = SERVICE_CALENDAR_HEADERS.filter((header) => !normalizedHeaders.has(header));
-  if (missingHeaders.length > 0) {
-    throw new Error(`Spreadsheet is missing required columns: ${missingHeaders.join(", ")}.`);
-  }
-};
-
-const isEmptySpreadsheetRow = (row: SpreadsheetRowRecord): boolean => (
-  SERVICE_CALENDAR_HEADERS.every((header) => {
-    const value = row[header];
-    if (value === null || value === undefined) {
-      return true;
-    }
-    if (typeof value === "string") {
-      return value.trim() === "";
-    }
-    return false;
-  })
-);
-
 const parseSpreadsheetRow = (
   row: SpreadsheetRowRecord,
   role: AccountRole | undefined,
@@ -371,39 +254,22 @@ export const parseServiceCalendarSpreadsheetFile = async (
   file: File,
   role: AccountRole | undefined
 ): Promise<CreateLocationServiceEventRequest[]> => {
-  if (!(file instanceof File)) {
-    throw new Error("Select an .xlsx spreadsheet to import.");
-  }
-  if (!file.name.toLowerCase().endsWith(".xlsx")) {
-    throw new Error("Only .xlsx spreadsheets are supported.");
-  }
-
-  const xlsx = await loadXlsxModule();
-  let workbook;
-  try {
-    workbook = xlsx.read(await file.arrayBuffer(), {
-      type: "array",
+  const {xlsx, workbook} = await loadXlsxWorkbookFromFile(file, {
+    readOptions: {
       cellDates: true
-    });
-  } catch {
-    throw new Error("Spreadsheet could not be read.");
-  }
+    }
+  });
+  const sheet = getFirstWorksheetFromWorkbook(
+    workbook,
+    "Spreadsheet does not contain any worksheets.",
+    "Spreadsheet worksheet could not be read."
+  );
 
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) {
-    throw new Error("Spreadsheet does not contain any worksheets.");
-  }
-
-  const sheet = workbook.Sheets[firstSheetName];
-  if (!sheet) {
-    throw new Error("Spreadsheet worksheet could not be read.");
-  }
-
-  validateHeaders(sheet, xlsx);
+  validateHeaders(sheet, xlsx, SERVICE_CALENDAR_HEADERS);
 
   const parsedEvents = parseSheetRows(sheet, xlsx)
     .map((row, index) => ({row, rowNumber: index + 2}))
-    .filter(({row}) => !isEmptySpreadsheetRow(row))
+    .filter(({row}) => !isEmptySpreadsheetRow(row, SERVICE_CALENDAR_HEADERS))
     .map(({row, rowNumber}) => parseSpreadsheetRow(row, role, rowNumber));
 
   if (parsedEvents.length === 0) {

@@ -16,6 +16,8 @@ import {
 import {GanttTaskEditorBody, type UpdateGanttTaskDraftFn} from "./GanttTaskEditor";
 
 type GanttTaskPopoverProps = {
+  apiHost: string;
+  locationId: string;
   task: TimelineTaskLike;
   canEdit: boolean;
   anchorStyle?: JSX.CSSProperties;
@@ -291,6 +293,10 @@ export const GanttTaskPopover = (props: ParentProps<GanttTaskPopoverProps>) => {
                 onDelete={() => {
                   void remove();
                 }}
+                dependencyDialogApiHost={props.apiHost}
+                dependencyDialogLocationId={props.locationId}
+                dependencyDialogCurrentTaskId={props.task.id}
+                dependencyDialogCurrentTaskTitle={draft().title || props.task.title}
                 updateDraft={updateDraft}
               />
             </div>

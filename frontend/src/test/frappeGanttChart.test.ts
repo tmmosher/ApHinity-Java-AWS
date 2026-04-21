@@ -16,6 +16,7 @@ describe("frappeGanttChart", () => {
         startDate: "2026-04-01",
         endDate: "2026-04-10",
         description: null,
+        dependencyTaskIds: [],
         createdAt: "2026-03-01T00:00:00Z",
         updatedAt: "2026-03-02T00:00:00Z"
       })
@@ -26,7 +27,8 @@ describe("frappeGanttChart", () => {
       end: "2026-04-10",
       progress: 0,
       custom_class: "gantt-task-persisted",
-      description: null
+      description: null,
+      dependencies: []
     });
   });
 
@@ -38,6 +40,7 @@ describe("frappeGanttChart", () => {
         startDate: "2026-04-11",
         endDate: "2026-04-12",
         description: "Draft",
+        dependencyTaskIds: [9, 4],
         createdAt: "2026-03-01T00:00:00Z",
         updatedAt: "2026-03-02T00:00:00Z",
         isStaged: true
@@ -49,7 +52,26 @@ describe("frappeGanttChart", () => {
       end: "2026-04-12",
       progress: 0,
       custom_class: "gantt-task-staged",
-      description: "Draft"
+      description: "Draft",
+      dependencies: ["9", "4"]
+    });
+  });
+
+  it("maps dependency ids into Frappe Gantt dependency strings", () => {
+    expect(
+      toFrappeGanttTask({
+        id: 99,
+        title: "Dependent task",
+        startDate: "2026-04-11",
+        endDate: "2026-04-12",
+        description: "Draft",
+        dependencyTaskIds: [12, 7, 12],
+        createdAt: "2026-03-01T00:00:00Z",
+        updatedAt: "2026-03-02T00:00:00Z"
+      })
+    ).toMatchObject({
+      id: "99",
+      dependencies: ["12", "7", "12"]
     });
   });
 
@@ -71,7 +93,7 @@ describe("frappeGanttChart", () => {
       popup_on: "click",
       view_mode: "Day",
       date_format: "YYYY-MM-DD",
-      scroll_to: "start",
+      scroll_to: "today",
       infinite_padding: true,
       container_height: 513
     });

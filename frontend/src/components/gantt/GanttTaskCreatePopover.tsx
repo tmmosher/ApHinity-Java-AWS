@@ -10,6 +10,8 @@ import {SERVICE_EVENT_POPOVER_POSITION_PROPS} from "../../util/location/serviceE
 import {GanttTaskEditorBody, type UpdateGanttTaskDraftFn} from "./GanttTaskEditor";
 
 type GanttTaskCreatePopoverProps = {
+  apiHost: string;
+  locationId: string;
   onCreate: (request: CreateLocationGanttTaskRequest) => Promise<void>;
 };
 
@@ -113,6 +115,9 @@ export const GanttTaskCreatePopover = (props: GanttTaskCreatePopoverProps) => {
               onSubmit={() => {
                 void submit();
               }}
+              dependencyDialogApiHost={props.apiHost}
+              dependencyDialogLocationId={props.locationId}
+              dependencyDialogCurrentTaskTitle={draft().title || "this new gantt task"}
               updateDraft={updateDraft}
             />
           </div>

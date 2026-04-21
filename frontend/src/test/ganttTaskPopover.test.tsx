@@ -22,12 +22,15 @@ const baseTask = {
   endDate: "2026-04-10",
   description: "Planned outage",
   createdAt: "2026-03-01T00:00:00Z",
-  updatedAt: "2026-03-02T00:00:00Z"
+  updatedAt: "2026-03-02T00:00:00Z",
+  dependencyTaskIds: []
 };
 
 describe("GanttTaskPopover", () => {
   it("renders an information-first popover with an edit action for privileged users", () => {
     const html = renderToString(() => GanttTaskPopover({
+      apiHost: "https://example.test",
+      locationId: "42",
       task: baseTask,
       canEdit: true,
       onSave: async () => undefined,
@@ -45,6 +48,8 @@ describe("GanttTaskPopover", () => {
 
   it("hides the edit action when the viewer cannot edit gantt tasks", () => {
     const html = renderToString(() => GanttTaskPopover({
+      apiHost: "https://example.test",
+      locationId: "42",
       task: baseTask,
       canEdit: false,
       onSave: async () => undefined,

@@ -10,6 +10,7 @@ import com.aphinity.client_analytics_core.api.core.response.gantt.GanttTaskRespo
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttChartTemplateService;
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskAuditService;
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskAuthorizationService;
+import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskDependencyService;
 import com.aphinity.client_analytics_core.api.core.services.gantt.GanttTaskRequestMapper;
 import com.aphinity.client_analytics_core.api.core.services.gantt.LocationGanttTaskService;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +40,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class LocationGanttTaskServiceTest {
@@ -53,6 +54,9 @@ class LocationGanttTaskServiceTest {
 
     @Mock
     private GanttTaskAuditService auditService;
+
+    @Mock
+    private GanttTaskDependencyService dependencyService;
 
     @Spy
     private GanttTaskRequestMapper requestMapper = new GanttTaskRequestMapper();
@@ -72,10 +76,16 @@ class LocationGanttTaskServiceTest {
         when(authorizationService.requireUser(5L)).thenReturn(user);
         doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
         when(ganttTaskRepository.findVisibleByLocationIdAndTitleSearch(99L, "ops")).thenReturn(List.of(first, second));
+        when(dependencyService.findDependencyTaskIdsByTaskIds(99L, List.of(31L, 32L))).thenReturn(Map.of(
+            31L,
+            List.of(91L, 92L)
+        ));
 
         List<GanttTaskResponse> response = locationGanttTaskService.getAccessibleLocationTasks(5L, 99L, "  ops ");
 
         assertEquals(List.of("OPS", "QMS"), response.stream().map(GanttTaskResponse::title).toList());
+        assertEquals(List.of(91L, 92L), response.getFirst().dependencyTaskIds());
+        assertTrue(response.get(1).dependencyTaskIds().isEmpty());
         verify(authorizationService).requireUser(5L);
         verify(authorizationService).requireReadableLocationAccess(user, 99L);
         verify(ganttTaskRepository).findVisibleByLocationIdAndTitleSearch(99L, "ops");
@@ -103,6 +113,7 @@ class LocationGanttTaskServiceTest {
         when(authorizationService.requireUser(5L)).thenReturn(user);
         doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
         when(ganttTaskRepository.findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(99L)).thenReturn(List.of(first));
+        when(dependencyService.findDependencyTaskIdsByTaskIds(99L, List.of(31L))).thenReturn(Map.of());
 
         List<GanttTaskResponse> response = locationGanttTaskService.getAccessibleLocationTasks(5L, 99L, null);
 
@@ -129,18 +140,29 @@ class LocationGanttTaskServiceTest {
             task.setUpdatedAt(Instant.parse("2026-03-01T00:00:00Z"));
             return task;
         });
+        when(dependencyService.replaceDependencies(any(GanttTask.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<Long> dependencyTaskIds = invocation.getArgument(1, List.class);
+            return dependencyTaskIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .sorted()
+                .toList();
+        });
 
         GanttTaskResponse response = locationGanttTaskService.createLocationTask(
             5L,
             99L,
-            request("  OPS  ", "  Operational update  ")
+            request("  OPS  ", "  Operational update  ", List.of(13L, 7L, 13L))
         );
 
         assertEquals(44L, response.id());
         assertEquals("OPS", response.title());
         assertEquals("Operational update", response.description());
+        assertEquals(List.of(7L, 13L), response.dependencyTaskIds());
         verify(ganttTaskRepository).saveAndFlush(any(GanttTask.class));
-        verify(auditService).recordCreated(eq(5L), any(GanttTask.class));
+        verify(dependencyService).replaceDependencies(any(GanttTask.class), eq(List.of(13L, 7L, 13L)));
+        verify(auditService).recordCreated(eq(5L), any(GanttTask.class), eq(List.of(7L, 13L)));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
@@ -181,20 +203,34 @@ class LocationGanttTaskServiceTest {
             }
             return persisted;
         });
+        when(dependencyService.replaceDependencies(any(GanttTask.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<Long> dependencyTaskIds = invocation.getArgument(1, List.class);
+            return dependencyTaskIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .sorted()
+                .toList();
+        });
 
         List<GanttTaskResponse> response = locationGanttTaskService.createLocationTasksBulk(
             5L,
             99L,
             List.of(
-                request("OPS", "Ops update"),
-                request("QMS", "Quality update")
+                request("OPS", "Ops update", List.of(9L)),
+                request("QMS", "Quality update", List.of(4L, 8L, 4L))
             )
         );
 
         assertEquals(2, response.size());
         assertEquals(List.of("OPS", "QMS"), response.stream().map(GanttTaskResponse::title).toList());
+        assertEquals(List.of(9L), response.get(0).dependencyTaskIds());
+        assertEquals(List.of(4L, 8L), response.get(1).dependencyTaskIds());
         verify(ganttTaskRepository).saveAllAndFlush(any());
-        verify(auditService, times(2)).recordCreated(eq(5L), any(GanttTask.class));
+        verify(dependencyService).replaceDependencies(any(GanttTask.class), eq(List.of(9L)));
+        verify(dependencyService).replaceDependencies(any(GanttTask.class), eq(List.of(4L, 8L, 4L)));
+        verify(auditService).recordCreated(eq(5L), any(GanttTask.class), eq(List.of(9L)));
+        verify(auditService).recordCreated(eq(5L), any(GanttTask.class), eq(List.of(4L, 8L)));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
@@ -226,18 +262,29 @@ class LocationGanttTaskServiceTest {
         doNothing().when(authorizationService).requireLocationExists(99L);
         when(ganttTaskRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(task));
         when(ganttTaskRepository.saveAndFlush(task)).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dependencyService.replaceDependencies(any(GanttTask.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<Long> dependencyTaskIds = invocation.getArgument(1, List.class);
+            return dependencyTaskIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .sorted()
+                .toList();
+        });
 
         GanttTaskResponse response = locationGanttTaskService.updateLocationTask(
             5L,
             99L,
             44L,
-            request("QMS", "Updated")
+            request("QMS", "Updated", List.of(6L, 2L))
         );
 
         assertEquals("QMS", response.title());
         assertEquals("Updated", response.description());
+        assertEquals(List.of(2L, 6L), response.dependencyTaskIds());
         verify(ganttTaskRepository).saveAndFlush(task);
-        verify(auditService).recordUpdated(eq(5L), any(GanttTask.class));
+        verify(dependencyService).replaceDependencies(task, List.of(6L, 2L));
+        verify(auditService).recordUpdated(eq(5L), any(GanttTask.class), eq(List.of(2L, 6L)));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
@@ -276,7 +323,8 @@ class LocationGanttTaskServiceTest {
                     "OPS",
                     LocalDate.parse("2026-04-10"),
                     LocalDate.parse("2026-04-01"),
-                    "desc"
+                    "desc",
+                    List.of()
                 )
             )
         );
@@ -296,10 +344,11 @@ class LocationGanttTaskServiceTest {
         when(authorizationService.requireUser(5L)).thenReturn(user);
         doNothing().when(authorizationService).requireWritePermission(user, 99L);
         when(ganttTaskRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(task));
+        when(dependencyService.findDependencyTaskIds(99L, 44L)).thenReturn(List.of(2L, 11L));
 
         locationGanttTaskService.deleteLocationTask(5L, 99L, 44L, actorIpAddress);
 
-        verify(auditService).recordDeleted(5L, actorIpAddress, task);
+        verify(auditService).recordDeleted(5L, actorIpAddress, task, List.of(2L, 11L));
         verify(ganttTaskRepository).delete(task);
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
@@ -322,11 +371,16 @@ class LocationGanttTaskServiceTest {
     }
 
     private LocationGanttTaskRequest request(String title, String description) {
+        return request(title, description, List.of());
+    }
+
+    private LocationGanttTaskRequest request(String title, String description, List<Long> dependencyTaskIds) {
         return new LocationGanttTaskRequest(
             title,
             LocalDate.parse("2026-04-01"),
             LocalDate.parse("2026-04-10"),
-            description
+            description,
+            dependencyTaskIds
         );
     }
 

@@ -63,7 +63,7 @@ export const LocationGanttChartPanel = () => {
   const [ganttContainerHeight, setGanttContainerHeight] = createSignal(1);
   let ganttChart: Gantt | undefined;
   let ganttResizeObserver: ResizeObserver | undefined;
-  let csvUploadInput: HTMLInputElement | undefined;
+  let spreadsheetUploadInput: HTMLInputElement | undefined;
 
   onCleanup(() => {
     ganttResizeObserver?.disconnect();
@@ -77,8 +77,8 @@ export const LocationGanttChartPanel = () => {
   };
 
   const clearUploadInput = (): void => {
-    if (csvUploadInput) {
-      csvUploadInput.value = "";
+    if (spreadsheetUploadInput) {
+      spreadsheetUploadInput.value = "";
     }
   };
 
@@ -311,20 +311,20 @@ export const LocationGanttChartPanel = () => {
       <GanttChartToolbar
         canEdit={canEditTasks()}
         templateHref={ganttChartTemplateHref()}
-        isImportingCsv={importController.isImportingCsv()}
+        isImportingSpreadsheet={importController.isImportingSpreadsheet()}
         isApplyingImports={importController.isApplyingImports()}
         hasStagedTasks={importController.hasStagedTasks()}
         hasPendingTaskChanges={importController.hasPendingTaskChanges()}
-        csvUploadInputRef={(element) => {
-          csvUploadInput = element;
+        spreadsheetUploadInputRef={(element) => {
+          spreadsheetUploadInput = element;
         }}
-        onCsvUploadChange={(event) => {
+        onSpreadsheetUploadChange={(event) => {
           const input = event.currentTarget;
           const file = input.files?.[0];
           if (!file) {
             return;
           }
-          void importController.stageCsvImportFile(file)
+          void importController.stageSpreadsheetImportFile(file)
             .finally(() => {
               input.value = "";
             });
@@ -336,6 +336,8 @@ export const LocationGanttChartPanel = () => {
       />
 
       <GanttChartContent
+        apiHost={host}
+        locationId={params.locationId}
         searchDraft={searchControl.searchDraft()}
         onSearchInput={(event) => {
           searchControl.updateSearchDraft(event.currentTarget.value);
@@ -352,6 +354,8 @@ export const LocationGanttChartPanel = () => {
       <Show when={selectedTask()}>
         {(task) => (
           <GanttTaskPopover
+            apiHost={host}
+            locationId={params.locationId}
             task={task()}
             canEdit={canEditTasks()}
             anchorStyle={selectedTaskAnchorStyle()}

@@ -10,6 +10,7 @@ export type GanttTaskDraft = {
   startDate: string;
   endDate: string;
   description: string;
+  dependencyTaskIds: number[];
 };
 
 export const GANTT_TASK_TITLE_MIN_LENGTH = 3;
@@ -25,7 +26,8 @@ export const createDefaultGanttTaskDraft = (now: Date = new Date()): GanttTaskDr
     title: "",
     startDate: today,
     endDate: today,
-    description: ""
+    description: "",
+    dependencyTaskIds: []
   };
 };
 
@@ -33,7 +35,8 @@ export const createGanttTaskDraftFromTask = (task: LocationGanttTask): GanttTask
   title: task.title,
   startDate: task.startDate,
   endDate: task.endDate,
-  description: task.description ?? ""
+  description: task.description ?? "",
+  dependencyTaskIds: normalizeGanttTaskDependencyTaskIds(task.dependencyTaskIds)
 });
 
 export const createLocationGanttTaskRequestFromDraft = (
@@ -67,6 +70,23 @@ export const createLocationGanttTaskRequestFromDraft = (
     title: normalizedTitle,
     startDate: draft.startDate,
     endDate: draft.endDate,
-    description: draft.description.trim() ? draft.description.trim() : null
+    description: draft.description.trim() ? draft.description.trim() : null,
+    dependencyTaskIds: normalizeGanttTaskDependencyTaskIds(draft.dependencyTaskIds)
   };
+};
+
+export const normalizeGanttTaskDependencyTaskIds = (
+  dependencyTaskIds: readonly number[] | null | undefined
+): number[] => {
+  if (!dependencyTaskIds || dependencyTaskIds.length === 0) {
+    return [];
+  }
+
+  return [...new Set(
+    dependencyTaskIds.filter((dependencyTaskId): dependencyTaskId is number => (
+      typeof dependencyTaskId === "number"
+      && Number.isFinite(dependencyTaskId)
+      && dependencyTaskId > 0
+    ))
+  )].sort((left, right) => left - right);
 };

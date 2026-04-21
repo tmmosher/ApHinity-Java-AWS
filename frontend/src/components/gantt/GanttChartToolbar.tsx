@@ -4,12 +4,12 @@ import {GanttChartToolbarContent} from "./GanttChartToolbarContent";
 type GanttChartToolbarProps = {
   canEdit: boolean;
   templateHref: string;
-  isImportingCsv: boolean;
+  isImportingSpreadsheet: boolean;
   isApplyingImports: boolean;
   hasStagedTasks: boolean;
   hasPendingTaskChanges: boolean;
-  csvUploadInputRef: (element: HTMLInputElement) => void;
-  onCsvUploadChange: JSX.EventHandler<HTMLInputElement, Event>;
+  spreadsheetUploadInputRef: (element: HTMLInputElement) => void;
+  onSpreadsheetUploadChange: JSX.EventHandler<HTMLInputElement, Event>;
   onApply: () => void;
   onUndo: () => void;
 };
@@ -22,7 +22,7 @@ const toolbarUploadInputClassInactive =
   "btn hover:btn-soft h-11 min-h-11 rounded-2xl text-sm md:w-auto flex-initial";
 
 export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
-  const isBusy = props.isImportingCsv || props.isApplyingImports;
+  const isBusy = props.isImportingSpreadsheet || props.isApplyingImports;
 
   return (
     <section
@@ -43,10 +43,10 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
 
             <Show when={props.canEdit}>
               <label
-                for="gantt_csv_upload"
+                for="gantt_spreadsheet_upload"
                 class={toolbarUploadInputClassInactive + (isBusy ? " btn-disabled" : "")}
               >
-                <span class="sr-only">Upload CSV</span>
+                <span class="sr-only">Upload Excel spreadsheet</span>
                 {/*got this svg from https://lucide.dev/icons/upload*/}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -66,13 +66,13 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
                 </svg>
               </label>
               <input
-                id="gantt_csv_upload"
+                id="gantt_spreadsheet_upload"
                 type="file"
-                ref={props.csvUploadInputRef}
+                ref={props.spreadsheetUploadInputRef}
                 class="hidden"
-                accept=".csv"
+                accept=".xlsx"
                 disabled={isBusy}
-                onChange={props.onCsvUploadChange}
+                onChange={props.onSpreadsheetUploadChange}
               />
               <button
                 type="button"

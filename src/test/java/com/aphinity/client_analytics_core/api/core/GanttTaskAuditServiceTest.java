@@ -29,7 +29,7 @@ class GanttTaskAuditServiceTest {
             GanttTaskAuditService auditService = new GanttTaskAuditService(asyncLogService);
             GanttTask task = ganttTask();
 
-            auditService.recordDeleted(5L, "203.0.113.8", task);
+            auditService.recordDeleted(5L, "203.0.113.8", task, List.of(11L, 3L, 11L));
             stopAsyncLogService(asyncLogService);
 
             try (var files = Files.list(tempDir)) {
@@ -45,6 +45,7 @@ class GanttTaskAuditServiceTest {
                 assertTrue(content.contains("locationId=99"));
                 assertTrue(content.contains("title=\"OPS\""));
                 assertTrue(content.contains("description=\"Ops update\""));
+                assertTrue(content.contains("dependencyTaskIds=[3, 11]"));
             }
         } finally {
             stopAsyncLogService(asyncLogService);

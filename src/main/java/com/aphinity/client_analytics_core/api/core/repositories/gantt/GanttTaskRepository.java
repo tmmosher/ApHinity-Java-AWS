@@ -7,9 +7,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface GanttTaskRepository extends JpaRepository<GanttTask, Long> {
     List<GanttTask> findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(Long locationId);
+
+    List<GanttTask> findByLocation_IdAndIdInOrderByIdAsc(Long locationId, Collection<Long> ganttTaskIds);
 
     @Query("""
         select ganttTask from GanttTask ganttTask

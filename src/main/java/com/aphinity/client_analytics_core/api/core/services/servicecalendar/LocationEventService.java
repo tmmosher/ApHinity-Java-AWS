@@ -118,6 +118,7 @@ public class LocationEventService {
 
         ServiceEvent sourceEvent = serviceEventRepository.findByIdAndLocation_Id(sourceEventId, locationId)
             .orElseThrow(this::locationEventNotFound);
+        authorizationService.requireCreateCorrectiveActionPermission(user, locationId, sourceEvent);
         authorizationService.requireCreatePermission(user, locationId, responsibility);
 
         ServiceEvent correctiveAction = requestMapper.createServiceEvent(sourceEvent.getLocation(), request);

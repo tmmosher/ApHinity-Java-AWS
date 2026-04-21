@@ -456,6 +456,47 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void createCorrectiveActionRejectsClientWhenSourceEventIsPartnerOwned() throws Exception {
+        AppUser client = createUser("client-corrective-action-partner@example.com", PASSWORD, true, "client");
+        Location location = createLocation("Scottsdale");
+        addMembership(location, client);
+        ServiceEvent sourceEvent = createServiceEvent(
+            location,
+            "Partner inspection",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-14"),
+            LocalTime.parse("09:00:00"),
+            "Partner-owned event",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("client-corrective-action-partner@example.com", PASSWORD);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/events/{sourceEventId}/corrective-actions", location.getId(), sourceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Client corrective action",
+                          "responsibility": "client",
+                          "date": "2026-04-15",
+                          "time": "10:15:00",
+                          "endDate": "2026-04-15",
+                          "endTime": "12:00:00",
+                          "description": "Attempted unauthorized corrective action",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+
+        assertEquals(1L, serviceEventRepository.count());
+    }
+
+    @Test
     void updateLocationEventAllowsPartnerAndPersistsChanges() throws Exception {
         createUser("partner-events-update@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Peoria");

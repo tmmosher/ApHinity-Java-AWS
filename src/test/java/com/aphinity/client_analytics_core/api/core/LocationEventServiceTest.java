@@ -225,6 +225,7 @@ class LocationEventServiceTest {
 
         when(authorizationService.requireUser(5L)).thenReturn(user);
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
+        doNothing().when(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.PARTNER);
         when(authorizationService.isPartnerOrAdmin(user)).thenReturn(true);
         when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
@@ -249,6 +250,7 @@ class LocationEventServiceTest {
         assertEquals("Source Event", response.correctiveActionSourceEventTitle());
         verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
         verify(auditService).recordCreated(eq(5L), any(ServiceEvent.class));
+        verify(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         verify(correctiveActionEmailService).sendCorrectiveActionWorkOrderEmail(
             eq(99L),
             eq(sourceEvent),
@@ -265,9 +267,11 @@ class LocationEventServiceTest {
         location.setId(99L);
         ServiceEvent sourceEvent = serviceEvent(44L, "Source Event");
         sourceEvent.setLocation(location);
+        sourceEvent.setResponsibility(ServiceEventResponsibility.CLIENT);
 
         when(authorizationService.requireUser(5L)).thenReturn(user);
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
+        doNothing().when(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.CLIENT);
         when(authorizationService.isPartnerOrAdmin(user)).thenReturn(false);
         when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
@@ -287,6 +291,7 @@ class LocationEventServiceTest {
 
         assertTrue(response.correctiveAction());
         assertEquals(44L, response.correctiveActionSourceEventId());
+        verify(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         verify(correctiveActionEmailService, never()).sendCorrectiveActionWorkOrderEmail(any(), any(), any(), any());
     }
 

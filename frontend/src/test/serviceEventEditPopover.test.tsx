@@ -112,6 +112,22 @@ describe("ServiceEventEditPopover", () => {
     expect(html).toContain("data-service-event-create-corrective-action");
   });
 
+  it("hides corrective-action creation for clients viewing partner-responsibility events", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        responsibility: "partner"
+      },
+      canEdit: false,
+      canComplete: false,
+      role: "client",
+      onCreateCorrectiveAction: async () => undefined,
+      children: "Open"
+    }));
+
+    expect(html).not.toContain("data-service-event-create-corrective-action");
+  });
+
   it("hides the corrective-action button for corrective-action events", () => {
     const html = renderToString(() => ServiceEventEditPopover({
       event: {

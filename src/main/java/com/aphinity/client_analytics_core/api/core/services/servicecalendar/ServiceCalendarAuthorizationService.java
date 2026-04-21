@@ -68,6 +68,20 @@ public class ServiceCalendarAuthorizationService {
         throw forbidden();
     }
 
+    public void requireCreateCorrectiveActionPermission(
+        AppUser user,
+        Long locationId,
+        ServiceEvent sourceEvent
+    ) {
+        if (accountRoleService.isPartnerOrAdmin(user)) {
+            return;
+        }
+        if (sourceEvent.getResponsibility() == ServiceEventResponsibility.CLIENT && hasLocationAccess(user, locationId)) {
+            return;
+        }
+        throw forbidden();
+    }
+
     public void requireUpdatePermission(
         AppUser user,
         Long locationId,

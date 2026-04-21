@@ -129,6 +129,7 @@ export interface LocationGanttTask {
     description: string | null;
     createdAt: string;
     updatedAt: string;
+    dependencyTaskIds: number[];
 }
 
 export interface CreateLocationGanttTaskRequest {
@@ -136,6 +137,7 @@ export interface CreateLocationGanttTaskRequest {
     startDate: string;
     endDate: string;
     description: string | null;
+    dependencyTaskIds: number[];
 }
 
 export interface ManagedUser {

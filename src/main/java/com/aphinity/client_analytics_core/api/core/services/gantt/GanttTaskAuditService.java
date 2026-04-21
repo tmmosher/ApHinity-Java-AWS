@@ -6,6 +6,8 @@ import com.aphinity.client_analytics_core.api.core.entities.gantt.GanttTaskAudit
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class GanttTaskAuditService {
     private final AsyncLogService asyncLogService;
@@ -15,24 +17,37 @@ public class GanttTaskAuditService {
     }
 
     public void recordCreated(Long actorUserId, GanttTask task) {
-        record(actorUserId, null, task, GanttTaskAuditAction.CREATED);
+        recordCreated(actorUserId, task, List.of());
+    }
+
+    public void recordCreated(Long actorUserId, GanttTask task, List<Long> dependencyTaskIds) {
+        record(actorUserId, null, task, dependencyTaskIds, GanttTaskAuditAction.CREATED);
     }
 
     public void recordUpdated(Long actorUserId, GanttTask task) {
-        record(actorUserId, null, task, GanttTaskAuditAction.UPDATED);
+        recordUpdated(actorUserId, task, List.of());
+    }
+
+    public void recordUpdated(Long actorUserId, GanttTask task, List<Long> dependencyTaskIds) {
+        record(actorUserId, null, task, dependencyTaskIds, GanttTaskAuditAction.UPDATED);
     }
 
     public void recordDeleted(Long actorUserId, String actorIpAddress, GanttTask task) {
-        record(actorUserId, actorIpAddress, task, GanttTaskAuditAction.DELETED);
+        recordDeleted(actorUserId, actorIpAddress, task, List.of());
+    }
+
+    public void recordDeleted(Long actorUserId, String actorIpAddress, GanttTask task, List<Long> dependencyTaskIds) {
+        record(actorUserId, actorIpAddress, task, dependencyTaskIds, GanttTaskAuditAction.DELETED);
     }
 
     private void record(
         Long actorUserId,
         String actorIpAddress,
         GanttTask task,
+        List<Long> dependencyTaskIds,
         GanttTaskAuditAction action
     ) {
-        GanttTaskAuditLog auditLog = GanttTaskAuditLog.from(actorUserId, actorIpAddress, task, action);
+        GanttTaskAuditLog auditLog = GanttTaskAuditLog.from(actorUserId, actorIpAddress, task, dependencyTaskIds, action);
         asyncLogService.log(auditLog.toLogLine());
     }
 }

@@ -36,6 +36,11 @@ class LocationGraphTemplateFactoryTest {
                         Map.of("color", "#FF000030", "range", List.of(30, 60)),
                         Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
                         Map.of("color", "#00800030", "range", List.of(90, 100))
+                    ),
+                    "threshold", Map.of(
+                            "line", Map.of("color", "red", "width", 2),
+                            "thickness", 0.75,
+                            "value", 90
                     )
                 )
             )),

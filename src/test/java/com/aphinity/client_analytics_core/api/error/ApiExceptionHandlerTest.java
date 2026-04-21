@@ -61,6 +61,26 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void handleResponseStatusMapsGanttDependencyValidationReasons() {
+        ResponseStatusException selfDependency = new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "Task cannot depend on itself"
+        );
+        ResponseStatusException invalidLocation = new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "Task dependencies must belong to this location"
+        );
+
+        ResponseEntity<ApiErrorResponse> selfDependencyResponse = apiExceptionHandler.handleResponseStatus(selfDependency);
+        ResponseEntity<ApiErrorResponse> invalidLocationResponse = apiExceptionHandler.handleResponseStatus(invalidLocation);
+
+        assertEquals("task_dependency_self_reference", selfDependencyResponse.getBody().code());
+        assertEquals("Task cannot depend on itself", selfDependencyResponse.getBody().message());
+        assertEquals("task_dependency_invalid_location", invalidLocationResponse.getBody().code());
+        assertEquals("Task dependencies must belong to this location", invalidLocationResponse.getBody().message());
+    }
+
+    @Test
     void handleUnexpectedSuppressesNoResourceStackTraceInMainLog() {
         NoResourceFoundException exception = new NoResourceFoundException(
             HttpMethod.GET,

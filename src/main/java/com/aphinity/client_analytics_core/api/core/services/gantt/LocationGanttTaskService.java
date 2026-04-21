@@ -27,6 +27,7 @@ public class LocationGanttTaskService {
     private final GanttTaskRepository ganttTaskRepository;
     private final GanttTaskAuthorizationService authorizationService;
     private final GanttTaskRequestMapper requestMapper;
+    private final GanttTaskDependencyService dependencyService;
     private final GanttChartTemplateService templateService;
     private final GanttTaskAuditService auditService;
 
@@ -35,6 +36,7 @@ public class LocationGanttTaskService {
         GanttTaskRepository ganttTaskRepository,
         GanttTaskAuthorizationService authorizationService,
         GanttTaskRequestMapper requestMapper,
+        GanttTaskDependencyService dependencyService,
         GanttChartTemplateService templateService,
         GanttTaskAuditService auditService
     ) {
@@ -42,6 +44,7 @@ public class LocationGanttTaskService {
         this.ganttTaskRepository = ganttTaskRepository;
         this.authorizationService = authorizationService;
         this.requestMapper = requestMapper;
+        this.dependencyService = dependencyService;
         this.templateService = templateService;
         this.auditService = auditService;
     }
@@ -56,8 +59,20 @@ public class LocationGanttTaskService {
             ? ganttTaskRepository.findByLocation_IdOrderByStartDateAscEndDateAscIdAsc(locationId)
             : ganttTaskRepository.findVisibleByLocationIdAndTitleSearch(locationId, normalizedSearchTerm);
 
+        if (tasks.isEmpty()) {
+            return List.of();
+        }
+
+        var dependencyIdsByTaskId = dependencyService.findDependencyTaskIdsByTaskIds(
+            locationId,
+            tasks.stream().map(GanttTask::getId).toList()
+        );
+
         return tasks.stream()
-            .map(requestMapper::toResponse)
+            .map(task -> requestMapper.toResponse(
+                task,
+                dependencyIdsByTaskId.getOrDefault(task.getId(), List.of())
+            ))
             .toList();
     }
 
@@ -77,9 +92,10 @@ public class LocationGanttTaskService {
         GanttTask task = requestMapper.createTask(location, request);
         try {
             GanttTask persisted = ganttTaskRepository.saveAndFlush(task);
-            auditService.recordCreated(userId, persisted);
+            List<Long> dependencyTaskIds = dependencyService.replaceDependencies(persisted, request.dependencyTaskIds());
+            auditService.recordCreated(userId, persisted, dependencyTaskIds);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            return requestMapper.toResponse(persisted);
+            return requestMapper.toResponse(persisted, dependencyTaskIds);
         } catch (RuntimeException ex) {
             log.error(
                 "Gantt task creation persistence failed actorUserId={} locationId={}",
@@ -112,13 +128,18 @@ public class LocationGanttTaskService {
 
         try {
             List<GanttTask> persisted = ganttTaskRepository.saveAllAndFlush(tasks);
-            for (GanttTask task : persisted) {
-                auditService.recordCreated(userId, task);
+            List<GanttTaskResponse> response = new ArrayList<>(persisted.size());
+            for (int taskIndex = 0; taskIndex < persisted.size(); taskIndex += 1) {
+                GanttTask task = persisted.get(taskIndex);
+                List<Long> dependencyTaskIds = dependencyService.replaceDependencies(
+                    task,
+                    requests.get(taskIndex).dependencyTaskIds()
+                );
+                auditService.recordCreated(userId, task, dependencyTaskIds);
+                response.add(requestMapper.toResponse(task, dependencyTaskIds));
             }
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            return persisted.stream()
-                .map(requestMapper::toResponse)
-                .toList();
+            return response;
         } catch (RuntimeException ex) {
             log.error(
                 "Gantt task bulk creation persistence failed actorUserId={} locationId={} taskCount={}",
@@ -147,10 +168,12 @@ public class LocationGanttTaskService {
         requestMapper.applyRequest(task, request);
 
         try {
+            List<Long> dependencyTaskIds = dependencyService.replaceDependencies(task, request.dependencyTaskIds());
+            task.setUpdatedAt(Instant.now());
             GanttTask persisted = ganttTaskRepository.saveAndFlush(task);
-            auditService.recordUpdated(userId, persisted);
+            auditService.recordUpdated(userId, persisted, dependencyTaskIds);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            return requestMapper.toResponse(persisted);
+            return requestMapper.toResponse(persisted, dependencyTaskIds);
         } catch (RuntimeException ex) {
             log.error(
                 "Gantt task update persistence failed actorUserId={} locationId={} taskId={}",
@@ -171,7 +194,8 @@ public class LocationGanttTaskService {
         GanttTask task = ganttTaskRepository.findByIdAndLocation_Id(taskId, locationId).orElse(null);
         if (task != null) {
             try {
-                auditService.recordDeleted(userId, actorIpAddress, task);
+                List<Long> dependencyTaskIds = dependencyService.findDependencyTaskIds(locationId, taskId);
+                auditService.recordDeleted(userId, actorIpAddress, task, dependencyTaskIds);
                 ganttTaskRepository.delete(task);
                 locationRepository.touchUpdatedAt(locationId, Instant.now());
             } catch (RuntimeException ex) {

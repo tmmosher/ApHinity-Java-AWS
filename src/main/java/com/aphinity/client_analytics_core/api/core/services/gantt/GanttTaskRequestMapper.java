@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class GanttTaskRequestMapper {
@@ -32,6 +33,10 @@ public class GanttTaskRequestMapper {
     }
 
     public GanttTaskResponse toResponse(GanttTask task) {
+        return toResponse(task, List.of());
+    }
+
+    public GanttTaskResponse toResponse(GanttTask task, List<Long> dependencyTaskIds) {
         return new GanttTaskResponse(
             task.getId(),
             task.getTitle(),
@@ -39,7 +44,8 @@ public class GanttTaskRequestMapper {
             task.getEndDate(),
             task.getDescription(),
             task.getCreatedAt(),
-            task.getUpdatedAt()
+            task.getUpdatedAt(),
+            dependencyTaskIds
         );
     }
 
