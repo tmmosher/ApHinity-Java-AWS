@@ -9,7 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ServiceCalendarTemplateService {
     private static final String SERVICE_CALENDAR_TEMPLATE_PATH =
-        "servicecalendar/service_calendar_template.xlsx";
+            "templates/service_calendar_template.xlsx";
 
     public Resource getTemplate() {
         Resource resource = new ClassPathResource(SERVICE_CALENDAR_TEMPLATE_PATH);
