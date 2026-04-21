@@ -3,7 +3,7 @@ import PlotlyChart, {loadPlotlyModule} from "../../../../components/Chart";
 import GraphCreateModal from "../../../../components/graph-editor/GraphCreateModal";
 import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../../components/Chart";
 import GraphEditorModal from "../../../../components/graph-editor/GraphEditorModal";
-import {For, Show, Suspense, createEffect, createMemo, createResource, createSignal} from "solid-js";
+import {For, Show, Suspense, createEffect, createMemo, createResource, createSignal, untrack} from "solid-js";
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
@@ -11,9 +11,8 @@ import {LocationGraph, LocationSectionLayout} from "../../../../types/Types";
 import {
   applyGraphPayloadEdit,
   buildChangedLocationGraphUpdates,
-  buildGraphBaselineIndex,
   type GraphBaselineEntry,
-  reconcileLocationGraphs,
+  reconcileLocationGraphRefreshState,
   pruneDeletedLocationGraphState,
   undoGraphPayloadEdit,
   type EditableGraphPayload
@@ -68,10 +67,16 @@ export const LocationDashboardPanel = () => {
     if (!fetchedGraphs) {
       return;
     }
-    // Keep unchanged graph objects stable so Plotly charts stay mounted across refreshes.
-    setWorkingGraphs((currentGraphs) => reconcileLocationGraphs(currentGraphs, fetchedGraphs));
-    setGraphBaselineIndex(buildGraphBaselineIndex(fetchedGraphs));
-    setLocationUndoStack([]);
+    const refreshState = untrack(() => reconcileLocationGraphRefreshState(
+      workingGraphs(),
+      locationUndoStack(),
+      graphBaselineIndex(),
+      fetchedGraphs
+    ));
+    // Rebase the local graph state so a server refresh does not erase unsaved edits.
+    setWorkingGraphs(refreshState.nextGraphs);
+    setGraphBaselineIndex(refreshState.nextBaselineIndex);
+    setLocationUndoStack(refreshState.nextUndoStack);
   });
 
   createEffect(() => {

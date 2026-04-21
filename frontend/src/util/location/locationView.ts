@@ -23,6 +23,12 @@ export const createLocationViewActive = (
   view: DashboardLocationView
 ): Accessor<boolean> => () => currentView() === view;
 
+/**
+ * Returns a guard that reports `true` only when the location id changes.
+ *
+ * This is used to reset local dashboard state after route transitions without
+ * re-running the reset logic on every render.
+ */
 export const createDashboardLocationResetGuard = (initialLocationId: string) => {
   let previousLocationId = initialLocationId;
 
@@ -35,6 +41,13 @@ export const createDashboardLocationResetGuard = (initialLocationId: string) => 
   };
 };
 
+/**
+ * Keeps a nested location detail request aligned with the active view.
+ *
+ * Only the dashboard view swaps the location id directly; the calendar and
+ * gantt views keep the previous request identity so async responses do not
+ * overwrite the active subpanel.
+ */
 export const getNextLocationGraphRequestId = (
   currentRequestedLocationId: string | undefined,
   currentLocationId: string,
@@ -70,6 +83,12 @@ export const getLocationViewHref = (locationId: string, view: DashboardLocationV
   return `/dashboard/locations/${locationId}/${view}`;
 };
 
+/**
+ * Checks whether a resource still belongs to the current location.
+ *
+ * The detail panels use this to discard stale async results when the user
+ * navigates between locations while a request is still in flight.
+ */
 export const isFreshLocationScopedResource = <T>(
   currentLocationId: string,
   resource: LocationScopedResource<T> | undefined

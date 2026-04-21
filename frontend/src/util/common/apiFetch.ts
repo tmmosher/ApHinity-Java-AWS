@@ -2,6 +2,7 @@ const CSRF_COOKIE_NAME = "XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const CSRF_INVALID_ERROR_CODE = "csrf_invalid";
+// Deduplicate token priming and auth refresh work across concurrent requests.
 let csrfPrimeInFlight: Promise<void> | null = null;
 let authRefreshInFlight: Promise<void> | null = null;
 
@@ -106,6 +107,10 @@ const sendMutationRequest = async (
 const isAuthenticationRequiredResponse = (response: Response): boolean =>
   response.status === 401;
 
+/**
+ * Matches the backend's CSRF failure payload so mutation retries can re-prime
+ * the cookie and try once more.
+ */
 const isCsrfInvalidResponse = async (response: Response): Promise<boolean> => {
   if (response.status !== 403) {
     return false;
@@ -124,6 +129,10 @@ const isCsrfInvalidResponse = async (response: Response): Promise<boolean> => {
   }
 };
 
+/**
+ * Matches the generic forbidden shape returned by the backend when auth state
+ * needs to be refreshed before retrying the mutation.
+ */
 const isGenericForbiddenResponse = async (response: Response): Promise<boolean> => {
   if (response.status !== 403) {
     return false;

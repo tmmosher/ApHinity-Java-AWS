@@ -10,6 +10,12 @@ export type StateHistoryUndoResult<T> = {
   undone: boolean;
 };
 
+/**
+ * Records a new snapshot in an undo stack when the state changes.
+ *
+ * The caller provides `cloneState` so this helper stays generic and can keep
+ * history entries detached from the live state tree.
+ */
 export const applyStateSnapshot = <T>(
   currentState: T,
   undoStack: T[],
@@ -32,6 +38,13 @@ export const applyStateSnapshot = <T>(
   };
 };
 
+/**
+ * Restores the most recent snapshot from an undo stack.
+ *
+ * This is intentionally copy-on-write: the restored value should not share
+ * mutable structure with earlier snapshots, because the graph and calendar
+ * editors mutate deep JSON payloads.
+ */
 export const undoStateSnapshot = <T>(
   currentState: T,
   undoStack: T[],

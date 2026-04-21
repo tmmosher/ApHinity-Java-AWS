@@ -20,15 +20,15 @@ export const DashboardHomePanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
   const locationContext = useLocations();
-  const locations = locationContext.locations();
+  const locations = locationContext.locations;
   const [favoriteLocationId, setFavoriteLocationIdSignal] = createSignal(getFavoriteLocationId());
   const canAccess = () => Boolean(profileContext.profile()?.verified);
 
-    createEffect(() => {
+  createEffect(() => {
     if (!canAccess()) {
       return;
     }
-    const locationList = locations;
+    const locationList = locations();
     const currentFavoriteId = favoriteLocationId();
     if (!locationList || !currentFavoriteId) {
       return;
@@ -40,8 +40,13 @@ export const DashboardHomePanel = () => {
     }
   });
 
-  const [location, {refetch}] = createResource(favoriteLocationId() || null,
-    () => fetchLocationById(host, favoriteLocationId())
+  const [location, {refetch}] = createResource(
+    () => favoriteLocationId() || null,
+    (selectedFavoriteId) => (
+      selectedFavoriteId
+        ? fetchLocationById(host, selectedFavoriteId)
+        : Promise.resolve(undefined)
+    )
   );
 
   const roleDescription = () => {
@@ -52,7 +57,7 @@ export const DashboardHomePanel = () => {
     return `Signed in as ${roleLabel[profile.role]}.`;
   };
 
-   return (
+  return (
     <div class="space-y-6">
       <header class="space-y-1">
         <h1 class="text-3xl font-semibold tracking-tight">Dashboard</h1>
