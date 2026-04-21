@@ -49,7 +49,7 @@ export const createFrappeGanttOptions = (
   view_mode: "Day",
   date_format: "YYYY-MM-DD",
   scroll_to: "today",
-  infinite_padding: true,
+  infinite_padding: false,
   container_height: resolveFrappeGanttContainerHeight(containerHeight),
   on_click: onClick
 });
