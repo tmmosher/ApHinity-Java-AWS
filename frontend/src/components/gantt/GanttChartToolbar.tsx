@@ -25,7 +25,10 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
   const isBusy = props.isImportingCsv || props.isApplyingImports;
 
   return (
-    <section class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm">
+    <section
+      class="rounded-2xl border border-base-300 bg-base-100/70 p-6 shadow-sm"
+      data-template-href={props.templateHref}
+    >
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div class="space-y-1">
           <h2 class="flex h-11 items-center text-xl font-semibold tracking-tight ">Gantt Chart</h2>
