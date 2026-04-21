@@ -128,7 +128,14 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
             "gauge", Map.of(
                 "shape", "angular",
                 "axis", Map.of("range", List.of(0, 100)),
-                "bar", Map.of("color", "#1f77b4")
+                "bar", Map.of("color", "#1f77b4"),
+                "borderwidth", 0,
+                "steps", List.of(
+                    Map.of("color", "#80000030", "range", List.of(0, 30)),
+                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
+                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
+                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                )
             )
         );
     }

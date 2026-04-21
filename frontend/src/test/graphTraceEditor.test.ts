@@ -113,7 +113,14 @@ describe("graphTraceEditor", () => {
       gauge: {
         shape: "angular",
         axis: {range: [0, 100]},
-        bar: {color: "#1f77b4"}
+        bar: {color: "#1f77b4"},
+        borderwidth: 0,
+        steps: [
+          {color: "#80000030", range: [0, 30]},
+          {color: "#FF000030", range: [30, 60]},
+          {color: "#FFFF0030", range: [60, 90]},
+          {color: "#00800030", range: [90, 100]}
+        ]
       }
     };
 
@@ -123,7 +130,14 @@ describe("graphTraceEditor", () => {
     expect(nextTrace.gauge).toEqual({
       shape: "angular",
       axis: {range: [0, 100]},
-      bar: {color: "#d62728"}
+      bar: {color: "#d62728"},
+      borderwidth: 0,
+      steps: [
+        {color: "#80000030", range: [0, 30]},
+        {color: "#FF000030", range: [30, 60]},
+        {color: "#FFFF0030", range: [60, 90]},
+        {color: "#00800030", range: [90, 100]}
+      ]
     });
   });
 
@@ -230,7 +244,14 @@ describe("graphTraceEditor", () => {
         },
         bar: {
           color: "#1f77b4"
-        }
+        },
+        borderwidth: 0,
+        steps: [
+          {color: "#80000030", range: [0, 30]},
+          {color: "#FF000030", range: [30, 60]},
+          {color: "#FFFF0030", range: [60, 90]},
+          {color: "#00800030", range: [90, 100]}
+        ]
       }
     });
   });
@@ -250,7 +271,8 @@ describe("graphTraceEditor", () => {
       gauge: {
         shape: "angular",
         axis: {range: [0, 100]},
-        bar: {color: "#1f77b4"}
+        bar: {color: "#1f77b4"},
+        borderwidth: 0
       }
     };
 

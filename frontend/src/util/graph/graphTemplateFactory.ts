@@ -16,6 +16,12 @@ export const INDICATOR_VALUE_MIN = 0;
 export const INDICATOR_VALUE_MAX = 100;
 
 const DEFAULT_TRACE_COLOR = Object.values(TRACE_COLOR_OPTIONS)[0];
+const INDICATOR_GAUGE_STEPS = [
+  {color: "#80000030", range: [0, 30] as const},
+  {color: "#FF000030", range: [30, 60] as const},
+  {color: "#FFFF0030", range: [60, 90] as const},
+  {color: "#00800030", range: [90, 100] as const}
+] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -64,7 +70,12 @@ const indicatorTraceSchema = z.object({
     }),
     bar: z.object({
       color: z.string()
-    })
+    }),
+    borderwidth: z.number().finite().min(0).optional(),
+    steps: z.array(z.object({
+      color: z.string(),
+      range: z.tuple([z.number().finite(), z.number().finite()])
+    }))
   })
 });
 
@@ -142,7 +153,12 @@ export const createIndicatorTraceTemplate = (traceName: string): Record<string, 
       },
       bar: {
         color: DEFAULT_TRACE_COLOR
-      }
+      },
+      borderwidth: 0,
+      steps: INDICATOR_GAUGE_STEPS.map((step) => ({
+        color: step.color,
+        range: [...step.range]
+      }))
     }
   });
 

@@ -4,15 +4,16 @@ import {formatDisplayDate} from "../util/location/dateUtility";
 
 vi.mock("corvu/popover", () => {
   const Popover = (props: {children?: unknown} & Record<string, unknown>) => <>{props.children}</>;
-  Popover.Trigger = (props: {children?: unknown} & Record<string, unknown>) => <button {...props}>{props.children}</button>;
-  Popover.Portal = (props: {children?: unknown}) => <>{props.children}</>;
-  Popover.Content = (props: {children?: unknown} & Record<string, unknown>) => <div {...props}>{props.children}</div>;
-  Popover.Label = (props: {children?: unknown}) => <div>{props.children}</div>;
-  Popover.Description = (props: {children?: unknown}) => <div>{props.children}</div>;
+  Popover.Trigger = (props: {children?: JSX.Element} & Record<string, unknown>) => <button {...props}>{props.children}</button>;
+  Popover.Portal = (props: {children?: JSX.Element}) => <>{props.children}</>;
+  Popover.Content = (props: {children?: JSX.Element} & Record<string, unknown>) => <div {...props}>{props.children}</div>;
+  Popover.Label = (props: {children?: JSX.Element}) => <div>{props.children}</div>;
+  Popover.Description = (props: {children?: JSX.Element}) => <div>{props.children}</div>;
   return {default: Popover};
 });
 
 import {GanttTaskPopover, requestGanttTaskEdit} from "../components/gantt/GanttTaskPopover";
+import {JSX} from "solid-js";
 
 const baseTask = {
   id: 42,

@@ -4,7 +4,7 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 vi.mock("@solidjs/router", () => ({
   A: (props: {
     class?: string;
-    children?: unknown;
+    children?: JSX.Element;
     href?: string;
     "aria-label"?: string;
   }) => (
@@ -15,6 +15,7 @@ vi.mock("@solidjs/router", () => ({
 }));
 
 import {ErrorPage, goBackInSiteHistory} from "../pages/landing/ErrorPage";
+import {JSX} from "solid-js";
 
 describe("ErrorPage", () => {
   afterEach(() => {

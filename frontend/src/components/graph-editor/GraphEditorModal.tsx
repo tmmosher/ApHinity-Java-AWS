@@ -942,7 +942,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
               <button
                 type="button"
                 class={"btn btn-sm " + (isBusy() || operationError() || hasInvalidIndicatorDraft() ? "btn-disabled" : "btn-primary")}
-                disabled={isBusy() || operationError() || hasInvalidIndicatorDraft()}
+                disabled={isBusy() || (!!operationError()) || hasInvalidIndicatorDraft()}
                 onClick={applyEdit}
               >
                 {props.isSaving ? "Saving..." : isRemovingTrace() ? "Updating..." : "Apply"}
@@ -974,7 +974,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
               </div>
 
               <p class="text-sm text-base-content/80">
-                This sends the delete request to the server right away and cannot be undone from this modal.
+                This sends the delete request to the server right away and cannot be undone. Use with caution.
               </p>
 
               <Show when={deleteError()}>

@@ -8,15 +8,16 @@ vi.mock("corvu/popover", () => {
     lastPopoverProps = props;
     return <>{props.children}</>;
   };
-  Popover.Trigger = (props: {children?: unknown} & Record<string, unknown>) => <button {...props}>{props.children}</button>;
-  Popover.Portal = (props: {children?: unknown}) => <>{props.children}</>;
-  Popover.Content = (props: {children?: unknown} & Record<string, unknown>) => <div {...props}>{props.children}</div>;
-  Popover.Label = (props: {children?: unknown}) => <div>{props.children}</div>;
-  Popover.Description = (props: {children?: unknown}) => <div>{props.children}</div>;
+  Popover.Trigger = (props: {children?: JSX.Element} & Record<string, unknown>) => <button {...props}>{props.children}</button>;
+  Popover.Portal = (props: {children?: JSX.Element}) => <>{props.children}</>;
+  Popover.Content = (props: {children?: JSX.Element} & Record<string, unknown>) => <div {...props}>{props.children}</div>;
+  Popover.Label = (props: {children?: JSX.Element}) => <div>{props.children}</div>;
+  Popover.Description = (props: {children?: JSX.Element}) => <div>{props.children}</div>;
   return {default: Popover};
 });
 
 import {GanttTaskCreatePopover} from "../components/gantt/GanttTaskCreatePopover";
+import {JSX} from "solid-js";
 
 describe("GanttTaskCreatePopover", () => {
   it("renders a trigger and create form with the expected task fields", () => {

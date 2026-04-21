@@ -18,12 +18,13 @@ declare module "frappe-gantt" {
     readonly_progress?: boolean;
     popup?: (task: FrappeGanttTask) => string | false | undefined;
     popup_on?: "click" | "hover";
-    on_click?: (task: FrappeGanttTask) => void;
+    on_click?: (task: FrappeGanttChartTask) => void;
     view_mode?: FrappeGanttViewMode;
     date_format?: string;
     container_height?: "auto" | number;
     view_mode_select?: boolean;
     scroll_to?: "today" | "start" | "end" | string;
+    infinite_padding?: false | boolean;
   }
 
   export interface FrappeGanttBar {

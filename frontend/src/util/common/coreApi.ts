@@ -6,7 +6,7 @@ import {
     LocationSectionLayout,
     LocationSectionLayoutConfig,
     LocationSummary
-} from "../types/Types";
+} from "../../types/Types";
 
 // Data verification helpers. Add any new data verification helpers here!
 

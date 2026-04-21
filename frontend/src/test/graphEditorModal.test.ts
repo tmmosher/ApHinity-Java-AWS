@@ -277,7 +277,14 @@ describe("GraphEditorModal trace controls", () => {
           },
           bar: {
             color: "#1f77b4"
-          }
+          },
+          borderwidth: 0,
+          steps: [
+            {color: "#80000030", range: [0, 30]},
+            {color: "#FF000030", range: [30, 60]},
+            {color: "#FFFF0030", range: [60, 90]},
+            {color: "#00800030", range: [90, 100]}
+          ]
         }
       }],
       layout: {showlegend: false},
