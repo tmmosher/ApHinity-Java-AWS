@@ -13,6 +13,7 @@ import {createDashboardLocationResetGuard} from "../../../../util/location/locat
 import GraphLoadingPlaceholder from "../../../../components/graph/GraphLoadingPlaceholder";
 import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
+import LocationDashboardToolbar from "../../../../components/location/LocationDashboardToolbar";
 
 export const LocationDashboardPanel = () => {
   const host = useApiHost();
@@ -57,22 +58,21 @@ export const LocationDashboardPanel = () => {
     async (shouldLoad) => (shouldLoad ? loadPlotlyModule() : null)
   );
 
-  const updatedAtLabel = () => dashboard.updatedAtLabel();
-
   return (
     <div class="space-y-4">
       <LocationDashboardToolbar
         canEditGraphs={canEditGraphs()}
-        canCreateGraphs={canCreateGraphs()}
-        isCreatingGraph={isCreatingGraph()}
-        hasPendingGraphChanges={hasPendingGraphChanges()}
-        isGraphMutationBusy={isGraphMutationBusy()}
-        pendingGraphMutationCount={locationUndoStack().length}
-        updatedAtLabel={updatedAtLabel()}
+        canCreateGraphs={dashboard.canCreateGraphs()}
+        isCreatingGraph={dashboard.isCreatingGraph()}
+        hasPendingGraphChanges={dashboard.hasPendingDashboardChanges()}
+        isGraphMutationBusy={dashboard.isGraphMutationBusy()}
+        pendingGraphMutationCount={dashboard.pendingDashboardMutationCount()}
+        updatedAtLabel={dashboard.updatedAtLabel()}
         createGraphDisabledReason={createGraphDisabledReason()}
-        onAddGraph={openCreateGraphModal}
-        onApply={() => void applyGraphChanges()}
-        onUndo={undoLastGraphEdit}
+        onAddGraph={dashboard.openCreateGraphModal}
+        onApply={() => void dashboard.applyGraphChanges()}
+        onEditLayout={dashboard.openLayoutEditor}
+        onUndo={dashboard.undoLastDashboardEdit}
       />
 
       <Show

@@ -62,5 +62,5 @@ src/main/resources/static/
 /.gradle-home/
 /.gradle-local/
 
-# environment vars
+# environment vars and database information
 .env.runtime

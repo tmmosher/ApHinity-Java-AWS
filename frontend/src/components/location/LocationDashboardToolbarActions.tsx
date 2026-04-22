@@ -12,6 +12,7 @@ type LocationDashboardToolbarActionsProps = {
   createGraphDisabledReason?: string;
   onAddGraph: () => void;
   onApply: () => void;
+  onEditLayout: () => void;
   onUndo: () => void;
 };
 
@@ -44,6 +45,14 @@ export const LocationDashboardToolbarActions = (props: LocationDashboardToolbarA
           onClick={props.onUndo}
         >
           Undo
+        </button>
+        <button
+          type="button"
+          class={locationToolbarActionButtonClass + " " + (!props.isGraphMutationBusy ? "btn-outline" : "btn-disabled")}
+          disabled={props.isGraphMutationBusy}
+          onClick={props.onEditLayout}
+        >
+          Edit Layout
         </button>
       </Show>
     </div>

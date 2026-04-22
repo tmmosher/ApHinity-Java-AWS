@@ -11,6 +11,7 @@ type LocationDashboardToolbarProps = {
   createGraphDisabledReason?: string;
   onAddGraph: () => void;
   onApply: () => void;
+  onEditLayout: () => void;
   onUndo: () => void;
 };
 
@@ -34,6 +35,7 @@ export const LocationDashboardToolbar = (props: LocationDashboardToolbarProps) =
         createGraphDisabledReason={props.createGraphDisabledReason}
         onAddGraph={props.onAddGraph}
         onApply={props.onApply}
+        onEditLayout={props.onEditLayout}
         onUndo={props.onUndo}
       />
     </div>

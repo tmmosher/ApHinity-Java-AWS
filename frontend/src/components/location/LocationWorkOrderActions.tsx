@@ -179,14 +179,6 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
     }
   };
 
-  const triggerLabel = () => {
-    const currentLocation = location();
-    if (isSavingWorkOrderEmail()) {
-      return "Saving...";
-    }
-    return currentLocation?.workOrderEmail ? "Update Work Order Email" : "Add Work Order Email";
-  };
-
   return (
     <div class={props.class ?? "flex flex-wrap items-center justify-end gap-2"}>
       <Show when={canManageWorkOrderEmail()}>
@@ -206,7 +198,7 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
             disabled={isHeaderActionBusy()}
             aria-label="Work order email settings"
           >
-            {triggerLabel()}
+            Work Order Email
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content class={locationToolbarPopoverClass}>
