@@ -1,6 +1,7 @@
 import {LocationSummary} from "../../types/Types";
 import {parseLocationSummary} from "./coreApi";
 import {apiFetch} from "./apiFetch";
+import {parseOptionalWorkOrderEmail} from "./apiSchemas";
 
 const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const payload = await response.json().catch(() => null) as {message?: unknown} | null;
@@ -16,11 +17,6 @@ const normalizeLocationName = (name: string): string => {
     throw new Error("Location name is required");
   }
   return normalized;
-};
-
-const normalizeLocationWorkOrderEmail = (value: string): string | null => {
-  const normalized = value.trim().toLowerCase();
-  return normalized ? normalized : null;
 };
 
 export const createLocation = async (
@@ -67,7 +63,7 @@ export const renameLocation = async (
 export const updateLocationWorkOrderEmail = async (
   host: string,
   locationId: number,
-  workOrderEmail: string
+  workOrderEmail: string | null
 ): Promise<LocationSummary> => {
   const response = await apiFetch(host + "/api/core/locations/" + locationId + "/work-order-email", {
     method: "PUT",
@@ -75,7 +71,7 @@ export const updateLocationWorkOrderEmail = async (
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      workOrderEmail: normalizeLocationWorkOrderEmail(workOrderEmail)
+      workOrderEmail: parseOptionalWorkOrderEmail(workOrderEmail)
     })
   });
   if (!response.ok) {

@@ -9,7 +9,12 @@ import {
   unsubscribeFromLocationAlerts,
   updateLocationWorkOrderEmail
 } from "../../util/common/locationApi";
+import {parseOptionalWorkOrderEmail} from "../../util/common/apiSchemas";
 import {canEditLocationGraphs} from "../../util/common/profileAccess";
+import {
+  locationToolbarActionButtonClass,
+  locationToolbarPopoverClass
+} from "./locationToolbarStyles";
 
 const bellUpdatingIcon = (
   <svg
@@ -42,7 +47,7 @@ const bellOffIcon = (
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
-    class="lucide lucide-bell-off-icon lucide-bell-off hover:bg-error"
+    class="lucide lucide-bell-off-icon lucide-bell-off"
   >
     <path d="M10.268 21a2 2 0 0 0 3.464 0" />
     <path d="M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742" />
@@ -63,7 +68,7 @@ const bellRingIcon = (
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
-    class="lucide lucide-bell-ring-icon lucide-bell-ring hover:bg-success"
+    class="lucide lucide-bell-ring-icon lucide-bell-ring"
   >
     <path d="M10.268 21a2 2 0 0 0 3.464 0" />
     <path d="M22 8c0-2.3-.8-4.3-2-6" />
@@ -107,10 +112,16 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
       return false;
     }
 
-    const normalizedDraft = workOrderEmailDraft().trim().toLowerCase();
-    const nextWorkOrderEmail = normalizedDraft.length > 0 ? normalizedDraft : "";
+    let nextWorkOrderEmail: string | null;
+    try {
+      nextWorkOrderEmail = parseOptionalWorkOrderEmail(workOrderEmailDraft());
+    } catch (error) {
+      setWorkOrderEmailError(error instanceof Error ? error.message : "Unable to update work order email.");
+      return false;
+    }
+
     const currentWorkOrderEmail = currentLocation.workOrderEmail ?? "";
-    if (nextWorkOrderEmail === currentWorkOrderEmail) {
+    if ((nextWorkOrderEmail ?? "") === currentWorkOrderEmail) {
       setWorkOrderEmailError("");
       return true;
     }
@@ -126,7 +137,7 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
         toast.error("Work order email saved, but location details could not refresh. Please refresh the page.");
       }
       toast.success(nextWorkOrderEmail ? "Work order email updated." : "Work order email cleared.");
-      setWorkOrderEmailDraft(nextWorkOrderEmail);
+      setWorkOrderEmailDraft(nextWorkOrderEmail ?? "");
       setWorkOrderEmailError("");
       return true;
     } catch (error) {
@@ -191,13 +202,14 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
         >
           <Popover.Trigger
             type="button"
-            class={"btn btn-sm " + (isHeaderActionBusy() ? "btn-disabled" : "btn-outline")}
+            class={locationToolbarActionButtonClass + " " + (isHeaderActionBusy() ? "btn-disabled" : "btn-outline")}
             disabled={isHeaderActionBusy()}
+            aria-label="Work order email settings"
           >
             {triggerLabel()}
           </Popover.Trigger>
           <Popover.Portal>
-            <Popover.Content class="z-[80] w-[min(92vw,24rem)] rounded-xl border border-base-300 bg-base-100 p-4 shadow-xl">
+            <Popover.Content class={locationToolbarPopoverClass}>
               <div class="space-y-3">
                 <div class="space-y-1">
                   <Popover.Label class="text-sm font-semibold">
@@ -236,7 +248,7 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
                   </Popover.Close>
                   <button
                     type="button"
-                    class={"btn btn-sm " + (isHeaderActionBusy() ? "btn-disabled" : "btn-primary")}
+                    class={locationToolbarActionButtonClass + " " + (isHeaderActionBusy() ? "btn-disabled" : "btn-primary")}
                     disabled={isHeaderActionBusy()}
                     onClick={() => void saveWorkOrderEmail()}
                   >
@@ -251,8 +263,15 @@ export const LocationWorkOrderActions = (props: LocationWorkOrderActionsProps) =
       <Show when={canToggleLocationAlerts()}>
         <button
           type="button"
-          class={"btn btn-sm inline-flex items-center gap-2 " + (isHeaderActionBusy() ? "btn-disabled" : "btn-outline")}
+          class={locationToolbarActionButtonClass + " " + (isHeaderActionBusy() ? "btn-disabled" : "btn-outline")}
           disabled={isHeaderActionBusy()}
+          aria-label={
+            isUpdatingLocationAlerts()
+              ? "Updating location alerts"
+              : (location()?.alertsSubscribed
+                ? "Unsubscribe from location alerts"
+                : "Subscribe to location alerts")
+          }
           onClick={() => void toggleLocationAlerts()}
         >
           {isUpdatingLocationAlerts()

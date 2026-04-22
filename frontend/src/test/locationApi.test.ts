@@ -127,6 +127,31 @@ describe("locationApi", () => {
     expect(location.workOrderEmail).toBe("work-orders@example.com");
   });
 
+  it("clears a location work-order email when the input is blank", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 12,
+      name: "Scottsdale",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z",
+      sectionLayout: {sections: []},
+      workOrderEmail: null,
+      alertsSubscribed: true
+    }));
+
+    const location = await updateLocationWorkOrderEmail(host, 12, "   ");
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/12/work-order-email", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        workOrderEmail: null
+      })
+    });
+    expect(location.workOrderEmail).toBeNull();
+  });
+
   it("subscribes a user to location alerts through the dedicated endpoint", async () => {
     apiFetchMock.mockResolvedValue(createMockResponse(true, {
       id: 12,
