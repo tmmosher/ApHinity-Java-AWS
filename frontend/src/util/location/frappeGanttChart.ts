@@ -1,4 +1,4 @@
-import type {FrappeGanttOptions} from "frappe-gantt";
+import type {FrappeGanttOptions, FrappeGanttViewModeConfig} from "frappe-gantt";
 import type {LocationGanttTask} from "../../types/Types";
 
 export const GANTT_CHART_HOST_ID = "location-gantt-chart-host";
@@ -24,6 +24,31 @@ export const isStagedGanttTask = (
   task: TimelineTaskLike
 ): task is TimelineTaskLike & {isStaged: true} => task.isStaged === true;
 
+const DAY_VIEW_MODE: FrappeGanttViewModeConfig = {
+  name: "Day",
+  // Frappe Gantt reads `step` during initialization, so a custom Day mode
+  // needs the built-in Day timing fields as well as the padding override.
+  // Keep the default left gutter but extend the right edge so the timeline
+  // does not end abruptly at the last task.
+  padding: ["7d", "14d"] as const,
+  step: "1d",
+  date_format: "YYYY-MM-DD",
+  lower_text: (date, previousDate, lang) => (
+    !previousDate || date.getDate() !== previousDate.getDate()
+      ? String(date.getDate()).padStart(2, "0")
+      : ""
+  ),
+  upper_text: (date, previousDate, lang) => {
+    if (previousDate && date.getMonth() === previousDate.getMonth()) {
+      return "";
+    }
+
+    const monthName = new Intl.DateTimeFormat(lang, {month: "long"}).format(date);
+    return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  },
+  thick_line: (date) => date.getDay() === 1
+};
+
 export const toFrappeGanttTask = (task: TimelineTaskLike): FrappeGanttChartTask => ({
   id: String(task.id),
   name: task.title,
@@ -47,6 +72,7 @@ export const createFrappeGanttOptions = (
   popup_on: "click",
   popup: () => false,
   view_mode: "Day",
+  view_modes: [DAY_VIEW_MODE],
   date_format: "YYYY-MM-DD",
   scroll_to: "today",
   infinite_padding: false,
