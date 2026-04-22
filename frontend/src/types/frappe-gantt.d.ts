@@ -1,5 +1,18 @@
 declare module "frappe-gantt" {
-  export type FrappeGanttViewMode = "Day" | "Week" | "Month" | "Year" | string;
+  export interface FrappeGanttViewModeConfig {
+    name: string;
+    padding?: string | readonly [string, string];
+    step?: string;
+    date_format?: string;
+    column_width?: number;
+    lower_text?: string | ((currentDate: Date, previousDate: Date | null | undefined, lang: string) => string);
+    upper_text?: string | ((currentDate: Date, previousDate: Date | null | undefined, lang: string) => string);
+    upper_text_frequency?: number;
+    thick_line?: (currentDate: Date) => boolean;
+    snap_at?: string;
+  }
+
+  export type FrappeGanttViewMode = "Day" | "Week" | "Month" | "Year" | string | FrappeGanttViewModeConfig;
 
   export interface FrappeGanttTask {
     id: string;
@@ -25,6 +38,7 @@ declare module "frappe-gantt" {
     view_mode_select?: boolean;
     scroll_to?: "today" | "start" | "end" | string;
     infinite_padding?: false | boolean;
+    view_modes?: FrappeGanttViewMode[];
   }
 
   export interface FrappeGanttBar {

@@ -95,7 +95,15 @@ describe("frappeGanttChart", () => {
       date_format: "YYYY-MM-DD",
       scroll_to: "today",
       infinite_padding: false,
-      container_height: 513
+      container_height: 513,
+      view_modes: [
+        {
+          name: "Day",
+          padding: ["7d", "14d"],
+          step: "1d",
+          date_format: "YYYY-MM-DD"
+        }
+      ]
     });
   });
 });
