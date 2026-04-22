@@ -1,6 +1,7 @@
 import {LocationSummary} from "../../types/Types";
 import {parseLocationSummary} from "./coreApi";
 import {apiFetch} from "./apiFetch";
+import {parseOptionalWorkOrderEmail} from "./apiSchemas";
 
 const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const payload = await response.json().catch(() => null) as {message?: unknown} | null;
@@ -55,6 +56,52 @@ export const renameLocation = async (
   });
   if (!response.ok) {
     throw new Error(await extractApiErrorMessage(response, "Unable to update location name."));
+  }
+  return parseLocationSummary(await response.json());
+};
+
+export const updateLocationWorkOrderEmail = async (
+  host: string,
+  locationId: number,
+  workOrderEmail: string | null
+): Promise<LocationSummary> => {
+  const response = await apiFetch(host + "/api/core/locations/" + locationId + "/work-order-email", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      workOrderEmail: parseOptionalWorkOrderEmail(workOrderEmail)
+    })
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to update location work order email."));
+  }
+  return parseLocationSummary(await response.json());
+};
+
+export const subscribeToLocationAlerts = async (
+  host: string,
+  locationId: number
+): Promise<LocationSummary> => {
+  const response = await apiFetch(host + "/api/core/locations/" + locationId + "/alerts/subscription", {
+    method: "PUT"
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to update location alert subscription."));
+  }
+  return parseLocationSummary(await response.json());
+};
+
+export const unsubscribeFromLocationAlerts = async (
+  host: string,
+  locationId: number
+): Promise<LocationSummary> => {
+  const response = await apiFetch(host + "/api/core/locations/" + locationId + "/alerts/subscription", {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to update location alert subscription."));
   }
   return parseLocationSummary(await response.json());
 };

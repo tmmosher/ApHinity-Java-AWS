@@ -1,6 +1,7 @@
 import {parseActiveInviteList, parseLocationList} from "./coreApi";
 import {ActiveInvite, LocationSummary} from "../types/Types";
 import {apiFetch} from "./apiFetch";
+import {parseInviteEmail} from "./apiSchemas";
 
 const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const payload = await response.json().catch(() => null) as {message?: unknown} | null;
@@ -38,10 +39,7 @@ export const createLocationInvite = async (
   if (!Number.isFinite(locationId) || locationId <= 0) {
     throw new Error("Select a location first.");
   }
-  const normalizedEmail = invitedEmail.trim().toLowerCase();
-  if (!normalizedEmail) {
-    throw new Error("Invite email is required.");
-  }
+  const normalizedEmail = parseInviteEmail(invitedEmail);
 
   const response = await apiFetch(host + "/api/core/location-invites", {
     method: "POST",

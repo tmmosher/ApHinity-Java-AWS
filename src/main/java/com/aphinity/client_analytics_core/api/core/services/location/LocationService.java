@@ -8,8 +8,10 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
+import com.aphinity.client_analytics_core.api.core.entities.location.UserSubscriptionToLocation;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
+import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
@@ -36,6 +38,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -53,6 +56,7 @@ public class LocationService {
     private final GraphRepository graphRepository;
     private final LocationGraphRepository locationGraphRepository;
     private final LocationUserRepository locationUserRepository;
+    private final UserSubscriptionToLocationRepository userSubscriptionToLocationRepository;
     private final AccountRoleService accountRoleService;
     private final LocationGraphTemplateFactory locationGraphTemplateFactory;
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
@@ -63,6 +67,7 @@ public class LocationService {
         GraphRepository graphRepository,
         LocationGraphRepository locationGraphRepository,
         LocationUserRepository locationUserRepository,
+        UserSubscriptionToLocationRepository userSubscriptionToLocationRepository,
         AccountRoleService accountRoleService,
         LocationGraphTemplateFactory locationGraphTemplateFactory,
         LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory
@@ -72,6 +77,7 @@ public class LocationService {
         this.graphRepository = graphRepository;
         this.locationGraphRepository = locationGraphRepository;
         this.locationUserRepository = locationUserRepository;
+        this.userSubscriptionToLocationRepository = userSubscriptionToLocationRepository;
         this.accountRoleService = accountRoleService;
         this.locationGraphTemplateFactory = locationGraphTemplateFactory;
         this.locationGraphUpdatePayloadValidationFactory = locationGraphUpdatePayloadValidationFactory;
@@ -91,7 +97,7 @@ public class LocationService {
         if (accountRoleService.isPartnerOrAdmin(user)) {
             List<Location> response = locationRepository.findAllByOrderByNameAsc();
             return response.stream()
-                    .map(this::toLocationResponse)
+                    .map(location -> toLocationResponse(location, null))
                     .toList();
         }
 
@@ -102,7 +108,7 @@ public class LocationService {
             if (location == null || location.getId() == null) {
                 continue;
             }
-            uniqueLocations.putIfAbsent(location.getId(), toLocationResponse(location));
+            uniqueLocations.putIfAbsent(location.getId(), toLocationResponse(location, null));
         }
         return List.copyOf(uniqueLocations.values());
     }
@@ -121,7 +127,7 @@ public class LocationService {
         if (!hasLocationAccess(user, locationId)) {
             throw forbidden();
         }
-        return toLocationResponse(location);
+        return toLocationResponse(location, user);
     }
 
     /**
@@ -506,7 +512,100 @@ public class LocationService {
             throw locationNameInUse();
         }
 
-        return toLocationResponse(location);
+        return toLocationResponse(location, user);
+    }
+
+    /**
+     * Updates the work-order submission email associated with a location.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @param workOrderEmail work-order submission email or null to clear it
+     * @return updated location payload
+     */
+    @Transactional
+    public LocationResponse updateLocationWorkOrderEmail(Long userId, Long locationId, String workOrderEmail) {
+        AppUser user = requireUser(userId);
+        requirePartnerOrAdmin(user);
+
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        location.setWorkOrderEmail(normalizeWorkOrderEmail(workOrderEmail));
+
+        try {
+            locationRepository.saveAndFlush(location);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Location work-order email persistence failed actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
+        }
+
+        return toLocationResponse(location, user);
+    }
+
+    /**
+     * Subscribes a verified user to location alerts.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @return updated location payload
+     */
+    @Transactional
+    public LocationResponse subscribeToLocationAlerts(Long userId, Long locationId) {
+        AppUser user = requireUser(userId);
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+
+        UserSubscriptionToLocation subscription = userSubscriptionToLocationRepository
+            .findByLocationIdAndUserId(locationId, userId)
+            .orElseGet(() -> {
+                UserSubscriptionToLocation toCreate = new UserSubscriptionToLocation();
+                toCreate.setLocation(location);
+                toCreate.setUserEmail(user);
+                return toCreate;
+            });
+        subscription.setLocation(location);
+        subscription.setUserEmail(user);
+
+        try {
+            userSubscriptionToLocationRepository.save(subscription);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Location alert subscription persistence failed actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
+        }
+
+        return toLocationResponse(location, user);
+    }
+
+    /**
+     * Unsubscribes a verified user from location alerts.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @return updated location payload
+     */
+    @Transactional
+    public LocationResponse unsubscribeFromLocationAlerts(Long userId, Long locationId) {
+        AppUser user = requireUser(userId);
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+
+        userSubscriptionToLocationRepository.findByLocationIdAndUserId(locationId, userId)
+            .ifPresent(userSubscriptionToLocationRepository::delete);
+
+        return toLocationResponse(location, user);
     }
 
     /**
@@ -530,7 +629,7 @@ public class LocationService {
             throw locationNameInUse();
         }
 
-        return toLocationResponse(location);
+        return toLocationResponse(location, user);
     }
 
     /**
@@ -708,12 +807,22 @@ public class LocationService {
      * Maps location entities into API response shape.
      */
     private LocationResponse toLocationResponse(Location location) {
+        return toLocationResponse(location, null);
+    }
+
+    private LocationResponse toLocationResponse(Location location, AppUser user) {
+        Boolean alertsSubscribed = null;
+        if (user != null) {
+            alertsSubscribed = userSubscriptionToLocationRepository.existsByLocationIdAndUserId(location.getId(), user.getId());
+        }
         return new LocationResponse(
             location.getId(),
             location.getName(),
             location.getCreatedAt(),
             location.getUpdatedAt(),
-            location.getSectionLayout()
+            location.getSectionLayout(),
+            location.getWorkOrderEmail(),
+            alertsSubscribed
         );
     }
 
@@ -931,6 +1040,14 @@ public class LocationService {
             throw invalidGraphName();
         }
         return normalized;
+    }
+
+    private String normalizeWorkOrderEmail(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.strip().toLowerCase(Locale.ROOT);
+        return normalized.isBlank() ? null : normalized;
     }
 
     /**

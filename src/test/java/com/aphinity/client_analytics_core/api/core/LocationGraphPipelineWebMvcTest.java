@@ -11,6 +11,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphR
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
@@ -88,6 +89,9 @@ class LocationGraphPipelineWebMvcTest {
 
     @MockitoBean
     private LocationUserRepository locationUserRepository;
+
+    @MockitoBean
+    private UserSubscriptionToLocationRepository userSubscriptionToLocationRepository;
 
     @MockitoBean
     private AccountRoleService accountRoleService;

@@ -7,6 +7,7 @@ import {For, Show, Suspense, createEffect, createMemo, createResource, createSig
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
+import LocationDashboardToolbar from "../../../../components/location/LocationDashboardToolbar";
 import {LocationGraph, LocationSectionLayout} from "../../../../types/Types";
 import {
   applyGraphPayloadEdit,
@@ -33,10 +34,6 @@ import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "../../../../context/LocationDetailContext";
 import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
 import GraphLoadingPlaceholder from "../../../../components/graph/GraphLoadingPlaceholder";
-
-const toolbarActionButtonClass =
-  "btn h-11 min-h-11 rounded-2xl px-4 text-sm font-medium shadow-sm transition duration-150 ease-out " +
-  "motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px active:translate-y-px active:scale-[0.98]";
 
 export const LocationDashboardPanel = () => {
   const host = useApiHost();
@@ -543,53 +540,19 @@ export const LocationDashboardPanel = () => {
 
   return (
     <div class="space-y-4">
-      <section class="rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div class="space-y-1">
-            <h2 class="text-xl flex items-center tracking-tight h-11 font-semibold">Dashboard</h2>
-            <p class="text-xs text-base-content/70">
-              Last updated {updatedAtLabel()}
-            </p>
-          </div>
-
-          <div class="flex flex-col gap-3 md:items-end">
-            <Show when={canEditGraphs()}>
-              <div class="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (canCreateGraphs() ? "btn-outline" : "btn-disabled")}
-                  disabled={!canCreateGraphs()}
-                  title={createGraphDisabledReason()}
-                  onClick={openCreateGraphModal}
-                >
-                  {isCreatingGraph() ? "Creating..." : "Add Graph"}
-                </button>
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (hasPendingGraphChanges() && !isGraphMutationBusy() ? "btn-primary" : "btn-disabled")}
-                  disabled={!hasPendingGraphChanges() || isGraphMutationBusy()}
-                  onClick={() => void applyGraphChanges()}
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (hasPendingGraphChanges() && !isGraphMutationBusy() ? "btn-outline" : "btn-disabled")}
-                  disabled={!hasPendingGraphChanges() || isGraphMutationBusy()}
-                  onClick={undoLastGraphEdit}
-                >
-                  Undo
-                </button>
-              </div>
-              <Show when={hasPendingGraphChanges()}>
-                <p class="text-right text-xs text-base-content/70">
-                  {locationUndoStack().length} pending graph mutation{locationUndoStack().length === 1 ? "" : "s"}
-                </p>
-              </Show>
-            </Show>
-          </div>
-        </div>
-      </section>
+      <LocationDashboardToolbar
+        canEditGraphs={canEditGraphs()}
+        canCreateGraphs={canCreateGraphs()}
+        isCreatingGraph={isCreatingGraph()}
+        hasPendingGraphChanges={hasPendingGraphChanges()}
+        isGraphMutationBusy={isGraphMutationBusy()}
+        pendingGraphMutationCount={locationUndoStack().length}
+        updatedAtLabel={updatedAtLabel()}
+        createGraphDisabledReason={createGraphDisabledReason()}
+        onAddGraph={openCreateGraphModal}
+        onApply={() => void applyGraphChanges()}
+        onUndo={undoLastGraphEdit}
+      />
 
       <Show
         when={!graphsError()}

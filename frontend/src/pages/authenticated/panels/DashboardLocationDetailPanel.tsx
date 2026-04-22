@@ -13,6 +13,7 @@ import {
   getLocationViewHref,
   type LocationScopedResource
 } from "../../../util/location/locationView";
+import LocationWorkOrderActions from "../../../components/location/LocationWorkOrderActions";
 
 const locationViewButtonClass = (active: boolean): string =>
   "flex min-h-11 items-center justify-center px-3 py-2 text-center text-xs font-semibold tracking-tight transform-gpu transition duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:text-sm " +
@@ -113,7 +114,7 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
                 refetchLocation={refetchLocationDetail}
                 refetchGraphs={refetchLocationGraphs}
               >
-                <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div class="min-w-0 space-y-1">
                     <p class="text-xs font-semibold uppercase tracking-3wide text-base-content/60">
                       Location
@@ -123,35 +124,38 @@ export const DashboardLocationDetailPanel = (props: ParentProps) => {
                     </h1>
                   </div>
 
-                  <nav
-                    class="w-fit max-w-full overflow-hidden rounded-2xl border border-base-300 bg-base-200/40 shadow-sm sm:ml-auto"
-                    aria-label="Location view selector"
-                  >
-                    <div class="inline-grid grid-cols-3 divide-x divide-base-300">
-                      <For each={dashboardLocationViews}>
-                        {(view) => {
-                          const active = createLocationViewActive(currentView, view.view);
-                          return (
-                            <A
-                              href={getLocationViewHref(params.locationId, view.view)}
-                              preload
-                              class={locationViewButtonClass(active())}
-                              classList={{
-                                "cursor-default": active()
-                              }}
-                              aria-current={active() ? "page" : undefined}
-                              aria-label={view.name}
-                              title={view.name}
-                              data-view={view.view}
-                            >
-                              <span aria-hidden="true">{view.label}</span>
-                              <span class="sr-only">{view.name}</span>
-                            </A>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </nav>
+                  <div class="flex flex-col gap-3 sm:items-end">
+
+                    <nav
+                      class="w-fit max-w-full overflow-hidden rounded-2xl border border-base-300 bg-base-200/40 shadow-sm"
+                      aria-label="Location view selector"
+                    >
+                      <div class="inline-grid grid-cols-3 divide-x divide-base-300">
+                        <For each={dashboardLocationViews}>
+                          {(view) => {
+                            const active = createLocationViewActive(currentView, view.view);
+                            return (
+                              <A
+                                href={getLocationViewHref(params.locationId, view.view)}
+                                preload
+                                class={locationViewButtonClass(active())}
+                                classList={{
+                                  "cursor-default": active()
+                                }}
+                                aria-current={active() ? "page" : undefined}
+                                aria-label={view.name}
+                                title={view.name}
+                                data-view={view.view}
+                              >
+                                <span aria-hidden="true">{view.label}</span>
+                                <span class="sr-only">{view.name}</span>
+                              </A>
+                            );
+                          }}
+                        </For>
+                      </div>
+                    </nav>
+                  </div>
                 </header>
 
                 <div class="pt-6">
