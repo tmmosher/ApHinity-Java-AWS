@@ -301,7 +301,8 @@ export const buildChangedLocationGraphUpdates = (
  *
  * Clean graphs adopt the latest server state, while dirty graphs keep the
  * local edits and retain their original baseline so later saves still detect
- * conflicts correctly. Undo history is rebased in the same way so pending
+ * conflicts correctly. A graph is only considered dirty while the undo stack
+ * contains pending edits. Undo history is rebased in the same way so pending
  * edits remain undoable after an unrelated refresh.
  */
 export const reconcileLocationGraphRefreshState = (
@@ -313,9 +314,16 @@ export const reconcileLocationGraphRefreshState = (
   const currentById = new Map(currentGraphs.map((graph) => [graph.id, graph]));
   const nextById = new Map(nextGraphs.map((graph) => [graph.id, graph]));
   const dirtyGraphIds = new Set<number>();
+  const hasPendingGraphEdits = currentUndoStack.length > 0;
 
   for (const currentGraph of currentGraphs) {
-    if (isGraphDirty(currentGraph, currentBaselineIndex.get(currentGraph.id))) {
+    // Once the undo stack is empty, the current graphs are the saved state.
+    // Let the next refresh replace them so the baseline picks up the server's
+    // latest updatedAt value.
+    if (
+      hasPendingGraphEdits
+      && isGraphDirty(currentGraph, currentBaselineIndex.get(currentGraph.id))
+    ) {
       dirtyGraphIds.add(currentGraph.id);
     }
   }

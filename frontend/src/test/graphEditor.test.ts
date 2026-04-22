@@ -225,6 +225,49 @@ describe("graphEditor", () => {
     });
   });
 
+  it("adopts refreshed saved graphs after a rename once the undo stack is empty", () => {
+    const savedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        name: "Water Quality Compliance - Renamed",
+        data: [{type: "bar", x: ["A"], y: [15]}],
+        layout: {title: {text: "Updated"}},
+        config: {displayModeBar: false},
+        style: {height: 360},
+        updatedAt: "2026-01-03T00:00:00Z"
+      },
+      {
+        ...baseGraphs[1]
+      }
+    ];
+    const refreshedGraphs: LocationGraph[] = [
+      {
+        ...savedGraphs[0],
+        updatedAt: "2026-01-04T00:00:00Z"
+      },
+      {
+        ...baseGraphs[1],
+        updatedAt: "2026-01-04T00:00:00Z"
+      }
+    ];
+
+    const refreshResult = reconcileLocationGraphRefreshState(
+      savedGraphs,
+      [],
+      buildGraphBaselineIndex(baseGraphs),
+      refreshedGraphs
+    );
+
+    expect(refreshResult.nextGraphs[0]).toBe(refreshedGraphs[0]);
+    expect(refreshResult.nextGraphs[1]).toBe(refreshedGraphs[1]);
+    expect(refreshResult.nextBaselineIndex.get(10)).toMatchObject({
+      expectedUpdatedAt: "2026-01-04T00:00:00Z"
+    });
+    expect(refreshResult.nextBaselineIndex.get(11)).toMatchObject({
+      expectedUpdatedAt: "2026-01-04T00:00:00Z"
+    });
+  });
+
   it("reads graph titles from string and object Plotly layout shapes", () => {
     expect(getEditableGraphTitle({title: "Legacy title"})).toBe("Legacy title");
     expect(getEditableGraphTitle({title: {text: "Current title", x: 0.02}})).toBe("Current title");

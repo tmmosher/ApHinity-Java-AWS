@@ -42,6 +42,9 @@ public class Location {
     @OneToMany(mappedBy = "location")
     private Set<ServiceEvent> serviceEvents = new LinkedHashSet<>();
 
+    @Column(name = "work_order_email", length = 256)
+    private String workOrderEmail;
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -110,6 +113,14 @@ public class Location {
 
     public void setServiceEvents(Set<ServiceEvent> serviceEvents) {
         this.serviceEvents = serviceEvents;
+    }
+
+    public String getWorkOrderEmail() {
+        return workOrderEmail;
+    }
+
+    public void setWorkOrderEmail(String workOrderEmail) {
+        this.workOrderEmail = workOrderEmail;
     }
 
     private Map<String, Object> defaultSectionLayout() {
