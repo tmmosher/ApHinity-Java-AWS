@@ -59,6 +59,8 @@ export const parseLocationSummary = (value: unknown): LocationSummary => {
     name: value.name,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    workOrderEmail: typeof value.workOrderEmail === "string" ? value.workOrderEmail : null,
+    alertsSubscribed: typeof value.alertsSubscribed === "boolean" ? value.alertsSubscribed : null,
     sectionLayout: parseLocationSectionLayout(value.sectionLayout ?? {
       sections: []
     })

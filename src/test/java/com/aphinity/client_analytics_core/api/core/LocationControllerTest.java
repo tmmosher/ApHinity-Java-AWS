@@ -6,6 +6,7 @@ import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.location.LocationRequest;
+import com.aphinity.client_analytics_core.api.core.requests.location.LocationWorkOrderEmailUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
@@ -214,6 +215,82 @@ class LocationControllerTest {
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).updateLocationGraphName(42L, 8L, 31L, "Renamed graph");
+    }
+
+    @Test
+    void updateLocationWorkOrderEmailDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationWorkOrderEmailUpdateRequest request = new LocationWorkOrderEmailUpdateRequest("work-orders@example.com");
+        LocationResponse expected = new LocationResponse(
+            8L,
+            "Dallas",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-03T00:00:00Z"),
+            Map.of("sections", List.of()),
+            "work-orders@example.com",
+            true
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.updateLocationWorkOrderEmail(42L, 8L, "work-orders@example.com")).thenReturn(expected);
+
+        LocationResponse actual = locationController.updateLocationWorkOrderEmail(jwt, 8L, request);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).updateLocationWorkOrderEmail(42L, 8L, "work-orders@example.com");
+    }
+
+    @Test
+    void subscribeToLocationAlertsDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationResponse expected = new LocationResponse(
+            8L,
+            "Dallas",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-03T00:00:00Z"),
+            Map.of("sections", List.of()),
+            null,
+            true
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.subscribeToLocationAlerts(42L, 8L)).thenReturn(expected);
+
+        LocationResponse actual = locationController.subscribeToLocationAlerts(jwt, 8L);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).subscribeToLocationAlerts(42L, 8L);
+    }
+
+    @Test
+    void unsubscribeFromLocationAlertsDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationResponse expected = new LocationResponse(
+            8L,
+            "Dallas",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-03T00:00:00Z"),
+            Map.of("sections", List.of()),
+            null,
+            false
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.unsubscribeFromLocationAlerts(42L, 8L)).thenReturn(expected);
+
+        LocationResponse actual = locationController.unsubscribeFromLocationAlerts(jwt, 8L);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).unsubscribeFromLocationAlerts(42L, 8L);
     }
 
     @Test

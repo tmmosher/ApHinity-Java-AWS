@@ -7,13 +7,20 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
-@Table(name = "user_subscription_to_location")
+@Table(
+    name = "user_subscription_to_location",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"location_id", "user_email"})
+)
 public class UserSubscriptionToLocation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
 
+    /**
+     * Database-level foreign key uses ON UPDATE CASCADE so subscriptions follow
+     * email changes on the owning app_user row.
+     */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @OnDelete(action = OnDeleteAction.CASCADE)

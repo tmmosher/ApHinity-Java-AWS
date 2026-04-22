@@ -30,6 +30,8 @@ export interface LocationSummary {
     createdAt: string;
     updatedAt: string;
     sectionLayout: LocationSectionLayoutConfig;
+    workOrderEmail?: string | null;
+    alertsSubscribed?: boolean | null;
 }
 
 export interface ActiveInvite {
