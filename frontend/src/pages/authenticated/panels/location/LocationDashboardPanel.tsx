@@ -14,10 +14,6 @@ import GraphLoadingPlaceholder from "../../../../components/graph/GraphLoadingPl
 import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 
-const toolbarActionButtonClass =
-  "btn h-11 min-h-11 rounded-2xl px-4 text-sm font-medium shadow-sm transition duration-150 ease-out " +
-  "motion-reduce:transform-none motion-reduce:transition-none hover:-translate-y-px active:translate-y-px active:scale-[0.98]";
-
 export const LocationDashboardPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
@@ -65,61 +61,19 @@ export const LocationDashboardPanel = () => {
 
   return (
     <div class="space-y-4">
-      <section class="rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-6">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div class="space-y-1">
-            <h2 class="text-xl flex items-center tracking-tight h-11 font-semibold">Dashboard</h2>
-            <p class="text-xs text-base-content/70">
-              Last updated {updatedAtLabel()}
-            </p>
-          </div>
-
-          <div class="flex flex-col gap-3 md:items-end">
-            <Show when={canEditGraphs()}>
-              <div class="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (dashboard.canCreateGraphs() ? "btn-outline" : "btn-disabled")}
-                  disabled={!dashboard.canCreateGraphs()}
-                  title={createGraphDisabledReason()}
-                  onClick={dashboard.openCreateGraphModal}
-                >
-                  {dashboard.isCreatingGraph() ? "Creating..." : "Add Graph"}
-                </button>
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (dashboard.hasPendingDashboardChanges() && !dashboard.isGraphMutationBusy() ? "btn-primary" : "btn-disabled")}
-                  disabled={!dashboard.hasPendingDashboardChanges() || dashboard.isGraphMutationBusy()}
-                  onClick={() => void dashboard.applyGraphChanges()}
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (dashboard.hasPendingDashboardChanges() && !dashboard.isGraphMutationBusy() ? "btn-outline" : "btn-disabled")}
-                  disabled={!dashboard.hasPendingDashboardChanges() || dashboard.isGraphMutationBusy()}
-                  onClick={dashboard.undoLastDashboardEdit}
-                >
-                  Undo
-                </button>
-                <button
-                  type="button"
-                  class={toolbarActionButtonClass + " " + (!dashboard.isGraphMutationBusy() && canEditGraphs() ? "btn-outline" : "btn-disabled")}
-                  disabled={dashboard.isGraphMutationBusy() || !canEditGraphs()}
-                  onClick={dashboard.openLayoutEditor}
-                >
-                  Edit Layout
-                </button>
-              </div>
-              <Show when={dashboard.hasPendingDashboardChanges()}>
-                <p class="text-right text-xs text-base-content/70">
-                  {dashboard.pendingDashboardMutationCount()} pending dashboard mutation{dashboard.pendingDashboardMutationCount() === 1 ? "" : "s"}
-                </p>
-              </Show>
-            </Show>
-          </div>
-        </div>
-      </section>
+      <LocationDashboardToolbar
+        canEditGraphs={canEditGraphs()}
+        canCreateGraphs={canCreateGraphs()}
+        isCreatingGraph={isCreatingGraph()}
+        hasPendingGraphChanges={hasPendingGraphChanges()}
+        isGraphMutationBusy={isGraphMutationBusy()}
+        pendingGraphMutationCount={locationUndoStack().length}
+        updatedAtLabel={updatedAtLabel()}
+        createGraphDisabledReason={createGraphDisabledReason()}
+        onAddGraph={openCreateGraphModal}
+        onApply={() => void applyGraphChanges()}
+        onUndo={undoLastGraphEdit}
+      />
 
       <Show
         when={!graphsError()}

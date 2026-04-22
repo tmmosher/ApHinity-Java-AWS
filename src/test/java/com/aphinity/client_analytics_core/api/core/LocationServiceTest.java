@@ -7,12 +7,14 @@ import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
+import com.aphinity.client_analytics_core.api.core.entities.location.UserSubscriptionToLocation;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
@@ -66,6 +68,9 @@ class LocationServiceTest {
 
     @Mock
     private LocationUserRepository locationUserRepository;
+
+    @Mock
+    private UserSubscriptionToLocationRepository userSubscriptionToLocationRepository;
 
     @Mock
     private AccountRoleService accountRoleService;
@@ -1422,6 +1427,110 @@ class LocationServiceTest {
         assertEquals(List.of("Austin", "Denver"), responses.stream().map(LocationResponse::name).toList());
         verify(locationRepository).findAllByOrderByNameAsc();
         verifyNoInteractions(locationUserRepository);
+    }
+
+    @Test
+    void getAccessibleLocationIncludesWorkOrderEmailAndAlertSubscriptionState() {
+        AppUser user = verifiedUser(6L);
+        when(appUserRepository.findById(6L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(3L);
+        location.setName("Austin");
+        location.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        location.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        location.setSectionLayout(Map.of("sections", List.of()));
+        location.setWorkOrderEmail("work-orders@example.com");
+
+        when(locationRepository.findById(3L)).thenReturn(Optional.of(location));
+        when(userSubscriptionToLocationRepository.existsByLocationIdAndUserId(3L, 6L)).thenReturn(true);
+
+        LocationResponse response = locationService.getAccessibleLocation(6L, 3L);
+
+        assertEquals("work-orders@example.com", response.workOrderEmail());
+        assertEquals(true, response.alertsSubscribed());
+        verify(locationRepository).findById(3L);
+        verify(userSubscriptionToLocationRepository).existsByLocationIdAndUserId(3L, 6L);
+    }
+
+    @Test
+    void updateLocationWorkOrderEmailPersistsNormalizedEmailForPartnerOrAdmin() {
+        AppUser user = verifiedUser(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(9L);
+        location.setName("Phoenix");
+        location.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        location.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(9L)).thenReturn(Optional.of(location));
+        when(userSubscriptionToLocationRepository.existsByLocationIdAndUserId(9L, 7L)).thenReturn(false);
+
+        LocationResponse response = locationService.updateLocationWorkOrderEmail(7L, 9L, "  WorkOrders@Example.com  ");
+
+        assertEquals("workorders@example.com", location.getWorkOrderEmail());
+        assertEquals("workorders@example.com", response.workOrderEmail());
+        assertEquals(false, response.alertsSubscribed());
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void subscribeToLocationAlertsCreatesSubscriptionForVerifiedUser() {
+        AppUser user = verifiedUser(8L);
+        when(appUserRepository.findById(8L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(10L);
+        location.setName("Dallas");
+        location.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        location.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(10L)).thenReturn(Optional.of(location));
+        when(userSubscriptionToLocationRepository.findByLocationIdAndUserId(10L, 8L)).thenReturn(Optional.empty());
+        when(userSubscriptionToLocationRepository.existsByLocationIdAndUserId(10L, 8L)).thenReturn(true);
+
+        LocationResponse response = locationService.subscribeToLocationAlerts(8L, 10L);
+
+        assertEquals(true, response.alertsSubscribed());
+        org.mockito.Mockito.verify(userSubscriptionToLocationRepository).save(
+            org.mockito.ArgumentMatchers.argThat(subscription -> {
+                if (subscription == null) {
+                    return false;
+                }
+                return subscription.getLocation() == location
+                    && subscription.getUserEmail() == user;
+            })
+        );
+    }
+
+    @Test
+    void unsubscribeFromLocationAlertsDeletesSubscriptionForVerifiedUser() {
+        AppUser user = verifiedUser(9L);
+        when(appUserRepository.findById(9L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(11L);
+        location.setName("Denver");
+        location.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        location.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(11L)).thenReturn(Optional.of(location));
+
+        UserSubscriptionToLocation subscription = new UserSubscriptionToLocation();
+        subscription.setLocation(location);
+        subscription.setUserEmail(user);
+        when(userSubscriptionToLocationRepository.findByLocationIdAndUserId(11L, 9L)).thenReturn(Optional.of(subscription));
+        when(userSubscriptionToLocationRepository.existsByLocationIdAndUserId(11L, 9L)).thenReturn(false);
+
+        LocationResponse response = locationService.unsubscribeFromLocationAlerts(9L, 11L);
+
+        assertEquals(false, response.alertsSubscribed());
+        verify(userSubscriptionToLocationRepository).delete(subscription);
     }
 
     @Test

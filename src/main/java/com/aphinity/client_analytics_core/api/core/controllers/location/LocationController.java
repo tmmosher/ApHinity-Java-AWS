@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphCreateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.requests.location.LocationRequest;
+import com.aphinity.client_analytics_core.api.core.requests.location.LocationWorkOrderEmailUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
@@ -350,6 +351,53 @@ public class LocationController {
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationService.updateLocationName(userId, locationId, request.name());
+    }
+
+    /**
+     * Updates a location's work-order submission email.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param request validated request containing the work-order email
+     * @return updated location payload
+     */
+    @PutMapping("/locations/{locationId}/work-order-email")
+    public LocationResponse updateLocationWorkOrderEmail(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @Valid @RequestBody LocationWorkOrderEmailUpdateRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationService.updateLocationWorkOrderEmail(userId, locationId, request.workOrderEmail());
+    }
+
+    /**
+     * Subscribes the authenticated user to location alerts.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @return updated location payload
+     */
+    @PutMapping("/locations/{locationId}/alerts/subscription")
+    public LocationResponse subscribeToLocationAlerts(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationService.subscribeToLocationAlerts(userId, locationId);
+    }
+
+    /**
+     * Unsubscribes the authenticated user from location alerts.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @return updated location payload
+     */
+    @DeleteMapping("/locations/{locationId}/alerts/subscription")
+    public LocationResponse unsubscribeFromLocationAlerts(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationService.unsubscribeFromLocationAlerts(userId, locationId);
     }
 
     /**

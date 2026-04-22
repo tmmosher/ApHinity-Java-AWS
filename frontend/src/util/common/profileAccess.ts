@@ -6,7 +6,8 @@ import {AccountRole} from "../types/Types";
 export const canEditProfileEmail = (role: AccountRole | undefined): boolean => role !== "partner";
 
 /**
- * Location graph editing is only available to partner and admin accounts.
+ * Location graph editing and partner/admin-only location controls are only available
+ * to partner and admin accounts.
  */
 export const canEditLocationGraphs = (role: AccountRole | undefined): boolean =>
   role === "admin" || role === "partner";

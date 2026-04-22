@@ -122,9 +122,9 @@ export const HomePage = () => {
       <main class="w-full max-w-6xl mx-auto space-y-8 md:space-y-10" aria-labelledby="home-title">
         <section class="rounded-2xl border border-base-300 bg-base-100 shadow-xl">
           <div class="p-6 md:p-10 space-y-6">
-            <span class="badge badge-primary badge-outline">ApHinity Management Solutions</span>
+            <span class="badge badge-primary badge-outline">ApHinity Information Management (AIM)</span>
             <h1 id="home-title" class="text-4xl md:text-5xl font-bold leading-tight">
-              Visual Reporting for Management Partners and Client Teams
+              Visual Reporting for Management Partner and Client Teams
             </h1>
             <p class="text-base md:text-lg text-base-content/80">
               AIM supports ApHinity management partners in communicating key performance indicators to
@@ -166,7 +166,7 @@ export const HomePage = () => {
           <div class="p-6 md:p-8 space-y-4">
             <h2 class="text-2xl font-semibold">Client Coverage</h2>
             <p class="text-sm text-base-content/75 leading-6">
-              Partner reporting structures support a broad client mix, including organizations such as TSMC,
+              Partner reporting structures support a broad client mix, including organizations such as Hoag Hospitals, TSMC,
               HelloFresh, Dexcom, and various regulated healthcare and agricultural operations across manufacturing and processing
               environments.
             </p>
