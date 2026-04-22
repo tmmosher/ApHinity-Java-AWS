@@ -43,6 +43,11 @@ vi.mock("../components/graph-editor/GraphEditorModal", () => ({
   default: () => null
 }));
 
+vi.mock("../components/location/LocationDashboardLayoutModal", () => ({
+  __esModule: true,
+  default: () => null
+}));
+
 import {LocationDashboardPanel} from "../pages/authenticated/panels/location/LocationDashboardPanel";
 
 describe("LocationDashboardPanel", () => {
@@ -53,6 +58,7 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Add Graph");
     expect(html).toContain("Apply");
     expect(html).toContain("Undo");
+    expect(html).toContain("Edit Layout");
     expect(html).toContain("Last updated");
     expect(html).toContain("btn h-11 min-h-11 rounded-2xl");
   });
