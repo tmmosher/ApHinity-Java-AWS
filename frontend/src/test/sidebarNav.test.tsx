@@ -44,6 +44,8 @@ describe("SidebarNav", () => {
     expect(html).toContain('data-dashboard-nav-link="/dashboard/locations"');
     expect(html).toContain('aria-current="page"');
     expect(html).toMatch(/data-dashboard-nav-item="\/dashboard"[^>]*data-active="false"/);
+    expect(html).toContain('data-focus-mode="none"');
+    expect(html).not.toContain('data-focus-mode="animate-once"');
   });
 
   it("renders disabled items without dashboard link wrappers", () => {

@@ -187,7 +187,11 @@ public class LocationController {
             graphUpdateSummary
         );
         try {
-            locationService.updateLocationGraphData(userId, locationId, request.graphs());
+            if (request.sectionLayout() == null) {
+                locationService.updateLocationGraphData(userId, locationId, request.graphs());
+            } else {
+                locationService.updateLocationGraphData(userId, locationId, request.graphs(), request.sectionLayout());
+            }
             log.info(
                 "Completed location graph update request actorUserId={} locationId={} graphCount={}",
                 userId,

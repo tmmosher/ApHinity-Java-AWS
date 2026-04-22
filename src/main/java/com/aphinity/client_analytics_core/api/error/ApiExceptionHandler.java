@@ -62,6 +62,7 @@ public class ApiExceptionHandler {
         Map.entry("Target user not found", new ErrorDefinition("target_user_not_found", "Target user not found")),
         Map.entry("Location membership not found", new ErrorDefinition("location_membership_not_found", "Location membership not found")),
         Map.entry("Location graph not found", new ErrorDefinition("location_graph_not_found", "Location graph not found")),
+        Map.entry("Location section layout is invalid", new ErrorDefinition("location_section_layout_invalid", "Location section layout is invalid")),
         Map.entry("Location event not found", new ErrorDefinition("location_event_not_found", "Location event not found")),
         Map.entry("Invited user not found", new ErrorDefinition("invited_user_not_found", "Invited user not found")),
         Map.entry("Role is invalid", new ErrorDefinition("role_invalid", "Role is invalid")),

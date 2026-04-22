@@ -153,6 +153,27 @@ class LocationControllerTest {
     }
 
     @Test
+    void updateLocationGraphDataDelegatesSectionLayoutUpdatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        LocationGraphDataUpdateBatchRequest request = new LocationGraphDataUpdateBatchRequest(
+            List.of(new LocationGraphDataUpdateRequest(31L, List.of(Map.of("type", "bar", "y", List.of(2, 4, 6))))),
+            Map.of(
+                "sections",
+                List.of(Map.of("section_id", 1, "graph_ids", List.of(31L)))
+            )
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationController.updateLocationGraphData(jwt, 8L, request);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).updateLocationGraphData(42L, 8L, request.graphs(), request.sectionLayout());
+    }
+
+    @Test
     void createLocationGraphDelegatesToServiceForAuthenticatedUser() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")

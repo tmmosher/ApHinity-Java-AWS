@@ -220,6 +220,48 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     });
   });
 
+  it("saves dashboard ordering updates alongside graph payloads", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await saveLocationGraphsById(
+      host,
+      "55",
+      [
+        {
+          graphId: 99,
+          data: [{type: "bar", y: [4, 5, 6]}]
+        }
+      ],
+      {
+        sections: [
+          {section_id: 7, graph_ids: [99, 12]},
+          {section_id: 8, graph_ids: []}
+        ]
+      }
+    );
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        graphs: [
+          {
+            graphId: 99,
+            data: [{type: "bar", y: [4, 5, 6]}]
+          }
+        ],
+        sectionLayout: {
+          sections: [
+            {section_id: 7, graph_ids: [99, 12]},
+            {section_id: 8, graph_ids: []}
+          ]
+        }
+      })
+    });
+  });
+
   it("passes expectedUpdatedAt through the save payload", async () => {
     apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
 

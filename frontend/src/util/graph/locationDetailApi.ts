@@ -7,6 +7,7 @@ import {
   LocationGraphRenameResult,
   LocationGraphType,
   LocationGraphUpdate,
+  LocationSectionLayoutConfig,
   LocationSummary
 } from "../../types/Types";
 
@@ -152,7 +153,8 @@ export const fetchLocationGraphsById = async (host: string, locationId: string):
 export const saveLocationGraphsById = async (
   host: string,
   locationId: string,
-  graphUpdates: LocationGraphUpdate[]
+  graphUpdates: LocationGraphUpdate[],
+  sectionLayout?: LocationSectionLayoutConfig
 ): Promise<void> => {
   const parsedId = parseRouteLocationId(locationId);
 
@@ -162,7 +164,8 @@ export const saveLocationGraphsById = async (
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      graphs: graphUpdates
+      graphs: graphUpdates,
+      sectionLayout
     })
   });
 

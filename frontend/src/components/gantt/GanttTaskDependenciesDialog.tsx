@@ -5,6 +5,7 @@ import {
   createAvailableGanttTaskDependencyTasks,
   createGanttTaskDependencyOptions
 } from "../../util/location/ganttTaskDependencies";
+import {createMapById} from "../../util/common/indexById";
 import {fetchLocationGanttTasksById} from "../../util/location/locationGanttTaskApi";
 import {createLocationReactiveSearchControl} from "../../util/location/locationReactiveSearchControl";
 import {normalizeGanttTaskDependencyTaskIds} from "../../util/location/ganttTaskForm";
@@ -39,9 +40,7 @@ export const GanttTaskDependenciesDialog = (props: GanttTaskDependenciesDialogPr
     allTasks() ?? []
   ));
 
-  const taskOptionsById = createMemo(() => (
-    new Map(persistedTasks().map((task) => [task.id, task] as const))
-  ));
+  const taskOptionsById = createMemo(() => createMapById(persistedTasks()));
 
   const availableTaskOptions = createMemo(() => {
     return createAvailableGanttTaskDependencyTasks(

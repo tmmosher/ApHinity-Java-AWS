@@ -1023,6 +1023,86 @@ class LocationServiceTest {
     }
 
     @Test
+    void updateLocationGraphDataPersistsSectionLayoutWithoutGraphPayloadChanges() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of("sections", List.of())));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(99L)).thenReturn(List.of(locationGraph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(),
+            new LinkedHashMap<>(Map.of(
+                "sections",
+                List.of(
+                    Map.of("section_id", 1, "graph_ids", List.of(31L)),
+                    Map.of("section_id", 2, "graph_ids", List.of())
+                )
+            ))
+        );
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(31L), sections.getFirst().get("graph_ids"));
+        assertEquals(List.of(), sections.get(1).get("graph_ids"));
+        verify(locationRepository).saveAndFlush(location);
+        verifyNoInteractions(graphRepository);
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsStaleSectionLayoutWhenGraphIdsDoNotMatch() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of("sections", List.of())));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdWithGraph(99L)).thenReturn(List.of(locationGraph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(),
+                new LinkedHashMap<>(Map.of(
+                    "sections",
+                    List.of(Map.of("section_id", 1, "graph_ids", List.of(999L)))
+                ))
+            )
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Graph update conflict", ex.getReason());
+        verify(locationRepository, never()).saveAndFlush(location);
+    }
+
+    @Test
     void updateLocationGraphDataUpdatesTraceDataAndLayout() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));

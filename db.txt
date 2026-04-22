@@ -1,0 +1,312 @@
+create table public.app_user
+(
+    id                bigserial
+        primary key,
+    email             text                                   not null
+        unique,
+    email_verified_at timestamp with time zone,
+    password_hash     text,
+    created_at        timestamp with time zone default now() not null,
+    updated_at        timestamp with time zone default now() not null,
+    name              varchar(255)
+);
+
+alter table public.app_user
+    owner to postgres;
+
+create table public.role
+(
+    id   bigserial
+        primary key,
+    name text not null
+        unique
+);
+
+alter table public.role
+    owner to postgres;
+
+create table public.user_role
+(
+    user_id bigint not null
+        references public.app_user
+            on delete cascade,
+    role_id bigint not null
+        references public.role
+            on delete cascade,
+    primary key (user_id, role_id)
+);
+
+alter table public.user_role
+    owner to postgres;
+
+create table public.auth_session
+(
+    id                     bigserial
+        primary key,
+    user_id                bigint                                 not null
+        references public.app_user
+            on delete cascade,
+    refresh_token_hash     text                                   not null
+        unique,
+    created_at             timestamp with time zone default now() not null,
+    expires_at             timestamp with time zone               not null,
+    revoked_at             timestamp with time zone,
+    replaced_by_session_id bigint
+        references public.auth_session,
+    ip_address             inet,
+    user_agent             text
+);
+
+alter table public.auth_session
+    owner to postgres;
+
+create index auth_session_user_id_idx
+    on public.auth_session (user_id);
+
+create index auth_session_expires_idx
+    on public.auth_session (expires_at);
+
+create index auth_session_revoked_idx
+    on public.auth_session (revoked_at);
+
+create table public.location
+(
+    id             bigserial
+        primary key,
+    name           text                                   not null,
+    created_at     timestamp with time zone default now() not null,
+    updated_at     timestamp with time zone default now() not null,
+    section_layout jsonb                    default '{"sections": []}'::jsonb
+);
+
+alter table public.location
+    owner to postgres;
+
+create unique index location_name_uq
+    on public.location (name);
+
+create table public.location_user
+(
+    location_id bigint                                 not null
+        references public.location
+            on delete cascade,
+    user_id     bigint                                 not null
+        references public.app_user
+            on delete cascade,
+    created_at  timestamp with time zone default now() not null,
+    primary key (location_id, user_id)
+);
+
+alter table public.location_user
+    owner to postgres;
+
+create index location_user_user_id_idx
+    on public.location_user (user_id);
+
+create index location_user_location_id_idx
+    on public.location_user (location_id);
+
+create table public.location_invite
+(
+    id               bigserial
+        primary key,
+    location_id      bigint                                           not null
+        references public.location
+            on delete cascade,
+    invited_email    text                                             not null,
+    invited_by       bigint
+                                                                      references public.app_user
+                                                                          on delete set null,
+    token_hash       text                                             not null
+        unique,
+    expires_at       timestamp with time zone                         not null,
+    status           text                     default 'pending'::text not null
+        constraint location_invite_status_check
+            check (status = ANY (ARRAY ['pending'::text, 'accepted'::text, 'revoked'::text, 'expired'::text])),
+    created_at       timestamp with time zone default now()           not null,
+    accepted_at      timestamp with time zone,
+    accepted_user_id bigint
+                                                                      references public.app_user
+                                                                          on delete set null,
+    revoked_at       timestamp with time zone
+);
+
+alter table public.location_invite
+    owner to postgres;
+
+create index location_invite_location_id_idx
+    on public.location_invite (location_id);
+
+create index location_invite_invited_email_idx
+    on public.location_invite (invited_email);
+
+create index location_invite_status_idx
+    on public.location_invite (status);
+
+create index location_invite_expires_at_idx
+    on public.location_invite (expires_at);
+
+create unique index location_invite_one_pending_per_email
+    on public.location_invite (location_id, invited_email)
+    where (status = 'pending'::text);
+
+create table public.graph
+(
+    id         bigserial
+        primary key,
+    name       text                                   not null,
+    data       jsonb                                  not null,
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null,
+    layout     jsonb,
+    config     jsonb,
+    style      json
+);
+
+alter table public.graph
+    owner to postgres;
+
+create table public.location_graph
+(
+    location_id bigint                                 not null
+        references public.location
+            on delete cascade,
+    graph_id    bigint                                 not null
+        references public.graph
+            on delete cascade,
+    created_at  timestamp with time zone default now() not null,
+    primary key (location_id, graph_id)
+);
+
+alter table public.location_graph
+    owner to postgres;
+
+create index location_graph_graph_id_idx
+    on public.location_graph (graph_id);
+
+create table public.email_verification_token
+(
+    id          bigserial
+        primary key,
+    user_id     bigint                                 not null
+        references public.app_user
+            on delete cascade,
+    token_hash  text                                   not null,
+    expires_at  timestamp with time zone               not null,
+    consumed_at timestamp with time zone,
+    created_at  timestamp with time zone default now() not null
+);
+
+alter table public.email_verification_token
+    owner to postgres;
+
+create index email_verification_token_user_id_idx
+    on public.email_verification_token (user_id);
+
+create unique index email_verification_token_active_token_hash_uq
+    on public.email_verification_token (token_hash)
+    where (consumed_at IS NULL);
+
+create table public.password_reset_token
+(
+    id          bigserial
+        primary key,
+    user_id     bigint                                 not null
+        references public.app_user
+            on delete cascade,
+    token_hash  text                                   not null,
+    expires_at  timestamp with time zone               not null,
+    consumed_at timestamp with time zone,
+    created_at  timestamp with time zone default now() not null
+);
+
+alter table public.password_reset_token
+    owner to postgres;
+
+create index password_reset_token_user_id_idx
+    on public.password_reset_token (user_id);
+
+create unique index password_reset_token_active_token_hash_uq
+    on public.password_reset_token (token_hash)
+    where (consumed_at IS NULL);
+
+create extension if not exists pg_trgm;
+
+create table public.service_event
+(
+    id             bigserial
+        primary key,
+    location_id    bigint                                 not null
+        references public.location
+            on delete cascade,
+    title          text                                   not null
+        constraint service_event_title_not_blank_check
+            check (btrim(title) <> ''::text),
+    responsibility text                                   not null
+        constraint service_event_responsibility_check
+            check (responsibility = ANY (ARRAY ['client'::text, 'partner'::text])),
+    event_date     date                                   not null,
+    event_time     time without time zone                 not null,
+    end_event_date date                                   not null,
+    end_event_time time without time zone                 not null,
+    description    text,
+    status         text                     default 'upcoming'::text not null
+        constraint service_event_status_check
+            check (status = ANY (ARRAY ['upcoming'::text, 'current'::text, 'overdue'::text, 'completed'::text])),
+    constraint service_event_range_check
+        check ((end_event_date > event_date)
+            or (end_event_date = event_date and end_event_time >= event_time)),
+    created_at     timestamp with time zone default now() not null,
+    updated_at     timestamp with time zone default now() not null
+);
+
+alter table public.service_event
+    owner to postgres;
+
+create index service_event_location_schedule_idx
+    on public.service_event (location_id, event_date, event_time, end_event_date, end_event_time);
+
+create index service_event_location_status_idx
+    on public.service_event (location_id, status);
+
+create index service_event_location_responsibility_idx
+    on public.service_event (location_id, responsibility);
+
+create index service_event_title_trgm_idx
+    on public.service_event using gin (title gin_trgm_ops);
+
+create index service_event_description_trgm_idx
+    on public.service_event using gin (description gin_trgm_ops);
+
+create table public.gantt_task
+(
+    id          bigserial
+        primary key,
+    location_id bigint                                 not null
+        references public.location
+            on delete cascade,
+    title       text                                   not null
+        constraint gantt_task_title_not_blank_check
+            check (btrim(title) <> ''::text),
+    start_date  date                                   not null,
+    end_date    date                                   not null,
+    description text,
+    created_at  timestamp with time zone default now() not null,
+    updated_at  timestamp with time zone default now() not null,
+    constraint gantt_task_title_trigram_check
+        check (char_length(btrim(title)) >= 3),
+    constraint gantt_task_range_check
+        check (end_date >= start_date)
+);
+
+alter table public.gantt_task
+    owner to postgres;
+
+create index gantt_task_location_schedule_idx
+    on public.gantt_task (location_id, start_date, end_date);
+
+create index gantt_task_title_trgm_idx
+    on public.gantt_task using gin (title gin_trgm_ops);
+
+create index gantt_task_description_trgm_idx
+    on public.gantt_task using gin (description gin_trgm_ops);
