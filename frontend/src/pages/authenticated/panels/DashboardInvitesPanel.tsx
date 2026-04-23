@@ -39,7 +39,7 @@ export const DashboardInvitesPanel = () => {
         ok: false,
         inviteId,
         decision,
-        message: error instanceof Error ? error.message : "Unable to update invite."
+        message: error instanceof Error ? error.message : "Unable to update invite"
       };
     }
   }, "processInvite");
@@ -54,10 +54,10 @@ export const DashboardInvitesPanel = () => {
     }
 
     if (result.ok) {
-      toast.success(result.decision === "accept" ? "Invite accepted." : "Invite declined.");
+      toast.success(result.decision === "accept" ? "Invite accepted" : "Invite declined");
       void refetch();
     } else {
-      toast.error(result.message ?? "Unable to update invite.");
+      toast.error(result.message ?? "Unable to update invite");
     }
 
     inviteDecisionSubmission.clear();

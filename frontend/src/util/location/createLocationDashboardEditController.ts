@@ -268,7 +268,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     try {
       await props.refetchLocation();
     } catch {
-      toast.error("Graph renamed, but location details could not refresh. Please refresh the page.");
+      toast.error("Graph renamed, but location details could not refresh. Please refresh the page");
     }
   };
 
@@ -302,7 +302,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       }
 
       setIsCreateGraphModalOpen(false);
-      toast.success("Graph created.");
+      toast.success("Graph created");
 
       try {
         await Promise.all([props.refetchGraphs(), props.refetchLocation()]);
@@ -311,7 +311,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
         }
       } catch {
         if (createLocationId === props.locationId() && createSessionToken === locationSessionToken()) {
-          toast.error("Graph created, but automatic refresh failed. Please refresh the page.");
+          toast.error("Graph created, but automatic refresh failed. Please refresh the page");
         }
       }
     } catch (error) {
@@ -325,7 +325,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
           await Promise.all([props.refetchGraphs(), props.refetchLocation()]);
         } catch {
           if (createLocationId === props.locationId() && createSessionToken === locationSessionToken()) {
-            toast.error("Graph created, but automatic refresh failed. Please refresh the page.");
+            toast.error("Graph created, but automatic refresh failed. Please refresh the page");
           }
         }
         return;
@@ -384,7 +384,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       setDashboardUndoStack((currentUndoStack) => currentUndoStack.length > 0 ? [] : currentUndoStack);
       setGraphBaselineIndex(cleanupResult.nextBaselineIndex);
       setEditingGraphId(null);
-      toast.success("Graph deleted.");
+      toast.success("Graph deleted");
 
       try {
         await Promise.all([props.refetchGraphs(), props.refetchLocation()]);
@@ -393,7 +393,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
         }
       } catch {
         if (deleteLocationId === props.locationId() && deleteSessionToken === locationSessionToken()) {
-          toast.error("Graph deleted, but automatic refresh failed. Please refresh the page.");
+          toast.error("Graph deleted, but automatic refresh failed. Please refresh the page");
         }
       }
     } catch (error) {
@@ -460,7 +460,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       setSectionLayoutSyncUpdatedAt(props.location()?.updatedAt ?? null);
       setDashboardUndoStack([]);
       setSectionLayoutBaseline(cloneLocationSectionLayout(workingSectionLayout()));
-      toast.success("Dashboard changes saved.");
+      toast.success("Dashboard changes saved");
       try {
         await Promise.all([props.refetchGraphs(), props.refetchLocation()]);
         if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
@@ -468,7 +468,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
         }
       } catch {
         if (saveLocationId === props.locationId() && saveSessionToken === locationSessionToken()) {
-          toast.error("Saved successfully, but automatic refresh failed. Please refresh the page.");
+          toast.error("Saved successfully, but automatic refresh failed. Please refresh the page");
         }
       }
     } catch (error) {
@@ -482,31 +482,31 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
           if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
             return;
           }
-          toast.error("A graph was updated by another user. Latest data was reloaded.");
+          toast.error("A graph was updated by another user. Latest data was reloaded");
         } catch {
           if (saveLocationId === props.locationId() && saveSessionToken === locationSessionToken()) {
-            toast.error("A graph was updated by another user, and automatic refresh failed. Please refresh the page.");
+            toast.error("A graph was updated by another user, and automatic refresh failed. Please refresh the page");
           }
         }
         return;
       }
       if (error instanceof Error && error.message === "CSRF invalid") {
-        toast.error("Security token refresh failed. Please retry Apply; your edits are still local.");
+        toast.error("Security token refresh failed. Please retry Apply; your edits are still local");
         return;
       }
       if (error instanceof Error && error.message === "Security token rejected") {
-        toast.error("Security validation failed. Retrying Apply usually succeeds without losing local edits.");
+        toast.error("Security validation failed. Retrying Apply usually succeeds without losing local edits");
         return;
       }
       if (error instanceof Error && error.message === "Authentication required") {
-        toast.error("Session refresh failed. Please sign in again; your local edits are still on this page.");
+        toast.error("Session refresh failed. Please sign in again; your local edits are still on this page");
         return;
       }
       if (error instanceof Error && error.message === "Insufficient permissions") {
-        toast.error("You no longer have permission to edit these graphs.");
+        toast.error("You no longer have permission to edit these graphs");
         return;
       }
-      toast.error("Unable to save dashboard changes.");
+      toast.error("Unable to save dashboard changes");
     } finally {
       if (saveLocationId === props.locationId() && saveSessionToken === locationSessionToken()) {
         setIsSavingGraphChanges(false);
@@ -529,21 +529,21 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
 
   const resolveGraphCreateFollowUpFailureMessage = (error: unknown): string => {
     if (error instanceof Error && error.message === "CSRF invalid") {
-      return "Graph created, but the custom Y-axis title could not be saved because the security token expired. Reopen the graph and try again.";
+      return "Graph created, but the custom Y-axis title could not be saved because the security token expired. Reopen the graph and try again";
     }
     if (error instanceof Error && error.message === "Security token rejected") {
-      return "Graph created, but the custom Y-axis title could not be saved because security validation failed. Reopen the graph and try again.";
+      return "Graph created, but the custom Y-axis title could not be saved because security validation failed. Reopen the graph and try again";
     }
     if (error instanceof Error && error.message === "Authentication required") {
-      return "Graph created, but the custom Y-axis title could not be saved because your session expired. Sign in again and retry from the graph editor.";
+      return "Graph created, but the custom Y-axis title could not be saved because your session expired. Sign in again and retry from the graph editor";
     }
     if (error instanceof Error && error.message === "Insufficient permissions") {
-      return "Graph created, but the custom Y-axis title could not be saved because you no longer have permission to edit graphs.";
+      return "Graph created, but the custom Y-axis title could not be saved because you no longer have permission to edit graphs";
     }
     if (error instanceof Error && error.message === "Graph update conflict") {
-      return "Graph created, but the custom Y-axis title could not be saved due to a graph update conflict. Reopen the graph and try again.";
+      return "Graph created, but the custom Y-axis title could not be saved due to a graph update conflict. Reopen the graph and try again";
     }
-    return "Graph created, but the custom Y-axis title could not be saved. Reopen the graph and try again.";
+    return "Graph created, but the custom Y-axis title could not be saved. Reopen the graph and try again";
   };
 
   return {
@@ -584,4 +584,3 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     applyGraphChanges
   };
 };
-

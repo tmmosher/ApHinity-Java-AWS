@@ -90,7 +90,7 @@ export const HomePage = () => {
 
     if (!parsed.success) {
       const firstIssue = parsed.error.issues[0];
-      toast.error(firstIssue?.message ?? "Please complete every contact field before submitting.");
+      toast.error(firstIssue?.message ?? "Please complete every contact field before submitting");
       return;
     }
 

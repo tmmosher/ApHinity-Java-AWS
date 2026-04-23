@@ -67,7 +67,7 @@ describe("createGanttTaskImportController", () => {
         expect(controller.hasStagedTasks()).toBe(true);
         expect(controller.stagedTasks()).toHaveLength(1);
         expect(mocks.parseGanttTaskSpreadsheetFile).toHaveBeenCalledWith(file);
-        expect(mocks.toastSuccess).toHaveBeenCalledWith("1 gantt task staged from spreadsheet.");
+        expect(mocks.toastSuccess).toHaveBeenCalledWith("1 gantt task staged from spreadsheet");
 
         await controller.applyStagedImports();
         await Promise.resolve();
@@ -88,7 +88,7 @@ describe("createGanttTaskImportController", () => {
         expect(clearUploadInput).toHaveBeenCalledTimes(1);
         expect(refetchTasks).toHaveBeenCalledTimes(1);
         expect(controller.hasStagedTasks()).toBe(false);
-        expect(mocks.toastSuccess).toHaveBeenCalledWith("Imported 1 gantt task.");
+        expect(mocks.toastSuccess).toHaveBeenCalledWith("Imported 1 gantt task");
       } finally {
         dispose();
       }

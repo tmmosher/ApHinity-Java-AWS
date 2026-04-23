@@ -11,7 +11,7 @@ export const createRenameLocationHandler = (
   try {
     const result = await runRenameLocationAction(host, locationId, nextName);
     if (!result.ok || !result.updatedLocation) {
-      toast.error(result.message ?? "Unable to update location name.");
+      toast.error(result.message ?? "Unable to update location name");
       return false;
     }
 
@@ -22,7 +22,7 @@ export const createRenameLocationHandler = (
     );
     return true;
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : "Unable to update location name.");
+    toast.error(error instanceof Error ? error.message : "Unable to update location name");
     return false;
   }
 };

@@ -17,7 +17,7 @@ const TurnstileWidget = () => {
     return <Turnstile
         sitekey={siteKey}
         onError={() => {
-            toast.error("Turnstile failed to load. Refresh and try again.");
+            toast.error("Turnstile failed to load. Refresh and try again");
         }}
         onVerify={() => {
             console.log("Client Turnstile verified.")

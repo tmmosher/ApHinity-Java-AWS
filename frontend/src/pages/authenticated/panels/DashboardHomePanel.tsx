@@ -66,12 +66,12 @@ export const DashboardHomePanel = () => {
     if (locationId === null) {
       setFavoriteLocationId("");
       setFavoriteLocationIdSignal("");
-      toast.success("Favorite location cleared.");
+      toast.success("Favorite location cleared");
       return;
     }
     setFavoriteLocationId(locationId);
     setFavoriteLocationIdSignal(String(locationId));
-    toast.success("Favorite location updated.");
+    toast.success("Favorite location updated");
   };
   const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
 

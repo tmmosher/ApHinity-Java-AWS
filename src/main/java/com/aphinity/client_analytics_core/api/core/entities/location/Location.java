@@ -45,6 +45,9 @@ public class Location {
     @Column(name = "work_order_email", length = 256)
     private String workOrderEmail;
 
+    @Column(name = "thumbnail")
+    private byte[] thumbnail;
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -121,6 +124,14 @@ public class Location {
 
     public void setWorkOrderEmail(String workOrderEmail) {
         this.workOrderEmail = workOrderEmail;
+    }
+
+    public byte[] getThumbnail() {
+        return thumbnail;
+    }
+
+    public void setThumbnail(byte[] thumbnail) {
+        this.thumbnail = thumbnail;
     }
 
     private Map<String, Object> defaultSectionLayout() {

@@ -97,7 +97,7 @@ export const LocationOverviewCard = (props: LocationOverviewCardProps) => {
         setRenameError("Unable to update location name.");
         return false;
       }
-      toast.success("Location updated.");
+      toast.success("Location updated");
       return true;
     } catch (error) {
       setRenameError(error instanceof Error ? error.message : "Unable to update location name.");

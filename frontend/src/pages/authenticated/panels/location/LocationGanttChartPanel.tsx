@@ -189,7 +189,7 @@ export const LocationGanttChartPanel = () => {
 
     await updateLocationGanttTaskById(host, params.locationId, task.id, request);
     await refetchTasks();
-    toast.success("Gantt task updated.");
+    toast.success("Gantt task updated");
   };
 
   const deleteTask = async (task: TimelineTask): Promise<void> => {
@@ -200,13 +200,13 @@ export const LocationGanttChartPanel = () => {
       if (!importController.deleteStagedTaskById(task.id)) {
         return;
       }
-      toast.success("Staged gantt task removed.");
+      toast.success("Staged gantt task removed");
       return;
     }
 
     await deleteLocationGanttTaskById(host, params.locationId, task.id);
     await refetchTasks();
-    toast.success("Gantt task deleted.");
+    toast.success("Gantt task deleted");
   };
 
   const createTask = async (request: CreateLocationGanttTaskRequest): Promise<void> => {
@@ -216,7 +216,7 @@ export const LocationGanttChartPanel = () => {
 
     await createLocationGanttTaskById(host, params.locationId, request);
     await refetchTasks();
-    toast.success("Gantt task created.");
+    toast.success("Gantt task created");
   };
 
   createEffect(() => {

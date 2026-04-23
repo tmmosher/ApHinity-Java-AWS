@@ -62,9 +62,9 @@ export const LocationWorkOrderEmailPopover = () => {
       try {
         await refetchLocation();
       } catch {
-        toast.error("Work order email saved, but location details could not refresh. Please refresh the page.");
+        toast.error("Work order email saved, but location details could not refresh. Please refresh the page");
       }
-      toast.success(nextWorkOrderEmail ? "Work order email updated." : "Work order email cleared.");
+      toast.success(nextWorkOrderEmail ? "Work order email updated" : "Work order email cleared");
       setWorkOrderEmailDraft(nextWorkOrderEmail ?? "");
       setWorkOrderEmailError("");
       return true;

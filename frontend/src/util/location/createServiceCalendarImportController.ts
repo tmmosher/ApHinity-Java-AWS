@@ -78,10 +78,10 @@ export const createServiceCalendarImportController = (props: ServiceCalendarImpo
       }
 
       toast.success(
-        `${parsedRequests.length} service event${parsedRequests.length === 1 ? "" : "s"} staged from spreadsheet.`
+        `${parsedRequests.length} service event${parsedRequests.length === 1 ? "" : "s"} staged from spreadsheet`
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to import service calendar spreadsheet.");
+      toast.error(error instanceof Error ? error.message : "Unable to import service calendar spreadsheet");
     } finally {
       setIsImportingSpreadsheet(false);
     }
@@ -127,14 +127,14 @@ export const createServiceCalendarImportController = (props: ServiceCalendarImpo
       setStagedImportUndoStack([]);
       props.clearUploadInput();
       toast.success(
-        `Imported ${response.importedCount} service event${response.importedCount === 1 ? "" : "s"}.`
+        `Imported ${response.importedCount} service event${response.importedCount === 1 ? "" : "s"}`
       );
 
       try {
         await props.refetchServiceEvents();
       } catch {
         if (uploadLocationId === props.locationId() && uploadSessionToken === props.locationSessionToken()) {
-          toast.error("Service calendar imported, but automatic refresh failed. Please refresh the page.");
+          toast.error("Service calendar imported, but automatic refresh failed. Please refresh the page");
         }
       }
     } catch (error) {
@@ -143,23 +143,23 @@ export const createServiceCalendarImportController = (props: ServiceCalendarImpo
       }
 
       if (error instanceof Error && error.message === "CSRF invalid") {
-        toast.error("Security token refresh failed. Please retry Apply; your staged import is still local.");
+        toast.error("Security token refresh failed. Please retry Apply; your staged import is still local");
         return;
       }
       if (error instanceof Error && error.message === "Security token rejected") {
-        toast.error("Security validation failed. Retrying Apply usually succeeds without losing staged imports.");
+        toast.error("Security validation failed. Retrying Apply usually succeeds without losing staged imports");
         return;
       }
       if (error instanceof Error && error.message === "Authentication required") {
-        toast.error("Session refresh failed. Please sign in again; your staged import is still on this page.");
+        toast.error("Session refresh failed. Please sign in again; your staged import is still on this page");
         return;
       }
       if (error instanceof Error && error.message === "Insufficient permissions") {
-        toast.error("You no longer have permission to import service calendar events.");
+        toast.error("You no longer have permission to import service calendar events");
         return;
       }
 
-      toast.error(error instanceof Error ? error.message : "Unable to upload service calendar spreadsheet.");
+      toast.error(error instanceof Error ? error.message : "Unable to upload service calendar spreadsheet");
     } finally {
       if (uploadLocationId === props.locationId() && uploadSessionToken === props.locationSessionToken()) {
         setIsApplyingImportedEvents(false);

@@ -53,27 +53,27 @@ export const DashboardManagementPanel = () => {
   ): Promise<ManagedUser> => {
     const updatedUser = await updateManagedUserRole(host, userId, role);
     if (updatedUser.role === "admin") {
-      toast.success("User role updated.");
+      toast.success("User role updated");
       void refetch();
       return updatedUser;
     }
 
     updateManagedUserInPage(updatedUser);
-    toast.success("User role updated.");
+    toast.success("User role updated");
     return updatedUser;
   };
 
   const queueUserDeletion = async (userId: number): Promise<ManagedUser> => {
     const updatedUser = await markManagedUserForDeletion(host, userId);
     updateManagedUserInPage(updatedUser);
-    toast.success("User queued for deletion.");
+    toast.success("User queued for deletion");
     return updatedUser;
   };
 
   const restoreUserFromDeletionQueue = async (userId: number): Promise<ManagedUser> => {
     const updatedUser = await restoreManagedUserDeletion(host, userId);
     updateManagedUserInPage(updatedUser);
-    toast.success("User restored.");
+    toast.success("User restored");
     return updatedUser;
   };
 

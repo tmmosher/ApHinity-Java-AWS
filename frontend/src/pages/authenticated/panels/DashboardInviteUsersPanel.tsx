@@ -43,7 +43,7 @@ export const DashboardInviteUsersPanel = () => {
     } catch (error) {
       return {
         ok: false,
-        message: error instanceof Error ? error.message : "Unable to create invite."
+        message: error instanceof Error ? error.message : "Unable to create invite"
       };
     }
   }, "submitInvite");
@@ -58,9 +58,9 @@ export const DashboardInviteUsersPanel = () => {
 
     if (result.ok) {
       setInvitedEmail("");
-      toast.success("Invite created.");
+      toast.success("Invite created");
     } else {
-      toast.error(result.message ?? "Unable to create invite.");
+      toast.error(result.message ?? "Unable to create invite");
     }
 
     inviteSubmission.clear();

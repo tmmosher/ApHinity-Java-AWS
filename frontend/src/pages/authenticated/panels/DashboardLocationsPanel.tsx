@@ -63,9 +63,9 @@ export const DashboardLocationsPanel = () => {
     if (result.ok && result.createdLocation) {
       locationContext.mutate((current) => sortLocationsByName([...(current ?? []), result.createdLocation!]));
       setNewLocationName("");
-      toast.success("Location created.");
+      toast.success("Location created");
     } else {
-      toast.error(result.message ?? "Unable to create location.");
+      toast.error(result.message ?? "Unable to create location");
     }
 
     createLocationSubmission.clear();
@@ -88,12 +88,12 @@ export const DashboardLocationsPanel = () => {
     if (locationId === null) {
       setFavoriteLocationId("");
       setFavoriteLocationIdSignal("");
-      toast.success("Favorite location cleared.");
+      toast.success("Favorite location cleared");
       return;
     }
     setFavoriteLocationId(locationId);
     setFavoriteLocationIdSignal(String(locationId));
-    toast.success("Favorite location updated.");
+    toast.success("Favorite location updated");
   };
   const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
 

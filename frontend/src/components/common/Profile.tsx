@@ -46,7 +46,7 @@ const Profile = () => {
     const updateThemePreference = (next: ThemePreference) => {
         setThemePreference(next);
         setStoredThemePreference(next);
-        toast.success(`Theme changed to ${next} mode.`);
+        toast.success(`Theme changed to ${next} mode`);
     };
 
     const updateProfileAction = action(async (formData: FormData): Promise<ActionResult> => {
@@ -68,7 +68,7 @@ const Profile = () => {
             if (!response.ok) {
                 return {
                     ok: false,
-                    message: await extractApiErrorMessage(response, "Unable to update profile.")
+                    message: await extractApiErrorMessage(response, "Unable to update profile")
                 };
             }
             return {
@@ -77,7 +77,7 @@ const Profile = () => {
         } catch {
             return {
                 ok: false,
-                message: "Unable to update profile."
+                message: "Unable to update profile"
             };
         }
     }, "updateProfile");
@@ -97,7 +97,7 @@ const Profile = () => {
             if (!response.ok) {
                 return {
                     ok: false,
-                    message: await extractApiErrorMessage(response, "Unable to update password.")
+                    message: await extractApiErrorMessage(response, "Unable to update password")
                 };
             }
             return {
@@ -106,7 +106,7 @@ const Profile = () => {
         } catch {
             return {
                 ok: false,
-                message: "Unable to update password."
+                message: "Unable to update password"
             };
         }
     }, "updatePassword");
@@ -133,7 +133,7 @@ const Profile = () => {
             if (!response.ok) {
                 return {
                     ok: false,
-                    message: await extractApiErrorMessage(response, "Verification failed.")
+                    message: await extractApiErrorMessage(response, "Verification failed")
                 };
             }
             return {
@@ -149,7 +149,7 @@ const Profile = () => {
             }
             return {
                 ok: false,
-                message: "Verification failed."
+                message: "Verification failed"
             };
         }
     }, "verifyProfileEmail");
@@ -186,9 +186,9 @@ const Profile = () => {
         }
         if (result.ok) {
             profileContext.refreshProfile();
-            toast.success("Profile updated. If you changed emails, please verify your new email address.");
+            toast.success("Profile updated. If you changed emails, please verify your new email address");
         } else {
-            toast.error(result.message ?? "Unable to update profile.");
+            toast.error(result.message ?? "Unable to update profile");
         }
         profileUpdateSubmission.clear();
     });
@@ -201,9 +201,9 @@ const Profile = () => {
         if (result.ok) {
             setCurrentPassword("");
             setNewPassword("");
-            toast.success("Password updated.");
+            toast.success("Password updated");
         } else {
-            toast.error(result.message ?? "Unable to update password.");
+            toast.error(result.message ?? "Unable to update password");
         }
         passwordUpdateSubmission.clear();
     });
@@ -216,9 +216,9 @@ const Profile = () => {
         if (result.ok) {
             setVerificationCode("");
             profileContext.refreshProfile();
-            toast.success("Email verified.");
+            toast.success("Email verified");
         } else {
-            toast.error(result.message ?? "Verification failed.");
+            toast.error(result.message ?? "Verification failed");
         }
         verifyEmailSubmission.clear();
     });
@@ -231,7 +231,7 @@ const Profile = () => {
         if (result.ok) {
             navigate("/login");
         } else {
-            toast.error(result.message ?? "Unable to logout.");
+            toast.error(result.message ?? "Unable to logout");
         }
         logoutSubmission.clear();
     });

@@ -74,7 +74,7 @@ export const ProfileProvider = (props: ParentProps) => {
             return;
         }
         navigate("/login");
-        toast.error("Unable to load profile. Please login again.");
+        toast.error("Unable to load profile. Please login again");
     });
 
     const value: ProfileContextValue = {

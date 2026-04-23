@@ -144,7 +144,7 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
       description: null,
       status: "completed"
     });
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Service event marked complete.");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Service event marked complete");
   });
 
   it("creates corrective actions from persisted service events", async () => {
@@ -177,7 +177,7 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
         status: "upcoming"
       }
     );
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Corrective action created.");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Corrective action created");
   });
 
   it("rejects corrective actions for staged events", async () => {

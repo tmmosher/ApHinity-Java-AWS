@@ -215,7 +215,7 @@ export const LocationServiceCalendarPanel = () => {
   const saveServiceEvent = async (request: CreateLocationServiceEventRequest): Promise<void> => {
     await createLocationEventById(host, params.locationId, request);
     await refetchServiceEvents();
-    toast.success("Service event created.");
+    toast.success("Service event created");
   };
 
   const saveEditedServiceEvent = async (
@@ -224,7 +224,7 @@ export const LocationServiceCalendarPanel = () => {
   ): Promise<void> => {
     await updateLocationEventById(host, params.locationId, event.id, request);
     await refetchServiceEvents();
-    toast.success("Service event updated.");
+    toast.success("Service event updated");
   };
 
   const createCorrectiveActionFromEvent = async (
@@ -237,7 +237,7 @@ export const LocationServiceCalendarPanel = () => {
 
     await createLocationCorrectiveActionById(host, params.locationId, sourceEvent.id, request);
     await refetchServiceEvents();
-    toast.success("Corrective action created.");
+    toast.success("Corrective action created");
   };
 
   const completeServiceEvent = async (event: LocationServiceEvent): Promise<void> => {
@@ -246,7 +246,7 @@ export const LocationServiceCalendarPanel = () => {
       status: "completed"
     });
     await refetchServiceEvents();
-    toast.success("Service event marked complete.");
+    toast.success("Service event marked complete");
   };
   const stageSpreadsheetImport = async (event: Event): Promise<void> => {
     const input = event.currentTarget;
@@ -276,10 +276,10 @@ export const LocationServiceCalendarPanel = () => {
         deletedEvents: stagedDeletedEvents()
       });
       toast.success(
-        `${parsedRequests.length} service event${parsedRequests.length === 1 ? "" : "s"} staged from spreadsheet.`
+        `${parsedRequests.length} service event${parsedRequests.length === 1 ? "" : "s"} staged from spreadsheet`
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to import service calendar spreadsheet.");
+      toast.error(error instanceof Error ? error.message : "Unable to import service calendar spreadsheet");
     } finally {
       setIsImportingSpreadsheet(false);
       input.value = "";
@@ -326,15 +326,15 @@ export const LocationServiceCalendarPanel = () => {
 
       if (importedCount > 0 && deletedEvents.length > 0) {
         toast.success(
-          `Imported ${importedCount} service event${importedCount === 1 ? "" : "s"} and deleted ${deletedEvents.length} service event${deletedEvents.length === 1 ? "" : "s"}.`
+          `Imported ${importedCount} service event${importedCount === 1 ? "" : "s"} and deleted ${deletedEvents.length} service event${deletedEvents.length === 1 ? "" : "s"}`
         );
       } else if (importedCount > 0) {
         toast.success(
-          `Imported ${importedCount} service event${importedCount === 1 ? "" : "s"}.`
+          `Imported ${importedCount} service event${importedCount === 1 ? "" : "s"}`
         );
       } else {
         toast.success(
-          `Deleted ${deletedEvents.length} service event${deletedEvents.length === 1 ? "" : "s"}.`
+          `Deleted ${deletedEvents.length} service event${deletedEvents.length === 1 ? "" : "s"}`
         );
       }
 
@@ -342,7 +342,7 @@ export const LocationServiceCalendarPanel = () => {
         await refetchServiceEvents();
       } catch {
         if (uploadLocationId === params.locationId && uploadSessionToken === locationSessionToken()) {
-          toast.error("Service calendar imported, but automatic refresh failed. Please refresh the page.");
+          toast.error("Service calendar imported, but automatic refresh failed. Please refresh the page");
         }
       }
     } catch (error) {
@@ -351,23 +351,23 @@ export const LocationServiceCalendarPanel = () => {
       }
 
       if (error instanceof Error && error.message === "CSRF invalid") {
-        toast.error("Security token refresh failed. Please retry Apply; your staged import is still local.");
+        toast.error("Security token refresh failed. Please retry Apply; your staged import is still local");
         return;
       }
       if (error instanceof Error && error.message === "Security token rejected") {
-        toast.error("Security validation failed. Retrying Apply usually succeeds without losing staged imports.");
+        toast.error("Security validation failed. Retrying Apply usually succeeds without losing staged imports");
         return;
       }
       if (error instanceof Error && error.message === "Authentication required") {
-        toast.error("Session refresh failed. Please sign in again; your staged import is still on this page.");
+        toast.error("Session refresh failed. Please sign in again; your staged import is still on this page");
         return;
       }
       if (error instanceof Error && error.message === "Insufficient permissions") {
-        toast.error("You no longer have permission to import service calendar events.");
+        toast.error("You no longer have permission to import service calendar events");
         return;
       }
 
-      toast.error(error instanceof Error ? error.message : "Unable to upload service calendar spreadsheet.");
+      toast.error(error instanceof Error ? error.message : "Unable to upload service calendar spreadsheet");
     } finally {
       if (uploadLocationId === params.locationId && uploadSessionToken === locationSessionToken()) {
         setIsApplyingImportedEvents(false);
@@ -401,7 +401,7 @@ export const LocationServiceCalendarPanel = () => {
       importedEvents: result.nextEvents,
       deletedEvents: stagedDeletedEvents()
     });
-    toast.success("Staged service event updated.");
+    toast.success("Staged service event updated");
   };
 
   const completeCalendarEvent = async (event: LocationServiceEvent): Promise<void> => {
@@ -426,7 +426,7 @@ export const LocationServiceCalendarPanel = () => {
       importedEvents: result.nextEvents,
       deletedEvents: stagedDeletedEvents()
     });
-    toast.success("Staged service event marked complete.");
+    toast.success("Staged service event marked complete");
   };
 
   const deleteCalendarEvent = async (event: LocationServiceEvent): Promise<void> => {
@@ -448,7 +448,7 @@ export const LocationServiceCalendarPanel = () => {
         importedEvents: result.nextEvents,
         deletedEvents: stagedDeletedEvents()
       });
-      toast.success("Staged service event deleted.");
+      toast.success("Staged service event deleted");
       return;
     }
 
@@ -463,7 +463,7 @@ export const LocationServiceCalendarPanel = () => {
       importedEvents: stagedImportedEvents(),
       deletedEvents: [...stagedDeletedEvents(), event]
     });
-    toast.success("Service event queued for deletion.");
+    toast.success("Service event queued for deletion");
   };
 
   const canDeleteCalendarEvent = (event: LocationServiceEvent): boolean => (

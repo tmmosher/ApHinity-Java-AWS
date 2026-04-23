@@ -28,7 +28,7 @@ export const ManagedUserListItem = (props: ManagedUserListItemProps) => {
         props.onRestoreDeletion
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to update user deletion state.");
+      toast.error(error instanceof Error ? error.message : "Unable to update user deletion state");
     }
   };
 
@@ -40,7 +40,7 @@ export const ManagedUserListItem = (props: ManagedUserListItemProps) => {
         props.onUpdateRole
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to update user role.");
+      toast.error(error instanceof Error ? error.message : "Unable to update user role");
     }
   };
 

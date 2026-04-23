@@ -66,9 +66,9 @@ export const createGanttTaskImportController = (props: GanttTaskImportController
         return;
       }
 
-      toast.success(`${requests.length} gantt task${requests.length === 1 ? "" : "s"} staged from spreadsheet.`);
+      toast.success(`${requests.length} gantt task${requests.length === 1 ? "" : "s"} staged from spreadsheet`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to import gantt spreadsheet.");
+      toast.error(error instanceof Error ? error.message : "Unable to import gantt spreadsheet");
     } finally {
       setIsImportingSpreadsheet(false);
     }
@@ -111,13 +111,13 @@ export const createGanttTaskImportController = (props: GanttTaskImportController
       setStagedTasks([]);
       setStagedUndoStack([]);
       props.clearUploadInput();
-      toast.success(`Imported ${tasksToImport.length} gantt task${tasksToImport.length === 1 ? "" : "s"}.`);
+      toast.success(`Imported ${tasksToImport.length} gantt task${tasksToImport.length === 1 ? "" : "s"}`);
 
       try {
         await props.refetchTasks();
       } catch {
         if (uploadLocationId === props.locationId() && uploadSessionToken === props.locationSessionToken()) {
-          toast.error("Gantt tasks imported, but automatic refresh failed. Please refresh the page.");
+          toast.error("Gantt tasks imported, but automatic refresh failed. Please refresh the page");
         }
       }
     } catch (error) {
@@ -126,23 +126,23 @@ export const createGanttTaskImportController = (props: GanttTaskImportController
       }
 
       if (error instanceof Error && error.message === "CSRF invalid") {
-        toast.error("Security token refresh failed. Please retry Apply; your staged tasks are still local.");
+        toast.error("Security token refresh failed. Please retry Apply; your staged tasks are still local");
         return;
       }
       if (error instanceof Error && error.message === "Security token rejected") {
-        toast.error("Security validation failed. Retrying Apply usually succeeds without losing staged tasks.");
+        toast.error("Security validation failed. Retrying Apply usually succeeds without losing staged tasks");
         return;
       }
       if (error instanceof Error && error.message === "Authentication required") {
-        toast.error("Session refresh failed. Please sign in again; your staged tasks are still on this page.");
+        toast.error("Session refresh failed. Please sign in again; your staged tasks are still on this page");
         return;
       }
       if (error instanceof Error && error.message === "Insufficient permissions") {
-        toast.error("You no longer have permission to import gantt tasks.");
+        toast.error("You no longer have permission to import gantt tasks");
         return;
       }
 
-      toast.error(error instanceof Error ? error.message : "Unable to import staged gantt tasks.");
+      toast.error(error instanceof Error ? error.message : "Unable to import staged gantt tasks");
     } finally {
       if (uploadLocationId === props.locationId() && uploadSessionToken === props.locationSessionToken()) {
         setIsApplyingImports(false);
