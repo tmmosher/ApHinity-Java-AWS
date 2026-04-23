@@ -1,7 +1,7 @@
 import Dialog from "corvu/dialog";
 import Popover from "corvu/popover";
 import {batch, Match, Show, Switch, createEffect, createMemo, createSignal, on} from "solid-js";
-import {loadPlotlyModule} from "../Chart";
+import {loadPlotlyModule} from "../common/Chart";
 import CartesianTraceEditor from "./CartesianTraceEditor";
 import IndicatorTraceEditor from "./IndicatorTraceEditor";
 import PieTraceEditor from "./PieTraceEditor";

@@ -1,4 +1,4 @@
-import { AuthCard } from "../../components/AuthCard";
+import { AuthCard } from "../../components/common/AuthCard";
 
 export const SupportPage = () => (
   <main class="w-full" aria-label="Contact support page">

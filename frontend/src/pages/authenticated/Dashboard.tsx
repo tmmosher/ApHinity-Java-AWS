@@ -1,6 +1,6 @@
 import {useLocation, useNavigate} from "@solidjs/router";
 import {Show, createEffect, type ParentProps} from "solid-js";
-import SidebarNav from "../../components/SidebarNav";
+import SidebarNav from "../../components/common/SidebarNav";
 import {useProfile} from "../../context/ProfileContext";
 import {dashboardNavForAccount, isDashboardPathAllowed} from "./dashboardConfig";
 

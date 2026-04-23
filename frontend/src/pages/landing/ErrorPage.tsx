@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router";
-import { AuthCard } from "../../components/AuthCard";
+import { AuthCard } from "../../components/common/AuthCard";
 
 export const goBackInSiteHistory = (): void => {
   if (typeof window === "undefined") {

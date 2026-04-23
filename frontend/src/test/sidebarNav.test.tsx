@@ -1,6 +1,6 @@
 import {renderToString} from "solid-js/web";
 import {describe, expect, it, vi} from "vitest";
-import SidebarNav from "../components/SidebarNav";
+import SidebarNav from "../components/common/SidebarNav";
 
 const routerState = vi.hoisted(() => ({
   pathname: "/dashboard"

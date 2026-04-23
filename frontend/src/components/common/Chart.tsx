@@ -1,8 +1,8 @@
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import type * as Plotly from "plotly.js";
-import type { ThemePreference } from "../util/common/themePreference";
-import { getDocumentThemePreference } from "../util/common/themePreference";
-import { resolveThemedGraphLayout } from "../util/graph/graphTheme";
+import type { ThemePreference } from "../../util/common/themePreference";
+import { getDocumentThemePreference } from "../../util/common/themePreference";
+import { resolveThemedGraphLayout } from "../../util/graph/graphTheme";
 
 export type PlotlyData = Partial<Plotly.PlotData>;
 export type PlotlyLayout = Partial<Plotly.Layout>;

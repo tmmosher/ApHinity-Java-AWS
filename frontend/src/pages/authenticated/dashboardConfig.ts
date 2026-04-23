@@ -1,4 +1,4 @@
-import {NavItem} from "../../components/SidebarNav";
+import {NavItem} from "../../components/common/SidebarNav";
 import {AccountRole} from "../../types/Types";
 
 export const dashboardNavByRole: Record<AccountRole, NavItem[]> = {

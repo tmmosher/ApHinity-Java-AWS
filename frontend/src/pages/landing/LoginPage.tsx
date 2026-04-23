@@ -1,9 +1,9 @@
 import { A, action, useNavigate, useSubmission } from "@solidjs/router";
-import { AuthCard } from "../../components/AuthCard";
+import { AuthCard } from "../../components/common/AuthCard";
 import { ActionResult } from "../../types/Types";
 import {toast} from "solid-toast";
 import {createEffect, createSignal, Show} from "solid-js";
-import TurnstileWidget from "../../components/TurnstileWidget";
+import TurnstileWidget from "../../components/common/TurnstileWidget";
 import {useApiHost} from "../../context/ApiHostContext";
 import { FieldError, parseLoginFormData } from "../../util/common/landingSchemas";
 

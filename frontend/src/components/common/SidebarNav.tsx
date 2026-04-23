@@ -1,6 +1,6 @@
 import {A, useLocation} from "@solidjs/router";
 import {createEffect, createSignal, For} from "solid-js";
-import {isDashboardNavItemActive} from "../pages/authenticated/dashboardConfig";
+import {isDashboardNavItemActive} from "../../pages/authenticated/dashboardConfig";
 import GradientBorder from "./GradientBorder";
 
 export type NavItem = {

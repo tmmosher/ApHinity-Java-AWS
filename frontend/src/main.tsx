@@ -1,8 +1,8 @@
 import {lazy} from "solid-js";
 import {render} from "solid-js/web";
-import {Route, Router} from "@solidjs/router";
+import {Route, Router, useParams} from "@solidjs/router";
 import App from "./App";
-import {withDashboardRouteBoundary} from "./components/withDashboardRouteBoundary";
+import {withDashboardRouteBoundary} from "./components/common/withDashboardRouteBoundary";
 import "./index.css";
 
 const root = document.getElementById("root");
@@ -118,7 +118,10 @@ const DashboardLocationDetailPanelRoute = withDashboardRouteBoundary(
   "/dashboard/locations"
 );
 const DashboardLocationDashboardPanelRoute = withDashboardRouteBoundary(
-  DashboardLocationDashboardPanel,
+  (props) => {
+    const params = useParams<{locationId: string}>();
+    return <DashboardLocationDashboardPanel locationId={params.locationId} {...props} />;
+  },
   "Location Dashboard",
   "/dashboard/locations"
 );

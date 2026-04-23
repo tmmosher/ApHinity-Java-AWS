@@ -6,7 +6,7 @@ import {
   buildPlotlyLayout,
   purgePlotlyChart,
   renderPlotlyChart
-} from "../components/Chart";
+} from "../components/common/Chart";
 
 vi.mock("plotly.js-dist-min", () => ({
   default: {

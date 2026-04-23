@@ -1,6 +1,6 @@
 import type { ParentProps } from "solid-js";
 import { useLocation } from "@solidjs/router";
-import { Banner } from "../components/Banner";
+import { Banner } from "../components/common/Banner";
 
 export const LandingLayout = (props: ParentProps) => {
   const location = useLocation();

@@ -1,17 +1,17 @@
 import {createEffect, createSignal, Show} from "solid-js";
 import {toast} from "solid-toast";
-import {useApiHost} from "../context/ApiHostContext";
-import {useProfile} from "../context/ProfileContext";
+import {useApiHost} from "../../context/ApiHostContext";
+import {useProfile} from "../../context/ProfileContext";
 import {
     getDocumentThemePreference,
     setStoredThemePreference,
     ThemePreference
-} from "../util/common/themePreference";
-import {apiFetch} from "../util/common/apiFetch";
+} from "../../util/common/themePreference";
+import {apiFetch} from "../../util/common/apiFetch";
 import {action, useNavigate, useSubmission} from "@solidjs/router";
-import {canEditProfileEmail} from "../util/common/profileAccess";
-import {FieldError, parseVerifyFormData} from "../util/common/landingSchemas";
-import {ActionResult} from "../types/Types";
+import {canEditProfileEmail} from "../../util/common/profileAccess";
+import {FieldError, parseVerifyFormData} from "../../util/common/landingSchemas";
+import {ActionResult} from "../../types/Types";
 
 const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
     const errorBody = await response.json().catch(() => null) as {message?: unknown} | null;

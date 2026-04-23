@@ -1,14 +1,20 @@
-import {Show, createEffect, createSignal, createResource} from "solid-js";
+import {Show, createEffect, createMemo, createSignal} from "solid-js";
+import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
+import {useLocations} from "../../../context/LocationContext";
 import {useProfile} from "../../../context/ProfileContext";
+import {canEditLocationGraphs} from "../../../util/common/profileAccess";
 import {
   getFavoriteLocationId,
   hasSelectableFavoriteLocation,
   setFavoriteLocationId
 } from "../../../util/common/favoriteLocation";
-import {A} from "@solidjs/router";
-import {useLocations} from "../../../context/LocationContext";
-import {fetchLocationById} from "../../../util/graph/locationDetailApi";
+import {
+  getQuickAccessLocations,
+  getRecentLocationIds
+} from "../../../util/common/recentLocation";
+import {LocationOverviewGrid} from "../../../components/location/LocationOverviewGrid";
+import {createRenameLocationHandler} from "../../../util/location/locationOverviewActions";
 
 const roleLabel: Record<"admin" | "partner" | "client", string> = {
   admin: "Admin",
@@ -23,6 +29,14 @@ export const DashboardHomePanel = () => {
   const locations = locationContext.locations;
   const [favoriteLocationId, setFavoriteLocationIdSignal] = createSignal(getFavoriteLocationId());
   const canAccess = () => Boolean(profileContext.profile()?.verified);
+  const canEditLocations = () => canEditLocationGraphs(profileContext.profile()?.role);
+  const quickAccessLocations = createMemo(() =>
+    getQuickAccessLocations(
+      locations() ?? [],
+      favoriteLocationId(),
+      getRecentLocationIds()
+    )
+  );
 
   createEffect(() => {
     if (!canAccess()) {
@@ -40,15 +54,6 @@ export const DashboardHomePanel = () => {
     }
   });
 
-  const [location, {refetch}] = createResource(
-    () => favoriteLocationId() || null,
-    (selectedFavoriteId) => (
-      selectedFavoriteId
-        ? fetchLocationById(host, selectedFavoriteId)
-        : Promise.resolve(undefined)
-    )
-  );
-
   const roleDescription = () => {
     const profile = profileContext.profile();
     if (!profile) {
@@ -57,6 +62,13 @@ export const DashboardHomePanel = () => {
     return `Signed in as ${roleLabel[profile.role]}.`;
   };
 
+  const saveFavorite = (locationId: number) => {
+    setFavoriteLocationId(locationId);
+    setFavoriteLocationIdSignal(String(locationId));
+    toast.success("Favorite location updated.");
+  };
+  const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
+
   return (
     <div class="space-y-6">
       <header class="space-y-1">
@@ -64,37 +76,27 @@ export const DashboardHomePanel = () => {
         <p class="text-base-content/70">{roleDescription()}</p>
       </header>
 
-      <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-        <h2 class="text-lg font-semibold">Favorite location</h2>
-        <Show
-          when={canAccess()}
-          fallback={
-            <p class="mt-2 text-sm text-base-content/70">
-              Verify your email to view and select locations.
-            </p>
-          }
-        >
-          <Show when={!location.loading} fallback={<p class="mt-4 text-sm text-base-content/70">Loading locations...</p>}>
-              <Show when={!location.error} fallback={
-                  <div class="mt-4 space-y-3">
-                      <p class="text-error">Unable to load locations.</p>
-                      <button type="button" class="btn btn-outline" onClick={() => void refetch()}>
-                          Retry
-                      </button>
-                  </div>
-              }>
-                  <Show when={location()} fallback={
-                      <p class="mt-4 text-sm text-base-content/70">No favorite location!</p>
-                  }>
-                      <A href={`/dashboard/locations/${location()!.id}`} class="link link-primary text-lg font-medium"
-                         preload>
-                          {location()!.name}
-                      </A>
-                  </Show>
-              </Show>
-          </Show>
-        </Show>
-      </section>
+      <Show
+        when={canAccess()}
+        fallback={
+          <p class="text-sm text-base-content/70">
+            Verify your email to view and select locations.
+          </p>
+        }
+      >
+        <LocationOverviewGrid
+          title="Quick access"
+          description="Recently opened locations, with your favorite included when it is not already recent."
+          locations={locations}
+          favoriteLocationId={favoriteLocationId()}
+          canEditLocations={canEditLocations()}
+          displayLocations={quickAccessLocations()}
+          emptyMessage="No quick-access locations yet. Open a location to add it here."
+          onFavorite={saveFavorite}
+          onRename={renameLocation}
+          onRetry={() => void locationContext.refetch()}
+        />
+      </Show>
     </div>
   );
 };

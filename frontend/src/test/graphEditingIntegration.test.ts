@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderPlotlyChart } from "../components/Chart";
+import { renderPlotlyChart } from "../components/common/Chart";
 import type { LocationGraph } from "../types/Types";
 import {
   applyGraphPayloadEdit,

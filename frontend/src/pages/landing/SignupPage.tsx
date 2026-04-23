@@ -1,5 +1,5 @@
 import {A, action, useNavigate, useSubmission} from "@solidjs/router";
-import { AuthCard } from "../../components/AuthCard";
+import { AuthCard } from "../../components/common/AuthCard";
 import {toast} from "solid-toast";
 import {createEffect} from "solid-js";
 import {ActionResult} from "../../types/Types";

@@ -1,6 +1,6 @@
 import {renderToString} from "solid-js/web";
 import {describe, expect, it} from "vitest";
-import GradientBorder from "../components/GradientBorder";
+import GradientBorder from "../components/common/GradientBorder";
 
 describe("GradientBorder", () => {
   it("renders active, focus-animation, and outline state hooks", () => {

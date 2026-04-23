@@ -1,4 +1,4 @@
-import {ActionResult} from "../types/Types";
+import {ActionResult} from "../../types/Types";
 import {Action} from "@solidjs/router";
 
 interface SendVerificationProps {

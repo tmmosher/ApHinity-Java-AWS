@@ -1,7 +1,7 @@
-import {A, useParams} from "@solidjs/router";
-import PlotlyChart, {loadPlotlyModule} from "../../../../components/Chart";
+import {A} from "@solidjs/router";
+import PlotlyChart, {loadPlotlyModule} from "../../../../components/common/Chart";
 import GraphCreateModal from "../../../../components/graph-editor/GraphCreateModal";
-import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../../components/Chart";
+import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../../components/common/Chart";
 import GraphEditorModal from "../../../../components/graph-editor/GraphEditorModal";
 import LocationDashboardLayoutModal from "../../../../components/location/LocationDashboardLayoutModal";
 import {For, Show, Suspense, createMemo, createResource} from "solid-js";
@@ -15,16 +15,19 @@ import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 import LocationDashboardToolbar from "../../../../components/location/LocationDashboardToolbar";
 
-export const LocationDashboardPanel = () => {
+type LocationDashboardPanelProps = {
+  locationId: string;
+};
+
+export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   const host = useApiHost();
   const profileContext = useProfile();
-  const params = useParams<{ locationId: string }>();
   const {location, graphs, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
   const canEditGraphs = createMemo(() => canEditLocationGraphs(profileContext.profile()?.role));
-  const shouldResetDashboardState = createDashboardLocationResetGuard(params.locationId);
+  const shouldResetDashboardState = createDashboardLocationResetGuard(props.locationId);
   const dashboard = createLocationDashboardEditController({
     host,
-    locationId: () => params.locationId,
+    locationId: () => props.locationId,
     location,
     graphs,
     refetchLocation,
@@ -62,6 +65,7 @@ export const LocationDashboardPanel = () => {
     <div class="space-y-4">
       <LocationDashboardToolbar
         canEditGraphs={canEditGraphs()}
+        canManageWorkOrderEmail={canEditGraphs()}
         canCreateGraphs={dashboard.canCreateGraphs()}
         isCreatingGraph={dashboard.isCreatingGraph()}
         hasPendingGraphChanges={dashboard.hasPendingDashboardChanges()}

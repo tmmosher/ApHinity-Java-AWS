@@ -1,11 +1,11 @@
-import { AuthCard } from "../../components/AuthCard";
+import { AuthCard } from "../../components/common/AuthCard";
 import {useApiHost} from "../../context/ApiHostContext";
 import {action, useNavigate, useSubmission} from "@solidjs/router";
 import {ActionResult} from "../../types/Types";
 import {createEffect, createSignal, Match, Show, Switch} from "solid-js";
 import {toast} from "solid-toast";
-import SendRecovery from "../../components/SendRecovery";
-import SendVerification from "../../components/SendVerification";
+import SendRecovery from "../../components/common/SendRecovery";
+import SendVerification from "../../components/common/SendVerification";
 import { FieldError, parseRecoveryFormData, parseVerifyFormData } from "../../util/common/landingSchemas";
 import {
   createRecoverySubmissionControl,

@@ -1,7 +1,7 @@
 import type {ParentProps} from "solid-js";
 import {renderToString} from "solid-js/web";
 import {describe, expect, it, vi} from "vitest";
-import {withDashboardRouteBoundary} from "../components/withDashboardRouteBoundary";
+import {withDashboardRouteBoundary} from "../components/common/withDashboardRouteBoundary";
 
 vi.mock("@solidjs/router", () => ({
   A: (props: {children?: unknown}) => props.children

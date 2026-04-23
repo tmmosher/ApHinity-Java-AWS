@@ -3,7 +3,7 @@ import { A } from "@solidjs/router";
 export const Banner = () => (
   <div class="navbar bg-base-100 shadow-sm">
     <div class="navbar-start">
-      <A class="btn btn-ghost text-xl normal-case" href="/" preload>
+      <A class="btn btn-ghost text-xl normal-case" href="/frontend/public" preload>
         ApHinity Technologies
       </A>
     </div>
