@@ -92,12 +92,12 @@ export const DashboardHomePanel = () => {
       >
         <LocationOverviewGrid
           title="Quick access"
-          description="Your favorite location first, followed by your three most recent locations."
+          description="Recently visited locations"
           locations={locations}
           favoriteLocationId={favoriteLocationId()}
           canEditLocations={canEditLocations()}
           displayLocations={quickAccessLocations()}
-          emptyMessage="No quick-access locations yet. Open a location to add it here."
+          emptyMessage="No recently visited locations."
           onFavorite={saveFavorite}
           onRename={renameLocation}
           onRetry={() => void locationContext.refetch()}

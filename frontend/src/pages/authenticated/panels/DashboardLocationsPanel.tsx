@@ -138,7 +138,7 @@ export const DashboardLocationsPanel = () => {
 
       <LocationOverviewGrid
         title="All locations"
-        description="Favorite a location for faster access or rename it if you manage the dashboard."
+        description="Favorite a location for faster access."
         locations={locations}
         favoriteLocationId={favoriteLocationId()}
         canEditLocations={canEditLocations()}
