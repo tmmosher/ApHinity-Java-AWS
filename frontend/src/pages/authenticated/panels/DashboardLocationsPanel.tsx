@@ -84,7 +84,13 @@ export const DashboardLocationsPanel = () => {
     void submitCreateLocation(nextName);
   };
 
-  const saveFavorite = (locationId: number) => {
+  const saveFavorite = (locationId: number | null) => {
+    if (locationId === null) {
+      setFavoriteLocationId("");
+      setFavoriteLocationIdSignal("");
+      toast.success("Favorite location cleared.");
+      return;
+    }
     setFavoriteLocationId(locationId);
     setFavoriteLocationIdSignal(String(locationId));
     toast.success("Favorite location updated.");

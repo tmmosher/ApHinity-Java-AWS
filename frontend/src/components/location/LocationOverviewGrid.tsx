@@ -10,7 +10,7 @@ type LocationOverviewGridProps = {
   canEditLocations: boolean;
   emptyMessage: string;
   displayLocations?: LocationSummary[];
-  onFavorite: (locationId: number) => void;
+  onFavorite: (locationId: number | null) => void;
   onRename: (locationId: number, nextName: string) => Promise<boolean>;
   onRetry: () => void;
 };

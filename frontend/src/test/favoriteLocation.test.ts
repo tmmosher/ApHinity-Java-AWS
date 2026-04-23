@@ -77,6 +77,9 @@ describe("favoriteLocation", () => {
 
     setFavoriteLocationId("abc");
     expect(getFavoriteLocationId()).toBe("");
+
+    setFavoriteLocationId(null);
+    expect(getFavoriteLocationId()).toBe("");
   });
 
   it("returns empty favorite id when persisted value is not numeric", () => {

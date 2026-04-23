@@ -81,6 +81,8 @@ describe("LocationOverviewGrid", () => {
 
     expect((html.match(/<svg\b[^>]*aria-hidden="true"/g) ?? []).length).toBe(4);
     expect((html.match(/aria-label="Rename location"/g) ?? []).length).toBe(2);
+    expect((html.match(/aria-label="Remove favorite location"/g) ?? []).length).toBe(1);
+    expect((html.match(/aria-label="Set favorite location"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-pressed="true"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-pressed="false"/g) ?? []).length).toBe(1);
   });

@@ -61,7 +61,7 @@ export const getFavoriteLocationId = (): string => {
   return normalizeLocationId(value);
 };
 
-export const setFavoriteLocationId = (value: string | number) => {
+export const setFavoriteLocationId = (value: string | number | null | undefined) => {
   if (!canUseLocalStorage()) {
     return;
   }

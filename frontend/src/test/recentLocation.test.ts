@@ -2,6 +2,7 @@ import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import {
   getQuickAccessLocations,
   getRecentLocationIds,
+  recordRecentLocationIdIfLoaded,
   recordRecentLocationId
 } from "../util/common/recentLocation";
 
@@ -72,7 +73,7 @@ describe("recentLocation", () => {
     expect(window.localStorage.getItem(RECENT_LOCATION_IDS_KEY)).toBe(JSON.stringify(["4", "2", "3"]));
   });
 
-  it("builds quick access locations from recent ids and appends favorite when needed", () => {
+  it("prepends the favorite location before recent ids", () => {
     const locations = [
       {id: 1, name: "One"},
       {id: 2, name: "Two"},
@@ -82,10 +83,10 @@ describe("recentLocation", () => {
 
     const quickAccessLocations = getQuickAccessLocations(locations, "3", ["4", "2", "1"]);
 
-    expect(quickAccessLocations.map((location) => location.id)).toEqual([4, 2, 1, 3]);
+    expect(quickAccessLocations.map((location) => location.id)).toEqual([3, 4, 2, 1]);
   });
 
-  it("skips missing ids while preserving recent order and still includes the favorite", () => {
+  it("skips missing ids while preserving recent order after the favorite", () => {
     const locations = [
       {id: 1, name: "One"},
       {id: 3, name: "Three"}
@@ -93,7 +94,7 @@ describe("recentLocation", () => {
 
     const quickAccessLocations = getQuickAccessLocations(locations, "3", ["2", "1"]);
 
-    expect(quickAccessLocations.map((location) => location.id)).toEqual([1, 3]);
+    expect(quickAccessLocations.map((location) => location.id)).toEqual([3, 1]);
   });
 
   it("is safe when window/localStorage is unavailable", () => {
@@ -101,5 +102,12 @@ describe("recentLocation", () => {
 
     expect(getRecentLocationIds()).toEqual([]);
     expect(() => recordRecentLocationId(9)).not.toThrow();
+  });
+
+  it("records a location id only when a location has loaded", () => {
+    recordRecentLocationIdIfLoaded({id: 11});
+    recordRecentLocationIdIfLoaded(undefined);
+
+    expect(getRecentLocationIds()).toEqual(["11"]);
   });
 });

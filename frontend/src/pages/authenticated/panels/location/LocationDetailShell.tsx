@@ -13,7 +13,7 @@ import {
   type DashboardLocationView,
   type LocationScopedResource
 } from "../../../../util/location/locationView";
-import {recordRecentLocationId} from "../../../../util/common/recentLocation";
+import {recordRecentLocationIdIfLoaded} from "../../../../util/common/recentLocation";
 
 type LocationDetailShellProps = ParentProps & {
   locationId: string;
@@ -67,9 +67,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
   const currentView = createMemo(() => props.currentView);
 
   createEffect(on(location, (currentLocation) => {
-    if (currentLocation) {
-      recordRecentLocationId(props.locationId);
-    }
+    recordRecentLocationIdIfLoaded(currentLocation);
   }));
 
   createEffect(on(

@@ -101,14 +101,24 @@ export const getQuickAccessLocations = <T extends {id: number}>(
     selectedLocations.push(location);
   };
 
+  const normalizedFavoriteLocationId = normalizeLocationId(favoriteLocationId);
+  if (normalizedFavoriteLocationId) {
+    addLocation(normalizedFavoriteLocationId);
+  }
+
   for (const locationId of recentLocationIds.slice(0, MAX_RECENT_LOCATION_IDS)) {
     addLocation(locationId);
   }
 
-  const normalizedFavoriteLocationId = normalizeLocationId(favoriteLocationId);
-  if (normalizedFavoriteLocationId && !selectedLocationIds.has(normalizedFavoriteLocationId)) {
-    addLocation(normalizedFavoriteLocationId);
+  return selectedLocations;
+};
+
+export const recordRecentLocationIdIfLoaded = <T extends {id: number}>(
+  location: T | undefined
+): void => {
+  if (!location) {
+    return;
   }
 
-  return selectedLocations;
+  recordRecentLocationId(location.id);
 };

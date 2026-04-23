@@ -9,7 +9,7 @@ type LocationOverviewCardProps = {
   location: LocationSummary;
   isFavorite: boolean;
   canEditLocations: boolean;
-  onFavorite: (locationId: number) => void;
+  onFavorite: (locationId: number | null) => void;
   onRename: (locationId: number, nextName: string) => Promise<boolean>;
 };
 
@@ -116,9 +116,10 @@ export const LocationOverviewCard = (props: LocationOverviewCardProps) => {
             "btn btn-circle btn-sm border border-base-300 bg-base-100/90 shadow-sm backdrop-blur " +
             (props.isFavorite ? "text-warning" : "text-base-content/70")
           }
-          aria-label={props.isFavorite ? "Favorite location" : "Set favorite location"}
+          aria-label={props.isFavorite ? "Remove favorite location" : "Set favorite location"}
+          title={props.isFavorite ? "Remove favorite location" : "Set favorite location"}
           aria-pressed={props.isFavorite}
-          onClick={() => props.onFavorite(props.location.id)}
+          onClick={() => props.onFavorite(props.isFavorite ? null : props.location.id)}
         >
           {props.isFavorite ? <StarFilledIcon /> : <StarOutlineIcon />}
         </button>

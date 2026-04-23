@@ -87,9 +87,13 @@ vi.mock("../util/common/favoriteLocation", () => ({
   setFavoriteLocationId: vi.fn()
 }));
 
-vi.mock("../util/common/recentLocation", () => ({
-  getRecentLocationIds: () => ["1"]
-}));
+vi.mock("../util/common/recentLocation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../util/common/recentLocation")>();
+  return {
+    ...actual,
+    getRecentLocationIds: () => ["1"]
+  };
+});
 
 import {DashboardHomePanel} from "../pages/authenticated/panels/DashboardHomePanel";
 
@@ -98,9 +102,9 @@ describe("DashboardHomePanel", () => {
     const html = renderToString(DashboardHomePanel);
 
     expect(html).toContain("Quick access");
-    expect(html).toContain("Main Plant");
     expect(html).toContain("Secondary Plant");
-    expect(html.indexOf("Main Plant")).toBeLessThan(html.indexOf("Secondary Plant"));
+    expect(html).toContain("Main Plant");
+    expect(html.indexOf("Secondary Plant")).toBeLessThan(html.indexOf("Main Plant"));
     expect(html).toContain("/dashboard/locations/2");
     expect(html).toContain("aria-label=\"Rename location\"");
     expect(html).toContain("aria-pressed=\"true\"");

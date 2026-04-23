@@ -62,7 +62,13 @@ export const DashboardHomePanel = () => {
     return `Signed in as ${roleLabel[profile.role]}.`;
   };
 
-  const saveFavorite = (locationId: number) => {
+  const saveFavorite = (locationId: number | null) => {
+    if (locationId === null) {
+      setFavoriteLocationId("");
+      setFavoriteLocationIdSignal("");
+      toast.success("Favorite location cleared.");
+      return;
+    }
     setFavoriteLocationId(locationId);
     setFavoriteLocationIdSignal(String(locationId));
     toast.success("Favorite location updated.");
@@ -86,7 +92,7 @@ export const DashboardHomePanel = () => {
       >
         <LocationOverviewGrid
           title="Quick access"
-          description="Recently opened locations, with your favorite included when it is not already recent."
+          description="Your favorite location first, followed by your three most recent locations."
           locations={locations}
           favoriteLocationId={favoriteLocationId()}
           canEditLocations={canEditLocations()}
