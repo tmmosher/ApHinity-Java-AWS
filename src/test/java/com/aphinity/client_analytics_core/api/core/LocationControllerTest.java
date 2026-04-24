@@ -18,7 +18,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -26,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -83,7 +87,10 @@ class LocationControllerTest {
             "Dallas",
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-01-03T00:00:00Z"),
-            Map.of("sections", List.of())
+            Map.of("sections", List.of()),
+            null,
+            null,
+            null
         );
 
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
@@ -108,7 +115,10 @@ class LocationControllerTest {
             "Phoenix",
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-01-01T00:00:00Z"),
-            Map.of("sections", List.of())
+            Map.of("sections", List.of()),
+            null,
+            null,
+            null
         );
 
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
@@ -252,7 +262,8 @@ class LocationControllerTest {
             Instant.parse("2026-01-03T00:00:00Z"),
             Map.of("sections", List.of()),
             "work-orders@example.com",
-            true
+            true,
+            false
         );
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
         when(locationService.updateLocationWorkOrderEmail(42L, 8L, "work-orders@example.com")).thenReturn(expected);
@@ -262,6 +273,56 @@ class LocationControllerTest {
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).updateLocationWorkOrderEmail(42L, 8L, "work-orders@example.com");
+    }
+
+    @Test
+    void updateLocationThumbnailDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "thumbnail.png",
+            "image/png",
+            new byte[] {1, 2, 3}
+        );
+        LocationResponse expected = new LocationResponse(
+            8L,
+            "Dallas",
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-03T00:00:00Z"),
+            Map.of("sections", List.of()),
+            null,
+            null,
+            true
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.updateLocationThumbnail(42L, 8L, file)).thenReturn(expected);
+
+        LocationResponse actual = locationController.updateLocationThumbnail(jwt, 8L, file);
+
+        assertSame(expected, actual);
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).updateLocationThumbnail(42L, 8L, file);
+    }
+
+    @Test
+    void locationThumbnailDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        byte[] thumbnail = new byte[] {9, 8, 7};
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        when(locationService.getAccessibleLocationThumbnail(42L, 8L)).thenReturn(thumbnail);
+
+        ResponseEntity<byte[]> response = locationController.locationThumbnail(jwt, 8L);
+
+        assertArrayEquals(thumbnail, response.getBody());
+        assertEquals(MediaType.parseMediaType("image/webp"), response.getHeaders().getContentType());
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).getAccessibleLocationThumbnail(42L, 8L);
     }
 
     @Test
@@ -277,7 +338,8 @@ class LocationControllerTest {
             Instant.parse("2026-01-03T00:00:00Z"),
             Map.of("sections", List.of()),
             null,
-            true
+            true,
+            false
         );
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
         when(locationService.subscribeToLocationAlerts(42L, 8L)).thenReturn(expected);
@@ -302,6 +364,7 @@ class LocationControllerTest {
             Instant.parse("2026-01-03T00:00:00Z"),
             Map.of("sections", List.of()),
             null,
+            false,
             false
         );
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);

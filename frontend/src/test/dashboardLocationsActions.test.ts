@@ -2,26 +2,31 @@ import {beforeEach, describe, expect, it, vi} from "vitest";
 import {
   runCreateLocationAction,
   runRenameLocationAction,
+  runUploadLocationThumbnailAction,
   sortLocationsByName
 } from "../util/location/dashboardLocationsActions";
 import {
   createLocation as createLocationRequest,
-  renameLocation as renameLocationRequest
+  renameLocation as renameLocationRequest,
+  uploadLocationThumbnail as uploadLocationThumbnailRequest
 } from "../util/common/locationApi";
 
 vi.mock("../util/common/locationApi", () => ({
   createLocation: vi.fn(),
-  renameLocation: vi.fn()
+  renameLocation: vi.fn(),
+  uploadLocationThumbnail: vi.fn()
 }));
 
 describe("dashboardLocationsActions", () => {
   const host = "https://example.test";
   const createLocationMock = vi.mocked(createLocationRequest);
   const renameLocationMock = vi.mocked(renameLocationRequest);
+  const uploadLocationThumbnailMock = vi.mocked(uploadLocationThumbnailRequest);
 
   beforeEach(() => {
     createLocationMock.mockReset();
     renameLocationMock.mockReset();
+    uploadLocationThumbnailMock.mockReset();
   });
 
   it("calls the rename API helper with host, location id, and name", async () => {
@@ -87,5 +92,23 @@ describe("dashboardLocationsActions", () => {
     ]);
 
     expect(sorted.map((location) => location.name)).toEqual(["Alpha", "zeta"]);
+  });
+
+  it("calls the thumbnail upload API helper with host, location id, and file", async () => {
+    uploadLocationThumbnailMock.mockResolvedValue({
+      id: 12,
+      name: "Scottsdale",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+      sectionLayout: {sections: []},
+      thumbnailAvailable: true
+    });
+
+    const file = new File(["image"], "thumbnail.png", {type: "image/png"});
+    const result = await runUploadLocationThumbnailAction(host, 12, file);
+
+    expect(uploadLocationThumbnailMock).toHaveBeenCalledWith(host, 12, file);
+    expect(result.ok).toBe(true);
+    expect(result.updatedLocation?.thumbnailAvailable).toBe(true);
   });
 });

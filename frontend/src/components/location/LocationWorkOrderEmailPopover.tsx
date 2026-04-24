@@ -90,7 +90,7 @@ export const LocationWorkOrderEmailPopover = () => {
       >
         <Popover.Trigger
           type="button"
-          class={locationToolbarActionButtonClass + "w-full justify-start "+ " " + (isSavingWorkOrderEmail() ? "btn-disabled" : "btn-outline")}
+          class={locationToolbarActionButtonClass + " w-full justify-start " + (isSavingWorkOrderEmail() ? "btn-disabled" : "btn-outline")}
           disabled={isSavingWorkOrderEmail()}
           aria-label="Work order email settings"
         >

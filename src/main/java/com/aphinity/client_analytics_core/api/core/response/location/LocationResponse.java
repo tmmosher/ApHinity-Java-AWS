@@ -13,6 +13,7 @@ import java.util.Map;
  * @param sectionLayout dashboard section ordering metadata
  * @param workOrderEmail work-order submission email
  * @param alertsSubscribed whether the current user is subscribed to location alerts
+ * @param thumbnailAvailable whether the location has a stored thumbnail image
  */
 public record LocationResponse(
     Long id,
@@ -21,7 +22,8 @@ public record LocationResponse(
     Instant updatedAt,
     Map<String, Object> sectionLayout,
     String workOrderEmail,
-    Boolean alertsSubscribed
+    Boolean alertsSubscribed,
+    Boolean thumbnailAvailable
 ) {
     public LocationResponse(
         Long id,
@@ -30,6 +32,6 @@ public record LocationResponse(
         Instant updatedAt,
         Map<String, Object> sectionLayout
     ) {
-        this(id, name, createdAt, updatedAt, sectionLayout, null, null);
+        this(id, name, createdAt, updatedAt, sectionLayout, null, null, null);
     }
 }

@@ -47,7 +47,8 @@ const locations = Object.assign(
       name: "Alpha",
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-02T00:00:00Z",
-      sectionLayout: {sections: []}
+      sectionLayout: {sections: []},
+      thumbnailAvailable: true
     },
     {
       id: 2,
@@ -69,21 +70,27 @@ describe("LocationOverviewGrid", () => {
       <LocationOverviewGrid
         title="Locations"
         description="All locations"
+        apiHost="https://example.test"
         locations={locations}
         favoriteLocationId="1"
         canEditLocations={true}
         emptyMessage="No locations."
         onFavorite={vi.fn()}
         onRename={vi.fn(async () => true)}
+        onThumbnailUpload={vi.fn(async () => true)}
         onRetry={vi.fn()}
       />
     ));
 
     expect((html.match(/<svg\b[^>]*aria-hidden="true"/g) ?? []).length).toBe(4);
+    expect((html.match(/aria-label="More location actions"/g) ?? []).length).toBe(2);
     expect((html.match(/aria-label="Rename location"/g) ?? []).length).toBe(2);
+    expect((html.match(/aria-label="Upload thumbnail"/g) ?? []).length).toBe(1);
+    expect((html.match(/aria-label="Replace thumbnail"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-label="Remove favorite location"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-label="Set favorite location"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-pressed="true"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-pressed="false"/g) ?? []).length).toBe(1);
+    expect(html).toContain("https://example.test/api/core/locations/1/thumbnail");
   });
 });

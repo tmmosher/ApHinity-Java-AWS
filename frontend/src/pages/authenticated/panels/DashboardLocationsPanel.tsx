@@ -15,7 +15,10 @@ import {
   runCreateLocationAction,
   sortLocationsByName
 } from "../../../util/location/dashboardLocationsActions";
-import {createRenameLocationHandler} from "../../../util/location/locationOverviewActions";
+import {
+  createRenameLocationHandler,
+  createUploadLocationThumbnailHandler
+} from "../../../util/location/locationOverviewActions";
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();
@@ -96,6 +99,7 @@ export const DashboardLocationsPanel = () => {
     toast.success("Favorite location updated");
   };
   const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
+  const uploadLocationThumbnail = createUploadLocationThumbnailHandler(host, locationContext.mutate);
 
   return (
     <div class="space-y-6">
@@ -139,12 +143,14 @@ export const DashboardLocationsPanel = () => {
       <LocationOverviewGrid
         title="All locations"
         description="Favorite a location for faster access."
+        apiHost={host}
         locations={locations}
         favoriteLocationId={favoriteLocationId()}
         canEditLocations={canEditLocations()}
         emptyMessage="No locations available."
         onFavorite={saveFavorite}
         onRename={renameLocation}
+        onThumbnailUpload={uploadLocationThumbnail}
         onRetry={() => void locationContext.refetch()}
       />
     </div>

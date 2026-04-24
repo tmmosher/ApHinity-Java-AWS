@@ -1,7 +1,8 @@
 import {ActionResult, LocationSummary} from "../../types/Types";
 import {
   createLocation as createLocationRequest,
-  renameLocation as renameLocationRequest
+  renameLocation as renameLocationRequest,
+  uploadLocationThumbnail as uploadLocationThumbnailRequest
 } from "../common/locationApi";
 
 export type RenameLocationActionResult = ActionResult & {
@@ -11,6 +12,11 @@ export type RenameLocationActionResult = ActionResult & {
 
 export type CreateLocationActionResult = ActionResult & {
   createdLocation?: LocationSummary;
+};
+
+export type UploadLocationThumbnailActionResult = ActionResult & {
+  locationId: number;
+  updatedLocation?: LocationSummary;
 };
 
 export const sortLocationsByName = (items: LocationSummary[]): LocationSummary[] =>
@@ -51,6 +57,26 @@ export const runCreateLocationAction = async (
     return {
       ok: false,
       message: error instanceof Error ? error.message : "Unable to create location."
+    };
+  }
+};
+
+export const runUploadLocationThumbnailAction = async (
+  host: string,
+  locationId: number,
+  file: File
+): Promise<UploadLocationThumbnailActionResult> => {
+  try {
+    return {
+      ok: true,
+      locationId,
+      updatedLocation: await uploadLocationThumbnailRequest(host, locationId, file)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      locationId,
+      message: error instanceof Error ? error.message : "Unable to update location thumbnail"
     };
   }
 };

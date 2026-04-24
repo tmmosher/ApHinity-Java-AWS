@@ -54,17 +54,18 @@ export const parseLocationSummary = (value: unknown): LocationSummary => {
   ) {
     throw new Error("Invalid location shape");
   }
-  return {
-    id: value.id,
-    name: value.name,
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt,
-    workOrderEmail: typeof value.workOrderEmail === "string" ? value.workOrderEmail : null,
-    alertsSubscribed: typeof value.alertsSubscribed === "boolean" ? value.alertsSubscribed : null,
-    sectionLayout: parseLocationSectionLayout(value.sectionLayout ?? {
-      sections: []
-    })
-  };
+    return {
+        id: value.id,
+        name: value.name,
+        createdAt: value.createdAt,
+        updatedAt: value.updatedAt,
+        workOrderEmail: typeof value.workOrderEmail === "string" ? value.workOrderEmail : null,
+        alertsSubscribed: typeof value.alertsSubscribed === "boolean" ? value.alertsSubscribed : null,
+        thumbnailAvailable: typeof value.thumbnailAvailable === "boolean" ? value.thumbnailAvailable : null,
+        sectionLayout: parseLocationSectionLayout(value.sectionLayout ?? {
+            sections: []
+        })
+    };
 };
 
 export const parseLocationList = (value: unknown): LocationSummary[] => {

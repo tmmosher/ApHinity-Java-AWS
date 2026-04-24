@@ -15,10 +15,13 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -369,6 +372,101 @@ public class LocationController {
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationService.updateLocationWorkOrderEmail(userId, locationId, request.workOrderEmail());
+    }
+
+    /**
+     * Uploads a thumbnail image for a location.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param file uploaded image file
+     * @return updated location payload
+     */
+    @PostMapping(path = "/locations/{locationId}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public LocationResponse updateLocationThumbnail(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @RequestParam("file") MultipartFile file
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received location thumbnail upload request actorUserId={} locationId={} filename={} contentType={}",
+            userId,
+            locationId,
+            file == null ? null : file.getOriginalFilename(),
+            file == null ? null : file.getContentType()
+        );
+        try {
+            LocationResponse response = locationService.updateLocationThumbnail(userId, locationId, file);
+            log.info(
+                "Completed location thumbnail upload request actorUserId={} locationId={}",
+                userId,
+                locationId
+            );
+            return response;
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location thumbnail upload request actorUserId={} locationId={} status={} reason={}",
+                userId,
+                locationId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location thumbnail upload request actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
+        }
+    }
+
+    /**
+     * Returns the stored thumbnail image for a location.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @return WEBP thumbnail bytes
+     */
+    @GetMapping(value = "/locations/{locationId}/thumbnail", produces = "image/webp")
+    public ResponseEntity<byte[]> locationThumbnail(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received location thumbnail request actorUserId={} locationId={}",
+            userId,
+            locationId
+        );
+        try {
+            byte[] thumbnail = locationService.getAccessibleLocationThumbnail(userId, locationId);
+            log.info(
+                "Completed location thumbnail request actorUserId={} locationId={}",
+                userId,
+                locationId
+            );
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("image/webp"))
+                .body(thumbnail);
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location thumbnail request actorUserId={} locationId={} status={} reason={}",
+                userId,
+                locationId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location thumbnail request actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
+        }
     }
 
     /**

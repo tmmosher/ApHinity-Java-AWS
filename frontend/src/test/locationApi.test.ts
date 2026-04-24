@@ -5,7 +5,8 @@ import {
   renameLocation,
   subscribeToLocationAlerts,
   unsubscribeFromLocationAlerts,
-  updateLocationWorkOrderEmail
+  updateLocationWorkOrderEmail,
+  uploadLocationThumbnail
 } from "../util/common/locationApi";
 
 vi.mock("../util/common/apiFetch", () => ({
@@ -186,5 +187,25 @@ describe("locationApi", () => {
       method: "DELETE"
     });
     expect(location.alertsSubscribed).toBe(false);
+  });
+
+  it("uploads a location thumbnail as multipart form data", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      id: 12,
+      name: "Scottsdale",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z",
+      sectionLayout: {sections: []},
+      thumbnailAvailable: true
+    }));
+
+    const file = new File(["image"], "thumbnail.png", {type: "image/png"});
+    const location = await uploadLocationThumbnail(host, 12, file);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/12/thumbnail", {
+      method: "POST",
+      body: expect.any(FormData)
+    });
+    expect(location.thumbnailAvailable).toBe(true);
   });
 });

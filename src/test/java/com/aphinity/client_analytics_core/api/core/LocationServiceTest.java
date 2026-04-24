@@ -22,6 +22,7 @@ import com.aphinity.client_analytics_core.api.core.response.location.LocationRes
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -74,6 +76,9 @@ class LocationServiceTest {
 
     @Mock
     private AccountRoleService accountRoleService;
+
+    @Mock
+    private LocationThumbnailImageService locationThumbnailImageService;
 
     @Spy
     private LocationGraphTemplateFactory locationGraphTemplateFactory = new LocationGraphTemplateFactory();
@@ -1474,7 +1479,80 @@ class LocationServiceTest {
         assertEquals("workorders@example.com", location.getWorkOrderEmail());
         assertEquals("workorders@example.com", response.workOrderEmail());
         assertEquals(false, response.alertsSubscribed());
+        assertEquals(false, response.thumbnailAvailable());
         verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void updateLocationThumbnailPersistsConvertedWebpForPartnerOrAdmin() {
+        AppUser user = verifiedUser(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(9L);
+        location.setName("Phoenix");
+        location.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        location.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(9L)).thenReturn(Optional.of(location));
+        when(userSubscriptionToLocationRepository.existsByLocationIdAndUserId(9L, 7L)).thenReturn(false);
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "thumbnail.png",
+            "image/png",
+            new byte[] {1, 2, 3}
+        );
+        byte[] webpBytes = new byte[] {4, 5, 6};
+        when(locationThumbnailImageService.convertToWebp(file)).thenReturn(webpBytes);
+
+        LocationResponse response = locationService.updateLocationThumbnail(7L, 9L, file);
+
+        assertArrayEquals(webpBytes, location.getThumbnail());
+        assertTrue(response.thumbnailAvailable());
+        verify(locationThumbnailImageService).convertToWebp(file);
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void getAccessibleLocationThumbnailReturnsStoredWebpForAuthorizedUser() {
+        AppUser user = verifiedUser(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(9L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(9L, 7L)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(9L);
+        location.setName("Phoenix");
+        location.setThumbnail(new byte[] {7, 8, 9});
+        when(locationRepository.findById(9L)).thenReturn(Optional.of(location));
+
+        byte[] thumbnail = locationService.getAccessibleLocationThumbnail(7L, 9L);
+
+        assertArrayEquals(new byte[] {7, 8, 9}, thumbnail);
+    }
+
+    @Test
+    void getAccessibleLocationThumbnailRejectsMissingThumbnail() {
+        AppUser user = verifiedUser(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(locationRepository.existsById(9L)).thenReturn(true);
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(9L, 7L)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(9L);
+        location.setName("Phoenix");
+        when(locationRepository.findById(9L)).thenReturn(Optional.of(location));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.getAccessibleLocationThumbnail(7L, 9L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("Location thumbnail not found", ex.getReason());
     }
 
     @Test

@@ -32,6 +32,7 @@ export interface LocationSummary {
     sectionLayout: LocationSectionLayoutConfig;
     workOrderEmail?: string | null;
     alertsSubscribed?: boolean | null;
+    thumbnailAvailable?: boolean | null;
 }
 
 export interface ActiveInvite {

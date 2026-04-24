@@ -16,6 +16,7 @@ import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
@@ -95,6 +96,9 @@ class LocationGraphPipelineWebMvcTest {
 
     @MockitoBean
     private AccountRoleService accountRoleService;
+
+    @MockitoBean
+    private LocationThumbnailImageService locationThumbnailImageService;
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;

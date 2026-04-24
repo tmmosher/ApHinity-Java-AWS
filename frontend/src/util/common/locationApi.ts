@@ -105,3 +105,21 @@ export const unsubscribeFromLocationAlerts = async (
   }
   return parseLocationSummary(await response.json());
 };
+
+export const uploadLocationThumbnail = async (
+  host: string,
+  locationId: number,
+  file: File
+): Promise<LocationSummary> => {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await apiFetch(host + "/api/core/locations/" + locationId + "/thumbnail", {
+    method: "POST",
+    body: formData
+  });
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Unable to update location thumbnail"));
+  }
+  return parseLocationSummary(await response.json());
+};

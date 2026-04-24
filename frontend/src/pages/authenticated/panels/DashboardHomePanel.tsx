@@ -14,7 +14,10 @@ import {
   getRecentLocationIds
 } from "../../../util/common/recentLocation";
 import {LocationOverviewGrid} from "../../../components/location/LocationOverviewGrid";
-import {createRenameLocationHandler} from "../../../util/location/locationOverviewActions";
+import {
+  createRenameLocationHandler,
+  createUploadLocationThumbnailHandler
+} from "../../../util/location/locationOverviewActions";
 
 const roleLabel: Record<"admin" | "partner" | "client", string> = {
   admin: "Admin",
@@ -74,6 +77,7 @@ export const DashboardHomePanel = () => {
     toast.success("Favorite location updated");
   };
   const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
+  const uploadLocationThumbnail = createUploadLocationThumbnailHandler(host, locationContext.mutate);
 
   return (
     <div class="space-y-6">
@@ -92,7 +96,8 @@ export const DashboardHomePanel = () => {
       >
         <LocationOverviewGrid
           title="Quick access"
-          description="Recently visited locations"
+          description="Recently visited locations."
+          apiHost={host}
           locations={locations}
           favoriteLocationId={favoriteLocationId()}
           canEditLocations={canEditLocations()}
@@ -100,6 +105,7 @@ export const DashboardHomePanel = () => {
           emptyMessage="No recently visited locations."
           onFavorite={saveFavorite}
           onRename={renameLocation}
+          onThumbnailUpload={uploadLocationThumbnail}
           onRetry={() => void locationContext.refetch()}
         />
       </Show>

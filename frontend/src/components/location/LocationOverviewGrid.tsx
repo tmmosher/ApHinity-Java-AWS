@@ -5,6 +5,7 @@ import {LocationOverviewCard} from "./LocationOverviewCard";
 type LocationOverviewGridProps = {
   title: string;
   description: string;
+  apiHost: string;
   locations: Resource<LocationSummary[] | undefined>;
   favoriteLocationId: string;
   canEditLocations: boolean;
@@ -12,6 +13,7 @@ type LocationOverviewGridProps = {
   displayLocations?: LocationSummary[];
   onFavorite: (locationId: number | null) => void;
   onRename: (locationId: number, nextName: string) => Promise<boolean>;
+  onThumbnailUpload: (locationId: number, file: File) => Promise<boolean>;
   onRetry: () => void;
 };
 
@@ -70,12 +72,14 @@ export const LocationOverviewGrid = (props: LocationOverviewGridProps) => {
             <div class="grid gap-4 md:grid-cols-2">
               <For each={orderedLocations()}>
                 {(location) => (
-                  <LocationOverviewCard
-                    location={location}
-                    isFavorite={String(location.id) === props.favoriteLocationId}
-                    canEditLocations={props.canEditLocations}
-                    onFavorite={props.onFavorite}
+                    <LocationOverviewCard
+                      location={location}
+                      apiHost={props.apiHost}
+                      isFavorite={String(location.id) === props.favoriteLocationId}
+                      canEditLocations={props.canEditLocations}
+                      onFavorite={props.onFavorite}
                     onRename={props.onRename}
+                    onThumbnailUpload={props.onThumbnailUpload}
                   />
                 )}
               </For>

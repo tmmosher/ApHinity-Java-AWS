@@ -32,6 +32,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -60,6 +61,7 @@ public class LocationService {
     private final LocationUserRepository locationUserRepository;
     private final UserSubscriptionToLocationRepository userSubscriptionToLocationRepository;
     private final AccountRoleService accountRoleService;
+    private final LocationThumbnailImageService locationThumbnailImageService;
     private final LocationGraphTemplateFactory locationGraphTemplateFactory;
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
 
@@ -71,6 +73,7 @@ public class LocationService {
         LocationUserRepository locationUserRepository,
         UserSubscriptionToLocationRepository userSubscriptionToLocationRepository,
         AccountRoleService accountRoleService,
+        LocationThumbnailImageService locationThumbnailImageService,
         LocationGraphTemplateFactory locationGraphTemplateFactory,
         LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory
     ) {
@@ -81,6 +84,7 @@ public class LocationService {
         this.locationUserRepository = locationUserRepository;
         this.userSubscriptionToLocationRepository = userSubscriptionToLocationRepository;
         this.accountRoleService = accountRoleService;
+        this.locationThumbnailImageService = locationThumbnailImageService;
         this.locationGraphTemplateFactory = locationGraphTemplateFactory;
         this.locationGraphUpdatePayloadValidationFactory = locationGraphUpdatePayloadValidationFactory;
     }
@@ -316,6 +320,8 @@ public class LocationService {
      * @param locationId target location id
      * @param graphUpdates requested graph payload replacements
      */
+    // The controller may invoke this overload directly when a section layout is supplied,
+    // so it needs its own transaction boundary instead of relying on the 3-arg wrapper.
     @Transactional
     public void updateLocationGraphData(
         Long userId,
@@ -325,6 +331,7 @@ public class LocationService {
         updateLocationGraphData(userId, locationId, graphUpdates, null);
     }
 
+    @Transactional
     public void updateLocationGraphData(
         Long userId,
         Long locationId,
@@ -604,6 +611,37 @@ public class LocationService {
     }
 
     /**
+     * Updates a location thumbnail image.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @param file uploaded image file
+     * @return updated location payload
+     */
+    @Transactional
+    public LocationResponse updateLocationThumbnail(Long userId, Long locationId, MultipartFile file) {
+        AppUser user = requireUser(userId);
+        requirePartnerOrAdmin(user);
+
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        location.setThumbnail(locationThumbnailImageService.convertToWebp(file));
+
+        try {
+            locationRepository.saveAndFlush(location);
+        } catch (RuntimeException ex) {
+            log.error(
+                "Location thumbnail persistence failed actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
+        }
+
+        return toLocationResponse(location, user);
+    }
+
+    /**
      * Subscribes a verified user to location alerts.
      *
      * @param userId authenticated user id
@@ -663,6 +701,28 @@ public class LocationService {
             .ifPresent(userSubscriptionToLocationRepository::delete);
 
         return toLocationResponse(location, user);
+    }
+
+    /**
+     * Returns a stored location thumbnail image.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @return WEBP thumbnail bytes
+     */
+    @Transactional(readOnly = true)
+    public byte[] getAccessibleLocationThumbnail(Long userId, Long locationId) {
+        AppUser user = requireUser(userId);
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+
+        byte[] thumbnail = location.getThumbnail();
+        if (thumbnail == null || thumbnail.length == 0) {
+            throw locationThumbnailNotFound();
+        }
+        return thumbnail;
     }
 
     /**
@@ -872,6 +932,7 @@ public class LocationService {
         if (user != null) {
             alertsSubscribed = userSubscriptionToLocationRepository.existsByLocationIdAndUserId(location.getId(), user.getId());
         }
+        byte[] thumbnail = location.getThumbnail();
         return new LocationResponse(
             location.getId(),
             location.getName(),
@@ -879,7 +940,8 @@ public class LocationService {
             location.getUpdatedAt(),
             location.getSectionLayout(),
             location.getWorkOrderEmail(),
-            alertsSubscribed
+            alertsSubscribed,
+            thumbnail != null && thumbnail.length > 0
         );
     }
 
@@ -1259,6 +1321,10 @@ public class LocationService {
 
     private ResponseStatusException locationGraphNotFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Location graph not found");
+    }
+
+    private ResponseStatusException locationThumbnailNotFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Location thumbnail not found");
     }
 
     private ResponseStatusException invalidLocationName() {

@@ -3,6 +3,7 @@ import {Show} from "solid-js";
 import LocationWorkOrderEmailPopover from "./LocationWorkOrderEmailPopover";
 import LocationDashboardToolbarOverflowMenuAddGraphAction from "./LocationDashboardToolbarOverflowMenuAddGraphAction";
 import LocationDashboardToolbarOverflowMenuEditLayoutAction from "./LocationDashboardToolbarOverflowMenuEditLayoutAction";
+import LocationOverflowMenuIcon from "./LocationOverflowMenuIcon";
 import {locationToolbarIconButtonClass} from "./locationToolbarStyles";
 
 const overflowMenuProps = {
@@ -11,31 +12,6 @@ const overflowMenuProps = {
   restoreFocus: false,
   closeOnOutsideFocus: false
 };
-
-// @ts-ignore
-const OverflowMenuIcon = () => (
-  <svg
-    aria-hidden="true"
-    xmlns="http://www.w3.org/2000/svg"
-    width="32"
-    height="32"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    class="lucide lucide-ellipsis-vertical-icon lucide-ellipsis-vertical block shrink-0"
-    style={{
-      width: "2rem",
-      height: "2rem",
-    }}
-  >
-    <circle cx="12" cy="12" r="1" />
-    <circle cx="12" cy="5" r="1" />
-    <circle cx="12" cy="19" r="1" />
-  </svg>
-);
 
 type LocationDashboardToolbarOverflowMenuProps = {
   canEditGraphs: boolean;
@@ -58,7 +34,7 @@ export const LocationDashboardToolbarOverflowMenu = (
         class={locationToolbarIconButtonClass + " btn-outline"}
         aria-label="More actions"
       >
-        <OverflowMenuIcon />
+        <LocationOverflowMenuIcon />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content class="z-[80] w-[min(92vw,18rem)] rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl">
