@@ -1,6 +1,5 @@
 import {action, useAction, useSubmission} from "@solidjs/router";
 import {createEffect, createSignal, Show} from "solid-js";
-import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useLocations} from "../../../context/LocationContext";
 import {useProfile} from "../../../context/ProfileContext";
@@ -9,6 +8,7 @@ import {LocationOverviewGrid} from "../../../components/location/LocationOvervie
 import {
   getFavoriteLocationId,
   hasSelectableFavoriteLocation,
+  saveFavoriteLocation,
   setFavoriteLocationId
 } from "../../../util/common/favoriteLocation";
 import {
@@ -19,6 +19,7 @@ import {
   createRenameLocationHandler,
   createUploadLocationThumbnailHandler
 } from "../../../util/location/locationOverviewActions";
+import {toast} from "solid-toast";
 
 export const DashboardLocationsPanel = () => {
   const host = useApiHost();
@@ -87,17 +88,8 @@ export const DashboardLocationsPanel = () => {
     void submitCreateLocation(nextName);
   };
 
-  const saveFavorite = (locationId: number | null) => {
-    if (locationId === null) {
-      setFavoriteLocationId("");
-      setFavoriteLocationIdSignal("");
-      toast.success("Favorite location cleared");
-      return;
-    }
-    setFavoriteLocationId(locationId);
-    setFavoriteLocationIdSignal(String(locationId));
-    toast.success("Favorite location updated");
-  };
+  const saveFavorite = (locationId: number | null) =>
+    saveFavoriteLocation(locationId, setFavoriteLocationIdSignal);
   const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
   const uploadLocationThumbnail = createUploadLocationThumbnailHandler(host, locationContext.mutate);
 

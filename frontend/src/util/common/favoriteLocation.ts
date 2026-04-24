@@ -1,3 +1,5 @@
+import {toast} from "solid-toast";
+
 const FAVORITE_LOCATION_KEY = "aphinity.favoriteLocationId";
 
 // some privacy extensions may break favorite finding by blocking localstorage. Should probably add this
@@ -71,4 +73,20 @@ export const setFavoriteLocationId = (value: string | number | null | undefined)
     return;
   }
   window.localStorage.setItem(FAVORITE_LOCATION_KEY, normalized);
+};
+
+export const saveFavoriteLocation = (
+  locationId: number | null,
+  setFavoriteLocationIdSignal: (nextValue: string) => void
+) => {
+  if (locationId === null) {
+    setFavoriteLocationId("");
+    setFavoriteLocationIdSignal("");
+    toast.success("Favorite location cleared");
+    return;
+  }
+
+  setFavoriteLocationId(locationId);
+  setFavoriteLocationIdSignal(String(locationId));
+  toast.success("Favorite location updated");
 };

@@ -1,5 +1,4 @@
 import {Show, createEffect, createMemo, createSignal} from "solid-js";
-import {toast} from "solid-toast";
 import {useApiHost} from "../../../context/ApiHostContext";
 import {useLocations} from "../../../context/LocationContext";
 import {useProfile} from "../../../context/ProfileContext";
@@ -7,6 +6,7 @@ import {canEditLocationGraphs} from "../../../util/common/profileAccess";
 import {
   getFavoriteLocationId,
   hasSelectableFavoriteLocation,
+  saveFavoriteLocation,
   setFavoriteLocationId
 } from "../../../util/common/favoriteLocation";
 import {
@@ -65,17 +65,8 @@ export const DashboardHomePanel = () => {
     return `Signed in as ${roleLabel[profile.role]}.`;
   };
 
-  const saveFavorite = (locationId: number | null) => {
-    if (locationId === null) {
-      setFavoriteLocationId("");
-      setFavoriteLocationIdSignal("");
-      toast.success("Favorite location cleared");
-      return;
-    }
-    setFavoriteLocationId(locationId);
-    setFavoriteLocationIdSignal(String(locationId));
-    toast.success("Favorite location updated");
-  };
+  const saveFavorite = (locationId: number | null) =>
+    saveFavoriteLocation(locationId, setFavoriteLocationIdSignal);
   const renameLocation = createRenameLocationHandler(host, locationContext.mutate);
   const uploadLocationThumbnail = createUploadLocationThumbnailHandler(host, locationContext.mutate);
 
