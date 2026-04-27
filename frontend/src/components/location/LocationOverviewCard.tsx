@@ -1,6 +1,7 @@
 import {A} from "@solidjs/router";
+import {createSignal, Show} from "solid-js";
 import {LocationSummary} from "../../types/Types";
-import {getLocationCardArtStyle} from "../../util/location/locationCardArt";
+import {getLocationCardArtStyle, getLocationThumbnailUrl} from "../../util/location/locationCardArt";
 import LocationOverviewCardOverflowMenu from "./LocationOverviewCardOverflowMenu";
 
 type LocationOverviewCardProps = {
@@ -55,6 +56,8 @@ const formatUpdatedAt = (updatedAt: string): string =>
   });
 
 export const LocationOverviewCard = (props: LocationOverviewCardProps) => {
+  const [thumbnailError, setThumbnailError] = createSignal(false);
+
   return (
     <article class="group relative overflow-hidden rounded-3xl border border-base-300 bg-base-100 shadow-sm transition duration-150 ease-out hover:-translate-y-1 hover:shadow-xl">
       <div class="absolute right-3 top-3 z-20 flex items-center gap-2">
@@ -85,13 +88,24 @@ export const LocationOverviewCard = (props: LocationOverviewCardProps) => {
         class="relative z-0 flex h-full min-h-[19rem] flex-col overflow-hidden"
         aria-label={`Open location ${props.location.name}`}
       >
-        <div class="relative basis-[68%] overflow-hidden">
+        <div class="relative basis-[68%] overflow-hidden bg-base-200">
           <div
-            class="absolute inset-0 transition duration-300 ease-out group-hover:scale-[1.03]"
-            style={getLocationCardArtStyle(props.location, props.apiHost)}
+            class="absolute inset-0 z-0 transition duration-300 ease-out group-hover:scale-[1.03]"
+            style={getLocationCardArtStyle(props.location)}
           />
-          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.10),_transparent_36%)]" />
-          <div class="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-base-100/25 via-transparent to-transparent" />
+          <Show when={props.location.thumbnailAvailable && !thumbnailError()}>
+            <img
+              src={getLocationThumbnailUrl(props.location.id, props.apiHost)}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              class="absolute inset-0 z-10 h-full w-full object-cover transition duration-300 ease-out group-hover:scale-[1.03]"
+              onError={() => setThumbnailError(true)}
+            />
+          </Show>
+          <div class="absolute inset-0 z-20 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.10),_transparent_36%)]" />
+          <div class="absolute inset-x-0 bottom-0 z-20 h-20 bg-gradient-to-t from-base-100/25 via-transparent to-transparent" />
         </div>
 
         <div class="flex basis-[32%] flex-col justify-end gap-1 bg-gradient-to-b from-base-100/95 to-base-100 p-5">

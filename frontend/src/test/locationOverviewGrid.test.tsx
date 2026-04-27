@@ -91,6 +91,6 @@ describe("LocationOverviewGrid", () => {
     expect((html.match(/aria-label="Set favorite location"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-pressed="true"/g) ?? []).length).toBe(1);
     expect((html.match(/aria-pressed="false"/g) ?? []).length).toBe(1);
-    expect(html).toContain("https://example.test/api/core/locations/1/thumbnail");
+    expect((html.match(/<img\b[^>]*src="https:\/\/example\.test\/api\/core\/locations\/1\/thumbnail"/g) ?? []).length).toBe(1);
   });
 });

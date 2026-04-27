@@ -12,8 +12,7 @@ const toHueColor = (hue: number, saturation: number, lightness: number): string 
   `hsl(${hue} ${saturation}% ${lightness}%)`;
 
 export const getLocationCardArtStyle = (
-  location: Pick<LocationSummary, "id" | "name" | "thumbnailAvailable">,
-  apiHost: string
+  location: Pick<LocationSummary, "id" | "name" | "thumbnailAvailable">
 ): Record<string, string> => {
   const seed = hashLocationKey(`${location.id}:${location.name}`);
   const baseHue = seed % 360;
@@ -30,13 +29,12 @@ export const getLocationCardArtStyle = (
       : `linear-gradient(135deg, ${toHueColor(baseHue, 82, 54)}, ${toHueColor(accentHue, 74, 44)} 58%, ${toHueColor(glowHue, 76, 32)})`
   ];
 
-  if (location.thumbnailAvailable) {
-    layers.push(`url("${new URL("/api/core/locations/" + location.id + "/thumbnail", apiHost).toString()}")`);
-  }
-
   return {
     backgroundImage: layers.join(", "),
     backgroundPosition: "center",
     backgroundSize: "cover"
   };
 };
+
+export const getLocationThumbnailUrl = (locationId: number, apiHost: string): string =>
+  new URL("/api/core/locations/" + locationId + "/thumbnail", apiHost).toString();

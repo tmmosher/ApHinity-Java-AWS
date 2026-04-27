@@ -260,6 +260,7 @@ class LocationInviteServiceTest {
         AppUser inviter = verifiedUser(7L, "partner@example.com");
         Location austin = location(11L, "Austin");
         Location denver = location(12L, "Denver");
+        austin.setThumbnail(new byte[] {1, 2, 3});
 
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(inviter));
         when(accountRoleService.isPartnerOrAdmin(inviter)).thenReturn(true);
@@ -270,6 +271,8 @@ class LocationInviteServiceTest {
         assertEquals(2, response.size());
         assertEquals("Austin", response.get(0).name());
         assertEquals("Denver", response.get(1).name());
+        assertEquals(true, response.get(0).thumbnailAvailable());
+        assertEquals(false, response.get(1).thumbnailAvailable());
         verify(locationRepository).findAllByOrderByNameAsc();
         verifyNoInteractions(locationUserRepository);
     }

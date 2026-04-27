@@ -312,7 +312,10 @@ public class LocationInviteService {
             location.getName(),
             location.getCreatedAt(),
             location.getUpdatedAt(),
-            location.getSectionLayout()
+            location.getSectionLayout(),
+            location.getWorkOrderEmail(),
+            null,
+            location.getThumbnail() != null && location.getThumbnail().length > 0
         );
     }
 
