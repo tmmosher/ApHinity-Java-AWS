@@ -96,20 +96,12 @@ export const DashboardLocationsPanel = () => {
   return (
     <div class="space-y-6">
       <header class="space-y-1">
-        <h1 class="text-3xl font-semibold tracking-tight">Locations</h1>
-        <p class="text-base-content/70">
-          Select a location.
-        </p>
+        <h1 class="text-3xl font-semibold tracking-tight">All Locations</h1>
+        <p class="text-base-content/70">Favorite a location for faster access.</p>
       </header>
 
       <Show when={canCreateLocations()}>
         <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm space-y-3">
-          <div>
-            <p class="font-medium">Add location</p>
-            <p class="text-sm text-base-content/70">
-              Create a new location and make it available across the dashboard.
-            </p>
-          </div>
           <div class="flex flex-wrap items-center gap-2">
             <input
               type="text"
