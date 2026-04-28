@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = LocationController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@org.springframework.context.annotation.Import(LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class)
+@Import(LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class)
 class LocationThumbnailWebMvcTest {
     @Autowired
     private MockMvc mockMvc;

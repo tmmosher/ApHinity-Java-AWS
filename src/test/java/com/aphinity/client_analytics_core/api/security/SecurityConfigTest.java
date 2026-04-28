@@ -5,9 +5,7 @@ import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -33,8 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
     SecurityConfig.class,
     ApiAuthenticationEntryPoint.class,
-    CsrfCookieFilter.class,
-    SecurityConfigTest.SecurityTestBeans.class
+    CsrfCookieFilter.class
 })
 @TestPropertySource(properties = {
     "security.jwt.issuer=test-issuer",
@@ -148,24 +145,6 @@ class SecurityConfigTest {
         @GetMapping("/private")
         String privateProbe() {
             return "ok";
-        }
-    }
-
-    @TestConfiguration
-    static class SecurityTestBeans {
-        @Bean
-        AccessTokenRefreshFilter accessTokenRefreshFilter(
-            AuthService authService,
-            AuthCookieService authCookieService,
-            ClientRequestMetadataResolver clientRequestMetadataResolver,
-            JwtProperties jwtProperties
-        ) {
-            return new AccessTokenRefreshFilter(
-                authService,
-                authCookieService,
-                clientRequestMetadataResolver,
-                jwtProperties
-            );
         }
     }
 

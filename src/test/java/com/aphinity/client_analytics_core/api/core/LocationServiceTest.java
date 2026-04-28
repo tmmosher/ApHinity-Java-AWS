@@ -1519,7 +1519,6 @@ class LocationServiceTest {
     void getAccessibleLocationThumbnailReturnsStoredWebpForAuthorizedUser() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(9L)).thenReturn(true);
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(9L, 7L)).thenReturn(true);
 
@@ -1538,8 +1537,6 @@ class LocationServiceTest {
     void getAccessibleLocationThumbnailRejectsMissingThumbnail() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(9L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(9L, 7L)).thenReturn(true);
 
         Location location = new Location();

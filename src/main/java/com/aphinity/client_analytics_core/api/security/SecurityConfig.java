@@ -25,6 +25,8 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
+import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
 import com.digitalsanctuary.cf.turnstile.TurnstileConfiguration;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
@@ -42,6 +44,24 @@ import java.nio.charset.StandardCharsets;
 @EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
 @Import(TurnstileConfiguration.class)
 public class SecurityConfig {
+    /**
+     * @return access token refresh filter used before authentication and CSRF processing
+     */
+    @Bean
+    AccessTokenRefreshFilter accessTokenRefreshFilter(
+        AuthService authService,
+        AuthCookieService authCookieService,
+        ClientRequestMetadataResolver requestMetadataResolver,
+        JwtProperties jwtProperties
+    ) {
+        return new AccessTokenRefreshFilter(
+            authService,
+            authCookieService,
+            requestMetadataResolver,
+            jwtProperties
+        );
+    }
+
     /**
      * Builds the application security filter chain.
      *

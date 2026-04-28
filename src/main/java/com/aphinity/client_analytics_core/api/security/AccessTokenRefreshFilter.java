@@ -20,7 +20,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
@@ -48,7 +47,6 @@ import java.util.concurrent.ConcurrentMap;
  * the filter issues new tokens and injects the refreshed bearer token into the current
  * request so downstream authentication can proceed normally.
  */
-@Component
 public class AccessTokenRefreshFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AccessTokenRefreshFilter.class);
     private static final int REFRESH_RESULT_CACHE_MAX_SIZE = 10_000;
