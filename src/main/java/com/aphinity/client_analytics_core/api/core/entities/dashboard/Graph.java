@@ -16,15 +16,15 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -43,10 +43,10 @@ public class Graph {
     @Column(nullable = false)
     private String name;
 
-    // Template / legacy payload snapshot. Live chart data is read from graph_traces.
+    // Unused snapshot column retained only for schema compatibility.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "template_data", columnDefinition = "jsonb")
-    private Object data;
+    private Object templateData;
 
     @Column(name = "graph_type")
     private String graphType;
@@ -93,9 +93,6 @@ public class Graph {
         if (updatedAt == null) {
             updatedAt = now;
         }
-        if (data == null) {
-            data = List.of();
-        }
         if (dataModelVersion == null && graphTraces != null && !graphTraces.isEmpty()) {
             dataModelVersion = 1;
         }
@@ -107,9 +104,6 @@ public class Graph {
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();
-        if (data == null) {
-            data = List.of();
-        }
         if (dataModelVersion == null && graphTraces != null && !graphTraces.isEmpty()) {
             dataModelVersion = 1;
         }
@@ -135,15 +129,10 @@ public class Graph {
     }
 
     public Object getData() {
-        if (dataModelVersion != null && dataModelVersion >= 1) {
-            return GraphRelationalPayloadMapper.normalize(this).data();
-        }
-        return data;
+        return GraphRelationalPayloadMapper.normalize(this).data();
     }
 
     public void setData(Object data) {
-        // Preserve the JSON snapshot only for the initial legacy write path.
-        boolean legacyStorageMode = this.dataModelVersion == null;
         GraphPayloadMapper.GraphPayload normalized = GraphPayloadMapper.normalize(
             data,
             layout,
@@ -151,20 +140,10 @@ public class Graph {
             style
         );
         GraphRelationalPayloadMapper.syncGraphData(this, normalized.data());
-        if (legacyStorageMode && this.data == null) {
-            this.data = GraphPayloadMapper.toStoredData(normalized.data());
-        }
+        templateData = null;
         this.layout = normalized.layout();
         this.config = normalized.config();
         this.style = normalized.style();
-    }
-
-    public Object getTemplateData() {
-        return data;
-    }
-
-    public void setTemplateData(Object data) {
-        this.data = data;
     }
 
     public String getGraphType() {

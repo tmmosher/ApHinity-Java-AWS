@@ -21,7 +21,7 @@ final class GraphPayloadValidationSupport {
         return switch (traceType.strip().toLowerCase(Locale.ROOT)) {
             case "pie" -> GraphPayloadFamily.PIE;
             case "indicator" -> GraphPayloadFamily.INDICATOR;
-            case "bar", "scatter", "scattergl" -> GraphPayloadFamily.CARTESIAN;
+            case "bar", "scatter", "scattergl", "line" -> GraphPayloadFamily.CARTESIAN;
             default -> throw invalidGraphData();
         };
     }
@@ -35,7 +35,7 @@ final class GraphPayloadValidationSupport {
             case "pie" -> "pie";
             case "indicator" -> "indicator";
             case "bar" -> "bar";
-            case "scatter", "scattergl" -> "scatter";
+            case "scatter", "scattergl", "line" -> "scatter";
             default -> throw invalidGraphData();
         };
     }

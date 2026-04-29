@@ -31,10 +31,7 @@ public class GanttTaskDependencyService {
     @Transactional(readOnly = true)
     public List<Long> findDependencyTaskIds(Long locationId, Long ganttTaskId) {
         return ganttTaskDependencyRepository
-            .findByLocation_IdAndGanttTask_IdOrderByDependencyTask_IdAsc(locationId, ganttTaskId)
-            .stream()
-            .map(GanttTaskDependency::getDependencyTaskId)
-            .toList();
+            .findDependencyTaskIdsByLocationIdAndGanttTaskId(locationId, ganttTaskId);
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +97,12 @@ public class GanttTaskDependencyService {
 
         ganttTaskDependencyRepository.saveAllAndFlush(dependencies);
         return normalizedDependencyTaskIds;
+    }
+
+    @Transactional
+    public void deleteDependenciesForTask(Long locationId, Long ganttTaskId) {
+        ganttTaskDependencyRepository.deleteByLocation_IdAndGanttTask_Id(locationId, ganttTaskId);
+        ganttTaskDependencyRepository.deleteByLocationIdAndDependencyTaskId(locationId, ganttTaskId);
     }
 
     private List<Long> normalizeDependencyTaskIds(Collection<Long> dependencyTaskIds) {

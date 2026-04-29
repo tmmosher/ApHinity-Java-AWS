@@ -243,7 +243,7 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
-    void locationGraphsNormalizesLegacyNestedDatabaseShapeBeforeTransmission() throws Exception {
+    void locationGraphsIgnoresLegacyTemplateSnapshotWhenRelationalPayloadExists() throws Exception {
         Long userId = 18L;
         Long locationId = 44L;
 
@@ -256,13 +256,12 @@ class LocationGraphPipelineWebMvcTest {
 
         Graph graph = new Graph();
         graph.setId(47L);
-        graph.setName("Legacy payload");
-        setRawGraphData(graph, Map.of(
-            "data", List.of(Map.of("type", "bar", "name", "Sessions", "y", List.of(4, 9, 6))),
-            "layout", Map.of("showlegend", true),
-            "config", Map.of("responsive", true),
-            "style", Map.of("width", "100%")
-        ));
+        graph.setName("Relational payload");
+        graph.setLayout(Map.of("showlegend", true));
+        graph.setConfig(Map.of("responsive", true));
+        graph.setStyle(Map.of("width", "100%"));
+        graph.setData(List.of(Map.of("type", "bar", "name", "Sessions", "y", List.of(4, 9, 6))));
+        setRawGraphData(graph, List.of(Map.of("type", "pie", "labels", List.of("legacy"), "values", List.of(1))));
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
@@ -273,13 +272,14 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$[0].id").value(47))
             .andExpect(jsonPath("$[0].data[0].type").value("bar"))
             .andExpect(jsonPath("$[0].data[0].name").value("Sessions"))
+            .andExpect(jsonPath("$[0].data[0].y[0]").value(4))
             .andExpect(jsonPath("$[0].layout.showlegend").value(true))
             .andExpect(jsonPath("$[0].config.responsive").value(true))
             .andExpect(jsonPath("$[0].style.width").value("100%"));
     }
 
     @Test
-    void locationGraphsReturnsServerErrorWhenStoredGraphPayloadIsMalformed() throws Exception {
+    void locationGraphsReturnsEmptyDataWhenOnlyLegacyTemplateSnapshotExists() throws Exception {
         Long userId = 25L;
         Long locationId = 66L;
 
@@ -292,7 +292,10 @@ class LocationGraphPipelineWebMvcTest {
 
         Graph graph = new Graph();
         graph.setId(101L);
-        graph.setName("Malformed graph");
+        graph.setName("Legacy-only graph");
+        graph.setLayout(Map.of("showlegend", false));
+        graph.setConfig(Map.of("responsive", false));
+        graph.setStyle(Map.of("height", 200));
         setRawGraphData(graph, List.of(Map.of("type", "bar"), "bad-entry"));
 
         LocationGraph locationGraph = new LocationGraph();
@@ -300,9 +303,13 @@ class LocationGraphPipelineWebMvcTest {
         when(locationGraphRepository.findByLocationIdWithGraph(locationId)).thenReturn(List.of(locationGraph));
 
         mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
-            .andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.code").value("request_failed"))
-            .andExpect(jsonPath("$.message").value("Request failed"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(101))
+            .andExpect(jsonPath("$[0].data").isArray())
+            .andExpect(jsonPath("$[0].data").isEmpty())
+            .andExpect(jsonPath("$[0].layout.showlegend").value(false))
+            .andExpect(jsonPath("$[0].config.responsive").value(false))
+            .andExpect(jsonPath("$[0].style.height").value(200));
     }
 
     @Test
@@ -921,7 +928,7 @@ class LocationGraphPipelineWebMvcTest {
 
     private void setRawGraphData(Graph graph, Object rawData) {
         try {
-            var field = Graph.class.getDeclaredField("data");
+            var field = Graph.class.getDeclaredField("templateData");
             field.setAccessible(true);
             field.set(graph, rawData);
         } catch (ReflectiveOperationException ex) {

@@ -46,8 +46,8 @@ class GanttTaskDependencyServiceTest {
         GanttTask firstDependency = ganttTask(7L, location);
         GanttTask secondDependency = ganttTask(11L, location);
 
-        when(ganttTaskDependencyRepository.findByLocation_IdAndGanttTask_IdOrderByDependencyTask_IdAsc(99L, 44L))
-            .thenReturn(List.of(dependencyLink(location, task, firstDependency)));
+        when(ganttTaskDependencyRepository.findDependencyTaskIdsByLocationIdAndGanttTaskId(99L, 44L))
+            .thenReturn(List.of(7L));
         when(ganttTaskRepository.findByLocation_IdAndIdInOrderByIdAsc(99L, List.of(7L, 11L)))
             .thenReturn(List.of(firstDependency, secondDependency));
         when(ganttTaskDependencyRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -72,11 +72,8 @@ class GanttTaskDependencyServiceTest {
         GanttTask firstDependency = ganttTask(7L, location);
         GanttTask secondDependency = ganttTask(11L, location);
 
-        when(ganttTaskDependencyRepository.findByLocation_IdAndGanttTask_IdOrderByDependencyTask_IdAsc(99L, 44L))
-            .thenReturn(List.of(
-                dependencyLink(location, task, firstDependency),
-                dependencyLink(location, task, secondDependency)
-            ));
+        when(ganttTaskDependencyRepository.findDependencyTaskIdsByLocationIdAndGanttTaskId(99L, 44L))
+            .thenReturn(List.of(7L, 11L));
 
         List<Long> dependencyTaskIds = dependencyService.replaceDependencies(task, List.of(11L, 7L, 11L));
 
@@ -106,7 +103,7 @@ class GanttTaskDependencyServiceTest {
         GanttTask task = ganttTask(44L, location);
         GanttTask firstDependency = ganttTask(7L, location);
 
-        when(ganttTaskDependencyRepository.findByLocation_IdAndGanttTask_IdOrderByDependencyTask_IdAsc(99L, 44L))
+        when(ganttTaskDependencyRepository.findDependencyTaskIdsByLocationIdAndGanttTaskId(99L, 44L))
             .thenReturn(List.of());
         when(ganttTaskRepository.findByLocation_IdAndIdInOrderByIdAsc(99L, List.of(7L, 11L)))
             .thenReturn(List.of(firstDependency));
@@ -119,6 +116,14 @@ class GanttTaskDependencyServiceTest {
         assertEquals("Task dependencies must belong to this location", ex.getReason());
         verify(ganttTaskDependencyRepository, never()).deleteByLocation_IdAndGanttTask_Id(any(), any());
         verify(ganttTaskDependencyRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void deleteDependenciesForTaskDeletesOutgoingAndIncomingLinks() {
+        dependencyService.deleteDependenciesForTask(99L, 44L);
+
+        verify(ganttTaskDependencyRepository).deleteByLocation_IdAndGanttTask_Id(99L, 44L);
+        verify(ganttTaskDependencyRepository).deleteByLocationIdAndDependencyTaskId(99L, 44L);
     }
 
     @Test

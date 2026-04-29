@@ -16,8 +16,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.hibernate.Hibernate;
-
 /**
  * Keeps Plotly payloads in sync with the relational trace/point tables.
  */
@@ -38,29 +36,28 @@ public final class GraphRelationalPayloadMapper {
         if (graphTraces == null) {
             graphTraces = new ArrayList<>();
             graph.setGraphTraces(graphTraces);
-        } else {
-            graphTraces.clear();
         }
 
         if (traces == null || traces.isEmpty()) {
-            if (graph.getDataModelVersion() == null) {
-                graph.setDataModelVersion(CURRENT_DATA_MODEL_VERSION);
-            }
+            graph.setDataModelVersion(CURRENT_DATA_MODEL_VERSION);
+            graphTraces.clear();
             return;
         }
 
-        String graphType = graph.getGraphType();
-        if (graphType == null || graphType.isBlank()) {
-            graph.setGraphType(resolveCanonicalTraceType(traces.getFirst()));
-        }
-        if (graph.getDataModelVersion() == null) {
-            graph.setDataModelVersion(CURRENT_DATA_MODEL_VERSION);
+        graph.setGraphType(resolveCanonicalTraceType(traces.getFirst()));
+        graph.setDataModelVersion(CURRENT_DATA_MODEL_VERSION);
+
+        int sharedCount = Math.min(graphTraces.size(), traces.size());
+        for (int index = 0; index < sharedCount; index++) {
+            updateGraphTrace(graph, graphTraces.get(index), traces.get(index), index);
         }
 
-        for (int index = 0; index < traces.size(); index++) {
-            Map<String, Object> trace = traces.get(index);
-            GraphTrace graphTrace = buildGraphTrace(graph, trace, index);
-            graphTraces.add(graphTrace);
+        for (int index = sharedCount; index < traces.size(); index++) {
+            graphTraces.add(buildGraphTrace(graph, traces.get(index), index));
+        }
+
+        while (graphTraces.size() > traces.size()) {
+            graphTraces.remove(graphTraces.size() - 1);
         }
     }
 
@@ -69,9 +66,10 @@ public final class GraphRelationalPayloadMapper {
             throw new IllegalArgumentException("Graph is required");
         }
 
-        if (!isRelationalGraph(graph)) {
-            return GraphPayloadMapper.normalize(
-                graph.getTemplateData(),
+        List<GraphTrace> graphTraces = graph.getGraphTraces();
+        if (graphTraces == null || graphTraces.isEmpty()) {
+            return new GraphPayloadMapper.GraphPayload(
+                List.of(),
                 graph.getLayout(),
                 graph.getConfig(),
                 graph.getStyle()
@@ -79,7 +77,7 @@ public final class GraphRelationalPayloadMapper {
         }
 
         List<Map<String, Object>> traces = new ArrayList<>();
-        for (GraphTrace graphTrace : graph.getGraphTraces()) {
+        for (GraphTrace graphTrace : graphTraces) {
             traces.add(toTraceMap(graphTrace));
         }
 
@@ -95,50 +93,58 @@ public final class GraphRelationalPayloadMapper {
         return normalize(graph).data();
     }
 
-    public static String inferGraphType(Object rawData) {
-        try {
-            List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(rawData);
-            if (traces.isEmpty()) {
-                return null;
-            }
-            return resolveCanonicalTraceType(traces.getFirst());
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
+    private static GraphTrace buildGraphTrace(Graph graph, Map<String, Object> trace, int index) {
+        GraphTrace graphTrace = new GraphTrace();
+        populateGraphTrace(graph, graphTrace, trace, index, false);
+        return graphTrace;
     }
 
-    private static GraphTrace buildGraphTrace(Graph graph, Map<String, Object> trace, int index) {
+    private static void updateGraphTrace(Graph graph, GraphTrace graphTrace, Map<String, Object> trace, int index) {
+        populateGraphTrace(graph, graphTrace, trace, index, true);
+    }
+
+    private static void populateGraphTrace(
+        Graph graph,
+        GraphTrace graphTrace,
+        Map<String, Object> trace,
+        int index,
+        boolean preserveExistingTraceKey
+    ) {
         String canonicalType = resolveCanonicalTraceType(trace);
-        GraphTrace graphTrace = new GraphTrace();
+        boolean timeSeriesTrace = "scatter".equals(canonicalType) && looksLikeTimeSeries(trace);
         graphTrace.setGraph(graph);
-        graphTrace.setTraceKey(canonicalType + "-" + (index + 1));
+        if (!preserveExistingTraceKey || graphTrace.getTraceKey() == null || graphTrace.getTraceKey().isBlank()) {
+            graphTrace.setTraceKey(canonicalType + "-" + (index + 1));
+        }
         graphTrace.setTraceName(resolveTraceName(trace, index));
         graphTrace.setTraceType(canonicalType);
         graphTrace.setTraceOrder(index);
         graphTrace.setDataMode(resolveDataMode(canonicalType, trace));
         graphTrace.setTraceConfig(extractTraceConfig(trace));
 
+        ensureCategoryPoints(graphTrace);
+        ensureTimeSeriesPoints(graphTrace);
+
+        if (timeSeriesTrace) {
+            graphTrace.getCategoryPoints().clear();
+            populateTimeSeriesPoints(graphTrace, trace);
+            return;
+        }
+
+        graphTrace.getTimeSeriesPoints().clear();
         switch (canonicalType) {
             case "pie" -> populatePiePoints(graphTrace, trace);
             case "indicator" -> populateIndicatorPoint(graphTrace, trace);
             case "bar" -> populateCartesianPoints(graphTrace, trace);
-            case "scatter" -> {
-                if (looksLikeTimeSeries(trace)) {
-                    populateTimeSeriesPoints(graphTrace, trace);
-                } else {
-                    populateCartesianPoints(graphTrace, trace);
-                }
-            }
+            case "scatter" -> populateCartesianPoints(graphTrace, trace);
             default -> throw new IllegalArgumentException("Graph data is invalid");
         }
-
-        return graphTrace;
     }
 
     private static Map<String, Object> toTraceMap(GraphTrace trace) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (trace.getTraceConfig() != null) {
-            result.putAll(trace.getTraceConfig());
+            result.putAll(normalizeTraceConfig(trace.getTraceConfig()));
         }
         result.put("type", trace.getTraceType());
         result.put("name", trace.getTraceName());
@@ -157,7 +163,7 @@ public final class GraphRelationalPayloadMapper {
             case "indicator" -> {
                 GraphCategoryPoint point = trace.getCategoryPoints().isEmpty() ? null : trace.getCategoryPoints().getFirst();
                 Number value = point == null
-                    ? 0
+                    ? 0L
                     : resolveNumericValue(point.getValueNumeric(), point.getValueText());
                 result.put("value", value);
             }
@@ -187,13 +193,20 @@ public final class GraphRelationalPayloadMapper {
     }
 
     private static void populatePiePoints(GraphTrace graphTrace, Map<String, Object> trace) {
-        List<?> labels = requireList(trace, "labels");
-        List<?> values = requireList(trace, "values");
+        List<?> labels = optionalList(trace, "labels");
+        if (labels == null) {
+            labels = List.of();
+        }
+        List<?> values = optionalList(trace, "values");
+        if (values == null) {
+            values = List.of();
+        }
         if (labels.size() != values.size()) {
             throw new IllegalArgumentException("Graph data is invalid");
         }
 
         for (int index = 0; index < labels.size(); index++) {
+            GraphCategoryPoint point = categoryPointAt(graphTrace, index);
             Object rawLabel = labels.get(index);
             if (!(rawLabel instanceof String label)) {
                 throw new IllegalArgumentException("Graph data is invalid");
@@ -203,59 +216,68 @@ public final class GraphRelationalPayloadMapper {
                 throw new IllegalArgumentException("Graph data is invalid");
             }
 
-            GraphCategoryPoint point = new GraphCategoryPoint();
-            point.setGraphTrace(graphTrace);
             point.setCategoryKey(label);
             point.setCategoryLabel(label);
             point.setPointOrder(index);
             point.setValueNumeric(toBigDecimal(number));
             point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, label));
-            graphTrace.getCategoryPoints().add(point);
         }
+        trimPoints(graphTrace.getCategoryPoints(), labels.size());
     }
 
     private static void populateIndicatorPoint(GraphTrace graphTrace, Map<String, Object> trace) {
         Object rawValue = trace.get("value");
-        if (!(rawValue instanceof Number number)) {
+        Number number;
+        if (rawValue == null) {
+            number = 0L;
+        } else if (rawValue instanceof Number numericValue) {
+            number = numericValue;
+        } else {
             throw new IllegalArgumentException("Graph data is invalid");
         }
 
-        GraphCategoryPoint point = new GraphCategoryPoint();
-        point.setGraphTrace(graphTrace);
+        GraphCategoryPoint point = categoryPointAt(graphTrace, 0);
         point.setCategoryKey("current");
         point.setCategoryLabel(resolveTraceName(trace, 0));
         point.setPointOrder(0);
         point.setValueNumeric(toBigDecimal(number));
         point.setPointMeta(Map.of());
-        graphTrace.getCategoryPoints().add(point);
+        trimPoints(graphTrace.getCategoryPoints(), 1);
     }
 
     private static void populateCartesianPoints(GraphTrace graphTrace, Map<String, Object> trace) {
-        List<?> yValues = requireList(trace, "y");
+        List<?> yValues = optionalList(trace, "y");
+        if (yValues == null) {
+            yValues = List.of();
+        }
         List<?> xValues = optionalList(trace, "x");
-        boolean hasExplicitX = xValues != null;
+        boolean hasExplicitX = xValues != null && !xValues.isEmpty();
 
-        if (hasExplicitX && !xValues.isEmpty() && looksLikeTimeSeries(trace)) {
+        if (hasExplicitX && yValues.isEmpty()) {
+            throw new IllegalArgumentException("Graph data is invalid");
+        }
+
+        if (hasExplicitX && looksLikeTimeSeries(trace)) {
+            graphTrace.getCategoryPoints().clear();
             populateTimeSeriesPoints(graphTrace, trace);
             return;
         }
 
         for (int index = 0; index < yValues.size(); index++) {
+            GraphCategoryPoint point = categoryPointAt(graphTrace, index);
             Object rawY = yValues.get(index);
             if (!(rawY instanceof Number number)) {
                 throw new IllegalArgumentException("Graph data is invalid");
             }
 
             Object rawX = hasExplicitX && index < xValues.size() ? xValues.get(index) : index;
-            GraphCategoryPoint point = new GraphCategoryPoint();
-            point.setGraphTrace(graphTrace);
             point.setCategoryKey(String.valueOf(rawX));
             point.setCategoryLabel(rawX instanceof String ? (String) rawX : String.valueOf(rawX));
             point.setPointOrder(index);
             point.setValueNumeric(toBigDecimal(number));
             point.setPointMeta(Map.of(INTERNAL_X_FIELD, rawX));
-            graphTrace.getCategoryPoints().add(point);
         }
+        trimPoints(graphTrace.getCategoryPoints(), yValues.size());
     }
 
     private static void populateTimeSeriesPoints(GraphTrace graphTrace, Map<String, Object> trace) {
@@ -266,6 +288,7 @@ public final class GraphRelationalPayloadMapper {
         }
 
         for (int index = 0; index < yValues.size(); index++) {
+            GraphTimeSeriesPoint point = timeSeriesPointAt(graphTrace, index);
             Object rawY = yValues.get(index);
             if (!(rawY instanceof Number number)) {
                 throw new IllegalArgumentException("Graph data is invalid");
@@ -273,14 +296,12 @@ public final class GraphRelationalPayloadMapper {
             Object rawX = index < xValues.size() ? xValues.get(index) : index;
             Instant observedAt = parseObservedAt(rawX);
 
-            GraphTimeSeriesPoint point = new GraphTimeSeriesPoint();
-            point.setGraphTrace(graphTrace);
             point.setObservedAt(observedAt);
             point.setPointOrder(index);
             point.setYNumeric(toBigDecimal(number));
             point.setPointMeta(Map.of(INTERNAL_X_FIELD, rawX));
-            graphTrace.getTimeSeriesPoints().add(point);
         }
+        trimPoints(graphTrace.getTimeSeriesPoints(), yValues.size());
     }
 
     private static String resolveDataMode(String canonicalType, Map<String, Object> trace) {
@@ -325,9 +346,56 @@ public final class GraphRelationalPayloadMapper {
             case "pie" -> "pie";
             case "indicator" -> "indicator";
             case "bar" -> "bar";
-            case "scatter", "scattergl" -> "scatter";
+            case "scatter", "scattergl", "line" -> "scatter";
             default -> throw new IllegalArgumentException("Graph data is invalid");
         };
+    }
+
+    private static Map<String, Object> normalizeTraceConfig(Map<String, Object> traceConfig) {
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        traceConfig.forEach((key, value) -> {
+            if (key != null) {
+                normalized.put(key, normalizeJsonValue(value));
+            }
+        });
+        return normalized;
+    }
+
+    private static Object normalizeJsonValue(Object value) {
+        if (value instanceof Map<?, ?> mapValue) {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            mapValue.forEach((key, entry) -> {
+                if (key != null) {
+                    normalized.put(String.valueOf(key), normalizeJsonValue(entry));
+                }
+            });
+            return normalized;
+        }
+        if (value instanceof List<?> listValue) {
+            List<Object> normalized = new ArrayList<>(listValue.size());
+            for (Object entry : listValue) {
+                normalized.add(normalizeJsonValue(entry));
+            }
+            return normalized;
+        }
+        if (value instanceof Number number) {
+            return normalizeNumber(number);
+        }
+        return value;
+    }
+
+    private static Number normalizeNumber(Number number) {
+        try {
+            BigDecimal normalized = number instanceof BigDecimal bigDecimal
+                ? bigDecimal.stripTrailingZeros()
+                : new BigDecimal(number.toString()).stripTrailingZeros();
+            if (normalized.scale() <= 0) {
+                return normalized.longValueExact();
+            }
+            return normalized;
+        } catch (ArithmeticException | NumberFormatException ex) {
+            return number;
+        }
     }
 
     private static Map<String, Object> extractTraceConfig(Map<String, Object> trace) {
@@ -342,13 +410,46 @@ public final class GraphRelationalPayloadMapper {
         return config;
     }
 
-    private static boolean isRelationalGraph(Graph graph) {
-        Integer dataModelVersion = graph.getDataModelVersion();
-        if (dataModelVersion != null && dataModelVersion >= CURRENT_DATA_MODEL_VERSION) {
-            return true;
+    private static void ensureCategoryPoints(GraphTrace graphTrace) {
+        if (graphTrace.getCategoryPoints() == null) {
+            graphTrace.setCategoryPoints(new ArrayList<>());
         }
-        List<GraphTrace> graphTraces = graph.getGraphTraces();
-        return graphTraces != null && Hibernate.isInitialized(graphTraces) && !graphTraces.isEmpty();
+    }
+
+    private static void ensureTimeSeriesPoints(GraphTrace graphTrace) {
+        if (graphTrace.getTimeSeriesPoints() == null) {
+            graphTrace.setTimeSeriesPoints(new ArrayList<>());
+        }
+    }
+
+    private static GraphCategoryPoint categoryPointAt(GraphTrace graphTrace, int index) {
+        List<GraphCategoryPoint> points = graphTrace.getCategoryPoints();
+        while (points.size() <= index) {
+            GraphCategoryPoint point = new GraphCategoryPoint();
+            point.setGraphTrace(graphTrace);
+            points.add(point);
+        }
+        GraphCategoryPoint point = points.get(index);
+        point.setGraphTrace(graphTrace);
+        return point;
+    }
+
+    private static GraphTimeSeriesPoint timeSeriesPointAt(GraphTrace graphTrace, int index) {
+        List<GraphTimeSeriesPoint> points = graphTrace.getTimeSeriesPoints();
+        while (points.size() <= index) {
+            GraphTimeSeriesPoint point = new GraphTimeSeriesPoint();
+            point.setGraphTrace(graphTrace);
+            points.add(point);
+        }
+        GraphTimeSeriesPoint point = points.get(index);
+        point.setGraphTrace(graphTrace);
+        return point;
+    }
+
+    private static <T> void trimPoints(List<T> points, int desiredSize) {
+        while (points.size() > desiredSize) {
+            points.remove(points.size() - 1);
+        }
     }
 
     private static List<?> requireList(Map<String, Object> trace, String field) {
@@ -382,13 +483,21 @@ public final class GraphRelationalPayloadMapper {
             try {
                 return numericValue.longValueExact();
             } catch (ArithmeticException ignored) {
+                // fails and is ignored if the value is too large to fit in a long
                 return numericValue.stripTrailingZeros();
             }
         }
         if (textValue != null) {
-            return textValue;
+            try {
+                return BigDecimal.valueOf(Double.parseDouble(textValue)).longValueExact();
+            } catch (ArithmeticException ignored) {
+                return BigDecimal.valueOf(Double.parseDouble(textValue)).stripTrailingZeros();
+            } catch (NumberFormatException e) {
+                // not really recoverable, return error state
+                return 0L;
+            }
         }
-        return 0;
+        return 0L;
     }
 
     private static Object resolveXValue(Map<String, Object> pointMeta, Object fallback) {

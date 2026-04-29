@@ -1046,7 +1046,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isNoContent());
 
-        Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
+        Graph persisted = reloadGraph(graph.getId());
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
         assertEquals(List.of(6L, 6L, 6L), traces.getFirst().get("y"));
     }
@@ -1059,7 +1059,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         Graph secondGraph = createGraph("Second graph", List.of(Map.of("type", "bar", "y", List.of(4, 5, 6))));
         addLocationGraph(location, firstGraph);
         addLocationGraph(location, secondGraph);
-        Graph persistedFirst = graphRepository.findById(firstGraph.getId()).orElseThrow();
+        Graph persistedFirst = reloadGraph(firstGraph.getId());
 
         AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-partial@example.com", PASSWORD);
 
@@ -1082,8 +1082,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isNoContent());
 
-        Graph updatedFirst = graphRepository.findById(firstGraph.getId()).orElseThrow();
-        Graph unchangedSecond = graphRepository.findById(secondGraph.getId()).orElseThrow();
+        Graph updatedFirst = reloadGraph(firstGraph.getId());
+        Graph unchangedSecond = reloadGraph(secondGraph.getId());
 
         List<Map<String, Object>> firstTraces = GraphPayloadMapper.toTraceList(updatedFirst.getData());
         List<Map<String, Object>> secondTraces = GraphPayloadMapper.toTraceList(unchangedSecond.getData());
@@ -1401,6 +1401,107 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsAllowsUnchangedSectionLayoutSnapshotEvenWhenLocationGraphSetHasExtraAssignments() throws Exception {
+        createUser("partner-layout-snapshot@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Laguna Hills");
+        Graph primaryGraph = createGraph("Primary graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        Graph extraGraph = createGraph("Extra graph", List.of(Map.of("type", "bar", "y", List.of(4, 5, 6))));
+        addLocationGraph(location, primaryGraph);
+        addLocationGraph(location, extraGraph);
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(Map.of(
+                "section_id", 1,
+                "graph_ids", List.of(primaryGraph.getId())
+            ))
+        ));
+        locationRepository.saveAndFlush(location);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-layout-snapshot@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ],
+                          "sectionLayout": {
+                            "sections": [
+                              {
+                                "section_id": 1,
+                                "graph_ids": [%d]
+                              }
+                            ]
+                          }
+                        }
+                        """.formatted(primaryGraph.getId(), primaryGraph.getId()))
+            )
+            .andExpect(status().isNoContent());
+
+        Graph persistedPrimary = reloadGraph(primaryGraph.getId());
+        List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedPrimary.getData());
+        assertEquals(List.of(9L, 8L, 7L), persistedTraces.getFirst().get("y"));
+    }
+
+    @Test
+    void updateLocationGraphsStillRejectsChangedSectionLayoutWhenLocationGraphSetHasExtraAssignments() throws Exception {
+        createUser("partner-layout-conflict@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Laguna Niguel");
+        Graph primaryGraph = createGraph("Primary graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        Graph extraGraph = createGraph("Extra graph", List.of(Map.of("type", "bar", "y", List.of(4, 5, 6))));
+        addLocationGraph(location, primaryGraph);
+        addLocationGraph(location, extraGraph);
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(Map.of(
+                "section_id", 1,
+                "graph_ids", List.of(primaryGraph.getId())
+            ))
+        ));
+        locationRepository.saveAndFlush(location);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-layout-conflict@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ],
+                          "sectionLayout": {
+                            "sections": [
+                              {
+                                "section_id": 1,
+                                "graph_ids": [%d]
+                              },
+                              {
+                                "section_id": 2,
+                                "graph_ids": []
+                              }
+                            ]
+                          }
+                        }
+                        """.formatted(primaryGraph.getId(), primaryGraph.getId()))
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("graph_update_conflict"));
+    }
+
+    @Test
     void updateLocationGraphsRejectsStaleExpectedUpdatedAtWithConflict() throws Exception {
         createUser("partner-graph-conflict@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Mission Viejo");
@@ -1467,7 +1568,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("location_graph_not_found"));
 
-        Graph persistedFirst = graphRepository.findById(firstGraph.getId()).orElseThrow();
+        Graph persistedFirst = reloadGraph(firstGraph.getId());
         List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedFirst.getData());
         assertEquals(List.of(1L, 2L, 3L), persistedTraces.getFirst().get("y"));
     }
@@ -1544,7 +1645,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             executor.shutdownNow();
         }
 
-        Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
+        Graph persisted = reloadGraph(graph.getId());
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
         assertEquals(1, traces.size());
         assertThat(traces.getFirst()).containsEntry("type", "bar");

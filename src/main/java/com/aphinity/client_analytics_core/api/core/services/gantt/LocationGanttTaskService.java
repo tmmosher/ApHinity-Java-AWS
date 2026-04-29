@@ -196,6 +196,7 @@ public class LocationGanttTaskService {
             try {
                 List<Long> dependencyTaskIds = dependencyService.findDependencyTaskIds(locationId, taskId);
                 auditService.recordDeleted(userId, actorIpAddress, task, dependencyTaskIds);
+                dependencyService.deleteDependenciesForTask(locationId, taskId);
                 ganttTaskRepository.delete(task);
                 locationRepository.touchUpdatedAt(locationId, Instant.now());
             } catch (RuntimeException ex) {

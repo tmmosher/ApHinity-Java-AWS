@@ -32,6 +32,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -45,6 +47,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Business logic for location visibility and membership administration.
@@ -65,6 +69,7 @@ public class LocationService {
     private final LocationThumbnailImageService locationThumbnailImageService;
     private final LocationGraphTemplateFactory locationGraphTemplateFactory;
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
+    private final ConcurrentHashMap<Long, ReentrantLock> locationGraphUpdateLocks = new ConcurrentHashMap<>();
 
     public LocationService(
         AppUserRepository appUserRepository,
@@ -202,12 +207,9 @@ public class LocationService {
 
         Graph graph = new Graph();
         graph.setName(template.name());
-        graph.setGraphType(graphType == null ? null : graphType.strip().toLowerCase(Locale.ROOT));
-        graph.setDataModelVersion(1);
         graph.setLayout(template.layout());
         graph.setConfig(template.config());
         graph.setStyle(template.style());
-        graph.setTemplateData(template.data());
         graph.setData(template.data());
 
         Graph savedGraph;
@@ -343,156 +345,201 @@ public class LocationService {
         Map<String, Object> sectionLayout
     ) {
         AppUser user = requireUser(userId);
-        if (!accountRoleService.isPartnerOrAdmin(user)) {
-            log.warn(
-                "Rejected graph update due to insufficient permissions actorUserId={} locationId={}",
-                userId,
-                locationId
-            );
-            throw forbidden();
-        }
-        if (!locationRepository.existsById(locationId)) {
-            log.warn(
-                "Rejected graph update because location was not found actorUserId={} locationId={}",
-                userId,
-                locationId
-            );
-            throw locationNotFound();
-        }
-        Location location = null;
-        if (sectionLayout != null) {
-            location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
-        }
-        if ((graphUpdates == null || graphUpdates.isEmpty()) && sectionLayout == null) {
-            log.warn(
-                "Skipping graph update because request payload was empty actorUserId={} locationId={}",
-                userId,
-                locationId
-            );
-            return;
-        }
+        ReentrantLock locationLock = locationGraphUpdateLocks.computeIfAbsent(locationId, ignored -> new ReentrantLock());
+        locationLock.lock();
+        boolean releaseInFinally = true;
+        try {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (locationLock.isHeldByCurrentThread()) {
+                            locationLock.unlock();
+                        }
+                    }
+                });
+                releaseInFinally = false;
+            }
 
-        Set<Long> currentGraphIds = new HashSet<>();
-        if (sectionLayout != null) {
-            List<LocationGraph> locationGraphs = locationGraphRepository.findByLocationIdWithGraph(locationId);
-            for (LocationGraph locationGraph : locationGraphs) {
-                if (locationGraph.getGraph() != null && locationGraph.getGraph().getId() != null) {
-                    currentGraphIds.add(locationGraph.getGraph().getId());
+            if (!accountRoleService.isPartnerOrAdmin(user)) {
+                log.warn(
+                    "Rejected graph update due to insufficient permissions actorUserId={} locationId={}",
+                    userId,
+                    locationId
+                );
+                throw forbidden();
+            }
+            if (!locationRepository.existsById(locationId)) {
+                log.warn(
+                    "Rejected graph update because location was not found actorUserId={} locationId={}",
+                    userId,
+                    locationId
+                );
+                throw locationNotFound();
+            }
+            Location location = null;
+            NormalizedSectionLayout currentSectionLayout = null;
+            if (sectionLayout != null) {
+                location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+                currentSectionLayout = normalizeSectionLayoutShape(location.getSectionLayout(), locationId, userId);
+            }
+            if ((graphUpdates == null || graphUpdates.isEmpty()) && sectionLayout == null) {
+                log.warn(
+                    "Skipping graph update because request payload was empty actorUserId={} locationId={}",
+                    userId,
+                    locationId
+                );
+                return;
+            }
+
+            boolean hasGraphUpdates = graphUpdates != null && !graphUpdates.isEmpty();
+            Map<Long, LocationGraphDataUpdateRequest> updatesByGraphId = hasGraphUpdates
+                ? mapGraphUpdatesById(graphUpdates, locationId, userId)
+                : Map.of();
+            List<Graph> graphs = hasGraphUpdates
+                ? graphRepository.findByLocationIdAndGraphIdInForUpdate(locationId, updatesByGraphId.keySet())
+                : List.of();
+
+            if (hasGraphUpdates && graphs.size() != updatesByGraphId.size()) {
+                List<Long> matchedGraphIds = graphs.stream().map(Graph::getId).sorted().toList();
+                log.warn(
+                    "Rejected graph update because one or more graphs were not assigned to location actorUserId={} locationId={} requestedGraphIds={} matchedGraphIds={}",
+                    userId,
+                    locationId,
+                    updatesByGraphId.keySet(),
+                    matchedGraphIds
+                );
+                throw locationGraphNotFound();
+            }
+
+            Map<Long, ValidatedGraphPayload> validatedPayloads = new LinkedHashMap<>();
+            for (Graph graph : graphs) {
+                LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
+                try {
+                    validateExpectedGraphTimestamp(update, graph, locationId, userId);
+                    validatedPayloads.put(
+                        graph.getId(),
+                        locationGraphUpdatePayloadValidationFactory.validateForUpdate(
+                            graph.getData(),
+                            update.data(),
+                            update.layout()
+                        )
+                    );
+                } catch (IllegalArgumentException ex) {
+                    log.warn(
+                        "Rejected invalid graph data update locationId={} graphId={} actorUserId={}",
+                        locationId,
+                        graph.getId(),
+                        userId,
+                        ex
+                    );
+                    throw invalidGraphData();
                 }
             }
-        }
 
-        boolean hasGraphUpdates = graphUpdates != null && !graphUpdates.isEmpty();
-        Map<Long, LocationGraphDataUpdateRequest> updatesByGraphId = hasGraphUpdates
-            ? mapGraphUpdatesById(graphUpdates, locationId, userId)
-            : Map.of();
-        List<Graph> graphs = hasGraphUpdates
-            ? graphRepository.findByLocationIdAndGraphIdInForUpdate(locationId, updatesByGraphId.keySet())
-            : List.of();
+            Map<String, Object> normalizedSectionLayout = null;
+            if (sectionLayout != null) {
+                NormalizedSectionLayout requestedSectionLayout = normalizeSectionLayoutShape(sectionLayout, locationId, userId);
+                // Replaying the stored layout should not block graph-only edits.
+                if (!Objects.equals(requestedSectionLayout.layout(), currentSectionLayout.layout())) {
+                    Set<Long> currentGraphIds = new HashSet<>();
+                    List<LocationGraph> locationGraphs = locationGraphRepository.findByLocationIdWithGraph(locationId);
+                    for (LocationGraph locationGraph : locationGraphs) {
+                        if (locationGraph.getGraph() != null && locationGraph.getGraph().getId() != null) {
+                            currentGraphIds.add(locationGraph.getGraph().getId());
+                        }
+                    }
 
-        if (hasGraphUpdates && graphs.size() != updatesByGraphId.size()) {
-            List<Long> matchedGraphIds = graphs.stream().map(Graph::getId).sorted().toList();
-            log.warn(
-                "Rejected graph update because one or more graphs were not assigned to location actorUserId={} locationId={} requestedGraphIds={} matchedGraphIds={}",
-                userId,
-                locationId,
-                updatesByGraphId.keySet(),
-                matchedGraphIds
-            );
-            throw locationGraphNotFound();
-        }
+                    if (!requestedSectionLayout.graphIds().equals(currentGraphIds)) {
+                        log.warn(
+                            "Rejected section layout update because graph ids no longer matched the location actorUserId={} locationId={} requestedGraphIds={} currentGraphIds={}",
+                            userId,
+                            locationId,
+                            requestedSectionLayout.graphIds(),
+                            currentGraphIds
+                        );
+                        throw graphUpdateConflict();
+                    }
 
-        Map<Long, ValidatedGraphPayload> validatedPayloads = new LinkedHashMap<>();
-        for (Graph graph : graphs) {
-            LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
-            try {
-                validateExpectedGraphTimestamp(update, graph, locationId, userId);
-                validatedPayloads.put(
-                    graph.getId(),
-                    locationGraphUpdatePayloadValidationFactory.validateForUpdate(
-                        graph.getData(),
-                        update.data(),
-                        update.layout()
-                    )
-                );
-            } catch (IllegalArgumentException ex) {
-                log.warn(
-                    "Rejected invalid graph data update locationId={} graphId={} actorUserId={}",
-                    locationId,
-                    graph.getId(),
+                    normalizedSectionLayout = requestedSectionLayout.layout();
+                }
+            }
+
+            if (!hasGraphUpdates && sectionLayout != null && normalizedSectionLayout == null) {
+                log.info(
+                    "Skipped graph update because section layout snapshot was unchanged actorUserId={} locationId={}",
                     userId,
+                    locationId
+                );
+                return;
+            }
+
+            for (Graph graph : graphs) {
+                ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
+                if (validatedPayload == null) {
+                    throw new IllegalStateException("Validated graph payload was missing");
+                }
+                LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
+                if (update.layout() != null) {
+                    graph.setLayout(validatedPayload.layout());
+                }
+                graph.setData(validatedPayload.data());
+            }
+
+            try {
+                if (hasGraphUpdates) {
+                    graphRepository.saveAll(graphs);
+                }
+                if (normalizedSectionLayout != null) {
+                    location.setSectionLayout(normalizedSectionLayout);
+                    locationRepository.saveAndFlush(location);
+                } else if (hasGraphUpdates) {
+                    locationRepository.touchUpdatedAt(locationId, Instant.now());
+                }
+            } catch (RuntimeException ex) {
+                log.error(
+                    "Graph update persistence failed actorUserId={} locationId={} graphIds={}",
+                    userId,
+                    locationId,
+                    updatesByGraphId.keySet(),
                     ex
                 );
-                throw invalidGraphData();
+                throw ex;
             }
-        }
 
-        Map<String, Object> normalizedSectionLayout = null;
-        if (sectionLayout != null) {
-            normalizedSectionLayout = normalizeSectionLayout(sectionLayout, locationId, userId, currentGraphIds);
-        }
+            if (normalizedSectionLayout != null && hasGraphUpdates) {
+                log.info(
+                    "Updated graph data payloads and section layout locationId={} graphCount={} actorUserId={} graphIds={}",
+                    locationId,
+                    graphs.size(),
+                    userId,
+                    updatesByGraphId.keySet()
+                );
+                return;
+            }
 
-        for (Graph graph : graphs) {
-            ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
-            if (validatedPayload == null) {
-                throw new IllegalStateException("Validated graph payload was missing");
-            }
-            LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
-            if (update.layout() != null) {
-                graph.setLayout(validatedPayload.layout());
-            }
-            graph.setData(validatedPayload.data());
-        }
-
-        try {
-            if (hasGraphUpdates) {
-                graphRepository.saveAll(graphs);
-            }
             if (normalizedSectionLayout != null) {
-                location.setSectionLayout(normalizedSectionLayout);
-                locationRepository.saveAndFlush(location);
-            } else if (hasGraphUpdates) {
-                locationRepository.touchUpdatedAt(locationId, Instant.now());
+                log.info(
+                    "Updated section layout locationId={} actorUserId={} sectionCount={}",
+                    locationId,
+                    userId,
+                    ((List<?>) normalizedSectionLayout.getOrDefault("sections", List.of())).size()
+                );
+                return;
             }
-        } catch (RuntimeException ex) {
-            log.error(
-                "Graph update persistence failed actorUserId={} locationId={} graphIds={}",
-                userId,
-                locationId,
-                updatesByGraphId.keySet(),
-                ex
-            );
-            throw ex;
-        }
 
-        if (normalizedSectionLayout != null && hasGraphUpdates) {
             log.info(
-                "Updated graph data payloads and section layout locationId={} graphCount={} actorUserId={} graphIds={}",
+                "Updated graph data payloads locationId={} graphCount={} actorUserId={} graphIds={}",
                 locationId,
                 graphs.size(),
                 userId,
                 updatesByGraphId.keySet()
             );
-            return;
+        } finally {
+            if (releaseInFinally && locationLock.isHeldByCurrentThread()) {
+                locationLock.unlock();
+            }
         }
-
-        if (normalizedSectionLayout != null) {
-            log.info(
-                "Updated section layout locationId={} actorUserId={} sectionCount={}",
-                locationId,
-                userId,
-                ((List<?>) normalizedSectionLayout.getOrDefault("sections", List.of())).size()
-            );
-            return;
-        }
-
-        log.info(
-            "Updated graph data payloads locationId={} graphCount={} actorUserId={} graphIds={}",
-            locationId,
-            graphs.size(),
-            userId,
-            updatesByGraphId.keySet()
-        );
     }
 
     /**
@@ -1116,11 +1163,16 @@ public class LocationService {
         return copy;
     }
 
-    private Map<String, Object> normalizeSectionLayout(
+    private record NormalizedSectionLayout(
+        Map<String, Object> layout,
+        Set<Long> graphIds
+    ) {
+    }
+
+    private NormalizedSectionLayout normalizeSectionLayoutShape(
         Map<String, Object> sectionLayout,
         Long locationId,
-        Long actorUserId,
-        Set<Long> currentGraphIds
+        Long actorUserId
     ) {
         if (sectionLayout == null) {
             throw invalidSectionLayout();
@@ -1200,20 +1252,9 @@ public class LocationService {
             ));
         }
 
-        if (!seenGraphIds.equals(currentGraphIds)) {
-            log.warn(
-                "Rejected section layout update because graph ids no longer matched the location actorUserId={} locationId={} requestedGraphIds={} currentGraphIds={}",
-                actorUserId,
-                locationId,
-                seenGraphIds,
-                currentGraphIds
-            );
-            throw graphUpdateConflict();
-        }
-
         Map<String, Object> normalizedLayout = new LinkedHashMap<>();
         normalizedLayout.put("sections", List.copyOf(normalizedSections));
-        return normalizedLayout;
+        return new NormalizedSectionLayout(normalizedLayout, Set.copyOf(seenGraphIds));
     }
 
     private boolean matchesSectionId(Object rawSectionId, Long expectedSectionId) {

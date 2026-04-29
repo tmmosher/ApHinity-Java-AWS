@@ -25,8 +25,6 @@ import com.aphinity.client_analytics_core.api.security.JwtProperties;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import jakarta.servlet.http.Cookie;
-import jakarta.json.bind.Jsonb;
-import jakarta.json.bind.JsonbBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +38,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -105,6 +104,9 @@ abstract class AbstractApiIntegrationTest {
     @Autowired
     protected JwtProperties jwtProperties;
 
+    @Autowired
+    protected TransactionTemplate transactionTemplate;
+
     @MockitoBean
     protected TurnstileValidationService turnstileValidationService;
 
@@ -159,8 +161,16 @@ abstract class AbstractApiIntegrationTest {
     protected Graph createGraph(String name, Object data) {
         Graph graph = new Graph();
         graph.setName(name);
-        setRawGraphData(graph, asJsonString(data));
-        return graphRepository.save(graph);
+        graph.setData(data);
+        return graphRepository.saveAndFlush(graph);
+    }
+
+    protected Graph reloadGraph(Long graphId) {
+        return transactionTemplate.execute(status -> {
+            Graph graph = graphRepository.findById(graphId).orElseThrow();
+            graph.getData();
+            return graph;
+        });
     }
 
     protected void addLocationGraph(Location location, Graph graph) {
@@ -215,27 +225,6 @@ abstract class AbstractApiIntegrationTest {
         serviceEvent.setDescription(description);
         serviceEvent.setStatus(status);
         return serviceEventRepository.save(serviceEvent);
-    }
-
-    private String asJsonString(Object value) {
-        if (value instanceof String jsonText) {
-            return jsonText;
-        }
-        try (Jsonb jsonb = JsonbBuilder.create()) {
-            return jsonb.toJson(value);
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Unable to serialize graph test payload as JSON", ex);
-        }
-    }
-
-    private void setRawGraphData(Graph graph, Object rawData) {
-        try {
-            var field = Graph.class.getDeclaredField("data");
-            field.setAccessible(true);
-            field.set(graph, rawData);
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException("Unable to set raw graph test payload", ex);
-        }
     }
 
     protected AuthCookies loginAndCaptureCookies(String email, String password) throws Exception {
@@ -329,6 +318,9 @@ abstract class AbstractApiIntegrationTest {
         List<String> tables = List.of(
             "location_invite",
             "service_event",
+            "graph_time_series_point",
+            "graph_category_point",
+            "graph_trace",
             "location_graph",
             "location_user",
             "graph",

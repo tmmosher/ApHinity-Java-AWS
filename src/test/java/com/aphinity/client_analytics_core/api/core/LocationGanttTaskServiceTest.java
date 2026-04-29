@@ -349,6 +349,7 @@ class LocationGanttTaskServiceTest {
         locationGanttTaskService.deleteLocationTask(5L, 99L, 44L, actorIpAddress);
 
         verify(auditService).recordDeleted(5L, actorIpAddress, task, List.of(2L, 11L));
+        verify(dependencyService).deleteDependenciesForTask(99L, 44L);
         verify(ganttTaskRepository).delete(task);
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }

@@ -502,6 +502,7 @@ class LocationServiceTest {
         assertEquals("Trace 1", traces.getFirst().get("name"));
         assertEquals(List.of(), traces.getFirst().get("x"));
         assertEquals(List.of(), traces.getFirst().get("y"));
+        assertNull(readLegacyTemplateData(savedGraphHolder[0]));
         assertEquals(expectedScatterTemplateLayout("Phoenix"), savedGraphHolder[0].getLayout());
         assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
         assertEquals(expectedScatterTemplateStyle(), savedGraphHolder[0].getStyle());
@@ -671,6 +672,39 @@ class LocationServiceTest {
         assertEquals(Map.of("displayModeBar", false, "responsive", false), savedGraphHolder[0].getConfig());
         verify(locationGraphRepository).save(any(LocationGraph.class));
         verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
+    void createLocationGraphCanonicalizesLineAliasToScatterGraphType() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(new LinkedHashMap<>(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 1, "graph_ids", List.of()))
+        )));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        Graph[] savedGraphHolder = new Graph[1];
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(35L);
+            graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
+            savedGraphHolder[0] = graph;
+            return graph;
+        });
+
+        GraphResponse response = locationService.createLocationGraph(5L, 99L, 1L, false, "line");
+
+        assertEquals(35L, response.id());
+        assertEquals("scatter", savedGraphHolder[0].getGraphType());
+        assertEquals("scatter", response.data().getFirst().get("type"));
+        assertNull(readLegacyTemplateData(savedGraphHolder[0]));
     }
 
     @Test
@@ -1265,7 +1299,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void getAccessibleLocationGraphsNormalizesLegacyNestedGraphPayload() {
+    void getAccessibleLocationGraphsIgnoresLegacyTemplateSnapshotWhenRelationalDataIsPresent() {
         AppUser user = verifiedUser(17L);
         when(appUserRepository.findById(17L)).thenReturn(Optional.of(user));
         when(locationRepository.existsById(44L)).thenReturn(true);
@@ -1274,19 +1308,18 @@ class LocationServiceTest {
 
         Graph graph = new Graph();
         graph.setId(41L);
-        graph.setName("Legacy graph");
-        setRawGraphData(graph, Map.of(
-            "data", List.of(
-                Map.of(
-                    "type", "pie",
-                    "labels", List.of("fill", "rest"),
-                    "values", List.of(65, 35)
-                )
-            ),
-            "layout", Map.of("showlegend", false),
-            "config", Map.of("displayModeBar", false),
-            "style", Map.of("height", 280)
+        graph.setName("Relational graph");
+        graph.setLayout(Map.of("showlegend", false));
+        graph.setConfig(Map.of("displayModeBar", false));
+        graph.setStyle(Map.of("height", 280));
+        graph.setData(List.of(
+            Map.of(
+                "type", "pie",
+                "labels", List.of("relational"),
+                "values", List.of(65)
+            )
         ));
+        setRawGraphData(graph, "{\"type\":\"bar\",\"y\":[999]}");
         graph.setCreatedAt(Instant.parse("2026-01-03T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-01-04T00:00:00Z"));
 
@@ -1300,6 +1333,7 @@ class LocationServiceTest {
         GraphResponse response = responses.getFirst();
         assertEquals(1, response.data().size());
         assertEquals("pie", response.data().getFirst().get("type"));
+        assertEquals(List.of("relational"), response.data().getFirst().get("labels"));
         assertEquals(Map.of("showlegend", false), response.layout());
         assertEquals(Map.of("displayModeBar", false), response.config());
         assertEquals(Map.of("height", 280), response.style());
@@ -1340,7 +1374,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void getAccessibleLocationGraphsParsesJsonTextPayloadsFromDatabase() {
+    void getAccessibleLocationGraphsReturnsEmptyDataWhenOnlyLegacyTemplateSnapshotExists() {
         AppUser user = verifiedUser(24L);
         when(appUserRepository.findById(24L)).thenReturn(Optional.of(user));
         when(locationRepository.existsById(58L)).thenReturn(true);
@@ -1349,7 +1383,7 @@ class LocationServiceTest {
 
         Graph graph = new Graph();
         graph.setId(89L);
-        graph.setName("String payload graph");
+        graph.setName("Legacy-only graph");
         setRawGraphData(
             graph,
             "{\"type\":\"pie\",\"labels\":[\"fill\",\"rest\"],\"values\":[65,35]}"
@@ -1368,40 +1402,10 @@ class LocationServiceTest {
 
         assertEquals(1, responses.size());
         GraphResponse response = responses.getFirst();
-        assertEquals(1, response.data().size());
-        assertEquals("pie", response.data().getFirst().get("type"));
-        assertEquals(List.of("fill", "rest"), response.data().getFirst().get("labels"));
-        assertEquals(List.of(65L, 35L), response.data().getFirst().get("values"));
+        assertTrue(response.data().isEmpty());
         assertEquals(Map.of("showlegend", false), response.layout());
         assertEquals(Map.of(), response.config());
         assertEquals(Map.of(), response.style());
-    }
-
-    @Test
-    void getAccessibleLocationGraphsRejectsMalformedStoredGraphData() {
-        AppUser user = verifiedUser(31L);
-        when(appUserRepository.findById(31L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(66L)).thenReturn(true);
-        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
-        when(locationUserRepository.existsByIdLocationIdAndIdUserId(66L, 31L)).thenReturn(true);
-
-        Graph graph = new Graph();
-        graph.setId(101L);
-        graph.setName("Malformed graph");
-        setRawGraphData(graph, List.of(Map.of("type", "bar"), "bad-entry"));
-        graph.setCreatedAt(Instant.parse("2026-01-07T00:00:00Z"));
-        graph.setUpdatedAt(Instant.parse("2026-01-08T00:00:00Z"));
-
-        LocationGraph locationGraph = new LocationGraph();
-        locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(66L)).thenReturn(List.of(locationGraph));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            locationService.getAccessibleLocationGraphs(31L, 66L)
-        );
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
-        assertEquals("Graph payload is invalid", ex.getReason());
     }
 
     @Test
@@ -1658,11 +1662,21 @@ class LocationServiceTest {
 
     private void setRawGraphData(Graph graph, Object rawData) {
         try {
-            var field = Graph.class.getDeclaredField("data");
+            var field = Graph.class.getDeclaredField("templateData");
             field.setAccessible(true);
             field.set(graph, rawData);
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError("Unable to set raw graph data for legacy payload test", ex);
+        }
+    }
+
+    private Object readLegacyTemplateData(Graph graph) {
+        try {
+            var field = Graph.class.getDeclaredField("templateData");
+            field.setAccessible(true);
+            return field.get(graph);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError("Unable to inspect legacy graph snapshot data", ex);
         }
     }
 

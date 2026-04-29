@@ -79,7 +79,7 @@ public class LocationGraphTemplateFactory {
                     "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
                 )),
                 Map.of(
-                    "title", buildLegacyGraphTitle(locationName),
+                    "title", buildGraphTitle(locationName),
                     "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
                     "showlegend", false
                 ),
@@ -105,7 +105,7 @@ public class LocationGraphTemplateFactory {
             case "pie" -> GraphTemplateType.PIE;
             case "indicator" -> GraphTemplateType.INDICATOR;
             case "bar" -> GraphTemplateType.BAR;
-            case "scatter" -> GraphTemplateType.SCATTER;
+            case "scatter", "line" -> GraphTemplateType.SCATTER;
             default -> throw new IllegalArgumentException("Graph type is invalid");
         };
     }
@@ -156,7 +156,7 @@ public class LocationGraphTemplateFactory {
         );
     }
 
-    private Map<String, Object> buildLegacyGraphTitle(String locationName) {
+    private Map<String, Object> buildGraphTitle(String locationName) {
         return Map.of(
             "x", 0.02,
             "text", locationName == null ? "" : locationName,
@@ -200,7 +200,7 @@ public class LocationGraphTemplateFactory {
 
     private Map<String, Object> buildScatterTemplateLayout(String locationName) {
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("title", buildLegacyGraphTitle(locationName));
+        layout.put("title", buildGraphTitle(locationName));
         layout.put("xaxis", Map.of(
             "type", "date",
             "tickformat", "%b %Y"
