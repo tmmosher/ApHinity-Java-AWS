@@ -10,6 +10,7 @@ import com.aphinity.client_analytics_core.api.core.entities.location.LocationUse
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.entities.location.UserSubscriptionToLocation;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
@@ -201,9 +202,12 @@ public class LocationService {
 
         Graph graph = new Graph();
         graph.setName(template.name());
+        graph.setGraphType(graphType == null ? null : graphType.strip().toLowerCase(Locale.ROOT));
+        graph.setDataModelVersion(1);
         graph.setLayout(template.layout());
         graph.setConfig(template.config());
         graph.setStyle(template.style());
+        graph.setTemplateData(template.data());
         graph.setData(template.data());
 
         Graph savedGraph;
@@ -951,12 +955,7 @@ public class LocationService {
     private GraphResponse toGraphResponse(Graph graph) {
         GraphPayloadMapper.GraphPayload payload;
         try {
-            payload = GraphPayloadMapper.normalize(
-                graph.getData(),
-                graph.getLayout(),
-                graph.getConfig(),
-                graph.getStyle()
-            );
+            payload = GraphRelationalPayloadMapper.normalize(graph);
         } catch (IllegalArgumentException ex) {
             log.warn(
                 "Invalid graph payload for graphId={} during location graph response mapping",

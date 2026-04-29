@@ -4,6 +4,13 @@ import type {LocationGanttTask} from "../../types/Types";
 export const GANTT_CHART_HOST_ID = "location-gantt-chart-host";
 
 export const GANTT_CHART_HOST_CLASS = "gantt-chart-host";
+export const GANTT_CHART_BAR_HEIGHT = 30;
+export const GANTT_CHART_ROW_PADDING = 18;
+export const GANTT_CHART_ROW_HEIGHT = GANTT_CHART_BAR_HEIGHT + GANTT_CHART_ROW_PADDING;
+export const GANTT_CHART_UPPER_HEADER_HEIGHT = 45;
+export const GANTT_CHART_LOWER_HEADER_HEIGHT = 30;
+export const GANTT_CHART_HEADER_HEIGHT =
+  GANTT_CHART_UPPER_HEADER_HEIGHT + GANTT_CHART_LOWER_HEADER_HEIGHT + 10;
 
 export type FrappeGanttChartTask = {
   id: string;
@@ -76,6 +83,10 @@ export const createFrappeGanttOptions = (
   date_format: "YYYY-MM-DD",
   scroll_to: "today",
   infinite_padding: false,
+  bar_height: GANTT_CHART_BAR_HEIGHT,
+  padding: GANTT_CHART_ROW_PADDING,
+  upper_header_height: GANTT_CHART_UPPER_HEADER_HEIGHT,
+  lower_header_height: GANTT_CHART_LOWER_HEADER_HEIGHT,
   container_height: resolveFrappeGanttContainerHeight(containerHeight),
   on_click: onClick
 });

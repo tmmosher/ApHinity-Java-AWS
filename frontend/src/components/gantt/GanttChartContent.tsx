@@ -2,6 +2,8 @@ import {type JSX, Show} from "solid-js";
 import {GanttChartShell} from "./GanttChartShell";
 import {GanttTaskCreatePopover} from "./GanttTaskCreatePopover";
 import type {CreateLocationGanttTaskRequest} from "../../types/Types";
+import type {TimelineTaskLike} from "../../util/location/frappeGanttChart";
+import GanttChartResourcesColumn from "./GanttChartResourcesColumn";
 
 type GanttChartContentProps = {
   apiHost: string;
@@ -13,7 +15,7 @@ type GanttChartContentProps = {
   canEdit: boolean;
   onCreateTask: (request: CreateLocationGanttTaskRequest) => Promise<void>;
   hostId: string;
-  timelineTaskCount: number;
+  timelineTasks: TimelineTaskLike[];
   searchQuery: string;
 };
 
@@ -46,13 +48,18 @@ export const GanttChartContent = (props: GanttChartContentProps) => (
       </div>
     </Show>
 
-    <div class="w-full overflow-x-auto rounded-2xl border border-base-300 bg-base-100/80">
-      {/* Frappe Gantt sets the SVG width to 100% and only expands it when the chart is wider.
-          Keep the host shrink-wrapped so the SVG matches the actual grid width instead of leaving a blank gutter. */}
-      <GanttChartShell
-        hostId={props.hostId}
-        class="w-max min-h-[32rem]"
-      />
+    <div class="w-full overflow-hidden rounded-2xl border border-base-300 bg-base-100/80">
+      <div class="flex min-h-[32rem] flex-col lg:flex-row">
+        <GanttChartResourcesColumn tasks={props.timelineTasks} />
+        <div class="min-w-0 flex-1 overflow-x-auto">
+          {/* Frappe Gantt sets the SVG width to 100% and only expands it when the chart is wider.
+              Keep the host shrink-wrapped so the SVG matches the actual grid width instead of leaving a blank gutter. */}
+          <GanttChartShell
+            hostId={props.hostId}
+            class="w-max min-h-[32rem]"
+          />
+        </div>
+      </div>
     </div>
   </section>
 );

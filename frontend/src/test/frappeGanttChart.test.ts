@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {
   createFrappeGanttOptions,
+  GANTT_CHART_HEADER_HEIGHT,
   GANTT_CHART_HOST_CLASS,
   GANTT_CHART_HOST_ID,
   resolveFrappeGanttContainerHeight,
@@ -95,6 +96,10 @@ describe("frappeGanttChart", () => {
       date_format: "YYYY-MM-DD",
       scroll_to: "today",
       infinite_padding: false,
+      bar_height: 30,
+      padding: 18,
+      upper_header_height: 45,
+      lower_header_height: 30,
       container_height: 513,
       view_modes: [
         {
@@ -105,5 +110,9 @@ describe("frappeGanttChart", () => {
         }
       ]
     });
+  });
+
+  it("tracks the chart header height used by Frappe's rendered grid", () => {
+    expect(GANTT_CHART_HEADER_HEIGHT).toBe(85);
   });
 });

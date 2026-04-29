@@ -1,27 +1,40 @@
 package com.aphinity.client_analytics_core.api.core.entities.dashboard;
 
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import jakarta.json.bind.Jsonb;
-import jakarta.json.bind.JsonbBuilder;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Index;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 @Entity
-@Table(name = "graph")
+@Table(
+    name = "graph",
+    indexes = {
+        @Index(name = "idx_graph_graph_type", columnList = "graph_type"),
+        @Index(name = "idx_graph_data_model_version", columnList = "data_model_version"),
+        @Index(name = "idx_graph_updated_at", columnList = "updated_at")
+    }
+)
 public class Graph {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,9 +43,16 @@ public class Graph {
     @Column(nullable = false)
     private String name;
 
+    // Template / legacy payload snapshot. Live chart data is read from graph_traces.
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "data", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "template_data", columnDefinition = "jsonb")
     private Object data;
+
+    @Column(name = "graph_type")
+    private String graphType;
+
+    @Column(name = "data_model_version")
+    private Integer dataModelVersion;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -52,6 +72,15 @@ public class Graph {
     @Column(name = "style")
     private Map<String, Object> style;
 
+    @OneToMany(
+        mappedBy = "graph",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
+    )
+    @OrderBy("traceOrder asc")
+    @Fetch(FetchMode.SUBSELECT)
+    private List<GraphTrace> graphTraces = new ArrayList<>();
+
     @OneToMany(mappedBy = "graph")
     private Set<LocationGraph> locationGraphs = new LinkedHashSet<>();
 
@@ -65,13 +94,28 @@ public class Graph {
             updatedAt = now;
         }
         if (data == null) {
-            data = "[]";
+            data = List.of();
+        }
+        if (dataModelVersion == null && graphTraces != null && !graphTraces.isEmpty()) {
+            dataModelVersion = 1;
+        }
+        if ((graphType == null || graphType.isBlank()) && graphTraces != null && !graphTraces.isEmpty()) {
+            graphType = graphTraces.getFirst().getTraceType();
         }
     }
 
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();
+        if (data == null) {
+            data = List.of();
+        }
+        if (dataModelVersion == null && graphTraces != null && !graphTraces.isEmpty()) {
+            dataModelVersion = 1;
+        }
+        if ((graphType == null || graphType.isBlank()) && graphTraces != null && !graphTraces.isEmpty()) {
+            graphType = graphTraces.getFirst().getTraceType();
+        }
     }
 
     public Long getId() {
@@ -91,21 +135,52 @@ public class Graph {
     }
 
     public Object getData() {
+        if (dataModelVersion != null && dataModelVersion >= 1) {
+            return GraphRelationalPayloadMapper.normalize(this).data();
+        }
         return data;
     }
 
     public void setData(Object data) {
+        // Preserve the JSON snapshot only for the initial legacy write path.
+        boolean legacyStorageMode = this.dataModelVersion == null;
         GraphPayloadMapper.GraphPayload normalized = GraphPayloadMapper.normalize(
             data,
             layout,
             config,
             style
         );
-        Object storedData = GraphPayloadMapper.toStoredData(normalized.data());
-        this.data = toJsonText(storedData);
+        GraphRelationalPayloadMapper.syncGraphData(this, normalized.data());
+        if (legacyStorageMode && this.data == null) {
+            this.data = GraphPayloadMapper.toStoredData(normalized.data());
+        }
         this.layout = normalized.layout();
         this.config = normalized.config();
         this.style = normalized.style();
+    }
+
+    public Object getTemplateData() {
+        return data;
+    }
+
+    public void setTemplateData(Object data) {
+        this.data = data;
+    }
+
+    public String getGraphType() {
+        return graphType;
+    }
+
+    public void setGraphType(String graphType) {
+        this.graphType = graphType;
+    }
+
+    public Integer getDataModelVersion() {
+        return dataModelVersion;
+    }
+
+    public void setDataModelVersion(Integer dataModelVersion) {
+        this.dataModelVersion = dataModelVersion;
     }
 
     public Instant getCreatedAt() {
@@ -148,19 +223,19 @@ public class Graph {
         this.style = style;
     }
 
+    public List<GraphTrace> getGraphTraces() {
+        return graphTraces;
+    }
+
+    public void setGraphTraces(List<GraphTrace> graphTraces) {
+        this.graphTraces = graphTraces == null ? new ArrayList<>() : new ArrayList<>(graphTraces);
+    }
+
     public Set<LocationGraph> getLocationGraphs() {
         return locationGraphs;
     }
 
     public void setLocationGraphs(Set<LocationGraph> locationGraphs) {
         this.locationGraphs = locationGraphs;
-    }
-
-    private String toJsonText(Object value) {
-        try (Jsonb jsonb = JsonbBuilder.create()) {
-            return jsonb.toJson(value);
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Graph data must be serializable JSON", ex);
-        }
     }
 }

@@ -347,7 +347,7 @@ export const LocationGanttChartPanel = () => {
         canEdit={canEditTasks()}
         onCreateTask={createTask}
         hostId={GANTT_CHART_HOST_ID}
-        timelineTaskCount={timelineTasks().length}
+        timelineTasks={timelineTasks()}
         searchQuery={searchControl.searchQuery()}
       />
 

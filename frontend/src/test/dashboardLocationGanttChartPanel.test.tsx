@@ -53,6 +53,7 @@ describe("LocationGanttChartPanel", () => {
     const html = renderToString(LocationGanttChartPanel);
 
     expect(html).toContain("Gantt Chart");
+    expect(html).toContain("Resources");
     expect(html).toContain("placeholder=\"Search title...\"");
     expect(html).toContain("Upload Excel spreadsheet");
     expect(html).not.toContain("Upload CSV");

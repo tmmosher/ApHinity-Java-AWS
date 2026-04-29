@@ -1,19 +1,17 @@
 import {A} from "@solidjs/router";
-import PlotlyChart, {loadPlotlyModule} from "../../../../components/common/Chart";
 import GraphCreateModal from "../../../../components/graph-editor/GraphCreateModal";
-import type {PlotlyConfig, PlotlyData, PlotlyLayout} from "../../../../components/common/Chart";
 import GraphEditorModal from "../../../../components/graph-editor/GraphEditorModal";
 import LocationDashboardLayoutModal from "../../../../components/location/LocationDashboardLayoutModal";
-import {For, Show, Suspense, createMemo, createResource} from "solid-js";
+import {For, Show, createMemo, createResource} from "solid-js";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "../../../../context/LocationDetailContext";
 import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
-import GraphLoadingPlaceholder from "../../../../components/graph/GraphLoadingPlaceholder";
-import {resolveGraphHeight} from "../../../../util/graph/graphTheme";
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 import LocationDashboardToolbar from "../../../../components/location/LocationDashboardToolbar";
+import LocationDashboardSection from "../../../../components/location/LocationDashboardSection";
+import {loadPlotlyModule} from "../../../../components/common/Chart";
 
 type LocationDashboardPanelProps = {
   locationId: string;
@@ -113,65 +111,16 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           >
             <div class="space-y-4">
               <For each={orderedSections()}>
-                {(section, sectionIndex) => (
-                  <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-                    <Show when={sectionGraphs(section).length > 0} fallback={
-                      <p class="text-sm text-base-content/70">
-                        No available graph payloads for this section.
-                      </p>
-                    }>
-                      <div class="grid gap-4 lg:grid-cols-2">
-                        <For each={sectionGraphs(section)}>
-                          {(graph) => (
-                            <article class="rounded-lg border border-base-200 bg-base-200/40 p-3">
-                              <div class="mb-2 flex items-start justify-between gap-2">
-                                <h4 class="text-sm font-medium">{graph.name}</h4>
-                                <Show when={canEditGraphs()}>
-                                  <button
-                                    type="button"
-                                    class={"btn btn-xs " + (dashboard.isGraphMutationBusy() ? "btn-disabled" : "btn-outline")}
-                                    disabled={dashboard.isGraphMutationBusy()}
-                                    onClick={() => dashboard.openGraphEditor(graph.id)}
-                                  >
-                                    Edit
-                                  </button>
-                                </Show>
-                              </div>
-                              <Show
-                                when={!plotlyModule.error}
-                                fallback={<p class="h-72 w-full rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">Unable to load graph renderer.</p>}
-                              >
-                                <Suspense fallback={
-                                  <div class="w-full overflow-hidden rounded-lg">
-                                    <GraphLoadingPlaceholder graphName={graph.name} />
-                                  </div>
-                                }>
-                                  <Show when={plotlyModule()}>
-                                    <div class="w-full" style={{height: resolveGraphHeight(graph.style)}}>
-                                      <PlotlyChart
-                                        name={graph.name}
-                                        data={graph.data as PlotlyData[]}
-                                        layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
-                                        config={(graph.config ?? undefined) as PlotlyConfig | undefined}
-                                        style={graph.style ?? undefined}
-                                        class="h-full w-full"
-                                      />
-                                    </div>
-                                  </Show>
-                                </Suspense>
-                              </Show>
-                            </article>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-
-                    <Show when={missingGraphIds(section).length > 0}>
-                      <p class="mt-3 text-xs text-warning">
-                        Missing graph IDs: {missingGraphIds(section).join(", ")}
-                      </p>
-                    </Show>
-                  </section>
+                {(section) => (
+                  <LocationDashboardSection
+                    section={section}
+                    graphs={sectionGraphs(section)}
+                    missingGraphIds={missingGraphIds(section)}
+                    canEditGraphs={canEditGraphs()}
+                    isGraphMutationBusy={dashboard.isGraphMutationBusy()}
+                    plotlyModule={plotlyModule}
+                    onOpenGraphEditor={dashboard.openGraphEditor}
+                  />
                 )}
               </For>
             </div>
