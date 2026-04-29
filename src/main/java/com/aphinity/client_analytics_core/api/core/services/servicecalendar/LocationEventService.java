@@ -199,6 +199,8 @@ public class LocationEventService {
         if (serviceEvent != null) {
             try {
                 auditService.recordDeleted(userId, actorIpAddress, serviceEvent);
+                // Break corrective-action back-references before deleting the source event.
+                serviceEventRepository.clearCorrectiveActionSourceEvent(locationId, serviceEvent.getId());
                 serviceEventRepository.delete(serviceEvent);
                 locationRepository.touchUpdatedAt(locationId, Instant.now());
             } catch (RuntimeException ex) {

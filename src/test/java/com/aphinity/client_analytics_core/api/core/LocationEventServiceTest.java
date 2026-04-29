@@ -16,6 +16,7 @@ import com.aphinity.client_analytics_core.api.core.services.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarTemplateService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventAuditService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventRequestMapper;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,6 +38,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -106,6 +108,48 @@ class LocationEventServiceTest {
             LocalDate.parse("2026-03-01"),
             LocalDate.parse("2026-05-31")
         );
+    }
+
+    @Test
+    void getAccessibleLocationEventsReturnsCorrectiveActionWithoutDeletedSourceEvent() {
+        AppUser user = verifiedUser(5L);
+        GuardedServiceEvent sourceEvent = new GuardedServiceEvent();
+        sourceEvent.setId(3L);
+        sourceEvent.setTitle("Source Event");
+        sourceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
+        sourceEvent.setEventDate(LocalDate.parse("2026-04-01"));
+        sourceEvent.setEventTime(LocalTime.parse("08:00:00"));
+        sourceEvent.setEndEventDate(LocalDate.parse("2026-04-01"));
+        sourceEvent.setEndEventTime(LocalTime.parse("09:00:00"));
+        sourceEvent.setDescription("Original issue");
+        sourceEvent.setStatus(ServiceEventStatus.UPCOMING);
+        sourceEvent.setCorrectiveAction(false);
+        sourceEvent.setCreatedAt(Instant.parse("2026-03-01T00:00:00Z"));
+        sourceEvent.setUpdatedAt(Instant.parse("2026-03-02T00:00:00Z"));
+        sourceEvent.markDetached();
+
+        ServiceEvent correctiveAction = serviceEvent(44L, "Corrective Action");
+        correctiveAction.setCorrectiveAction(true);
+        correctiveAction.setCorrectiveActionSourceEvent(sourceEvent);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireReadableLocationAccess(user, 99L);
+        when(serviceEventRepository.findVisibleByLocationIdAndDateWindow(
+            99L,
+            LocalDate.parse("2026-03-01"),
+            LocalDate.parse("2026-05-31")
+        )).thenReturn(List.of(correctiveAction));
+
+        List<ServiceEventResponse> response = locationEventService.getAccessibleLocationEvents(
+            5L,
+            99L,
+            YearMonth.of(2026, 4)
+        );
+
+        assertEquals(1, response.size());
+        assertTrue(response.getFirst().correctiveAction());
+        assertEquals(3L, response.getFirst().correctiveActionSourceEventId());
+        assertNull(response.getFirst().correctiveActionSourceEventTitle());
     }
 
     @Test
@@ -415,6 +459,7 @@ class LocationEventServiceTest {
         locationEventService.deleteLocationEvent(5L, 99L, 44L, clientIpAddress);
 
         verify(auditService).recordDeleted(5L, clientIpAddress, serviceEvent);
+        verify(serviceEventRepository).clearCorrectiveActionSourceEvent(99L, 44L);
         verify(serviceEventRepository).delete(serviceEvent);
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
@@ -510,7 +555,7 @@ class LocationEventServiceTest {
         @Override
         public String getTitle() {
             if (detached) {
-                throw new RuntimeException("Could not initialize proxy [ServiceEvent#3] - no session");
+                throw new EntityNotFoundException("Could not initialize proxy [ServiceEvent#3] - no session");
             }
             return super.getTitle();
         }

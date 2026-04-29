@@ -20,7 +20,6 @@ import java.util.Map;
  * Keeps Plotly payloads in sync with the relational trace/point tables.
  */
 public final class GraphRelationalPayloadMapper {
-    private static final int CURRENT_DATA_MODEL_VERSION = 1;
     private static final String INTERNAL_X_FIELD = "x";
     private static final String INTERNAL_LABEL_FIELD = "label";
 
@@ -39,13 +38,11 @@ public final class GraphRelationalPayloadMapper {
         }
 
         if (traces == null || traces.isEmpty()) {
-            graph.setDataModelVersion(CURRENT_DATA_MODEL_VERSION);
             graphTraces.clear();
             return;
         }
 
         graph.setGraphType(resolveCanonicalTraceType(traces.getFirst()));
-        graph.setDataModelVersion(CURRENT_DATA_MODEL_VERSION);
 
         int sharedCount = Math.min(graphTraces.size(), traces.size());
         for (int index = 0; index < sharedCount; index++) {

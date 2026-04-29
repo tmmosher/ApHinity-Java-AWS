@@ -6,7 +6,6 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
@@ -17,9 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraphRelationalPayloadMapperTest {
     @Test
-    void setDataSyncsRelationalTracesAndClearsLegacyTemplateSnapshot() throws Exception {
+    void setDataSyncsRelationalTraces() {
         Graph graph = new Graph();
-        setRawTemplateData(graph, List.of(Map.of("type", "scatter", "name", "Template")));
         graph.setData(List.of(Map.of(
             "type", "scatter",
             "name", "Live",
@@ -27,9 +25,7 @@ class GraphRelationalPayloadMapperTest {
             "y", List.of(10, 20)
         )));
 
-        assertEquals(1, graph.getDataModelVersion());
         assertEquals("scatter", graph.getGraphType());
-        assertEquals(null, readRawTemplateData(graph));
 
         Object data = graph.getData();
         assertInstanceOf(List.class, data);
@@ -42,27 +38,12 @@ class GraphRelationalPayloadMapperTest {
     }
 
     @Test
-    void getDataReturnsEmptyListWhenOnlyLegacyTemplateSnapshotExists() throws Exception {
+    void getDataReturnsEmptyListWhenGraphHasNoTraces() {
         Graph graph = new Graph();
-        setRawTemplateData(graph, "{\"type\":\"pie\",\"labels\":[\"A\"],\"values\":[3]}");
 
         Object data = graph.getData();
         assertInstanceOf(List.class, data);
         assertTrue(GraphPayloadMapper.toTraceList(data).isEmpty());
-    }
-
-    @Test
-    void setDataClearsStringBackedLegacyTemplateSnapshot() throws Exception {
-        Graph graph = new Graph();
-        setRawTemplateData(graph, "{\"type\":\"pie\",\"labels\":[\"A\"],\"values\":[3]}");
-
-        graph.setData(List.of(Map.of("type", "pie", "labels", List.of("A"), "values", List.of(4))));
-
-        assertEquals(null, readRawTemplateData(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
-        assertEquals(1, traces.size());
-        assertEquals("pie", traces.getFirst().get("type"));
-        assertEquals(List.of(4L), traces.getFirst().get("values"));
     }
 
     @Test
@@ -83,7 +64,6 @@ class GraphRelationalPayloadMapperTest {
 
         trace.setCategoryPoints(new ArrayList<>(List.of(point)));
         graph.setGraphTraces(new ArrayList<>(List.of(trace)));
-        graph.setDataModelVersion(1);
 
         graph.setData(List.of(Map.of("type", "bar", "y", List.of(5))));
 
@@ -94,19 +74,17 @@ class GraphRelationalPayloadMapperTest {
     }
 
     @Test
-    void emptyRelationalPayloadDoesNotFallBackToTemplateSnapshot() {
+    void emptyRelationalPayloadProducesEmptyData() {
         Graph graph = new Graph();
         graph.setData(List.of());
 
-        assertEquals(1, graph.getDataModelVersion());
         assertTrue(GraphPayloadMapper.toTraceList(graph.getData()).isEmpty());
     }
 
     @Test
-    void setDataCanonicalizesStaleGraphMetadata() {
+    void setDataCanonicalizesStaleGraphType() {
         Graph graph = new Graph();
         graph.setGraphType("line");
-        graph.setDataModelVersion(0);
 
         graph.setData(List.of(Map.of(
             "type", "scatter",
@@ -116,18 +94,5 @@ class GraphRelationalPayloadMapperTest {
         )));
 
         assertEquals("scatter", graph.getGraphType());
-        assertEquals(1, graph.getDataModelVersion());
-    }
-
-    private void setRawTemplateData(Graph graph, Object rawData) throws Exception {
-        Field field = Graph.class.getDeclaredField("templateData");
-        field.setAccessible(true);
-        field.set(graph, rawData);
-    }
-
-    private Object readRawTemplateData(Graph graph) throws Exception {
-        Field field = Graph.class.getDeclaredField("templateData");
-        field.setAccessible(true);
-        return field.get(graph);
     }
 }

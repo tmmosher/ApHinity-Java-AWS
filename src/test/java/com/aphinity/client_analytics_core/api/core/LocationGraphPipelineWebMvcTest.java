@@ -243,7 +243,7 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
-    void locationGraphsIgnoresLegacyTemplateSnapshotWhenRelationalPayloadExists() throws Exception {
+    void locationGraphsReturnsRelationalPayloadWhenGraphHasData() throws Exception {
         Long userId = 18L;
         Long locationId = 44L;
 
@@ -261,7 +261,6 @@ class LocationGraphPipelineWebMvcTest {
         graph.setConfig(Map.of("responsive", true));
         graph.setStyle(Map.of("width", "100%"));
         graph.setData(List.of(Map.of("type", "bar", "name", "Sessions", "y", List.of(4, 9, 6))));
-        setRawGraphData(graph, List.of(Map.of("type", "pie", "labels", List.of("legacy"), "values", List.of(1))));
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
@@ -279,7 +278,7 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
-    void locationGraphsReturnsEmptyDataWhenOnlyLegacyTemplateSnapshotExists() throws Exception {
+    void locationGraphsReturnsEmptyDataWhenGraphHasNoTraces() throws Exception {
         Long userId = 25L;
         Long locationId = 66L;
 
@@ -292,11 +291,10 @@ class LocationGraphPipelineWebMvcTest {
 
         Graph graph = new Graph();
         graph.setId(101L);
-        graph.setName("Legacy-only graph");
+        graph.setName("Empty graph");
         graph.setLayout(Map.of("showlegend", false));
         graph.setConfig(Map.of("responsive", false));
         graph.setStyle(Map.of("height", 200));
-        setRawGraphData(graph, List.of(Map.of("type", "bar"), "bad-entry"));
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
@@ -924,16 +922,6 @@ class LocationGraphPipelineWebMvcTest {
         user.setEmail("verified@example.com");
         user.setEmailVerifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
         return user;
-    }
-
-    private void setRawGraphData(Graph graph, Object rawData) {
-        try {
-            var field = Graph.class.getDeclaredField("templateData");
-            field.setAccessible(true);
-            field.set(graph, rawData);
-        } catch (ReflectiveOperationException ex) {
-            throw new AssertionError("Unable to set raw graph data for legacy payload test", ex);
-        }
     }
 
     @TestConfiguration

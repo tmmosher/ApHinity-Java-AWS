@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core.repositories.servicecalendar
 
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,4 +29,16 @@ public interface ServiceEventRepository extends JpaRepository<ServiceEvent, Long
     );
 
     Optional<ServiceEvent> findByIdAndLocation_Id(Long eventId, Long locationId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        update ServiceEvent correctiveAction
+           set correctiveAction.correctiveActionSourceEvent = null
+         where correctiveAction.location.id = :locationId
+           and correctiveAction.correctiveActionSourceEvent.id = :sourceEventId
+        """)
+    int clearCorrectiveActionSourceEvent(
+        @Param("locationId") Long locationId,
+        @Param("sourceEventId") Long sourceEventId
+    );
 }

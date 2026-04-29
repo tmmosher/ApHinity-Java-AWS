@@ -31,7 +31,6 @@ import org.hibernate.type.SqlTypes;
     name = "graph",
     indexes = {
         @Index(name = "idx_graph_graph_type", columnList = "graph_type"),
-        @Index(name = "idx_graph_data_model_version", columnList = "data_model_version"),
         @Index(name = "idx_graph_updated_at", columnList = "updated_at")
     }
 )
@@ -43,16 +42,8 @@ public class Graph {
     @Column(nullable = false)
     private String name;
 
-    // Unused snapshot column retained only for schema compatibility.
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "template_data", columnDefinition = "jsonb")
-    private Object templateData;
-
     @Column(name = "graph_type")
     private String graphType;
-
-    @Column(name = "data_model_version")
-    private Integer dataModelVersion;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -93,9 +84,6 @@ public class Graph {
         if (updatedAt == null) {
             updatedAt = now;
         }
-        if (dataModelVersion == null && graphTraces != null && !graphTraces.isEmpty()) {
-            dataModelVersion = 1;
-        }
         if ((graphType == null || graphType.isBlank()) && graphTraces != null && !graphTraces.isEmpty()) {
             graphType = graphTraces.getFirst().getTraceType();
         }
@@ -104,9 +92,6 @@ public class Graph {
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();
-        if (dataModelVersion == null && graphTraces != null && !graphTraces.isEmpty()) {
-            dataModelVersion = 1;
-        }
         if ((graphType == null || graphType.isBlank()) && graphTraces != null && !graphTraces.isEmpty()) {
             graphType = graphTraces.getFirst().getTraceType();
         }
@@ -140,7 +125,6 @@ public class Graph {
             style
         );
         GraphRelationalPayloadMapper.syncGraphData(this, normalized.data());
-        templateData = null;
         this.layout = normalized.layout();
         this.config = normalized.config();
         this.style = normalized.style();
@@ -152,14 +136,6 @@ public class Graph {
 
     public void setGraphType(String graphType) {
         this.graphType = graphType;
-    }
-
-    public Integer getDataModelVersion() {
-        return dataModelVersion;
-    }
-
-    public void setDataModelVersion(Integer dataModelVersion) {
-        this.dataModelVersion = dataModelVersion;
     }
 
     public Instant getCreatedAt() {

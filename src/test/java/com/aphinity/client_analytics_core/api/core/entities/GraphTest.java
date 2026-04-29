@@ -44,22 +44,4 @@ class GraphTest {
 
         assertTrue(ex.getMessage().contains("index 1"));
     }
-
-    @Test
-    void setDataBackfillsLegacyNestedColumns() {
-        Graph graph = new Graph();
-        graph.setData(Map.of(
-            "data", List.of(Map.of("type", "pie", "name", "share")),
-            "layout", Map.of("showlegend", false),
-            "config", Map.of("displayModeBar", false),
-            "style", Map.of("height", 240)
-        ));
-
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
-        assertEquals(1, traces.size());
-        assertEquals("pie", traces.getFirst().get("type"));
-        assertEquals(Map.of("showlegend", false), graph.getLayout());
-        assertEquals(Map.of("displayModeBar", false), graph.getConfig());
-        assertEquals(Map.of("height", 240), graph.getStyle());
-    }
 }

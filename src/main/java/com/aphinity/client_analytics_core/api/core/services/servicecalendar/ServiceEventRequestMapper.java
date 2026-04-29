@@ -6,6 +6,8 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
+import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.ObjectNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -43,6 +45,16 @@ public class ServiceEventRequestMapper {
 
     public ServiceEventResponse toResponse(ServiceEvent serviceEvent) {
         ServiceEvent sourceEvent = serviceEvent.getCorrectiveActionSourceEvent();
+        Long correctiveActionSourceEventId = null;
+        String correctiveActionSourceEventTitle = null;
+        if (sourceEvent != null) {
+            correctiveActionSourceEventId = sourceEvent.getId();
+            try {
+                correctiveActionSourceEventTitle = sourceEvent.getTitle();
+            } catch (EntityNotFoundException | ObjectNotFoundException ex) {
+                correctiveActionSourceEventTitle = null;
+            }
+        }
         return new ServiceEventResponse(
             serviceEvent.getId(),
             serviceEvent.getTitle(),
@@ -54,8 +66,8 @@ public class ServiceEventRequestMapper {
             serviceEvent.getDescription(),
             serviceEvent.getStatus(),
             serviceEvent.isCorrectiveAction(),
-            sourceEvent == null ? null : sourceEvent.getId(),
-            sourceEvent == null ? null : sourceEvent.getTitle(),
+            correctiveActionSourceEventId,
+            correctiveActionSourceEventTitle,
             serviceEvent.getCreatedAt(),
             serviceEvent.getUpdatedAt()
         );
