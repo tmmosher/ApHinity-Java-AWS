@@ -264,6 +264,7 @@ class LocationEventServiceTest {
         Location location = new Location();
         location.setId(99L);
         location.setName("Austin");
+        location.setWorkOrderEmail("work-orders@example.com");
         ServiceEvent sourceEvent = serviceEvent(44L, "Source Event");
         sourceEvent.setLocation(location);
 
@@ -271,7 +272,6 @@ class LocationEventServiceTest {
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
         doNothing().when(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.PARTNER);
-        when(authorizationService.isPartnerOrAdmin(user)).thenReturn(true);
         when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
             ServiceEvent event = invocation.getArgument(0);
             event.setId(45L);
@@ -296,7 +296,7 @@ class LocationEventServiceTest {
         verify(auditService).recordCreated(eq(5L), any(ServiceEvent.class));
         verify(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         verify(correctiveActionEmailService).sendCorrectiveActionWorkOrderEmail(
-            eq(99L),
+            eq(location),
             eq(sourceEvent),
             any(ServiceEvent.class),
             eq(user)
@@ -305,10 +305,12 @@ class LocationEventServiceTest {
     }
 
     @Test
-    void createCorrectiveActionSkipsEmailForClients() {
+    void createCorrectiveActionSubmitsWorkOrderEmailForClients() {
         AppUser user = verifiedUser(5L);
         Location location = new Location();
         location.setId(99L);
+        location.setName("Austin");
+        location.setWorkOrderEmail("work-orders@example.com");
         ServiceEvent sourceEvent = serviceEvent(44L, "Source Event");
         sourceEvent.setLocation(location);
         sourceEvent.setResponsibility(ServiceEventResponsibility.CLIENT);
@@ -317,7 +319,6 @@ class LocationEventServiceTest {
         when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
         doNothing().when(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
         doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.CLIENT);
-        when(authorizationService.isPartnerOrAdmin(user)).thenReturn(false);
         when(serviceEventRepository.saveAndFlush(any(ServiceEvent.class))).thenAnswer(invocation -> {
             ServiceEvent event = invocation.getArgument(0);
             event.setId(45L);
@@ -336,6 +337,41 @@ class LocationEventServiceTest {
         assertTrue(response.correctiveAction());
         assertEquals(44L, response.correctiveActionSourceEventId());
         verify(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
+        verify(correctiveActionEmailService).sendCorrectiveActionWorkOrderEmail(
+            eq(location),
+            eq(sourceEvent),
+            any(ServiceEvent.class),
+            eq(user)
+        );
+    }
+
+    @Test
+    void createCorrectiveActionRejectsMissingWorkOrderEmailBeforePersistence() {
+        AppUser user = verifiedUser(5L);
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Austin");
+        ServiceEvent sourceEvent = serviceEvent(44L, "Source Event");
+        sourceEvent.setLocation(location);
+        sourceEvent.setResponsibility(ServiceEventResponsibility.CLIENT);
+
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        when(serviceEventRepository.findByIdAndLocation_Id(44L, 99L)).thenReturn(Optional.of(sourceEvent));
+        doNothing().when(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
+        doNothing().when(authorizationService).requireCreatePermission(user, 99L, ServiceEventResponsibility.CLIENT);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationEventService.createCorrectiveActionForLocationEvent(
+                5L,
+                99L,
+                44L,
+                request("Corrective Action", "Fix it", ServiceEventResponsibility.CLIENT)
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Location work-order email is required", ex.getReason());
+        verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
         verify(correctiveActionEmailService, never()).sendCorrectiveActionWorkOrderEmail(any(), any(), any(), any());
     }
 

@@ -271,7 +271,8 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$[0].id").value(47))
             .andExpect(jsonPath("$[0].data[0].type").value("bar"))
             .andExpect(jsonPath("$[0].data[0].name").value("Sessions"))
-            .andExpect(jsonPath("$[0].data[0].y[0]").value(4))
+            .andExpect(jsonPath("$[0].data[0].orientation").value("h"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").value(4))
             .andExpect(jsonPath("$[0].layout.showlegend").value(true))
             .andExpect(jsonPath("$[0].config.responsive").value(true))
             .andExpect(jsonPath("$[0].style.width").value("100%"));
@@ -355,7 +356,8 @@ class LocationGraphPipelineWebMvcTest {
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
-        assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("y"));
+        assertEquals("h", traces.getFirst().get("orientation"));
+        assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("x"));
         assertEquals(Map.of("title", "Updated by backend"), graph.getLayout());
     }
 
@@ -401,9 +403,10 @@ class LocationGraphPipelineWebMvcTest {
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(2, traces.size());
         assertEquals("Actual", traces.get(0).get("name"));
-        assertEquals(List.of(9L), traces.get(0).get("y"));
+        assertEquals("h", traces.get(0).get("orientation"));
+        assertEquals(List.of(9L), traces.get(0).get("x"));
         assertEquals("Forecast", traces.get(1).get("name"));
-        assertEquals(List.of(12L), traces.get(1).get("y"));
+        assertEquals(List.of(12L), traces.get(1).get("x"));
     }
 
     @Test
@@ -452,6 +455,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].type").value("bar"))
             .andExpect(jsonPath("$.data[0].name").value("Trace 1"))
             .andExpect(jsonPath("$.data[0].marker.color").value("#1f77b4"))
+            .andExpect(jsonPath("$.data[0].orientation").value("h"))
             .andExpect(jsonPath("$.data[0].x").isArray())
             .andExpect(jsonPath("$.data[0].x").isEmpty())
             .andExpect(jsonPath("$.data[0].y").isArray())
@@ -632,6 +636,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.name").value("New Bar Graph"))
             .andExpect(jsonPath("$.data[0].type").value("bar"))
             .andExpect(jsonPath("$.data[0].marker.color").value("#1f77b4"))
+            .andExpect(jsonPath("$.data[0].orientation").value("h"))
             .andExpect(jsonPath("$.data[0].x").isArray())
             .andExpect(jsonPath("$.data[0].x").isEmpty())
             .andExpect(jsonPath("$.data[0].y").isArray())

@@ -8,6 +8,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Async;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class MailSendingService {
      * @param expiresInSeconds time-to-live for the code in seconds
      * @throws MailException when the underlying mail transport fails
      */
+    @Async("mailTaskExecutor")
     public void sendRecoveryEmail(String toEmail, String recoveryCode, long expiresInSeconds) {
         MimeMessagePreparator preparator = mimeMessage -> {
             MimeMessageHelper helper = new MimeMessageHelper(
@@ -70,6 +72,7 @@ public class MailSendingService {
     /**
      * Sends verification email. Similar in structure to sendRecoveryEmail.
      */
+    @Async("mailTaskExecutor")
     public void sendVerificationEmail(String toEmail, String verificationCode, long expiresInSeconds) {
         MimeMessagePreparator preparator = mimeMessage -> {
             MimeMessageHelper helper = new MimeMessageHelper(

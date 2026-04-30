@@ -81,6 +81,20 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void handleResponseStatusMapsMissingLocationWorkOrderEmailReason() {
+        ResponseStatusException exception = new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "Location work-order email is required"
+        );
+
+        ResponseEntity<ApiErrorResponse> response = apiExceptionHandler.handleResponseStatus(exception);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("location_work_order_email_required", response.getBody().code());
+        assertEquals("Location work-order email is required", response.getBody().message());
+    }
+
+    @Test
     void handleUnexpectedSuppressesNoResourceStackTraceInMainLog() {
         NoResourceFoundException exception = new NoResourceFoundException(
             HttpMethod.GET,

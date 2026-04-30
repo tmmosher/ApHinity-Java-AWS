@@ -750,6 +750,7 @@ class LocationServiceTest {
 
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(savedGraphHolder[0].getData());
         assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals("h", traces.getFirst().get("orientation"));
         assertEquals(List.of(), traces.getFirst().get("x"));
         assertEquals(List.of(), traces.getFirst().get("y"));
         assertEquals(Map.of("color", LEGACY_GRAPH_COLOR), traces.getFirst().get("marker"));
@@ -1177,7 +1178,8 @@ class LocationServiceTest {
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
-        assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("y"));
+        assertEquals("h", traces.getFirst().get("orientation"));
+        assertEquals(List.of(9L, 8L, 7L), traces.getFirst().get("x"));
         assertEquals(Map.of("title", "Updated layout"), graph.getLayout());
         assertEquals(Map.of("displayModeBar", false), graph.getConfig());
         assertEquals(Map.of("height", 240), graph.getStyle());
@@ -1215,9 +1217,10 @@ class LocationServiceTest {
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(2, traces.size());
         assertEquals("Actual", traces.get(0).get("name"));
-        assertEquals(List.of(9L), traces.get(0).get("y"));
+        assertEquals("h", traces.get(0).get("orientation"));
+        assertEquals(List.of(9L), traces.get(0).get("x"));
         assertEquals("Forecast", traces.get(1).get("name"));
-        assertEquals(List.of(12L), traces.get(1).get("y"));
+        assertEquals(List.of(12L), traces.get(1).get("x"));
         assertEquals(Map.of("title", "Original layout"), graph.getLayout());
     }
 

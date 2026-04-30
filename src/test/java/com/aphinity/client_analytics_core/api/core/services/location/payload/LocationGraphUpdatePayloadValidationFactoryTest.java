@@ -51,6 +51,18 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateAcceptsHorizontalBarPayloads() {
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(horizontalBarTrace(3, 5)),
+            List.of(horizontalBarTrace(4, 6)),
+            Map.of("showlegend", false)
+        );
+
+        assertEquals(List.of(horizontalBarTrace(4, 6)), payload.data());
+        assertEquals(Map.of("showlegend", false), payload.layout());
+    }
+
+    @Test
     void validateForUpdateRejectsGraphTypeChanges() {
         assertThrows(IllegalArgumentException.class, () ->
             factory.validateForUpdate(
@@ -164,6 +176,16 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
             "x", List.of("Jan", "Feb", "Mar"),
             "y", values.length == 0 ? List.of() : toIntegerList(values),
             "marker", Map.of("color", "#1f77b4")
+        );
+    }
+
+    private Map<String, Object> horizontalBarTrace(int... values) {
+        return Map.of(
+            "type", "bar",
+            "x", values.length == 0 ? List.of() : toIntegerList(values),
+            "y", List.of("Jan", "Feb"),
+            "marker", Map.of("color", "#1f77b4"),
+            "orientation", "h"
         );
     }
 

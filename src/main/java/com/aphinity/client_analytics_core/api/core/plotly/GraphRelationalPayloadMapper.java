@@ -117,7 +117,11 @@ public final class GraphRelationalPayloadMapper {
         graphTrace.setTraceType(canonicalType);
         graphTrace.setTraceOrder(index);
         graphTrace.setDataMode(resolveDataMode(canonicalType, trace));
-        graphTrace.setTraceConfig(extractTraceConfig(trace));
+        Map<String, Object> traceConfig = extractTraceConfig(trace);
+        if ("bar".equals(canonicalType)) {
+            traceConfig.put("orientation", "h");
+        }
+        graphTrace.setTraceConfig(traceConfig);
 
         ensureCategoryPoints(graphTrace);
         ensureTimeSeriesPoints(graphTrace);
@@ -164,11 +168,26 @@ public final class GraphRelationalPayloadMapper {
                     : resolveNumericValue(point.getValueNumeric(), point.getValueText());
                 result.put("value", value);
             }
-            case "bar", "scatter" -> {
+            case "bar" -> {
                 List<Object> xValues = new ArrayList<>();
                 List<Object> yValues = new ArrayList<>();
 
-                if ("scatter".equals(trace.getTraceType()) && "time_series".equals(trace.getDataMode())) {
+                for (GraphCategoryPoint point : trace.getCategoryPoints()) {
+                    xValues.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
+                    yValues.add(resolveLabelValue(point));
+                }
+
+                result.putAll(Map.of(
+                    "orientation", "h",
+                    "x", List.copyOf(xValues),
+                    "y", List.copyOf(yValues)
+                ));
+            }
+            case "scatter" -> {
+                List<Object> xValues = new ArrayList<>();
+                List<Object> yValues = new ArrayList<>();
+
+                if ("time_series".equals(trace.getDataMode())) {
                     for (GraphTimeSeriesPoint point : trace.getTimeSeriesPoints()) {
                         xValues.add(resolveXValue(point.getPointMeta(), point.getObservedAt()));
                         yValues.add(resolveNumericValue(point.getYNumeric(), point.getYText()));
@@ -243,14 +262,18 @@ public final class GraphRelationalPayloadMapper {
     }
 
     private static void populateCartesianPoints(GraphTrace graphTrace, Map<String, Object> trace) {
+        List<?> xValues = optionalList(trace, "x");
+        if (xValues == null) {
+            xValues = List.of();
+        }
         List<?> yValues = optionalList(trace, "y");
         if (yValues == null) {
             yValues = List.of();
         }
-        List<?> xValues = optionalList(trace, "x");
-        boolean hasExplicitX = xValues != null && !xValues.isEmpty();
+        boolean hasExplicitX = !xValues.isEmpty();
+        boolean horizontalBarTrace = "bar".equals(resolveCanonicalTraceType(trace)) && isHorizontalBarTrace(trace);
 
-        if (hasExplicitX && yValues.isEmpty()) {
+        if (!horizontalBarTrace && hasExplicitX && yValues.isEmpty()) {
             throw new IllegalArgumentException("Graph data is invalid");
         }
 
@@ -262,19 +285,41 @@ public final class GraphRelationalPayloadMapper {
 
         for (int index = 0; index < yValues.size(); index++) {
             GraphCategoryPoint point = categoryPointAt(graphTrace, index);
+            Object rawX = hasExplicitX && index < xValues.size() ? xValues.get(index) : index;
             Object rawY = yValues.get(index);
+            point.setPointOrder(index);
+
+            if (horizontalBarTrace) {
+                if (!(rawX instanceof Number number)) {
+                    throw new IllegalArgumentException("Graph data is invalid");
+                }
+                point.setCategoryKey(String.valueOf(rawY));
+                point.setCategoryLabel(rawY instanceof String ? (String) rawY : String.valueOf(rawY));
+                point.setValueNumeric(toBigDecimal(number));
+                point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, point.getCategoryLabel()));
+                continue;
+            }
+
             if (!(rawY instanceof Number number)) {
                 throw new IllegalArgumentException("Graph data is invalid");
             }
 
-            Object rawX = hasExplicitX && index < xValues.size() ? xValues.get(index) : index;
             point.setCategoryKey(String.valueOf(rawX));
             point.setCategoryLabel(rawX instanceof String ? (String) rawX : String.valueOf(rawX));
-            point.setPointOrder(index);
             point.setValueNumeric(toBigDecimal(number));
-            point.setPointMeta(Map.of(INTERNAL_X_FIELD, rawX));
+            point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, point.getCategoryLabel()));
         }
         trimPoints(graphTrace.getCategoryPoints(), yValues.size());
+    }
+
+    private static boolean isHorizontalBarTrace(Map<String, Object> trace) {
+        List<?> xValues = optionalList(trace, "x");
+        List<?> yValues = optionalList(trace, "y");
+        if (xValues == null || yValues == null || xValues.isEmpty() || yValues.isEmpty()) {
+            return false;
+        }
+
+        return isNumericList(xValues) && isScalarList(yValues);
     }
 
     private static void populateTimeSeriesPoints(GraphTrace graphTrace, Map<String, Object> trace) {
@@ -466,6 +511,28 @@ public final class GraphRelationalPayloadMapper {
             throw new IllegalArgumentException("Graph data is invalid");
         }
         return list;
+    }
+
+    private static boolean isNumericList(List<?> values) {
+        for (Object value : values) {
+            if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isScalarList(List<?> values) {
+        for (Object value : values) {
+            if (value == null) {
+                continue;
+            }
+            if (value instanceof String || value instanceof Number || value instanceof Boolean) {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 
     private static BigDecimal toBigDecimal(Number number) {

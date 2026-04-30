@@ -10,9 +10,12 @@ import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.Loca
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -121,7 +124,10 @@ public class LocationEventService {
         authorizationService.requireCreateCorrectiveActionPermission(user, locationId, sourceEvent);
         authorizationService.requireCreatePermission(user, locationId, responsibility);
 
-        ServiceEvent correctiveAction = requestMapper.createServiceEvent(sourceEvent.getLocation(), request);
+        Location location = sourceEvent.getLocation();
+        requireWorkOrderEmail(location);
+
+        ServiceEvent correctiveAction = requestMapper.createServiceEvent(location, request);
         correctiveAction.setCorrectiveAction(true);
         correctiveAction.setCorrectiveActionSourceEvent(sourceEvent);
 
@@ -129,17 +135,27 @@ public class LocationEventService {
             ServiceEvent persisted = serviceEventRepository.saveAndFlush(correctiveAction);
             auditService.recordCreated(userId, persisted);
 
-            if (authorizationService.isPartnerOrAdmin(user)) {
-                correctiveActionEmailService.sendCorrectiveActionWorkOrderEmail(
-                    locationId,
-                    sourceEvent,
-                    persisted,
-                    user
-                );
-            }
-
             ServiceEventResponse response = requestMapper.toResponse(persisted);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
+            runAfterCommit(() -> {
+                try {
+                    correctiveActionEmailService.sendCorrectiveActionWorkOrderEmail(
+                        location,
+                        sourceEvent,
+                        persisted,
+                        user
+                    );
+                } catch (TaskRejectedException ex) {
+                    log.error(
+                        "Corrective action work-order email submission rejected actorUserId={} locationId={} sourceEventId={} correctiveActionId={}",
+                        userId,
+                        locationId,
+                        sourceEventId,
+                        persisted.getId(),
+                        ex
+                    );
+                }
+            });
             return response;
         } catch (RuntimeException ex) {
             log.error(
@@ -150,6 +166,31 @@ public class LocationEventService {
                 ex
             );
             throw ex;
+        }
+    }
+
+    /**
+     * Runs side effects after commit when a transaction is active.
+     */
+    private void runAfterCommit(Runnable callback) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    callback.run();
+                }
+            });
+            return;
+        }
+        callback.run();
+    }
+
+    private void requireWorkOrderEmail(Location location) {
+        // Touch the name eagerly so the detached Location snapshot remains usable in the async mail task.
+        location.getName();
+        String workOrderEmail = location.getWorkOrderEmail();
+        if (workOrderEmail == null || workOrderEmail.isBlank()) {
+            throw locationWorkOrderEmailMissing();
         }
     }
 
@@ -222,5 +263,9 @@ public class LocationEventService {
 
     private ResponseStatusException locationEventNotFound() {
         return new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Location event not found");
+    }
+
+    private ResponseStatusException locationWorkOrderEmailMissing() {
+        return new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Location work-order email is required");
     }
 }

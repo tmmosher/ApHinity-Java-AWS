@@ -74,6 +74,34 @@ class LocationGraphTemplateFactoryTest {
     }
 
     @Test
+    void createBarTemplateUsesHorizontalOrientationByDefault() {
+        LocationGraphTemplateFactory.GraphTemplate template = factory.create("bar", "Phoenix");
+
+        assertEquals("New Bar Graph", template.name());
+        assertEquals(
+            List.of(Map.of(
+                "type", "bar",
+                "name", "Trace 1",
+                "x", List.of(),
+                "y", List.of(),
+                "orientation", "h",
+                "marker", Map.of("color", "#1f77b4")
+            )),
+            template.data()
+        );
+        assertEquals(
+            Map.of(
+                "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
+                "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                "showlegend", false
+            ),
+            template.layout()
+        );
+        assertEquals(Map.of("displayModeBar", false, "responsive", false), template.config());
+        assertEquals(Map.of("height", 320), template.style());
+    }
+
+    @Test
     void createRejectsUnsupportedGraphTypes() {
         assertThrows(IllegalArgumentException.class, () -> factory.create("donut", "Phoenix"));
         assertThrows(IllegalArgumentException.class, () -> factory.create(null, "Phoenix"));

@@ -19,6 +19,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailException;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -216,6 +217,12 @@ public class AuthService {
                 );
             } catch (MailException ex) {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send verification email", ex);
+            } catch (TaskRejectedException ex) {
+                asyncLogService.log(
+                    "Verification email submission rejected | to=" + email
+                        + ", errorType=" + ex.getClass().getSimpleName()
+                        + ", errorMessage=" + sanitize(ex.getMessage())
+                );
             }
         };
         runAfterCommit(sendEmail);
@@ -362,6 +369,12 @@ public class AuthService {
                 );
             } catch (MailException ex) {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send recovery email", ex);
+            } catch (TaskRejectedException ex) {
+                asyncLogService.log(
+                    "Recovery email submission rejected | to=" + user.getEmail()
+                        + ", errorType=" + ex.getClass().getSimpleName()
+                        + ", errorMessage=" + sanitize(ex.getMessage())
+                );
             }
         };
         runAfterCommit(sendEmail);
@@ -605,6 +618,13 @@ public class AuthService {
             return;
         }
         callback.run();
+    }
+
+    private String sanitize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\r", "\\r").replace("\n", "\\n");
     }
 
     // exceptions helpers

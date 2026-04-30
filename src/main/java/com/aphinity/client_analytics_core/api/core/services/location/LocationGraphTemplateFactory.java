@@ -76,6 +76,7 @@ public class LocationGraphTemplateFactory {
                     "name", "Trace 1",
                     "x", List.of(),
                     "y", List.of(),
+                    "orientation", "h",
                     "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
                 )),
                 Map.of(

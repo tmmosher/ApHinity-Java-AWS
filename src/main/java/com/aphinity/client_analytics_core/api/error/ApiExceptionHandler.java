@@ -54,6 +54,7 @@ public class ApiExceptionHandler {
         Map.entry("Unable to send recovery email", new ErrorDefinition("recovery_email_unavailable", "Unable to send recovery email")),
         Map.entry("Unable to send verification email", new ErrorDefinition("verification_email_unavailable", "Unable to send verification email")),
         Map.entry("Unable to issue verification code", new ErrorDefinition("verification_code_issue_failed", "Unable to issue verification code")),
+        Map.entry("Location work-order email is required", new ErrorDefinition("location_work_order_email_required", "Location work-order email is required")),
         Map.entry("Account email is not verified", new ErrorDefinition("account_not_verified", "Account email is not verified")),
         Map.entry("Insufficient permissions", new ErrorDefinition("forbidden", "Insufficient permissions")),
         Map.entry("Insufficient permissions for location access", new ErrorDefinition("forbidden", "Insufficient permissions for location access")),

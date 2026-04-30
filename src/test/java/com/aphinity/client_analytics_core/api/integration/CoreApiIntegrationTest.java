@@ -934,7 +934,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(graph.getId()))
-            .andExpect(jsonPath("$[0].data[0].y[0]").value(9))
+            .andExpect(jsonPath("$[0].data[0].orientation").value("h"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").value(9))
             .andExpect(jsonPath("$[0].layout.title").value("Updated by backend"));
 
         Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
@@ -1048,7 +1049,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         Graph persisted = reloadGraph(graph.getId());
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
-        assertEquals(List.of(6L, 6L, 6L), traces.getFirst().get("y"));
+        assertEquals("h", traces.getFirst().get("orientation"));
+        assertEquals(List.of(6L, 6L, 6L), traces.getFirst().get("x"));
     }
 
     @Test
@@ -1088,8 +1090,9 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         List<Map<String, Object>> firstTraces = GraphPayloadMapper.toTraceList(updatedFirst.getData());
         List<Map<String, Object>> secondTraces = GraphPayloadMapper.toTraceList(unchangedSecond.getData());
 
-        assertEquals(List.of(9L, 8L, 7L), firstTraces.getFirst().get("y"));
-        assertEquals(List.of(4L, 5L, 6L), secondTraces.getFirst().get("y"));
+        assertEquals("h", firstTraces.getFirst().get("orientation"));
+        assertEquals(List.of(9L, 8L, 7L), firstTraces.getFirst().get("x"));
+        assertEquals(List.of(4L, 5L, 6L), secondTraces.getFirst().get("x"));
     }
 
     @Test
@@ -1447,7 +1450,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         Graph persistedPrimary = reloadGraph(primaryGraph.getId());
         List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedPrimary.getData());
-        assertEquals(List.of(9L, 8L, 7L), persistedTraces.getFirst().get("y"));
+        assertEquals("h", persistedTraces.getFirst().get("orientation"));
+        assertEquals(List.of(9L, 8L, 7L), persistedTraces.getFirst().get("x"));
     }
 
     @Test
@@ -1570,7 +1574,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         Graph persistedFirst = reloadGraph(firstGraph.getId());
         List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedFirst.getData());
-        assertEquals(List.of(1L, 2L, 3L), persistedTraces.getFirst().get("y"));
+        assertEquals("h", persistedTraces.getFirst().get("orientation"));
+        assertEquals(List.of(1L, 2L, 3L), persistedTraces.getFirst().get("x"));
     }
 
     @Test
@@ -1649,6 +1654,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
         assertEquals(1, traces.size());
         assertThat(traces.getFirst()).containsEntry("type", "bar");
+        assertThat(traces.getFirst()).containsEntry("orientation", "h");
     }
 
     private Callable<MvcResult> concurrentLocationRequestTask(

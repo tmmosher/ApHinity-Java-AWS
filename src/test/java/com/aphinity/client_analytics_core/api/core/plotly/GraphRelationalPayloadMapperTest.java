@@ -95,4 +95,22 @@ class GraphRelationalPayloadMapperTest {
 
         assertEquals("scatter", graph.getGraphType());
     }
+
+    @Test
+    void setDataNormalizesBarTracesToHorizontalOrientation() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "name", "Sessions",
+            "x", List.of("Jan", "Feb"),
+            "y", List.of(5, 7)
+        )));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals("h", traces.getFirst().get("orientation"));
+        assertEquals(List.of(5L, 7L), traces.getFirst().get("x"));
+        assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("y"));
+    }
 }
