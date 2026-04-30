@@ -9,8 +9,8 @@ import com.aphinity.client_analytics_core.api.auth.repositories.RoleRepository;
 import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
-import com.aphinity.client_analytics_core.api.auth.services.MailSendingService;
 import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
+import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
@@ -27,7 +27,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
@@ -83,7 +82,7 @@ class AuthServiceTest {
     private JdbcTemplate jdbcTemplate;
 
     @Mock
-    private MailSendingService mailSendingService;
+    private MailOutboxCommandService mailOutboxService;
 
     @Spy
     private PasswordPolicyValidator passwordPolicyValidator;
@@ -126,7 +125,11 @@ class AuthServiceTest {
     void signupCreatesClientRoleForExternalEmail() {
         when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
         when(passwordEncoder.encode("Abcd123!")).thenReturn("hashed");
-        when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> {
+            AppUser saved = invocation.getArgument(0);
+            saved.setId(42L);
+            return saved;
+        });
 
         authService.signup("user@example.com", "Abcd123!", "John","10.0.0.1", "agent");
 
@@ -140,7 +143,7 @@ class AuthServiceTest {
         Role role = saved.getRoles().iterator().next();
         assertEquals("client", role.getName());
         assertEquals(17L, role.getId());
-        verify(mailSendingService).sendVerificationEmail(eq("user@example.com"), any(), eq(600L));
+        verify(mailOutboxService).queueVerificationEmail(eq(42L), eq("user@example.com"), any(), eq(600L));
         verify(jdbcTemplate).update(
             eq("update email_verification_token set consumed_at = ? where user_id = ? and consumed_at is null"),
             any(Timestamp.class),
@@ -158,7 +161,11 @@ class AuthServiceTest {
     void signupCreatesOnlyClientRoleForAphinityEmail() {
         when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
         when(passwordEncoder.encode("Abcd123!")).thenReturn("hashed");
-        when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> {
+            AppUser saved = invocation.getArgument(0);
+            saved.setId(42L);
+            return saved;
+        });
 
         authService.signup("user@aphinitytech.com", "Abcd123!","John" ,"10.0.0.1", "agent");
 
@@ -171,7 +178,7 @@ class AuthServiceTest {
         assertEquals(Set.of("client"), saved.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toSet()));
         assertEquals(Set.of(17L), saved.getRoles().stream().map(Role::getId).collect(java.util.stream.Collectors.toSet()));
         verify(roleRepository, never()).findByName("partner");
-        verify(mailSendingService).sendVerificationEmail(eq("user@aphinitytech.com"), any(), eq(600L));
+        verify(mailOutboxService).queueVerificationEmail(eq(42L), eq("user@aphinitytech.com"), any(), eq(600L));
     }
 
     @Test
@@ -453,7 +460,7 @@ class AuthServiceTest {
             anyString(),
             any(Timestamp.class)
         );
-        verify(mailSendingService).sendRecoveryEmail(eq("user@example.com"), any(), eq(3600L));
+        verify(mailOutboxService).queueRecoveryEmail(eq(42L), eq("user@example.com"), any(), eq(3600L));
     }
 
     @Test
@@ -530,7 +537,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void issueAndSendVerificationCodeWritesTokenAndSendsEmail() {
+    void issueAndSendVerificationCodeWritesTokenAndQueuesEmail() {
         authService.issueAndSendVerificationCode(42L, "user@example.com");
 
         verify(jdbcTemplate).update(
@@ -544,14 +551,17 @@ class AuthServiceTest {
             anyString(),
             any(Timestamp.class)
         );
-        verify(mailSendingService).sendVerificationEmail(eq("user@example.com"), anyString(), eq(600L));
+        verify(mailOutboxService).queueVerificationEmail(eq(42L), eq("user@example.com"), anyString(), eq(600L));
     }
 
     @Test
-    void issueAndSendVerificationCodeFailsWhenMailDeliveryFails() {
-        MailException deliveryFailure = new MailException("smtp unavailable") {};
-        doThrow(deliveryFailure).when(mailSendingService)
-            .sendVerificationEmail(eq("user@example.com"), anyString(), eq(600L));
+    void issueAndSendVerificationCodeFailsWhenOutboxQueueFails() {
+        ResponseStatusException queueFailure = new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Unable to send verification email"
+        );
+        doThrow(queueFailure).when(mailOutboxService)
+            .queueVerificationEmail(eq(42L), eq("user@example.com"), anyString(), eq(600L));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             authService.issueAndSendVerificationCode(42L, "user@example.com")

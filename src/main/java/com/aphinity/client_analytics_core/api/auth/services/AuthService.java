@@ -9,6 +9,7 @@ import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
+import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.slf4j.Logger;
@@ -18,13 +19,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mail.MailException;
-import org.springframework.core.task.TaskRejectedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
@@ -63,7 +60,7 @@ public class AuthService {
     private final LoginAttemptService loginAttemptService;
     private final TurnstileValidationService turnstileValidationService;
     private final JdbcTemplate jdbcTemplate;
-    private final MailSendingService mailSendingService;
+    private final MailOutboxCommandService mailOutboxCommandService;
     private final AsyncLogService asyncLogService;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -86,7 +83,7 @@ public class AuthService {
             LoginAttemptService loginAttemptService,
             TurnstileValidationService turnstileValidationService,
             JdbcTemplate jdbcTemplate,
-            MailSendingService mailSendingService,
+            MailOutboxCommandService mailOutboxCommandService,
             AsyncLogService asyncLogService)
     {
         this.appUserRepository = appUserRepository;
@@ -98,7 +95,7 @@ public class AuthService {
         this.loginAttemptService = loginAttemptService;
         this.turnstileValidationService = turnstileValidationService;
         this.jdbcTemplate = jdbcTemplate;
-        this.mailSendingService = mailSendingService;
+        this.mailOutboxCommandService = mailOutboxCommandService;
         this.asyncLogService = asyncLogService;
     }
 
@@ -199,33 +196,22 @@ public class AuthService {
     }
 
     /**
-     * Issues a new email verification code and delivers it to the provided address.
+     * Issues a new email verification code and queues it for delivery to the provided address.
      * Existing active verification codes for the same user are consumed first so only one
      * verification code remains active at a time.
      *
      * @param userId account id receiving the verification code
      * @param email destination email address
      */
+    @Transactional
     public void issueAndSendVerificationCode(Long userId, String email) {
         String verificationCode = issueVerificationCode(userId);
-        Runnable sendEmail = () -> {
-            try {
-                mailSendingService.sendVerificationEmail(
-                    email,
-                    verificationCode,
-                    verificationTokenTtlSeconds
-                );
-            } catch (MailException ex) {
-                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send verification email", ex);
-            } catch (TaskRejectedException ex) {
-                asyncLogService.log(
-                    "Verification email submission rejected | to=" + email
-                        + ", errorType=" + ex.getClass().getSimpleName()
-                        + ", errorMessage=" + sanitize(ex.getMessage())
-                );
-            }
-        };
-        runAfterCommit(sendEmail);
+        mailOutboxCommandService.queueVerificationEmail(
+            userId,
+            email,
+            verificationCode,
+            verificationTokenTtlSeconds
+        );
     }
 
     /**
@@ -329,7 +315,7 @@ public class AuthService {
     }
 
     /**
-     * Creates a one-time recovery code and delivers it to the account email.
+     * Creates a one-time recovery code and queues it for delivery to the account email.
      * The method is intentionally tolerant of unknown emails to avoid account enumeration.
      *
      * @param email normalized email address for the user
@@ -360,24 +346,12 @@ public class AuthService {
             return;
         }
 
-        Runnable sendEmail = () -> {
-            try {
-                mailSendingService.sendRecoveryEmail(
-                    user.getEmail(),
-                    recoveryCode,
-                    recoveryTokenTtlSeconds
-                );
-            } catch (MailException ex) {
-                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unable to send recovery email", ex);
-            } catch (TaskRejectedException ex) {
-                asyncLogService.log(
-                    "Recovery email submission rejected | to=" + user.getEmail()
-                        + ", errorType=" + ex.getClass().getSimpleName()
-                        + ", errorMessage=" + sanitize(ex.getMessage())
-                );
-            }
-        };
-        runAfterCommit(sendEmail);
+        mailOutboxService.queueRecoveryEmail(
+            user.getId(),
+            user.getEmail(),
+            recoveryCode,
+            recoveryTokenTtlSeconds
+        );
     }
 
     /**
@@ -601,30 +575,6 @@ public class AuthService {
             tokenId
         );
         return updated != 0 && expiresAt.isAfter(now);
-    }
-
-    /**
-     * Runs side effects after commit when a transaction is active.
-     */
-    private void runAfterCommit(Runnable callback) {
-        // Send only after commit so recipients never get a code that failed to persist.
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    callback.run();
-                }
-            });
-            return;
-        }
-        callback.run();
-    }
-
-    private String sanitize(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("\r", "\\r").replace("\n", "\\n");
     }
 
     // exceptions helpers

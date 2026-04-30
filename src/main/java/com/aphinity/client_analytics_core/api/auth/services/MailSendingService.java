@@ -1,6 +1,9 @@
 package com.aphinity.client_analytics_core.api.auth.services;
 
+import com.aphinity.client_analytics_core.api.notifications.MailDraft;
+import com.aphinity.client_analytics_core.api.notifications.MailTemplateService;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
+import jakarta.mail.Address;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSendException;
@@ -8,31 +11,37 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Service;
-import org.springframework.scheduling.annotation.Async;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Handles outbound auth-related emails and structured diagnostics for mail failures.
+ * High-level callers should prefer the mail outbox command and delivery services; this
+ * class only performs the low-level transport step and diagnostic logging.
  */
 @Service
 public class MailSendingService {
-    private static final String RECOVERY_EMAIL_SUBJECT = "Password reset";
-    private static final String VERIFICATION_EMAIL_SUBJECT = "Account verification";
     private static final int MAX_CAUSE_DEPTH = 6;
 
     private final JavaMailSender mailSender;
     private final AsyncLogService logService;
+    private final MailTemplateService mailTemplateService;
 
     @Value("${app.recovery.from-email}")
     private String serviceFromEmail;
 
-    public MailSendingService(JavaMailSender mailSender, AsyncLogService logService) {
+    public MailSendingService(
+        JavaMailSender mailSender,
+        AsyncLogService logService,
+        MailTemplateService mailTemplateService
+    ) {
         this.mailSender = mailSender;
         this.logService = logService;
+        this.mailTemplateService = mailTemplateService;
     }
 
     /**
@@ -43,8 +52,28 @@ public class MailSendingService {
      * @param expiresInSeconds time-to-live for the code in seconds
      * @throws MailException when the underlying mail transport fails
      */
-    @Async("mailTaskExecutor")
     public void sendRecoveryEmail(String toEmail, String recoveryCode, long expiresInSeconds) {
+        sendPlainTextEmail(toEmail, mailTemplateService.buildRecoveryDraft(recoveryCode, expiresInSeconds));
+    }
+
+    /**
+     * Sends verification email. Similar in structure to sendRecoveryEmail.
+     */
+    public void sendVerificationEmail(String toEmail, String verificationCode, long expiresInSeconds) {
+        sendPlainTextEmail(toEmail, mailTemplateService.buildVerificationDraft(verificationCode, expiresInSeconds));
+    }
+
+    /**
+     * Sends an already composed plain-text mail draft.
+     *
+     * @param toEmail recipient email address
+     * @param draft composed mail content
+     */
+    public void sendPlainTextEmail(String toEmail, MailDraft draft) {
+        sendPlainTextEmail(toEmail, draft.subject(), draft.body());
+    }
+
+    private void sendPlainTextEmail(String toEmail, String subject, String body) {
         MimeMessagePreparator preparator = mimeMessage -> {
             MimeMessageHelper helper = new MimeMessageHelper(
                 mimeMessage,
@@ -53,69 +82,20 @@ public class MailSendingService {
             );
             helper.setTo(toEmail);
             helper.setFrom(serviceFromEmail);
-            helper.setSubject(RECOVERY_EMAIL_SUBJECT);
-            helper.setText(buildRecoveryEmailBody(recoveryCode, expiresInSeconds), false);
+            helper.setSubject(subject);
+            helper.setText(body, false);
         };
         try {
             mailSender.send(preparator);
         } catch (MailException ex) {
-            // Log high-signal diagnostic metadata for operations without exposing stack traces to clients.
+            // Log high-signal diagnostic metadata for operators. Client-facing errors stay sanitized separately.
             logService.log(
-                "Recovery email send failed | to=" + safeValue(toEmail)
+                "Mail send failed | to=" + safeValue(toEmail)
                     + ", from=" + safeValue(serviceFromEmail)
                     + ", details={" + describeMailException(ex) + "}"
             );
             throw ex;
         }
-    }
-
-    /**
-     * Sends verification email. Similar in structure to sendRecoveryEmail.
-     */
-    @Async("mailTaskExecutor")
-    public void sendVerificationEmail(String toEmail, String verificationCode, long expiresInSeconds) {
-        MimeMessagePreparator preparator = mimeMessage -> {
-            MimeMessageHelper helper = new MimeMessageHelper(
-                    mimeMessage,
-                    true,
-                    StandardCharsets.UTF_8.name()
-            );
-            helper.setTo(toEmail);
-            helper.setFrom(serviceFromEmail);
-            helper.setSubject(VERIFICATION_EMAIL_SUBJECT);
-            helper.setText(buildVerificationEmailBody(verificationCode, expiresInSeconds), false);
-        };
-        try {
-            mailSender.send(preparator);
-        } catch (MailException ex) {
-            logService.log(
-                "Verification email send failed | to=" + safeValue(toEmail)
-                    + ", from=" + safeValue(serviceFromEmail)
-                    + ", details={" + describeMailException(ex) + "}"
-            );
-            throw ex;
-        }
-    }
-
-    /**
-     * Builds the plain-text recovery message body.
-     */
-    private String buildRecoveryEmailBody(String recoveryCode, long expiresInSeconds) {
-        long expiresInMinutes = Math.max(1, expiresInSeconds / 60);
-        return "We received a request to reset your password.\n\n"
-            + "Use this recovery code to continue:\n"
-            + recoveryCode + "\n\n"
-            + "This code expires in " + expiresInMinutes + " minutes.\n\n"
-            + "If you did not request a password reset, you can ignore this email.";
-    }
-
-    private String buildVerificationEmailBody(String verifyCode, long expiresInSeconds) {
-        long expiresInMinutes = Math.max(1, expiresInSeconds / 60);
-        return "Welcome to ApHinity Management Systems!\n\n"
-            + "Use this verification code in your profile to continue:\n"
-            + verifyCode + "\n\n"
-            + "This code expires in " + expiresInMinutes + " minutes.\n\n"
-            + "If you did not request verification, you can ignore this email.";
     }
 
     /**
@@ -161,11 +141,54 @@ public class MailSendingService {
         List<String> formatted = new ArrayList<>();
         for (Map.Entry<Object, Exception> entry : failedMessages.entrySet()) {
             formatted.add(
-                "mimeMessage=" + entry.getKey()
+                "mimeMessage=" + describeFailedMessage(entry.getKey())
                     + ", error=" + formatThrowable(entry.getValue())
             );
         }
         details.append(", failedMessages=").append(formatted);
+    }
+
+    /**
+     * Produces a descriptive representation of a failed transport payload.
+     */
+    private String describeFailedMessage(Object message) {
+        if (message instanceof jakarta.mail.internet.MimeMessage mimeMessage) {
+            return describeMimeMessage(mimeMessage);
+        }
+        return safeValue(String.valueOf(message));
+    }
+
+    /**
+     * Extracts a compact, operator-friendly summary from a MIME message.
+     */
+    private String describeMimeMessage(jakarta.mail.internet.MimeMessage mimeMessage) {
+        try {
+            return "MimeMessage{"
+                + "subject=" + safeValue(mimeMessage.getSubject())
+                + ", from=" + formatAddresses(mimeMessage.getFrom())
+                + ", to=" + formatAddresses(mimeMessage.getAllRecipients())
+                + ", contentType=" + safeValue(mimeMessage.getContentType())
+                + "}";
+        } catch (Exception ex) {
+            return "MimeMessage{describeFailed="
+                + ex.getClass().getSimpleName()
+                + "(" + safeValue(ex.getMessage()) + ")}";
+        }
+    }
+
+    private String formatAddresses(Address[] addresses) {
+        if (addresses == null || addresses.length == 0) {
+            return "[]";
+        }
+        return addresses.length == 1
+            ? "[" + safeValue(addresses[0].toString()) + "]"
+            : addressesAsString(addresses);
+    }
+
+    private String addressesAsString(Address[] addresses) {
+        return java.util.Arrays.stream(addresses)
+            .map(address -> safeValue(address.toString()))
+            .collect(Collectors.joining(", ", "[", "]"));
     }
 
     /**
@@ -204,9 +227,6 @@ public class MailSendingService {
         return type + "(" + message + ")";
     }
 
-    /**
-     * Sanitizes values for single-line structured logs.
-     */
     private String safeValue(String value) {
         if (value == null) {
             return "";

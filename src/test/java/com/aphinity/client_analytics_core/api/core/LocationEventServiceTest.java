@@ -11,11 +11,11 @@ import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.Loca
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarAuthorizationService;
-import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCorrectiveActionEmailService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarImportService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarTemplateService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventAuditService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventRequestMapper;
+import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,7 +75,7 @@ class LocationEventServiceTest {
     private ServiceEventAuditService auditService;
 
     @Mock
-    private ServiceCorrectiveActionEmailService correctiveActionEmailService;
+    private MailOutboxCommandService mailOutboxService;
 
     @InjectMocks
     private LocationEventService locationEventService;
@@ -259,7 +259,7 @@ class LocationEventServiceTest {
     }
 
     @Test
-    void createCorrectiveActionPersistsWithBacklinkAndSendsWorkOrderEmailForPartnerAdmin() {
+    void createCorrectiveActionPersistsWithBacklinkAndQueuesWorkOrderEmailForPartnerAdmin() {
         AppUser user = verifiedUser(5L);
         Location location = new Location();
         location.setId(99L);
@@ -295,17 +295,18 @@ class LocationEventServiceTest {
         verify(serviceEventRepository).saveAndFlush(any(ServiceEvent.class));
         verify(auditService).recordCreated(eq(5L), any(ServiceEvent.class));
         verify(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
-        verify(correctiveActionEmailService).sendCorrectiveActionWorkOrderEmail(
-            eq(location),
-            eq(sourceEvent),
-            any(ServiceEvent.class),
-            eq(user)
+        verify(mailOutboxService).queueWorkOrderEmail(
+            eq(5L),
+            eq("Austin"),
+            eq("work-orders@example.com"),
+            eq("Corrective Action"),
+            eq("Fix it")
         );
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
     @Test
-    void createCorrectiveActionSubmitsWorkOrderEmailForClients() {
+    void createCorrectiveActionQueuesWorkOrderEmailForClients() {
         AppUser user = verifiedUser(5L);
         Location location = new Location();
         location.setId(99L);
@@ -337,11 +338,12 @@ class LocationEventServiceTest {
         assertTrue(response.correctiveAction());
         assertEquals(44L, response.correctiveActionSourceEventId());
         verify(authorizationService).requireCreateCorrectiveActionPermission(user, 99L, sourceEvent);
-        verify(correctiveActionEmailService).sendCorrectiveActionWorkOrderEmail(
-            eq(location),
-            eq(sourceEvent),
-            any(ServiceEvent.class),
-            eq(user)
+        verify(mailOutboxService).queueWorkOrderEmail(
+            eq(5L),
+            eq("Austin"),
+            eq("work-orders@example.com"),
+            eq("Corrective Action"),
+            eq("Fix it")
         );
     }
 
@@ -372,7 +374,7 @@ class LocationEventServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Location work-order email is required", ex.getReason());
         verify(serviceEventRepository, never()).saveAndFlush(any(ServiceEvent.class));
-        verify(correctiveActionEmailService, never()).sendCorrectiveActionWorkOrderEmail(any(), any(), any(), any());
+        verify(mailOutboxService, never()).queueWorkOrderEmail(any(), any(), any(), any(), any());
     }
 
     @Test

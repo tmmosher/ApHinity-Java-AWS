@@ -95,6 +95,20 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void handleResponseStatusMapsWorkOrderEmailDeliveryReason() {
+        ResponseStatusException exception = new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Unable to send work-order email"
+        );
+
+        ResponseEntity<ApiErrorResponse> response = apiExceptionHandler.handleResponseStatus(exception);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertEquals("work_order_email_unavailable", response.getBody().code());
+        assertEquals("Unable to send work-order email", response.getBody().message());
+    }
+
+    @Test
     void handleUnexpectedSuppressesNoResourceStackTraceInMainLog() {
         NoResourceFoundException exception = new NoResourceFoundException(
             HttpMethod.GET,

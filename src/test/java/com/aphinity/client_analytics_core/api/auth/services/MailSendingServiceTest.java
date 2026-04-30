@@ -1,7 +1,10 @@
 package com.aphinity.client_analytics_core.api.auth.services;
 
+import com.aphinity.client_analytics_core.api.notifications.MailTemplateService;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.mail.Session;
+import jakarta.mail.Message;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +45,7 @@ class MailSendingServiceTest {
 
     @BeforeEach
     void setUp() {
-        mailSendingService = new MailSendingService(mailSender, logService);
+        mailSendingService = new MailSendingService(mailSender, logService, new MailTemplateService());
         ReflectionTestUtils.setField(mailSendingService, "serviceFromEmail", "no-reply@example.com");
     }
 
@@ -78,7 +81,7 @@ class MailSendingServiceTest {
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logService).log(logCaptor.capture());
         String logLine = logCaptor.getValue();
-        assertTrue(logLine.contains("Verification email send failed"));
+        assertTrue(logLine.contains("Mail send failed"));
         assertTrue(logLine.contains("smtp\\ndown"));
         assertTrue(logLine.contains("client@example.com\\nalias"));
     }
@@ -119,7 +122,7 @@ class MailSendingServiceTest {
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logService).log(logCaptor.capture());
         String logLine = logCaptor.getValue();
-        assertTrue(logLine.contains("Recovery email send failed"));
+        assertTrue(logLine.contains("Mail send failed"));
         assertFalse(logLine.contains("messageExceptions="));
         assertFalse(logLine.contains("failedMessages="));
     }
@@ -145,9 +148,42 @@ class MailSendingServiceTest {
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logService).log(logCaptor.capture());
         String logLine = logCaptor.getValue();
-        assertTrue(logLine.contains("Recovery email send failed"));
+        assertTrue(logLine.contains("Mail send failed"));
         assertTrue(logLine.contains("messageExceptions="));
         assertTrue(logLine.contains("failedMessages="));
         assertTrue(logLine.contains("causeChain="));
+    }
+
+    @Test
+    void sendRecoveryEmailLogsMimeMessageDiagnosticsForFailedTransportPayloads() throws Exception {
+        MailSendException exception = mock(MailSendException.class);
+        MimeMessage failedMimeMessage = new MimeMessage(Session.getInstance(new Properties()));
+        failedMimeMessage.setFrom(new InternetAddress("no-reply@example.com"));
+        failedMimeMessage.setRecipients(Message.RecipientType.TO, "client@example.com");
+        failedMimeMessage.setSubject("Password reset");
+        failedMimeMessage.setText("body", StandardCharsets.UTF_8.name());
+
+        Map<Object, Exception> failedMessages = new HashMap<>();
+        failedMessages.put(failedMimeMessage, new IllegalStateException("smtp unavailable"));
+
+        org.mockito.Mockito.when(exception.getMessage()).thenReturn("send failed");
+        org.mockito.Mockito.when(exception.getMessageExceptions()).thenReturn(new Exception[0]);
+        org.mockito.Mockito.when(exception.getFailedMessages()).thenReturn(failedMessages);
+        org.mockito.Mockito.when(exception.getCause()).thenReturn(null);
+
+        doThrow(exception).when(mailSender).send(any(MimeMessagePreparator.class));
+
+        assertThrows(MailSendException.class, () ->
+            mailSendingService.sendRecoveryEmail("client@example.com", "R-123", 300)
+        );
+
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        verify(logService).log(logCaptor.capture());
+        String logLine = logCaptor.getValue();
+        assertTrue(logLine.contains("Mail send failed"));
+        assertTrue(logLine.contains("MimeMessage{"));
+        assertTrue(logLine.contains("subject=Password reset"));
+        assertTrue(logLine.contains("from=[no-reply@example.com]"));
+        assertTrue(logLine.contains("to=[client@example.com]"));
     }
 }

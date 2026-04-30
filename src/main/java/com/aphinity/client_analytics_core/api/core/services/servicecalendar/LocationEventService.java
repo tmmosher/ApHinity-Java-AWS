@@ -6,16 +6,14 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.task.TaskRejectedException;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -35,7 +33,7 @@ public class LocationEventService {
     private final ServiceCalendarTemplateService templateService;
     private final ServiceCalendarImportService importService;
     private final ServiceEventAuditService auditService;
-    private final ServiceCorrectiveActionEmailService correctiveActionEmailService;
+    private final MailOutboxCommandService mailOutboxCommandService;
 
     public LocationEventService(
         LocationRepository locationRepository,
@@ -45,7 +43,7 @@ public class LocationEventService {
         ServiceCalendarTemplateService templateService,
         ServiceCalendarImportService importService,
         ServiceEventAuditService auditService,
-        ServiceCorrectiveActionEmailService correctiveActionEmailService
+        MailOutboxCommandService mailOutboxCommandService
     ) {
         this.locationRepository = locationRepository;
         this.serviceEventRepository = serviceEventRepository;
@@ -54,7 +52,7 @@ public class LocationEventService {
         this.templateService = templateService;
         this.importService = importService;
         this.auditService = auditService;
-        this.correctiveActionEmailService = correctiveActionEmailService;
+        this.mailOutboxCommandService = mailOutboxCommandService;
     }
 
     @Transactional(readOnly = true)
@@ -125,7 +123,8 @@ public class LocationEventService {
         authorizationService.requireCreatePermission(user, locationId, responsibility);
 
         Location location = sourceEvent.getLocation();
-        requireWorkOrderEmail(location);
+        String locationName = location.getName() == null ? null : location.getName().strip();
+        String workOrderEmail = requireWorkOrderEmail(location);
 
         ServiceEvent correctiveAction = requestMapper.createServiceEvent(location, request);
         correctiveAction.setCorrectiveAction(true);
@@ -137,29 +136,17 @@ public class LocationEventService {
 
             ServiceEventResponse response = requestMapper.toResponse(persisted);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
-            runAfterCommit(() -> {
-                try {
-                    correctiveActionEmailService.sendCorrectiveActionWorkOrderEmail(
-                        location,
-                        sourceEvent,
-                        persisted,
-                        user
-                    );
-                } catch (TaskRejectedException ex) {
-                    log.error(
-                        "Corrective action work-order email submission rejected actorUserId={} locationId={} sourceEventId={} correctiveActionId={}",
-                        userId,
-                        locationId,
-                        sourceEventId,
-                        persisted.getId(),
-                        ex
-                    );
-                }
-            });
+            mailOutboxCommandService.queueWorkOrderEmail(
+                userId,
+                locationName,
+                workOrderEmail,
+                persisted.getTitle(),
+                persisted.getDescription()
+            );
             return response;
         } catch (RuntimeException ex) {
             log.error(
-                "Corrective action creation persistence failed actorUserId={} locationId={} sourceEventId={}",
+                "Corrective action creation failed actorUserId={} locationId={} sourceEventId={}",
                 userId,
                 locationId,
                 sourceEventId,
@@ -169,29 +156,12 @@ public class LocationEventService {
         }
     }
 
-    /**
-     * Runs side effects after commit when a transaction is active.
-     */
-    private void runAfterCommit(Runnable callback) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    callback.run();
-                }
-            });
-            return;
-        }
-        callback.run();
-    }
-
-    private void requireWorkOrderEmail(Location location) {
-        // Touch the name eagerly so the detached Location snapshot remains usable in the async mail task.
-        location.getName();
+    private String requireWorkOrderEmail(Location location) {
         String workOrderEmail = location.getWorkOrderEmail();
         if (workOrderEmail == null || workOrderEmail.isBlank()) {
             throw locationWorkOrderEmailMissing();
         }
+        return workOrderEmail.strip();
     }
 
     @Transactional
