@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -79,6 +80,36 @@ class MailOutboxDeliveryServiceTest {
         assertNull(pending.getFailedAt());
         assertNull(pending.getNextAttemptAt());
         assertNull(pending.getLastError());
+    }
+
+    @Test
+    void deliverQueuedMessageRetriesAfterOneMinuteOnFailure() {
+        stubTransactions();
+
+        MailOutboxMessage pending = new MailOutboxMessage();
+        pending.setId(12L);
+        pending.setMailType(MailOutboxType.VERIFICATION);
+        pending.setRecipientEmail("client@example.com");
+        pending.setSubject("Account verification");
+        pending.setBody("Body");
+        pending.setAuthorizedUserId(41L);
+        pending.setAttemptCount(0);
+        pending.setCreatedAt(Instant.parse("2026-04-01T00:00:00Z"));
+
+        MailException failure = new MailException("smtp unavailable") {};
+        when(mailOutboxRepository.lockById(eq(12L))).thenReturn(Optional.of(pending));
+        doThrow(failure).when(mailSendingService).sendPlainTextEmail(eq("client@example.com"), any(MailDraft.class));
+
+        mailOutboxDeliveryService.deliverQueuedMessage(12L);
+
+        assertEquals(1, pending.getAttemptCount());
+        assertNotNull(pending.getLastAttemptAt());
+        assertNotNull(pending.getNextAttemptAt());
+        assertEquals(pending.getLastAttemptAt().plus(1, ChronoUnit.MINUTES), pending.getNextAttemptAt());
+        assertNull(pending.getFailedAt());
+        assertNull(pending.getConsumedAt());
+        assertNotNull(pending.getLastError());
+        assertTrue(pending.getLastError().contains("smtp unavailable"));
     }
 
     @Test

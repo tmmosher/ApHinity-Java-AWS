@@ -6,18 +6,19 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Owns the actual outbox delivery workflow, including claim, send, retry and terminal reconciliation.
+ * Owns the actual outbox delivery workflow, including claim, send, retry, and terminal reconciliation.
  */
 @Service
 public class MailOutboxDeliveryService {
     private static final int MAX_ATTEMPTS = 3;
     private static final int RETRY_BATCH_SIZE = 100;
+    private static final Duration RETRY_DELAY = Duration.ofMinutes(1);
 
     private final MailSendingService mailSendingService;
     private final MailOutboxRepository mailOutboxRepository;
@@ -153,7 +154,7 @@ public class MailOutboxDeliveryService {
                     continue;
                 }
                 // Lease the row for a retry window so a failed cleanup write cannot spin in-place.
-                message.setNextAttemptAt(now.plus(1, ChronoUnit.HOURS));
+                message.setNextAttemptAt(now.plus(RETRY_DELAY));
                 batch.add(snapshot(message));
             }
             mailOutboxRepository.saveAll(messages);
@@ -264,7 +265,7 @@ public class MailOutboxDeliveryService {
     private void claimForDelivery(MailOutboxMessage message, Instant now) {
         message.setAttemptCount(message.getAttemptCount() + 1);
         message.setLastAttemptAt(now);
-        message.setNextAttemptAt(now.plus(1, ChronoUnit.HOURS));
+        message.setNextAttemptAt(now.plus(RETRY_DELAY));
         message.setLastError(null);
     }
 

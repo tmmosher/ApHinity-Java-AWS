@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessagePreparator;
@@ -34,6 +33,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.fail;
 
 @SpringBootTest(properties = "spring.profiles.active=integration")
 class MailOutboxIntegrationTest {
@@ -52,23 +52,14 @@ class MailOutboxIntegrationTest {
     @MockitoBean
     private AsyncLogService asyncLogService;
 
-    @MockitoBean
-    private TaskExecutor mailTaskExecutor;
-
     @BeforeEach
     void setUp() {
         mailOutboxRepository.deleteAll();
-        reset(mailSender, mailTaskExecutor, asyncLogService);
-        doAnswer(invocation -> {
-            Runnable runnable = invocation.getArgument(0);
-            runnable.run();
-            return null;
-        }).when(mailTaskExecutor).execute(any(Runnable.class));
+        reset(mailSender, asyncLogService);
     }
 
     @Test
     void queueWorkOrderEmailPersistsMessageAndDeliversThroughMailTransport() throws Exception {
-        ArgumentCaptor<MimeMessagePreparator> preparatorCaptor = ArgumentCaptor.forClass(MimeMessagePreparator.class);
         doAnswer(invocation -> null).when(mailSender).send(any(MimeMessagePreparator.class));
 
         mailOutboxCommandService.queueWorkOrderEmail(
@@ -79,6 +70,9 @@ class MailOutboxIntegrationTest {
             "Inspect the west valve"
         );
 
+        MailOutboxMessage saved = awaitConsumedOutboxMessage();
+
+        ArgumentCaptor<MimeMessagePreparator> preparatorCaptor = ArgumentCaptor.forClass(MimeMessagePreparator.class);
         verify(mailSender).send(preparatorCaptor.capture());
         MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()));
         preparatorCaptor.getValue().prepare(mimeMessage);
@@ -93,7 +87,6 @@ class MailOutboxIntegrationTest {
 
         List<MailOutboxMessage> messages = mailOutboxRepository.findAll();
         assertEquals(1, messages.size());
-        MailOutboxMessage saved = messages.getFirst();
         assertEquals(MailOutboxType.WORK_ORDER, saved.getMailType());
         assertEquals(44L, saved.getAuthorizedUserId());
         assertEquals("work-orders@example.com", saved.getRecipientEmail());
@@ -105,6 +98,20 @@ class MailOutboxIntegrationTest {
         assertNull(saved.getFailedAt());
         assertNull(saved.getNextAttemptAt());
         assertNull(saved.getLastError());
+    }
+
+    private MailOutboxMessage awaitConsumedOutboxMessage() throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5_000L;
+        while (System.currentTimeMillis() < deadline) {
+            MailOutboxMessage message = mailOutboxRepository.findAll().stream().findFirst().orElse(null);
+            if (message != null && message.getConsumedAt() != null) {
+                return message;
+            }
+            Thread.sleep(25L);
+        }
+
+        fail("Timed out waiting for the outbox message to be consumed");
+        return null;
     }
 
     @Test

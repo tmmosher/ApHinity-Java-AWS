@@ -346,7 +346,7 @@ public class AuthService {
             return;
         }
 
-        mailOutboxService.queueRecoveryEmail(
+        mailOutboxCommandService.queueRecoveryEmail(
             user.getId(),
             user.getEmail(),
             recoveryCode,

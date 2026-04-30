@@ -4,7 +4,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * Spring scheduling entrypoint for hourly mail outbox retry processing.
+ * Spring scheduling entrypoint for minute-level mail outbox retry processing.
  */
 @Service
 public class MailOutboxRetryScheduler {
@@ -14,7 +14,7 @@ public class MailOutboxRetryScheduler {
         this.mailOutboxDeliveryService = mailOutboxDeliveryService;
     }
 
-    @Scheduled(cron = "0 0 * * * *", zone = "America/Phoenix")
+    @Scheduled(cron = "0 * * * * *", zone = "America/Phoenix")
     public void retryPendingMailOutbox() {
         mailOutboxDeliveryService.processPendingMailOutbox();
     }

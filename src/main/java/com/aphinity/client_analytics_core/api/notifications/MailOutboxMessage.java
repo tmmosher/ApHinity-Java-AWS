@@ -14,7 +14,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
- * Durable mail outbox row used for queued delivery and hourly retries.
+ * Durable mail outbox row used for queued delivery and retry processing.
  */
 @Entity
 @Table(name = "mail_outbox")
