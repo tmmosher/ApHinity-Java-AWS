@@ -693,6 +693,21 @@ public class LocationService {
     }
 
     /**
+     * Accepts a dashboard spreadsheet upload for future processing.
+     * This stub currently only validates access and location existence.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @param file uploaded Excel workbook
+     */
+    @Transactional(readOnly = true)
+    public void uploadLocationDashboardSpreadsheet(Long userId, Long locationId, MultipartFile file) {
+        AppUser user = requireUser(userId);
+        requirePartnerOrAdmin(user);
+        locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+    }
+
+    /**
      * Subscribes a verified user to location alerts.
      *
      * @param userId authenticated user id

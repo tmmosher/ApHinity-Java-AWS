@@ -1516,6 +1516,34 @@ class LocationServiceTest {
     }
 
     @Test
+    void uploadLocationDashboardSpreadsheetValidatesAccessWithoutProcessingFile() {
+        AppUser user = verifiedUser(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(9L);
+        location.setName("Phoenix");
+        location.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        location.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+        location.setSectionLayout(Map.of("sections", List.of()));
+        when(locationRepository.findById(9L)).thenReturn(Optional.of(location));
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "dashboard.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[] {1, 2, 3}
+        );
+
+        locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file);
+
+        verify(locationRepository).findById(9L);
+        verify(locationRepository, never()).saveAndFlush(any(Location.class));
+        verifyNoInteractions(locationThumbnailImageService, graphRepository, locationGraphRepository);
+    }
+
+    @Test
     void getAccessibleLocationThumbnailReturnsStoredWebpForAuthorizedUser() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));

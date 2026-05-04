@@ -64,6 +64,8 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
       <LocationDashboardToolbar
         canEditGraphs={canEditGraphs()}
         canManageWorkOrderEmail={canEditGraphs()}
+        apiHost={host}
+        locationId={props.locationId}
         canCreateGraphs={dashboard.canCreateGraphs()}
         isCreatingGraph={dashboard.isCreatingGraph()}
         hasPendingGraphChanges={dashboard.hasPendingDashboardChanges()}

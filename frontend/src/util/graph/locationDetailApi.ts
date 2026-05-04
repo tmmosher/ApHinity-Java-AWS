@@ -271,3 +271,40 @@ export const deleteLocationGraphById = async (
     await throwGraphMutationError(response, "delete");
   }
 };
+
+/**
+ * Uploads a dashboard spreadsheet for a location.
+ *
+ * Endpoint: `POST /api/core/locations/{locationId}/dashboard/spreadsheet-upload`
+ *
+ * @param host API host base URL.
+ * @param locationId Location id from route params.
+ * @param file Excel workbook to upload.
+ * @throws {Error} When ids are invalid or the request fails.
+ */
+export const uploadLocationDashboardSpreadsheetById = async (
+  host: string,
+  locationId: string,
+  file: File
+): Promise<void> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await apiFetch(
+    host + "/api/core/locations/" + parsedLocationId + "/dashboard/spreadsheet-upload",
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+
+  if (!response.ok) {
+    const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
+    throwAuthenticationOrSecurityError(response, errorPayload);
+    if (errorPayload?.message) {
+      throw new Error(errorPayload.message);
+    }
+    throw new Error("Unable to upload dashboard spreadsheet");
+  }
+};

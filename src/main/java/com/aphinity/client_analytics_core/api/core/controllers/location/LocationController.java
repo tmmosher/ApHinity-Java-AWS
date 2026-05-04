@@ -425,6 +425,56 @@ public class LocationController {
     }
 
     /**
+     * Accepts a dashboard spreadsheet upload for a location.
+     * The backend currently only validates access and does not process the file.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location identifier
+     * @param file uploaded Excel workbook
+     */
+    @PostMapping(path = "/locations/{locationId}/dashboard/spreadsheet-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void uploadLocationDashboardSpreadsheet(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @RequestParam("file") MultipartFile file
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        log.info(
+            "Received location dashboard spreadsheet upload request actorUserId={} locationId={} filename={} contentType={}",
+            userId,
+            locationId,
+            file == null ? null : file.getOriginalFilename(),
+            file == null ? null : file.getContentType()
+        );
+        try {
+            locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file);
+            log.info(
+                "Completed location dashboard spreadsheet upload request actorUserId={} locationId={}",
+                userId,
+                locationId
+            );
+        } catch (ResponseStatusException ex) {
+            log.warn(
+                "Rejected location dashboard spreadsheet upload request actorUserId={} locationId={} status={} reason={}",
+                userId,
+                locationId,
+                ex.getStatusCode().value(),
+                ex.getReason()
+            );
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed location dashboard spreadsheet upload request actorUserId={} locationId={}",
+                userId,
+                locationId,
+                ex
+            );
+            throw ex;
+        }
+    }
+
+    /**
      * Returns the stored thumbnail image for a location.
      *
      * @param jwt authenticated principal JWT

@@ -91,6 +91,7 @@ describe("LocationDashboardPanel", () => {
 
     expect(html).toContain("Dashboard");
     expect(html).toContain("Work Order Email");
+    expect(html).toContain("Upload Spreadsheet");
     expect(html).toContain("Add New Graph");
     expect(html).toContain("Edit Layout");
     expect(html).toContain("Apply");
@@ -98,6 +99,7 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Last updated");
     expect(html).toContain("btn h-11 min-h-11 rounded-2xl");
     expect(html).toContain("aria-label=\"More actions\"");
+    expect(html).toContain("accept=\".xlsx\"");
     expect(html).toMatch(/style="[^"]*width:2rem[^"]*height:2rem/);
   });
 });

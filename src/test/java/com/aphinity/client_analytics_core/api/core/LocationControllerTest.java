@@ -308,6 +308,26 @@ class LocationControllerTest {
     }
 
     @Test
+    void uploadLocationDashboardSpreadsheetDelegatesToServiceForAuthenticatedUser() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("42")
+            .build();
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "dashboard.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[] {1, 2, 3}
+        );
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+
+        locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file);
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
+        verify(locationService).uploadLocationDashboardSpreadsheet(42L, 8L, file);
+    }
+
+    @Test
     void locationThumbnailDelegatesToServiceForAuthenticatedUser() {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "HS256")

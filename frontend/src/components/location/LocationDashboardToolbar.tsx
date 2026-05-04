@@ -3,6 +3,8 @@ import {LocationDashboardToolbarActions} from "./LocationDashboardToolbarActions
 type LocationDashboardToolbarProps = {
   canEditGraphs: boolean;
   canManageWorkOrderEmail: boolean;
+  apiHost: string;
+  locationId: string;
   canCreateGraphs: boolean;
   isCreatingGraph: boolean;
   hasPendingGraphChanges: boolean;
@@ -29,6 +31,8 @@ export const LocationDashboardToolbar = (props: LocationDashboardToolbarProps) =
       <LocationDashboardToolbarActions
         canEditGraphs={props.canEditGraphs}
         canManageWorkOrderEmail={props.canManageWorkOrderEmail}
+        apiHost={props.apiHost}
+        locationId={props.locationId}
         canCreateGraphs={props.canCreateGraphs}
         isCreatingGraph={props.isCreatingGraph}
         hasPendingGraphChanges={props.hasPendingGraphChanges}

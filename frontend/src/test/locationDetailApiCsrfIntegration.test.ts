@@ -1,5 +1,8 @@
 import {afterAll, beforeEach, describe, expect, it, vi} from "vitest";
-import {saveLocationGraphsById} from "../util/graph/locationDetailApi";
+import {
+  saveLocationGraphsById,
+  uploadLocationDashboardSpreadsheetById
+} from "../util/graph/locationDetailApi";
 
 describe("locationDetailApi + apiFetch CSRF integration", () => {
   const originalFetch = globalThis.fetch;
@@ -96,6 +99,27 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
         }
       ])
     ).rejects.toThrowError("CSRF invalid");
+  });
+
+  it("uploads a dashboard spreadsheet as multipart form data", async () => {
+    installDocumentCookie("XSRF-TOKEN=token-fresh");
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, {status: 204}));
+
+    const file = new File(["workbook"], "dashboard.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+
+    await expect(
+      uploadLocationDashboardSpreadsheetById("https://example.test", "42", file)
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://example.test/api/core/locations/42/dashboard/spreadsheet-upload");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeInstanceOf(FormData);
+    expect((init?.headers as Headers).get("X-XSRF-TOKEN")).toBe("token-fresh");
   });
 
   afterAll(() => {

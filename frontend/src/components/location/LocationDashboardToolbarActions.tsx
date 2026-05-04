@@ -7,6 +7,8 @@ type LocationDashboardToolbarActionsProps = {
   canEditGraphs: boolean;
   canCreateGraphs: boolean;
   canManageWorkOrderEmail: boolean;
+  apiHost: string;
+  locationId: string;
   isCreatingGraph: boolean;
   hasPendingGraphChanges: boolean;
   isGraphMutationBusy: boolean;
@@ -46,6 +48,8 @@ export const LocationDashboardToolbarActions = (
         canEditGraphs={props.canEditGraphs}
         canCreateGraphs={props.canCreateGraphs}
         canManageWorkOrderEmail={props.canManageWorkOrderEmail}
+        apiHost={props.apiHost}
+        locationId={props.locationId}
         isCreatingGraph={props.isCreatingGraph}
         isGraphMutationBusy={props.isGraphMutationBusy}
         createGraphDisabledReason={props.createGraphDisabledReason}
