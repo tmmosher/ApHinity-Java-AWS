@@ -37,7 +37,32 @@ vi.mock("../components/Chart", () => ({
 
 vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
-    latestCartesianTraceEditorProps = props;
+    createRenderEffect(() => {
+      latestCartesianTraceEditorProps = {
+        heading: props.heading,
+        rowIndexes: props.rowIndexes,
+        xValues: props.xValues,
+        yValues: props.yValues,
+        xLabel: props.xLabel,
+        yLabel: props.yLabel,
+        rangeLabel: props.rangeLabel,
+        barOrientation: props.barOrientation,
+        yRangeMin: props.yRangeMin,
+        yRangeMax: props.yRangeMax,
+        xDrafts: props.xDrafts,
+        yDrafts: props.yDrafts,
+        yRangeMinDraft: props.yRangeMinDraft,
+        yRangeMaxDraft: props.yRangeMaxDraft,
+        isBusy: props.isBusy,
+        onUpdateBarOrientation: props.onUpdateBarOrientation,
+        onAddRow: props.onAddRow,
+        onUpdateX: props.onUpdateX,
+        onUpdateY: props.onUpdateY,
+        onUpdateYRangeMin: props.onUpdateYRangeMin,
+        onUpdateYRangeMax: props.onUpdateYRangeMax,
+        onRemoveRow: props.onRemoveRow
+      };
+    });
     return null;
   }
 }));
@@ -67,25 +92,27 @@ import { GraphEditorModal } from "../components/graph-editor/GraphEditorModal";
 
 const renderModal = (graph?: LocationGraph) =>
   createRoot((dispose) => {
-    createRenderEffect(() => {
-      GraphEditorModal({
-        isOpen: true,
-        graph,
-        canRenameGraph: false,
-        canDeleteGraph: false,
-        canUndo: false,
-        isDeleting: false,
-        isSaving: false,
-        onApply: vi.fn(),
-        onDeleteGraph: vi.fn().mockResolvedValue(undefined),
-        onRenameGraph: vi.fn().mockResolvedValue(undefined),
-        onUndo: vi.fn(),
-        onClose: vi.fn()
-      });
+    GraphEditorModal({
+      isOpen: true,
+      graph,
+      canRenameGraph: false,
+      canDeleteGraph: false,
+      canUndo: false,
+      isDeleting: false,
+      isSaving: false,
+      onApply: vi.fn(),
+      onDeleteGraph: vi.fn().mockResolvedValue(undefined),
+      onRenameGraph: vi.fn().mockResolvedValue(undefined),
+      onUndo: vi.fn(),
+      onClose: vi.fn()
     });
 
     return dispose;
   });
+
+const flushSolidUpdates = async () => {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+};
 
 const getTraceControlsProps = () => {
   if (!latestTraceControlsProps) {
@@ -135,10 +162,15 @@ const getCartesianTraceEditorProps = () => {
   return latestCartesianTraceEditorProps as {
     xValues: unknown[];
     yValues: unknown[];
+    xLabel?: string;
+    yLabel?: string;
+    rangeLabel?: string;
+    barOrientation?: "h" | "v";
     xDrafts: Record<number, string>;
     yDrafts: Record<number, string>;
     yRangeMinDraft?: string;
     yRangeMaxDraft?: string;
+    onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
     onUpdateX: (rowIndex: number, rawValue: string) => void;
     onUpdateY: (rowIndex: number, rawValue: string) => void;
     onUpdateYRangeMin: (rawValue: string) => void;
@@ -245,7 +277,7 @@ describe("GraphEditorModal trace controls", () => {
 
       const pieProps = getPieTraceEditorProps();
       pieProps.onUpdateValue(0, "abc");
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const updatedPieProps = getPieTraceEditorProps();
       expect(updatedPieProps.values).toEqual([3, 7]);
@@ -305,21 +337,21 @@ describe("GraphEditorModal trace controls", () => {
       expect(indicatorProps.color).toBe("#1f77b4");
 
       indicatorProps.onUpdateValue("abc");
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const updatedIndicatorProps = getIndicatorTraceEditorProps();
       expect(updatedIndicatorProps.value).toBe(68);
       expect(updatedIndicatorProps.valueDraft).toBe("abc");
 
       indicatorProps.onUpdateValue("150");
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const boundedIndicatorProps = getIndicatorTraceEditorProps();
       expect(boundedIndicatorProps.value).toBe(68);
       expect(boundedIndicatorProps.valueDraft).toBe("150");
 
       indicatorProps.onUpdateValue("1.");
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const incompleteIndicatorProps = getIndicatorTraceEditorProps();
       expect(incompleteIndicatorProps.value).toBe(68);
@@ -352,11 +384,55 @@ describe("GraphEditorModal trace controls", () => {
 
       const cartesianProps = getCartesianTraceEditorProps();
       cartesianProps.onUpdateY(0, "abc");
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const invalidProps = getCartesianTraceEditorProps();
       expect(invalidProps.yValues).toEqual([9]);
       expect(invalidProps.yDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("swaps bar trace axes when the orientation changes", async () => {
+    const barGraph: LocationGraph = {
+      id: 19,
+      name: "Counts",
+      data: [{
+        type: "bar",
+        name: "Open",
+        orientation: "h",
+        x: [3, 7],
+        y: ["North", "South"]
+      }],
+      layout: {
+        xaxis: {title: {text: "Count"}},
+        yaxis: {title: {text: "Facility"}}
+      },
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(barGraph);
+    try {
+      await Promise.resolve();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      expect(cartesianProps.barOrientation).toBe("h");
+      expect(cartesianProps.xLabel).toBe("Value");
+      expect(cartesianProps.yLabel).toBe("Category");
+
+      cartesianProps.onUpdateBarOrientation?.("v");
+      await flushSolidUpdates();
+
+      const updatedProps = getCartesianTraceEditorProps();
+      expect(updatedProps.barOrientation).toBe("v");
+      expect(updatedProps.xValues).toEqual(["North", "South"]);
+      expect(updatedProps.yValues).toEqual([3, 7]);
+      expect(updatedProps.xLabel).toBe("Category");
+      expect(updatedProps.yLabel).toBe("Value");
     } finally {
       dispose();
     }

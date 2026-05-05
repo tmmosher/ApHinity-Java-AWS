@@ -38,6 +38,7 @@ final class CartesianGraphPayloadValidator implements LocationGraphUpdateTraceVa
             throw GraphPayloadValidationSupport.invalidGraphData();
         }
 
+        String orientation = resolveBarOrientation(trace);
         List<?> yValues = GraphPayloadValidationSupport.requireListField(trace, "y");
         if (!trace.containsKey("x")) {
             GraphPayloadValidationSupport.requireNumericList(yValues);
@@ -45,6 +46,17 @@ final class CartesianGraphPayloadValidator implements LocationGraphUpdateTraceVa
         }
 
         List<?> xValues = GraphPayloadValidationSupport.requireListField(trace, "x");
+        if ("h".equals(orientation)) {
+            GraphPayloadValidationSupport.requireNumericList(xValues);
+            GraphPayloadValidationSupport.requireScalarList(yValues);
+            return;
+        }
+        if ("v".equals(orientation)) {
+            GraphPayloadValidationSupport.requireScalarList(xValues);
+            GraphPayloadValidationSupport.requireNumericList(yValues);
+            return;
+        }
+
         boolean horizontal = canValidateAsHorizontalBarTrace(xValues, yValues);
         if (horizontal) {
             GraphPayloadValidationSupport.requireNumericList(xValues);
@@ -80,5 +92,20 @@ final class CartesianGraphPayloadValidator implements LocationGraphUpdateTraceVa
         } catch (IllegalArgumentException ignored) {
             return false;
         }
+    }
+
+    private String resolveBarOrientation(Map<String, Object> trace) {
+        Object rawOrientation = trace.get("orientation");
+        if (rawOrientation == null) {
+            return null;
+        }
+        if (!(rawOrientation instanceof String orientation)) {
+            throw GraphPayloadValidationSupport.invalidGraphData();
+        }
+        String normalized = orientation.strip().toLowerCase(java.util.Locale.ROOT);
+        if ("h".equals(normalized) || "v".equals(normalized)) {
+            return normalized;
+        }
+        throw GraphPayloadValidationSupport.invalidGraphData();
     }
 }

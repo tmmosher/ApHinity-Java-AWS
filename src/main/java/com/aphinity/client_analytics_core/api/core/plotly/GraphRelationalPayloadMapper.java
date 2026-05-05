@@ -119,7 +119,8 @@ public final class GraphRelationalPayloadMapper {
         graphTrace.setDataMode(resolveDataMode(canonicalType, trace));
         Map<String, Object> traceConfig = extractTraceConfig(trace);
         if ("bar".equals(canonicalType)) {
-            traceConfig.put("orientation", "h");
+            String explicitBarOrientation = resolveExplicitBarOrientation(trace);
+            traceConfig.put("orientation", explicitBarOrientation == null ? "h" : explicitBarOrientation);
         }
         graphTrace.setTraceConfig(traceConfig);
 
@@ -171,14 +172,20 @@ public final class GraphRelationalPayloadMapper {
             case "bar" -> {
                 List<Object> xValues = new ArrayList<>();
                 List<Object> yValues = new ArrayList<>();
+                String orientation = resolveStoredBarOrientation(trace);
 
                 for (GraphCategoryPoint point : trace.getCategoryPoints()) {
-                    xValues.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
-                    yValues.add(resolveLabelValue(point));
+                    if ("v".equals(orientation)) {
+                        xValues.add(resolveLabelValue(point));
+                        yValues.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
+                    } else {
+                        xValues.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
+                        yValues.add(resolveLabelValue(point));
+                    }
                 }
 
                 result.putAll(Map.of(
-                    "orientation", "h",
+                    "orientation", orientation,
                     "x", List.copyOf(xValues),
                     "y", List.copyOf(yValues)
                 ));
@@ -271,7 +278,9 @@ public final class GraphRelationalPayloadMapper {
             yValues = List.of();
         }
         boolean hasExplicitX = !xValues.isEmpty();
-        boolean horizontalBarTrace = "bar".equals(resolveCanonicalTraceType(trace)) && isHorizontalBarTrace(trace);
+        boolean barTrace = "bar".equals(resolveCanonicalTraceType(trace));
+        String explicitBarOrientation = barTrace ? resolveExplicitBarOrientation(trace) : null;
+        boolean horizontalBarTrace = barTrace && isHorizontalBarInput(xValues, yValues, explicitBarOrientation);
 
         if (!horizontalBarTrace && hasExplicitX && yValues.isEmpty()) {
             throw new IllegalArgumentException("Graph data is invalid");
@@ -290,11 +299,20 @@ public final class GraphRelationalPayloadMapper {
             point.setPointOrder(index);
 
             if (horizontalBarTrace) {
-                if (!(rawX instanceof Number number)) {
+                Number number;
+                if (hasExplicitX) {
+                    if (!(rawX instanceof Number explicitNumber)) {
+                        throw new IllegalArgumentException("Graph data is invalid");
+                    }
+                    number = explicitNumber;
+                } else if (rawY instanceof Number implicitNumber) {
+                    number = implicitNumber;
+                } else {
                     throw new IllegalArgumentException("Graph data is invalid");
                 }
-                point.setCategoryKey(String.valueOf(rawY));
-                point.setCategoryLabel(rawY instanceof String ? (String) rawY : String.valueOf(rawY));
+                Object rawLabel = hasExplicitX ? rawY : rawX;
+                point.setCategoryKey(String.valueOf(rawLabel));
+                point.setCategoryLabel(rawLabel instanceof String ? (String) rawLabel : String.valueOf(rawLabel));
                 point.setValueNumeric(toBigDecimal(number));
                 point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, point.getCategoryLabel()));
                 continue;
@@ -310,16 +328,6 @@ public final class GraphRelationalPayloadMapper {
             point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, point.getCategoryLabel()));
         }
         trimPoints(graphTrace.getCategoryPoints(), yValues.size());
-    }
-
-    private static boolean isHorizontalBarTrace(Map<String, Object> trace) {
-        List<?> xValues = optionalList(trace, "x");
-        List<?> yValues = optionalList(trace, "y");
-        if (xValues == null || yValues == null || xValues.isEmpty() || yValues.isEmpty()) {
-            return false;
-        }
-
-        return isNumericList(xValues) && isScalarList(yValues);
     }
 
     private static void populateTimeSeriesPoints(GraphTrace graphTrace, Map<String, Object> trace) {
@@ -391,6 +399,46 @@ public final class GraphRelationalPayloadMapper {
             case "scatter", "scattergl", "line" -> "scatter";
             default -> throw new IllegalArgumentException("Graph data is invalid");
         };
+    }
+
+    private static String resolveExplicitBarOrientation(Map<String, Object> trace) {
+        Object rawOrientation = trace.get("orientation");
+        if (rawOrientation == null) {
+            return null;
+        }
+        if (!(rawOrientation instanceof String orientation)) {
+            throw new IllegalArgumentException("Graph data is invalid");
+        }
+        String normalized = orientation.strip().toLowerCase(Locale.ROOT);
+        if ("h".equals(normalized) || "v".equals(normalized)) {
+            return normalized;
+        }
+        throw new IllegalArgumentException("Graph data is invalid");
+    }
+
+    private static boolean isHorizontalBarInput(List<?> xValues, List<?> yValues, String explicitBarOrientation) {
+        if ("h".equals(explicitBarOrientation)) {
+            return true;
+        }
+        if ("v".equals(explicitBarOrientation)) {
+            return false;
+        }
+        return !xValues.isEmpty() && !yValues.isEmpty() && isNumericList(xValues) && isScalarList(yValues);
+    }
+
+    private static String resolveStoredBarOrientation(GraphTrace trace) {
+        Map<String, Object> traceConfig = trace.getTraceConfig();
+        if (traceConfig == null) {
+            return "h";
+        }
+        Object rawOrientation = traceConfig.get("orientation");
+        if (rawOrientation instanceof String orientation) {
+            String normalized = orientation.strip().toLowerCase(Locale.ROOT);
+            if ("h".equals(normalized) || "v".equals(normalized)) {
+                return normalized;
+            }
+        }
+        return "h";
     }
 
     private static Map<String, Object> normalizeTraceConfig(Map<String, Object> traceConfig) {

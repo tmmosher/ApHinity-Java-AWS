@@ -1054,6 +1054,55 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsPersistsExplicitVerticalBarOrientation() throws Exception {
+        AppUser partner = createUser("partner-graphs-vertical@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Long Beach");
+        Graph graph = createGraph("Vertical graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graphs-vertical@example.com", PASSWORD);
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "data": [{
+                                "type": "bar",
+                                "orientation": "v",
+                                "x": ["Jan", "Feb"],
+                                "y": [6, 8]
+                              }]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId()))
+            )
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(graph.getId()))
+            .andExpect(jsonPath("$[0].data[0].orientation").value("v"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").value("Jan"))
+            .andExpect(jsonPath("$[0].data[0].y[0]").value(6));
+
+        Graph persisted = reloadGraph(graph.getId());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
+        assertEquals("v", traces.getFirst().get("orientation"));
+        assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("x"));
+        assertEquals(List.of(6L, 8L), traces.getFirst().get("y"));
+    }
+
+    @Test
     void updateLocationGraphsCanUpdateOneGraphWithoutTouchingOtherGraphs() throws Exception {
         AppUser partner = createUser("partner-graphs-partial@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Dana Point");

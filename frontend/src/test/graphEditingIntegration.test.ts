@@ -348,7 +348,7 @@ describe("graph editing integration", () => {
     expect(editResult.changed).toBe(true);
     expect(editResult.nextGraphs[0].data).toEqual([
       { type: "bar", name: "Actual", x: ["Jan"], y: [2] },
-      { type: "bar", name: "Trace 2", x: [], y: [], marker: { color: "#1f77b4" } }
+      { type: "bar", name: "Trace 2", orientation: "h", x: [], y: [], marker: { color: "#1f77b4" } }
     ]);
 
     const react = vi.fn().mockResolvedValue(undefined);
@@ -361,7 +361,7 @@ describe("graph editing integration", () => {
     const [, renderedData] = react.mock.calls[0];
     expect(renderedData).toEqual([
       { type: "bar", name: "Actual", x: ["Jan"], y: [2] },
-      { type: "bar", name: "Trace 2", x: [], y: [], marker: { color: "#1f77b4" } }
+      { type: "bar", name: "Trace 2", orientation: "h", x: [], y: [], marker: { color: "#1f77b4" } }
     ]);
   });
 });

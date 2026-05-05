@@ -175,6 +175,7 @@ export const createScatterTraceTemplate = (traceName: string): Record<string, un
 export const createBarTraceTemplate = (traceName: string): Record<string, unknown> => ({
   type: "bar",
   name: traceName,
+  orientation: "h",
   x: [],
   y: [],
   marker: {color: DEFAULT_TRACE_COLOR}

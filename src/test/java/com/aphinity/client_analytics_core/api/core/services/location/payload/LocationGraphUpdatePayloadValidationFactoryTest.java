@@ -63,6 +63,35 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateAcceptsVerticalBarPayloads() {
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(barTrace(3, 5, 7)),
+            List.of(verticalBarTrace(4, 6)),
+            Map.of("showlegend", false)
+        );
+
+        assertEquals(List.of(verticalBarTrace(4, 6)), payload.data());
+        assertEquals(Map.of("showlegend", false), payload.layout());
+    }
+
+    @Test
+    void validateForUpdateRejectsMismatchedExplicitBarOrientation() {
+        assertThrows(IllegalArgumentException.class, () ->
+            factory.validateForUpdate(
+                List.of(horizontalBarTrace(3, 5)),
+                List.of(Map.of(
+                    "type", "bar",
+                    "orientation", "v",
+                    "x", List.of(4, 6),
+                    "y", List.of("Jan", "Feb"),
+                    "marker", Map.of("color", "#1f77b4")
+                )),
+                Map.of("showlegend", false)
+            )
+        );
+    }
+
+    @Test
     void validateForUpdateRejectsGraphTypeChanges() {
         assertThrows(IllegalArgumentException.class, () ->
             factory.validateForUpdate(
@@ -186,6 +215,16 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
             "y", List.of("Jan", "Feb"),
             "marker", Map.of("color", "#1f77b4"),
             "orientation", "h"
+        );
+    }
+
+    private Map<String, Object> verticalBarTrace(int... values) {
+        return Map.of(
+            "type", "bar",
+            "x", List.of("Jan", "Feb"),
+            "y", values.length == 0 ? List.of() : toIntegerList(values),
+            "marker", Map.of("color", "#1f77b4"),
+            "orientation", "v"
         );
     }
 

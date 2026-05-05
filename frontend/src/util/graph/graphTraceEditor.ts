@@ -11,6 +11,7 @@ import type { EditableGraphPayload } from "./graphEditor";
 
 export type {TraceType};
 export const AUTO_SIZE_TRACE_FLAG = "autoSize";
+export type BarOrientation = "h" | "v";
 
 export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
   pie: "pie",
@@ -76,6 +77,41 @@ export const getTraceArray = (trace: Record<string, unknown>, field: string): un
 export const getTraceType = (trace: Record<string, unknown>): TraceType | null => {
   const typeValue = typeof trace.type === "string" ? trace.type.toLowerCase() : "";
   return TRACE_EDITOR_BY_TYPE[typeValue] ?? null;
+};
+
+const isNumericList = (values: unknown[]): boolean =>
+  values.every((value) => typeof value === "number" && Number.isFinite(value));
+
+const isScalarList = (values: unknown[]): boolean =>
+  values.every((value) =>
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+
+export const getBarOrientation = (
+  trace: Record<string, unknown>
+): BarOrientation => {
+  const rawOrientation = typeof trace.orientation === "string"
+    ? trace.orientation.trim().toLowerCase()
+    : "";
+  if (rawOrientation === "h" || rawOrientation === "v") {
+    return rawOrientation;
+  }
+
+  const xValues = getTraceArray(trace, "x");
+  const yValues = getTraceArray(trace, "y");
+  if (xValues.length > 0 && yValues.length > 0) {
+    if (isNumericList(xValues) && isScalarList(yValues)) {
+      return "h";
+    }
+    if (isScalarList(xValues) && isNumericList(yValues)) {
+      return "v";
+    }
+  }
+
+  return "h";
 };
 
 export const isAutoSizingPieTrace = (trace: Record<string, unknown>): boolean =>
@@ -171,17 +207,45 @@ export const renameTrace = (
   };
 };
 
-const getTraceYAxisLayoutKey = (trace: Record<string, unknown>): string => {
-  const yAxisReference = typeof trace.yaxis === "string" ? trace.yaxis.trim().toLowerCase() : "y";
-  const match = /^y(\d+)?$/.exec(yAxisReference);
+const getTraceAxisLayoutKey = (
+  trace: Record<string, unknown>,
+  axisPrefix: "x" | "y"
+): string => {
+  const axisReferenceKey = axisPrefix === "x" ? "xaxis" : "yaxis";
+  const axisLayoutKey = axisPrefix === "x" ? "xaxis" : "yaxis";
+  const axisReference = typeof trace[axisReferenceKey] === "string"
+    ? String(trace[axisReferenceKey]).trim().toLowerCase()
+    : axisPrefix;
+  const match = new RegExp(`^${axisPrefix}(\\d+)?$`).exec(axisReference);
   if (!match) {
-    return "yaxis";
+    return axisLayoutKey;
   }
   const suffix = match[1];
   if (!suffix || suffix === "1") {
-    return "yaxis";
+    return axisLayoutKey;
   }
-  return `yaxis${suffix}`;
+  return `${axisLayoutKey}${suffix}`;
+};
+
+const getTraceValueAxisLayoutKey = (trace: Record<string, unknown>): string =>
+  getTraceType(trace) === "bar" && getBarOrientation(trace) === "h"
+    ? getTraceAxisLayoutKey(trace, "x")
+    : getTraceAxisLayoutKey(trace, "y");
+
+const swapTraceAxisReference = (
+  value: unknown,
+  axisPrefix: "x" | "y"
+): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  const match = /^[xy](\d+)?$/.exec(normalized);
+  if (!match) {
+    return normalized;
+  }
+  const suffix = match[1] ?? "";
+  return `${axisPrefix}${suffix}`;
 };
 
 const hasRangeBoundValue = (value: unknown): boolean =>
@@ -197,7 +261,7 @@ export const getTraceYAxisRange = (
     return ["", ""];
   }
 
-  const axis = layout[getTraceYAxisLayoutKey(trace)];
+  const axis = layout[getTraceValueAxisLayoutKey(trace)];
   if (!isRecord(axis) || !Array.isArray(axis.range)) {
     return ["", ""];
   }
@@ -211,7 +275,7 @@ export const updateTraceYAxisRange = (
   boundIndex: 0 | 1,
   rawValue: string
 ): Record<string, unknown> | null => {
-  const axisKey = getTraceYAxisLayoutKey(trace);
+  const axisKey = getTraceValueAxisLayoutKey(trace);
   const nextLayout = isRecord(layout) ? {...layout} : {};
   const nextAxis = isRecord(nextLayout[axisKey]) ? {...nextLayout[axisKey]} : {};
   const existingRange = Array.isArray(nextAxis.range)
@@ -242,6 +306,88 @@ export const updateTraceYAxisRange = (
   }
 
   return Object.keys(nextLayout).length > 0 ? nextLayout : null;
+};
+
+export const setBarOrientation = (
+  trace: Record<string, unknown>,
+  nextOrientation: BarOrientation
+): Record<string, unknown> => {
+  if (getTraceType(trace) !== "bar") {
+    return trace;
+  }
+
+  const currentOrientation = getBarOrientation(trace);
+  const xValues = getTraceArray(trace, "x");
+  const yValues = getTraceArray(trace, "y");
+  const nextXAxis = swapTraceAxisReference(trace.yaxis, "x");
+  const nextYAxis = swapTraceAxisReference(trace.xaxis, "y");
+
+  if (currentOrientation === nextOrientation) {
+    return {
+      ...trace,
+      orientation: nextOrientation
+    };
+  }
+
+  const nextTrace: Record<string, unknown> = {
+    ...trace,
+    orientation: nextOrientation,
+    x: yValues,
+    y: xValues
+  };
+  if (nextXAxis !== undefined) {
+    nextTrace.xaxis = nextXAxis;
+  } else {
+    delete nextTrace.xaxis;
+  }
+  if (nextYAxis !== undefined) {
+    nextTrace.yaxis = nextYAxis;
+  } else {
+    delete nextTrace.yaxis;
+  }
+  return nextTrace;
+};
+
+export const swapCartesianLayoutAxes = (
+  layout: Record<string, unknown> | null | undefined
+): Record<string, unknown> | null => {
+  if (!isRecord(layout)) {
+    return null;
+  }
+
+  const nextLayout = {...layout};
+  const suffixes = new Set<string>();
+  for (const key of Object.keys(nextLayout)) {
+    const match = /^(xaxis|yaxis)(\d*)$/.exec(key);
+    if (match) {
+      suffixes.add(match[2] || "");
+    }
+  }
+
+  if (suffixes.size === 0) {
+    return nextLayout;
+  }
+
+  for (const suffix of suffixes) {
+    const xKey = `xaxis${suffix}`;
+    const yKey = `yaxis${suffix}`;
+    const xAxis = nextLayout[xKey];
+    const yAxis = nextLayout[yKey];
+
+    if (yAxis === undefined) {
+      delete nextLayout[xKey];
+    } else {
+      nextLayout[xKey] = yAxis;
+    }
+
+    if (xAxis === undefined) {
+      delete nextLayout[yKey];
+    } else {
+      nextLayout[yKey] = xAxis;
+    }
+  }
+
+  return nextLayout;
 };
 
 export const setPieRowColor = (

@@ -6,6 +6,10 @@ type CartesianTraceEditorProps = {
   rowIndexes: number[];
   xValues: unknown[];
   yValues: unknown[];
+  xLabel?: string;
+  yLabel?: string;
+  rangeLabel?: string;
+  barOrientation?: "h" | "v";
   yRangeMin: unknown;
   yRangeMax: unknown;
   xDrafts: Record<number, string>;
@@ -13,6 +17,7 @@ type CartesianTraceEditorProps = {
   yRangeMinDraft?: string;
   yRangeMaxDraft?: string;
   isBusy: boolean;
+  onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
   onAddRow: () => void;
   onUpdateX: (rowIndex: number, rawValue: string) => void;
   onUpdateY: (rowIndex: number, rawValue: string) => void;
@@ -24,6 +29,9 @@ type CartesianTraceEditorProps = {
 const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
   const xDrafts = () => props.xDrafts ?? ({} as Record<number, string>);
   const yDrafts = () => props.yDrafts ?? ({} as Record<number, string>);
+  const xLabel = () => props.xLabel ?? "X";
+  const yLabel = () => props.yLabel ?? "Y";
+  const rangeLabel = () => props.rangeLabel ?? "Y";
 
   return (
     <section class="space-y-3">
@@ -39,9 +47,23 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
         </button>
       </div>
 
-      <div class="grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 md:grid-cols-2">
+      <div class={"grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 " + (props.onUpdateBarOrientation ? "md:grid-cols-3" : "md:grid-cols-2")}>
+        <Show when={props.onUpdateBarOrientation}>
+          <label class="form-control">
+            <span class="label-text">Orientation</span>
+            <select
+              class="select select-bordered select-sm mt-1"
+              value={props.barOrientation ?? "h"}
+              disabled={props.isBusy}
+              onChange={(event) => props.onUpdateBarOrientation?.(event.currentTarget.value === "v" ? "v" : "h")}
+            >
+              <option value="h">Horizontal</option>
+              <option value="v">Vertical</option>
+            </select>
+          </label>
+        </Show>
         <label class="form-control">
-          <span class="label-text">Y range min</span>
+          <span class="label-text">{rangeLabel()} range min</span>
           <input
             class={"input input-bordered input-sm mt-1" + (props.yRangeMinDraft !== undefined ? " input-error" : "")}
             aria-invalid={props.yRangeMinDraft !== undefined}
@@ -54,7 +76,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
           />
         </label>
         <label class="form-control">
-          <span class="label-text">Y range max</span>
+          <span class="label-text">{rangeLabel()} range max</span>
           <input
             class={"input input-bordered input-sm mt-1" + (props.yRangeMaxDraft !== undefined ? " input-error" : "")}
             aria-invalid={props.yRangeMaxDraft !== undefined}
@@ -77,7 +99,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                   class={"input input-bordered input-sm" + (xDrafts()[rowIndex] !== undefined ? " input-error" : "")}
                   aria-invalid={xDrafts()[rowIndex] !== undefined}
                   type="text"
-                  placeholder="X value"
+                  placeholder={`${xLabel()} value`}
                   value={xDrafts()[rowIndex] ?? toInputValue(props.xValues[rowIndex])}
                   disabled={props.isBusy}
                   onInput={(event) => props.onUpdateX(rowIndex, event.currentTarget.value)}
@@ -87,7 +109,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                   aria-invalid={yDrafts()[rowIndex] !== undefined}
                   type="text"
                   inputmode="decimal"
-                  placeholder="Y value"
+                  placeholder={`${yLabel()} value`}
                   value={yDrafts()[rowIndex] ?? toInputValue(props.yValues[rowIndex])}
                   disabled={props.isBusy}
                   onInput={(event) => props.onUpdateY(rowIndex, event.currentTarget.value)}

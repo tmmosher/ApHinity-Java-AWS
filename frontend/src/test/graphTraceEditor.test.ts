@@ -4,15 +4,18 @@ import {
   addPieRow,
   coerceInputValue,
   createTrace,
+  getBarOrientation,
   getPieRowColor,
   getTraceYAxisRange,
   isAutoSizingPieTrace,
   parseNumericInput,
   removePieRow,
   renameTrace,
+  setBarOrientation,
   setPieRowColor,
   getTraceColor,
   setTraceColor,
+  swapCartesianLayoutAxes,
   updateTraceYAxisRange,
   updatePieValue,
   updateIndicatorValue
@@ -197,10 +200,36 @@ describe("graphTraceEditor", () => {
     expect(nextTrace).toEqual({
       type: "bar",
       name: "Trace 1",
+      orientation: "h",
       x: [],
       y: [],
       marker: {color: "#1f77b4"}
     });
+  });
+
+  it("swaps bar trace values when the orientation changes", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      orientation: "h",
+      xaxis: "x2",
+      yaxis: "y3",
+      x: [3, 5],
+      y: ["Jan", "Feb"]
+    };
+
+    const vertical = setBarOrientation(trace, "v");
+    expect(getBarOrientation(vertical)).toBe("v");
+    expect(vertical.xaxis).toBe("x3");
+    expect(vertical.yaxis).toBe("y2");
+    expect(vertical.x).toEqual(["Jan", "Feb"]);
+    expect(vertical.y).toEqual([3, 5]);
+
+    const horizontal = setBarOrientation(vertical, "h");
+    expect(getBarOrientation(horizontal)).toBe("h");
+    expect(horizontal.xaxis).toBe("x2");
+    expect(horizontal.yaxis).toBe("y3");
+    expect(horizontal.x).toEqual([3, 5]);
+    expect(horizontal.y).toEqual(["Jan", "Feb"]);
   });
 
   it("creates pie traces with donut defaults", () => {
@@ -313,16 +342,18 @@ describe("graphTraceEditor", () => {
     expect(getTraceYAxisRange(withMinAndMax, trace)).toEqual([10, 20]);
   });
 
-  it("targets the selected trace y-axis key and preserves axis settings", () => {
+  it("targets the numeric axis key for horizontal bar traces and preserves axis settings", () => {
     const trace: Record<string, unknown> = {
       type: "bar",
-      yaxis: "y2",
-      y: [4, 5]
+      orientation: "h",
+      xaxis: "x2",
+      x: [4, 5],
+      y: ["A", "B"]
     };
 
     const layout = updateTraceYAxisRange(
       {
-        yaxis2: {
+        xaxis2: {
           title: {text: "Secondary Axis"}
         }
       },
@@ -332,10 +363,22 @@ describe("graphTraceEditor", () => {
     );
 
     expect(layout).toEqual({
-      yaxis2: {
+      xaxis2: {
         title: {text: "Secondary Axis"},
         range: [null, 42]
       }
+    });
+  });
+
+  it("swaps cartesian axis layout settings when a bar chart flips orientation", () => {
+    expect(swapCartesianLayoutAxes({
+      xaxis: {title: {text: "Count"}},
+      yaxis: {title: {text: "Facility"}},
+      margin: {l: 10}
+    })).toEqual({
+      xaxis: {title: {text: "Facility"}},
+      yaxis: {title: {text: "Count"}},
+      margin: {l: 10}
     });
   });
 
