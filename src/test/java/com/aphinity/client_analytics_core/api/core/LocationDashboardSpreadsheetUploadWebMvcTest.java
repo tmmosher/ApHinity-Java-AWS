@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.core;
 
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -75,6 +77,35 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(18L))
             .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"));
+
+        verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
+        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class));
+    }
+
+    @Test
+    void postsDashboardSpreadsheetMultipartSurfacesClientErrorsWithoutStackTraceNoise() throws Exception {
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(42L);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "dashboard.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[] {4, 5, 6}
+        );
+        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class)))
+            .thenThrow(new ApiClientException(
+                BAD_REQUEST,
+                "location_dashboard_file_invalid",
+                "Dashboard spreadsheet could not be parsed."
+            ));
+
+        mockMvc.perform(
+                multipart("/core/locations/{locationId}/dashboard/spreadsheet-upload", 8L)
+                    .file(file)
+                    .with(csrf().asHeader())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("location_dashboard_file_invalid"))
+            .andExpect(jsonPath("$.message").value("Dashboard spreadsheet could not be parsed."));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
         verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class));

@@ -11,6 +11,7 @@ import com.aphinity.client_analytics_core.api.core.response.location.LocationMem
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -461,6 +462,16 @@ public class LocationController {
                 locationId,
                 ex.getStatusCode().value(),
                 ex.getReason()
+            );
+            throw ex;
+        } catch (ApiClientException ex) {
+            log.warn(
+                "Rejected location dashboard spreadsheet upload request actorUserId={} locationId={} status={} code={} message={}",
+                userId,
+                locationId,
+                ex.getStatus().value(),
+                ex.getCode(),
+                ex.getMessage()
             );
             throw ex;
         } catch (RuntimeException ex) {
