@@ -425,16 +425,15 @@ public class LocationController {
     }
 
     /**
-     * Accepts a dashboard spreadsheet upload for a location.
-     * The backend currently only validates access and does not process the file.
+     * Accepts a dashboard spreadsheet upload for a location and returns the updated graphs.
      *
      * @param jwt authenticated principal JWT
      * @param locationId location identifier
      * @param file uploaded Excel workbook
+     * @return updated graph payloads for the configured import graphs
      */
     @PostMapping(path = "/locations/{locationId}/dashboard/spreadsheet-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void uploadLocationDashboardSpreadsheet(
+    public List<GraphResponse> uploadLocationDashboardSpreadsheet(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable Long locationId,
         @RequestParam("file") MultipartFile file
@@ -448,12 +447,13 @@ public class LocationController {
             file == null ? null : file.getContentType()
         );
         try {
-            locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file);
+            List<GraphResponse> response = locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file);
             log.info(
                 "Completed location dashboard spreadsheet upload request actorUserId={} locationId={}",
                 userId,
                 locationId
             );
+            return response;
         } catch (ResponseStatusException ex) {
             log.warn(
                 "Rejected location dashboard spreadsheet upload request actorUserId={} locationId={} status={} reason={}",

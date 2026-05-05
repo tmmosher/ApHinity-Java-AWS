@@ -24,6 +24,8 @@ import com.aphinity.client_analytics_core.api.core.response.location.LocationMem
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory.GraphTemplate;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
 import org.slf4j.Logger;
@@ -32,8 +34,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -47,8 +47,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Business logic for location visibility and membership administration.
@@ -69,7 +67,8 @@ public class LocationService {
     private final LocationThumbnailImageService locationThumbnailImageService;
     private final LocationGraphTemplateFactory locationGraphTemplateFactory;
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
-    private final ConcurrentHashMap<Long, ReentrantLock> locationGraphUpdateLocks = new ConcurrentHashMap<>();
+    private final LocationDashboardImportService locationDashboardImportService;
+    private final LocationDashboardMutationLockService locationDashboardMutationLockService;
 
     public LocationService(
         AppUserRepository appUserRepository,
@@ -81,7 +80,9 @@ public class LocationService {
         AccountRoleService accountRoleService,
         LocationThumbnailImageService locationThumbnailImageService,
         LocationGraphTemplateFactory locationGraphTemplateFactory,
-        LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory
+        LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory,
+        LocationDashboardImportService locationDashboardImportService,
+        LocationDashboardMutationLockService locationDashboardMutationLockService
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
@@ -93,6 +94,8 @@ public class LocationService {
         this.locationThumbnailImageService = locationThumbnailImageService;
         this.locationGraphTemplateFactory = locationGraphTemplateFactory;
         this.locationGraphUpdatePayloadValidationFactory = locationGraphUpdatePayloadValidationFactory;
+        this.locationDashboardImportService = locationDashboardImportService;
+        this.locationDashboardMutationLockService = locationDashboardMutationLockService;
     }
 
     /**
@@ -345,22 +348,7 @@ public class LocationService {
         Map<String, Object> sectionLayout
     ) {
         AppUser user = requireUser(userId);
-        ReentrantLock locationLock = locationGraphUpdateLocks.computeIfAbsent(locationId, ignored -> new ReentrantLock());
-        locationLock.lock();
-        boolean releaseInFinally = true;
-        try {
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCompletion(int status) {
-                        if (locationLock.isHeldByCurrentThread()) {
-                            locationLock.unlock();
-                        }
-                    }
-                });
-                releaseInFinally = false;
-            }
-
+        locationDashboardMutationLockService.executeWithLocationLock(locationId, () -> {
             if (!accountRoleService.isPartnerOrAdmin(user)) {
                 log.warn(
                     "Rejected graph update due to insufficient permissions actorUserId={} locationId={}",
@@ -389,7 +377,7 @@ public class LocationService {
                     userId,
                     locationId
                 );
-                return;
+                return null;
             }
 
             boolean hasGraphUpdates = graphUpdates != null && !graphUpdates.isEmpty();
@@ -471,7 +459,7 @@ public class LocationService {
                     userId,
                     locationId
                 );
-                return;
+                return null;
             }
 
             for (Graph graph : graphs) {
@@ -515,7 +503,7 @@ public class LocationService {
                     userId,
                     updatesByGraphId.keySet()
                 );
-                return;
+                return null;
             }
 
             if (normalizedSectionLayout != null) {
@@ -525,7 +513,7 @@ public class LocationService {
                     userId,
                     ((List<?>) normalizedSectionLayout.getOrDefault("sections", List.of())).size()
                 );
-                return;
+                return null;
             }
 
             log.info(
@@ -535,11 +523,8 @@ public class LocationService {
                 userId,
                 updatesByGraphId.keySet()
             );
-        } finally {
-            if (releaseInFinally && locationLock.isHeldByCurrentThread()) {
-                locationLock.unlock();
-            }
-        }
+            return null;
+        });
     }
 
     /**
@@ -693,18 +678,19 @@ public class LocationService {
     }
 
     /**
-     * Accepts a dashboard spreadsheet upload for future processing.
-     * This stub currently only validates access and location existence.
+     * Accepts a dashboard spreadsheet upload and returns the updated graph payloads.
      *
      * @param userId authenticated user id
      * @param locationId location id
      * @param file uploaded Excel workbook
+     * @return updated dashboard graph payloads
      */
-    @Transactional(readOnly = true)
-    public void uploadLocationDashboardSpreadsheet(Long userId, Long locationId, MultipartFile file) {
+    @Transactional
+    public List<GraphResponse> uploadLocationDashboardSpreadsheet(Long userId, Long locationId, MultipartFile file) {
         AppUser user = requireUser(userId);
         requirePartnerOrAdmin(user);
-        locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        return locationDashboardImportService.importLocationDashboard(location, file);
     }
 
     /**

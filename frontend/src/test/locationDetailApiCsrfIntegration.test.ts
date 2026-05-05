@@ -104,15 +104,32 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
   it("uploads a dashboard spreadsheet as multipart form data", async () => {
     installDocumentCookie("XSRF-TOKEN=token-fresh");
     const fetchMock = vi.mocked(globalThis.fetch);
-    fetchMock.mockResolvedValueOnce(new Response(null, {status: 204}));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([
+      {
+        id: 18,
+        name: "Water Quality Compliance",
+        data: [{type: "scatter", name: "HPC", x: ["2025-08-01"], y: [50]}],
+        layout: {meta: {aphinityImport: {graphId: "graph-1"}}},
+        config: {},
+        style: {},
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-02T00:00:00Z"
+      }
+    ]), {
+      status: 200,
+      headers: {"Content-Type": "application/json"}
+    }));
 
     const file = new File(["workbook"], "dashboard.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     });
 
-    await expect(
-      uploadLocationDashboardSpreadsheetById("https://example.test", "42", file)
-    ).resolves.toBeUndefined();
+    await expect(uploadLocationDashboardSpreadsheetById("https://example.test", "42", file)).resolves.toMatchObject([
+      {
+        id: 18,
+        name: "Water Quality Compliance"
+      }
+    ]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];

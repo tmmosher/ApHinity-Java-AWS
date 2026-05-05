@@ -10,6 +10,8 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.Locatio
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,9 @@ class LocationServiceTransactionTest {
     @Mock
     private AccountRoleService accountRoleService;
 
+    @Mock
+    private LocationDashboardImportService locationDashboardImportService;
+
     private LocationService locationService;
 
     private LocationService proxiedLocationService;
@@ -75,7 +80,9 @@ class LocationServiceTransactionTest {
             accountRoleService,
             new LocationThumbnailImageService(),
             new LocationGraphTemplateFactory(),
-            new LocationGraphUpdatePayloadValidationFactory()
+            new LocationGraphUpdatePayloadValidationFactory(),
+            locationDashboardImportService,
+            new LocationDashboardMutationLockService()
         );
 
         ProxyFactory proxyFactory = new ProxyFactory(locationService);

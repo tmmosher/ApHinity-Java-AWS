@@ -1,0 +1,56 @@
+{
+  "locationName": "Newport Beach",
+  "sublocations": [
+    {
+      "key": "newport-beach",
+      "displayName": "Newport Beach",
+      "facilityAliases": [
+        "Newport Beach"
+      ],
+      "buildingAliases": [],
+      "defaultForFacility": true
+    }
+  ],
+  "systems": [
+    {
+      "key": "cooling-towers",
+      "displayName": "Cooling Towers",
+      "rangeProfile": "towers",
+      "aliases": [
+        "Cooling Towers"
+      ]
+    }
+  ],
+  "graphs": [
+    {
+      "id": "newport-beach-water-quality-compliance",
+      "title": "Water Quality Compliance",
+      "importType": "water_quality_compliance",
+      "sublocationKey": "newport-beach",
+      "traceOrder": [
+        "HPC",
+        "Endotoxin",
+        "pH"
+      ],
+      "traceColors": {
+        "HPC": "#1f77b4",
+        "Endotoxin": "#2ca02c",
+        "pH": "#ff7f0e"
+      },
+      "graphType": "scatter"
+    },
+    {
+      "id": "newport-beach-system-type-compliance",
+      "title": "System Type Compliance",
+      "importType": "system_type_compliance",
+      "sublocationKey": "newport-beach",
+      "traceOrder": [
+        "Cooling Towers"
+      ],
+      "traceColors": {
+        "Cooling Towers": "#d62728"
+      },
+      "graphType": "scatter"
+    }
+  ]
+}

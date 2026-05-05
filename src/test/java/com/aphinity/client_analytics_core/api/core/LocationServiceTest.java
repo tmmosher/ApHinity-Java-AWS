@@ -23,6 +23,8 @@ import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,12 +82,19 @@ class LocationServiceTest {
     @Mock
     private LocationThumbnailImageService locationThumbnailImageService;
 
+    @Mock
+    private LocationDashboardImportService locationDashboardImportService;
+
     @Spy
     private LocationGraphTemplateFactory locationGraphTemplateFactory = new LocationGraphTemplateFactory();
 
     @Spy
     private LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory =
         new LocationGraphUpdatePayloadValidationFactory();
+
+    @Spy
+    private LocationDashboardMutationLockService locationDashboardMutationLockService =
+        new LocationDashboardMutationLockService();
 
     @InjectMocks
     private LocationService locationService;
@@ -1516,7 +1525,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void uploadLocationDashboardSpreadsheetValidatesAccessWithoutProcessingFile() {
+    void uploadLocationDashboardSpreadsheetDelegatesToDashboardImportService() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
@@ -1535,12 +1544,25 @@ class LocationServiceTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             new byte[] {1, 2, 3}
         );
+        List<GraphResponse> expected = List.of(new GraphResponse(
+            18L,
+            "Water Quality Compliance",
+            List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
+            Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
+            Map.of(),
+            Map.of(),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-02T00:00:00Z")
+        ));
+        when(locationDashboardImportService.importLocationDashboard(location, file)).thenReturn(expected);
 
-        locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file);
+        List<GraphResponse> actual = locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file);
 
+        assertSame(expected, actual);
         verify(locationRepository).findById(9L);
+        verify(locationDashboardImportService).importLocationDashboard(location, file);
         verify(locationRepository, never()).saveAndFlush(any(Location.class));
-        verifyNoInteractions(locationThumbnailImageService, graphRepository, locationGraphRepository);
+        verifyNoInteractions(locationThumbnailImageService);
     }
 
     @Test

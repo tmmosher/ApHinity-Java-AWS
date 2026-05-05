@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +27,11 @@ public interface ServiceEventRepository extends JpaRepository<ServiceEvent, Long
         @Param("locationId") Long locationId,
         @Param("windowStart") LocalDate windowStart,
         @Param("windowEnd") LocalDate windowEnd
+    );
+
+    List<ServiceEvent> findByLocation_IdAndCorrectiveActionTrueAndEventDateIn(
+        Long locationId,
+        Collection<LocalDate> eventDates
     );
 
     Optional<ServiceEvent> findByIdAndLocation_Id(Long eventId, Long locationId);

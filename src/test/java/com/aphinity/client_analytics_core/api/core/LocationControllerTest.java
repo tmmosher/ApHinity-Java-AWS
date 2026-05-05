@@ -320,9 +320,21 @@ class LocationControllerTest {
             new byte[] {1, 2, 3}
         );
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
+        List<GraphResponse> expected = List.of(new GraphResponse(
+            31L,
+            "Water Quality Compliance",
+            List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
+            Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
+            Map.of(),
+            Map.of(),
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-02T00:00:00Z")
+        ));
+        when(locationService.uploadLocationDashboardSpreadsheet(42L, 8L, file)).thenReturn(expected);
 
-        locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file);
+        List<GraphResponse> actual = locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file);
 
+        assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(locationService).uploadLocationDashboardSpreadsheet(42L, 8L, file);
     }

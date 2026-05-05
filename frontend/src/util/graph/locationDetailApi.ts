@@ -280,13 +280,14 @@ export const deleteLocationGraphById = async (
  * @param host API host base URL.
  * @param locationId Location id from route params.
  * @param file Excel workbook to upload.
+ * @returns Updated graph payloads returned by the backend import.
  * @throws {Error} When ids are invalid or the request fails.
  */
 export const uploadLocationDashboardSpreadsheetById = async (
   host: string,
   locationId: string,
   file: File
-): Promise<void> => {
+): Promise<LocationGraph[]> => {
   const parsedLocationId = parseRouteLocationId(locationId);
   const formData = new FormData();
   formData.set("file", file);
@@ -307,4 +308,6 @@ export const uploadLocationDashboardSpreadsheetById = async (
     }
     throw new Error("Unable to upload dashboard spreadsheet");
   }
+
+  return parseLocationGraphList(await response.json());
 };
