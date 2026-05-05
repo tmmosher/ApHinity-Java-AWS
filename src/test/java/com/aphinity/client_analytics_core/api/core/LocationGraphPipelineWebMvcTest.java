@@ -17,6 +17,8 @@ import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserSer
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
@@ -68,6 +70,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
     LocationGraphTemplateFactory.class,
     LocationGraphUpdatePayloadValidationFactory.class,
+    LocationDashboardMutationLockService.class,
     LocationService.class,
     LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class
 })
@@ -99,6 +102,9 @@ class LocationGraphPipelineWebMvcTest {
 
     @MockitoBean
     private LocationThumbnailImageService locationThumbnailImageService;
+
+    @MockitoBean
+    private LocationDashboardImportService locationDashboardImportService;
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
