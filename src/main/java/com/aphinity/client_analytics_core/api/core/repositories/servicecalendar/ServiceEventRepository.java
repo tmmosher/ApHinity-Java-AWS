@@ -29,9 +29,9 @@ public interface ServiceEventRepository extends JpaRepository<ServiceEvent, Long
         @Param("windowEnd") LocalDate windowEnd
     );
 
-    List<ServiceEvent> findByLocation_IdAndCorrectiveActionTrueAndEventDateIn(
+    List<ServiceEvent> findByLocation_IdAndCorrectiveActionTrueAndTitleIn(
         Long locationId,
-        Collection<LocalDate> eventDates
+        Collection<String> titles
     );
 
     Optional<ServiceEvent> findByIdAndLocation_Id(Long eventId, Long locationId);

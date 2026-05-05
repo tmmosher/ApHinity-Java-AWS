@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.integration;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Comment;
@@ -42,8 +43,20 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         Graph waterQualityGraph = createGraph("Water Quality Compliance", blankScatterData());
         Graph systemTypeGraph = createGraph("System Type Compliance", blankScatterData());
+        Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
+        Graph totalNonConformancesGraph = createGraph("Total Non-Conformances", blankPieData());
+        Graph activePercentGraph = createGraph("Active Non-Conformance Percent", blankPieData());
+        Graph nonConformancesByFacilityGraph = createGraphWithLayout(
+            "Non-Conformances",
+            blankBarData(),
+            Map.of("title", Map.of("text", "By Facility"))
+        );
         addLocationGraph(location, waterQualityGraph);
         addLocationGraph(location, systemTypeGraph);
+        addLocationGraph(location, totalSamplesGraph);
+        addLocationGraph(location, totalNonConformancesGraph);
+        addLocationGraph(location, activePercentGraph);
+        addLocationGraph(location, nonConformancesByFacilityGraph);
 
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload@example.com", PASSWORD);
 
@@ -60,18 +73,31 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$.length()").value(6))
             .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].y[0]").value(100))
+            .andExpect(jsonPath("$[0].data[0].y[0]").value(0))
             .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
             .andExpect(jsonPath("$[0].data[1].y[0]").value(0))
             .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
             .andExpect(jsonPath("$[1].data[0].name").value("Cooling Towers"))
-            .andExpect(jsonPath("$[1].data[0].y[0]").value(50));
+            .andExpect(jsonPath("$[1].data[0].y[0]").value(0))
+            .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
+            .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
+            .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
+            .andExpect(jsonPath("$[3].data[0].values[0]").value(1))
+            .andExpect(jsonPath("$[4].name").value("Active Non-Conformance Percent"))
+            .andExpect(jsonPath("$[4].data[0].values[0]").value(100))
+            .andExpect(jsonPath("$[5].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[5].data[0].x[0]").value(1))
+            .andExpect(jsonPath("$[5].data[0].y[0]").value("Newport Beach"));
 
         Graph persistedWaterQualityGraph = reloadGraph(waterQualityGraph.getId());
         Graph persistedSystemTypeGraph = reloadGraph(systemTypeGraph.getId());
+        Graph persistedTotalSamplesGraph = reloadGraph(totalSamplesGraph.getId());
+        Graph persistedTotalNonConformancesGraph = reloadGraph(totalNonConformancesGraph.getId());
+        Graph persistedActivePercentGraph = reloadGraph(activePercentGraph.getId());
+        Graph persistedNonConformancesByFacilityGraph = reloadGraph(nonConformancesByFacilityGraph.getId());
 
         assertThat(graphData(persistedWaterQualityGraph))
             .extracting(trace -> trace.get("name"))
@@ -79,6 +105,11 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         assertThat(graphData(persistedSystemTypeGraph))
             .extracting(trace -> trace.get("name"))
             .containsExactly("Cooling Towers");
+        assertEquals(List.of(6L), graphData(persistedTotalSamplesGraph).getFirst().get("values"));
+        assertEquals(List.of(1L), graphData(persistedTotalNonConformancesGraph).getFirst().get("values"));
+        assertEquals(List.of(100L, 0L), graphData(persistedActivePercentGraph).getFirst().get("values"));
+        assertEquals(List.of(1L), graphData(persistedNonConformancesByFacilityGraph).getFirst().get("x"));
+        assertEquals(List.of("Newport Beach"), graphData(persistedNonConformancesByFacilityGraph).getFirst().get("y"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(1, persistedEvents.size());
@@ -86,6 +117,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         assertTrue(persistedEvents.getFirst().getTitle().startsWith("CA: HPC 2025-08-01"));
         assertTrue(persistedEvents.getFirst().getTitle().length() <= 42);
         assertTrue(persistedEvents.getFirst().getDescription().contains("CA: Drain Tank, install new DI bottles"));
+        assertEquals(ServiceEventStatus.OVERDUE, persistedEvents.getFirst().getStatus());
     }
 
     @Test
@@ -169,6 +201,32 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             "x", List.of(),
             "y", List.of()
         ));
+    }
+
+    private List<Map<String, Object>> blankPieData() {
+        return List.of(Map.of(
+            "type", "pie",
+            "name", "Trace 1",
+            "hole", 0.72,
+            "labels", List.of("fill"),
+            "values", List.of(0)
+        ));
+    }
+
+    private List<Map<String, Object>> blankBarData() {
+        return List.of(Map.of(
+            "type", "bar",
+            "name", "Trace 1",
+            "x", List.of(),
+            "y", List.of(),
+            "orientation", "h"
+        ));
+    }
+
+    private Graph createGraphWithLayout(String name, Object data, Map<String, Object> layout) {
+        Graph graph = createGraph(name, data);
+        graph.setLayout(layout);
+        return graphRepository.saveAndFlush(graph);
     }
 
     private byte[] createDashboardSpreadsheet(

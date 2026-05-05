@@ -18,6 +18,7 @@ public interface LocationDashboardImportStrategy {
 
     record LocationDashboardImportComputation(
         List<ComputedGraphPayload> graphs,
+        List<ImportedObservation> observations,
         List<CorrectiveActionDraft> correctiveActions
     ) {
     }
@@ -28,10 +29,22 @@ public interface LocationDashboardImportStrategy {
     ) {
     }
 
+    record ImportedObservation(
+        LocalDate observedDate,
+        String facilityName,
+        String systemTypeName,
+        String measurementName,
+        boolean compliant
+    ) {
+    }
+
     record CorrectiveActionDraft(
-        LocalDate eventDate,
+        LocalDate observedDate,
         String title,
-        String description
+        String description,
+        String facilityName,
+        String systemTypeName,
+        String measurementName
     ) {
     }
 }

@@ -17,6 +17,7 @@ type LocationDashboardToolbarActionsProps = {
   onAddGraph: () => void;
   onApply: () => void;
   onEditLayout: () => void;
+  onUploadSpreadsheetSuccess?: () => Promise<void> | void;
   onUndo: () => void;
 };
 
@@ -55,6 +56,7 @@ export const LocationDashboardToolbarActions = (
         createGraphDisabledReason={props.createGraphDisabledReason}
         onAddGraph={props.onAddGraph}
         onEditLayout={props.onEditLayout}
+        onUploadSpreadsheetSuccess={props.onUploadSpreadsheetSuccess}
       />
     </div>
     <Show when={props.canEditGraphs && props.hasPendingGraphChanges}>

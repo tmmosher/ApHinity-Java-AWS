@@ -6,6 +6,7 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
@@ -23,7 +24,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +34,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -61,7 +65,7 @@ class LocationDashboardImportServiceTest {
     private LocationRepository locationRepository;
 
     @Test
-    void importLocationDashboardUpdatesGraphsAndCreatesCorrectiveActions() {
+    void importLocationDashboardUpdatesConfiguredAndDerivedGraphs() {
         LocationDashboardImportService importService = buildImportService();
 
         MockMultipartFile file = new MockMultipartFile(
@@ -82,28 +86,49 @@ class LocationDashboardImportServiceTest {
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = graph(18L, "Water Quality Compliance");
-        Graph systemTypeGraph = graph(19L, "System Type Compliance");
-        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(List.of(
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance");
+        Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples");
+        Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
+        Graph activePercentGraph = pieGraph(22L, "Active Non-Conformance Percent");
+        Graph nonConformancesByFacilityGraph = barGraph(23L, "Non-Conformances", "By Facility");
+        Graph nonConformanceStatusByFacilityGraph = barGraph(24L, "Non-Conformance Status", "By Facility");
+        Graph turnaroundTimeGraph = barGraph(25L, "Non-Conformance Status", "Turnaround Time");
+        List<Graph> graphs = List.of(
             locationGraph(9L, waterQualityGraph),
-            locationGraph(9L, systemTypeGraph)
-        ));
+            locationGraph(9L, systemTypeGraph),
+            locationGraph(9L, totalSamplesGraph),
+            locationGraph(9L, totalNonConformancesGraph),
+            locationGraph(9L, activePercentGraph),
+            locationGraph(9L, nonConformancesByFacilityGraph),
+            locationGraph(9L, nonConformanceStatusByFacilityGraph),
+            locationGraph(9L, turnaroundTimeGraph)
+        ).stream().map(LocationGraph::getGraph).toList();
+        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
+            .map(graph -> locationGraph(9L, graph))
+            .toList());
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList()))
-            .thenReturn(List.of(waterQualityGraph, systemTypeGraph));
-        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndEventDateIn(9L, List.of(LocalDate.parse("2025-08-01"))))
+            .thenReturn(graphs);
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(eq(9L), anyList()))
             .thenReturn(List.of());
-        when(graphRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(graphRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(serviceEventRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        assertEquals(2, responses.size());
-        assertEquals("Water Quality Compliance", responses.getFirst().name());
-        assertEquals(List.of(100L), responses.getFirst().data().getFirst().get("y"));
-        assertEquals("System Type Compliance", responses.get(1).name());
-        assertEquals(List.of(50L), responses.get(1).data().getFirst().get("y"));
+        assertEquals(8, responses.size());
+        assertEquals(List.of(0L), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"));
+        assertEquals(List.of(0L), findResponseByName(responses, "System Type Compliance").data().getFirst().get("y"));
+        assertEquals(List.of(2L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
+        assertEquals(List.of(1L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        assertEquals(List.of(100L, 0L), findResponseByName(responses, "Active Non-Conformance Percent").data().getFirst().get("values"));
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
+        assertEquals("Active", findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("name"));
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
         @SuppressWarnings("unchecked")
-        Map<String, Object> meta = (Map<String, Object>) responses.getFirst().layout().get("meta");
+        Map<String, Object> meta = (Map<String, Object>) findResponseByName(responses, "Water Quality Compliance").layout().get("meta");
         assertTrue(meta.containsKey("aphinityImport"));
 
         verify(serviceEventRepository).saveAllAndFlush(org.mockito.ArgumentMatchers.argThat((Iterable<ServiceEvent> events) -> {
@@ -115,7 +140,8 @@ class LocationDashboardImportServiceTest {
             ServiceEvent event = eventList.getFirst();
             return event.isCorrectiveAction()
                 && event.getTitle().startsWith("CA: HPC 2025-08-01")
-                && event.getDescription().contains("CA: Drain Tank, install new DI bottles");
+                && event.getDescription().contains("CA: Drain Tank, install new DI bottles")
+                && event.getStatus() == ServiceEventStatus.OVERDUE;
         }));
         verify(locationRepository).touchUpdatedAt(eq(9L), org.mockito.ArgumentMatchers.any(Instant.class));
     }
@@ -146,7 +172,7 @@ class LocationDashboardImportServiceTest {
     }
 
     @Test
-    void importLocationDashboardUpdatesExistingCorrectiveActionAcrossShiftedCellReference() {
+    void importLocationDashboardPreservesExistingCorrectiveActionResolutionStateOnReimport() {
         LocationDashboardImportService importService = buildImportService();
         MockMultipartFile file = new MockMultipartFile(
             "file",
@@ -163,31 +189,51 @@ class LocationDashboardImportServiceTest {
         when(spreadsheetParser.parse(file)).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = graph(18L, "Water Quality Compliance");
-        Graph systemTypeGraph = graph(19L, "System Type Compliance");
-        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(List.of(
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance");
+        Graph resolutionPercentGraph = indicatorGraph(20L, "Resolution Percent");
+        Graph turnaroundTimeGraph = barGraph(21L, "Non-Conformance Status", "Turnaround Time");
+        Graph nonConformanceStatusByFacilityGraph = barGraph(22L, "Non-Conformance Status", "By Facility");
+        List<Graph> graphs = List.of(
             locationGraph(9L, waterQualityGraph),
-            locationGraph(9L, systemTypeGraph)
-        ));
+            locationGraph(9L, systemTypeGraph),
+            locationGraph(9L, resolutionPercentGraph),
+            locationGraph(9L, turnaroundTimeGraph),
+            locationGraph(9L, nonConformanceStatusByFacilityGraph)
+        ).stream().map(LocationGraph::getGraph).toList();
+        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
+            .map(graph -> locationGraph(9L, graph))
+            .toList());
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList()))
-            .thenReturn(List.of(waterQualityGraph, systemTypeGraph));
+            .thenReturn(graphs);
 
         ServiceEvent existingEvent = new ServiceEvent();
         existingEvent.setId(501L);
         existingEvent.setLocation(location);
         existingEvent.setCorrectiveAction(true);
         existingEvent.setEventDate(LocalDate.parse("2025-08-01"));
+        existingEvent.setEventTime(LocalTime.MIDNIGHT);
+        existingEvent.setEndEventDate(LocalDate.parse("2025-08-03"));
+        existingEvent.setEndEventTime(LocalTime.NOON);
+        existingEvent.setStatus(ServiceEventStatus.COMPLETED);
         existingEvent.setTitle(strategy.computeImport(
             workbook("Newport Beach", "Initial DI bottle change", "F5"),
             measurementBounds()
         ).correctiveActions().getFirst().title());
-        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndEventDateIn(9L, List.of(LocalDate.parse("2025-08-01"))))
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(eq(9L), anyList()))
             .thenReturn(List.of(existingEvent));
 
-        when(graphRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(graphRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(serviceEventRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+
+        assertEquals(5, responses.size());
+        assertEquals(100L, ((Number) findResponseByName(responses, "Resolution Percent").data().getFirst().get("value")).longValue());
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
+        assertEquals(List.of("2 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+        assertEquals(List.of(0L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
 
         verify(serviceEventRepository).saveAllAndFlush(org.mockito.ArgumentMatchers.argThat((Iterable<ServiceEvent> events) -> {
             List<ServiceEvent> eventList = new java.util.ArrayList<>();
@@ -198,7 +244,10 @@ class LocationDashboardImportServiceTest {
             ServiceEvent event = eventList.getFirst();
             return event == existingEvent
                 && event.getDescription().contains("CA: Replace DI bottles")
-                && event.getTitle().startsWith("CA: HPC 2025-08-01");
+                && event.getTitle().startsWith("CA: HPC 2025-08-01")
+                && event.getStatus() == ServiceEventStatus.COMPLETED
+                && LocalDate.parse("2025-08-03").equals(event.getEndEventDate())
+                && LocalTime.NOON.equals(event.getEndEventTime());
         }));
     }
 
@@ -302,18 +351,86 @@ class LocationDashboardImportServiceTest {
         );
     }
 
-    private Graph graph(Long id, String name) {
+    private Graph scatterGraph(Long id, String name) {
+        return graph(id, name, "scatter", Map.of(), List.of());
+    }
+
+    private Graph pieGraph(Long id, String name) {
+        return graph(id, name, "pie", Map.of(
+            "annotations", List.of(Map.of(
+                "x", 0.5,
+                "y", 0.5,
+                "text", "<b>0</b>",
+                "xref", "paper",
+                "yref", "paper",
+                "showarrow", false
+            ))
+        ), List.of(Map.of(
+            "type", "pie",
+            "name", "Trace 1",
+            "hole", 0.72,
+            "labels", List.of("fill"),
+            "values", List.of(0)
+        )));
+    }
+
+    private Graph indicatorGraph(Long id, String name) {
+        return graph(id, name, "indicator", Map.of(), List.of(Map.of(
+            "type", "indicator",
+            "name", "Trace 1",
+            "mode", "gauge+number",
+            "value", 0,
+            "number", Map.of("suffix", "%"),
+            "gauge", Map.of("axis", Map.of("range", List.of(0, 100)))
+        )));
+    }
+
+    private Graph barGraph(Long id, String name, String titleText) {
+        return graph(id, name, "bar", Map.of(
+            "title", Map.of("text", titleText)
+        ), List.of(Map.of(
+            "type", "bar",
+            "name", "Trace 1",
+            "x", List.of(),
+            "y", List.of(),
+            "orientation", "h"
+        )));
+    }
+
+    private Graph graph(Long id, String name, String graphType, Map<String, Object> layout, List<Map<String, Object>> data) {
         Graph graph = new Graph();
         graph.setId(id);
         graph.setName(name);
-        graph.setGraphType("scatter");
-        graph.setLayout(Map.of());
+        graph.setGraphType(graphType);
+        graph.setLayout(new LinkedHashMap<>(layout));
         graph.setConfig(Map.of());
         graph.setStyle(Map.of());
         graph.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
-        graph.setData(List.of());
+        graph.setData(data);
         return graph;
+    }
+
+    private GraphResponse findResponseByName(List<GraphResponse> responses, String graphName) {
+        return responses.stream()
+            .filter(response -> graphName.equals(response.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Graph response was not returned for " + graphName));
+    }
+
+    @SuppressWarnings("unchecked")
+    private GraphResponse findResponseByNameAndTitle(List<GraphResponse> responses, String graphName, String titleText) {
+        return responses.stream()
+            .filter(response -> graphName.equals(response.name()))
+            .filter(response -> {
+                Object title = response.layout().get("title");
+                if (!(title instanceof Map<?, ?> titleMap)) {
+                    return false;
+                }
+                return titleText.equals(titleMap.get("text"));
+            })
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Graph response was not returned for " + graphName + " / " + titleText));
     }
 
     private LocationGraph locationGraph(Long locationId, Graph graph) {

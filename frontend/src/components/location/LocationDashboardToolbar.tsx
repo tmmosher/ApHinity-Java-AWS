@@ -15,6 +15,7 @@ type LocationDashboardToolbarProps = {
   onAddGraph: () => void;
   onApply: () => void;
   onEditLayout: () => void;
+  onUploadSpreadsheetSuccess?: () => Promise<void> | void;
   onUndo: () => void;
 };
 
@@ -42,6 +43,7 @@ export const LocationDashboardToolbar = (props: LocationDashboardToolbarProps) =
         onAddGraph={props.onAddGraph}
         onApply={props.onApply}
         onEditLayout={props.onEditLayout}
+        onUploadSpreadsheetSuccess={props.onUploadSpreadsheetSuccess}
         onUndo={props.onUndo}
       />
     </div>

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,15 +30,26 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityHpcTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityHpcTrace.get("x"));
-        assertEquals(List.of(50.0d), waterQualityHpcTrace.get("y"));
+        assertEquals(List.of(0.0d), waterQualityHpcTrace.get("y"));
 
         Map<String, Object> systemTypeTrace = result.graphs().get(1).data().getFirst();
         assertEquals("Cooling Towers", systemTypeTrace.get("name"));
-        assertEquals(List.of(50.0d), systemTypeTrace.get("y"));
+        assertEquals(List.of(25.0d), systemTypeTrace.get("y"));
 
+        assertEquals(4, result.observations().size());
+        assertEquals(1, result.observations().stream().filter(observation -> observation.compliant()).count());
         assertEquals(1, result.correctiveActions().size());
         assertTrue(result.correctiveActions().getFirst().title().startsWith("CA: HPC 2025-08-01"));
         assertTrue(result.correctiveActions().getFirst().description().contains("CA: Drain Tank, install new DI bottles"));
+    }
+
+    @Test
+    void rangeProfileTreatsMaximumAsExclusive() {
+        MeasurementBound measurementBound =
+            measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("10"));
+
+        assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("9.9"), measurementBound));
+        assertFalse(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("10"), measurementBound));
     }
 
     @Test

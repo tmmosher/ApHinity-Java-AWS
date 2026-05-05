@@ -129,7 +129,7 @@ public record LocationDashboardImportStrategyConfig(
             if (min != null && numericValue.compareTo(min) < 0) {
                 return false;
             }
-            if (max != null && numericValue.compareTo(max) > 0) {
+            if (max != null && numericValue.compareTo(max) >= 0) {
                 return false;
             }
             return true;

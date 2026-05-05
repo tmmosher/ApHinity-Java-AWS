@@ -85,6 +85,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             aggregationsByGraphId.put(graphDefinition.id(), new GraphAggregation());
         }
 
+        List<ImportedObservation> observations = new ArrayList<>();
         List<CorrectiveActionDraft> correctiveActions = new ArrayList<>();
         String activeFacility = null;
         String activeBuilding = null;
@@ -123,7 +124,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     ).ifPresent(correctiveActions::add);
                 }
 
-                if (cell.numericValue() == null || activeSublocation == null || activeSystemType == null) {
+                if (cell.numericValue() == null || activeSystemType == null) {
                     continue;
                 }
                 MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
@@ -131,16 +132,29 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     continue;
                 }
                 boolean compliant = activeSystemType.rangeProfile().isCompliant(cell.numericValue(), measurementBound);
-                List<GraphConfig> graphDefinitions = graphsBySublocationKey.getOrDefault(
-                    normalizeKey(activeSublocation.key()),
-                    List.of()
-                );
-                for (GraphConfig graphDefinition : graphDefinitions) {
-                    String traceName = switch (graphDefinition.importType()) {
-                        case SYSTEM_TYPE_COMPLIANCE -> activeSystemType.displayName();
-                        case WATER_QUALITY_COMPLIANCE -> measurementBound.getMeasurementName();
-                    };
-                    aggregationsByGraphId.get(graphDefinition.id()).record(traceName, cell.observedDate(), compliant);
+                String facilityName = resolveFacilityName(activeSublocation, resolvedFacility);
+                if (facilityName != null) {
+                    observations.add(new ImportedObservation(
+                        cell.observedDate(),
+                        facilityName,
+                        activeSystemType.displayName(),
+                        measurementBound.getMeasurementName(),
+                        compliant
+                    ));
+                }
+
+                if (activeSublocation != null) {
+                    List<GraphConfig> graphDefinitions = graphsBySublocationKey.getOrDefault(
+                        normalizeKey(activeSublocation.key()),
+                        List.of()
+                    );
+                    for (GraphConfig graphDefinition : graphDefinitions) {
+                        String traceName = switch (graphDefinition.importType()) {
+                            case SYSTEM_TYPE_COMPLIANCE -> activeSystemType.displayName();
+                            case WATER_QUALITY_COMPLIANCE -> measurementBound.getMeasurementName();
+                        };
+                        aggregationsByGraphId.get(graphDefinition.id()).record(traceName, cell.observedDate(), compliant);
+                    }
                 }
             }
         }
@@ -156,6 +170,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
 
         return new LocationDashboardImportComputation(
             List.copyOf(computedGraphs),
+            List.copyOf(observations),
             List.copyOf(deduplicateCorrectiveActions(correctiveActions))
         );
     }
@@ -346,25 +361,24 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         String resolvedSystem
     ) {
         List<String> formattedCommentLines = formatCommentLines(cell.commentText());
-        if (formattedCommentLines.isEmpty()) {
-            return java.util.Optional.empty();
-        }
 
         List<String> descriptionLines = new ArrayList<>();
         descriptionLines.add("Measurement: " + cell.metricName());
         descriptionLines.add("Observed At: " + cell.observedDate());
+        String facilityName = resolveFacilityName(sublocation, resolvedFacility);
         if (sublocation != null && sublocation.displayName() != null && !sublocation.displayName().isBlank()) {
             descriptionLines.add("Sublocation: " + sublocation.displayName());
-        } else if (resolvedFacility != null && !resolvedFacility.isBlank()) {
-            descriptionLines.add("Facility: " + resolvedFacility);
+        } else if (facilityName != null) {
+            descriptionLines.add("Facility: " + facilityName);
         }
         if (resolvedBuilding != null && !resolvedBuilding.isBlank()) {
             descriptionLines.add("Building: " + resolvedBuilding);
         }
+        String systemTypeName = resolveSystemTypeName(systemType, resolvedSystem);
         if (systemType != null && systemType.displayName() != null && !systemType.displayName().isBlank()) {
             descriptionLines.add("System: " + systemType.displayName());
-        } else if (resolvedSystem != null && !resolvedSystem.isBlank()) {
-            descriptionLines.add("System: " + resolvedSystem);
+        } else if (systemTypeName != null) {
+            descriptionLines.add("System: " + systemTypeName);
         }
         if (row.pointOfUse() != null) {
             descriptionLines.add("Point of Use: " + row.pointOfUse());
@@ -372,8 +386,10 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         if (row.basis() != null) {
             descriptionLines.add("Basis: " + row.basis());
         }
-        descriptionLines.add("");
-        descriptionLines.addAll(formattedCommentLines);
+        if (!formattedCommentLines.isEmpty()) {
+            descriptionLines.add("");
+            descriptionLines.addAll(formattedCommentLines);
+        }
 
         String title = buildCorrectiveActionTitle(
             cell.metricName(),
@@ -386,7 +402,10 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         return java.util.Optional.of(new CorrectiveActionDraft(
             cell.observedDate(),
             title,
-            String.join("\n", descriptionLines)
+            String.join("\n", descriptionLines),
+            facilityName,
+            systemTypeName,
+            cell.metricName()
         ));
     }
 
@@ -570,10 +589,32 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         return value == null ? "" : value;
     }
 
+    private String resolveFacilityName(SublocationConfig sublocation, String resolvedFacility) {
+        if (sublocation != null && sublocation.displayName() != null && !sublocation.displayName().isBlank()) {
+            return sublocation.displayName();
+        }
+        if (resolvedFacility == null) {
+            return null;
+        }
+        String normalized = resolvedFacility.strip();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private String resolveSystemTypeName(SystemTypeConfig systemType, String resolvedSystem) {
+        if (systemType != null && systemType.displayName() != null && !systemType.displayName().isBlank()) {
+            return systemType.displayName();
+        }
+        if (resolvedSystem == null) {
+            return null;
+        }
+        String normalized = resolvedSystem.strip();
+        return normalized.isBlank() ? null : normalized;
+    }
+
     private List<CorrectiveActionDraft> deduplicateCorrectiveActions(List<CorrectiveActionDraft> drafts) {
         Map<String, CorrectiveActionDraft> draftsByIdentity = new LinkedHashMap<>();
         for (CorrectiveActionDraft draft : drafts) {
-            String identity = draft.eventDate() + "|" + normalizeKey(draft.title());
+            String identity = draft.observedDate() + "|" + normalizeKey(draft.title());
             draftsByIdentity.putIfAbsent(identity, draft);
         }
         return List.copyOf(draftsByIdentity.values());

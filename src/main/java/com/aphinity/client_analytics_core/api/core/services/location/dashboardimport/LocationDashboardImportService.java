@@ -145,7 +145,7 @@ public class LocationDashboardImportService {
             .toList();
 
         Map<String, Graph> matchedGraphsByDefinitionId = matchGraphs(strategy.graphDefinitions(), assignedGraphs, location.getName());
-        List<Long> targetGraphIds = matchedGraphsByDefinitionId.values().stream()
+        List<Long> targetGraphIds = assignedGraphs.stream()
             .map(Graph::getId)
             .filter(Objects::nonNull)
             .toList();
@@ -162,6 +162,8 @@ public class LocationDashboardImportService {
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation computation =
             strategy.computeImport(workbook, measurementBounds);
+        List<LocationDashboardDerivedGraphSupport.CorrectiveActionState> correctiveActionStates =
+            upsertCorrectiveActions(location, computation.correctiveActions());
         Map<String, GraphConfig> graphDefinitionsById = strategy.graphDefinitions().stream()
             .collect(Collectors.toMap(
                 graphDefinition -> normalizeKey(graphDefinition.id()),
@@ -170,7 +172,7 @@ public class LocationDashboardImportService {
                 LinkedHashMap::new
             ));
 
-        List<Graph> graphsToPersist = new ArrayList<>();
+        Map<Long, Graph> graphsToPersistById = new LinkedHashMap<>();
         for (LocationDashboardImportStrategy.ComputedGraphPayload computedGraphPayload : computation.graphs()) {
             Graph matchedGraph = matchedGraphsByDefinitionId.get(normalizeKey(computedGraphPayload.graphId()));
             if (matchedGraph == null || matchedGraph.getId() == null) {
@@ -187,13 +189,36 @@ public class LocationDashboardImportService {
             lockedGraph.setLayout(withImportMetadataAndDefaults(lockedGraph.getLayout(), graphDefinition, strategy.locationName()));
             lockedGraph.setGraphType(normalizeGraphType(graphDefinition.graphType()));
             lockedGraph.setData(computedGraphPayload.data());
-            graphsToPersist.add(lockedGraph);
+            graphsToPersistById.put(lockedGraph.getId(), lockedGraph);
+        }
+
+        List<LocationDashboardDerivedGraphSupport.DerivedGraphUpdate> derivedGraphUpdates =
+            LocationDashboardDerivedGraphSupport.buildUpdates(
+                lockedGraphs,
+                computation.observations(),
+                correctiveActionStates
+            );
+        for (LocationDashboardDerivedGraphSupport.DerivedGraphUpdate derivedGraphUpdate : derivedGraphUpdates) {
+            Graph targetGraph = derivedGraphUpdate.graph();
+            if (targetGraph == null || targetGraph.getId() == null) {
+                continue;
+            }
+            targetGraph.setLayout(withDerivedImportMetadata(
+                targetGraph.getLayout(),
+                derivedGraphUpdate.derivedGraphType(),
+                strategy.locationName()
+            ));
+            targetGraph.setData(derivedGraphUpdate.data());
+            graphsToPersistById.put(targetGraph.getId(), targetGraph);
         }
 
         try {
-            graphRepository.saveAllAndFlush(graphsToPersist);
-            upsertCorrectiveActions(location, computation.correctiveActions());
-            List<GraphResponse> responses = buildResponsesInDefinitionOrder(strategy.graphDefinitions(), matchedGraphsByDefinitionId, lockedGraphsById);
+            graphRepository.saveAllAndFlush(new ArrayList<>(graphsToPersistById.values()));
+            List<GraphResponse> responses = buildResponsesInGraphOrder(
+                assignedGraphs,
+                lockedGraphsById,
+                graphsToPersistById.keySet()
+            );
             locationRepository.touchUpdatedAt(location.getId(), Instant.now());
             return responses;
         } catch (RuntimeException ex) {
@@ -325,6 +350,21 @@ public class LocationDashboardImportService {
         return layout;
     }
 
+    private Map<String, Object> withDerivedImportMetadata(
+        Map<String, Object> existingLayout,
+        LocationDashboardDerivedGraphSupport.DerivedGraphType derivedGraphType,
+        String strategyLocationName
+    ) {
+        Map<String, Object> layout = copyMutableMap(existingLayout);
+        Map<String, Object> meta = copyMutableMap(asMap(layout.get("meta")));
+        Map<String, Object> importMeta = copyMutableMap(asMap(meta.get(IMPORT_LAYOUT_META_KEY)));
+        importMeta.put("derivedGraphType", LocationDashboardDerivedGraphSupport.metadataValue(derivedGraphType));
+        importMeta.put("locationName", strategyLocationName);
+        meta.put(IMPORT_LAYOUT_META_KEY, importMeta);
+        layout.put("meta", meta);
+        return layout;
+    }
+
     private Map<String, Object> asMap(Object value) {
         if (!(value instanceof Map<?, ?> mapValue)) {
             return Map.of();
@@ -350,29 +390,30 @@ public class LocationDashboardImportService {
         return "line".equals(normalized) ? "scatter" : normalized;
     }
 
-    private void upsertCorrectiveActions(
+    private List<LocationDashboardDerivedGraphSupport.CorrectiveActionState> upsertCorrectiveActions(
         Location location,
         List<LocationDashboardImportStrategy.CorrectiveActionDraft> correctiveActions
     ) {
         if (correctiveActions.isEmpty()) {
-            return;
+            return List.of();
         }
 
-        List<LocalDate> eventDates = correctiveActions.stream()
-            .map(LocationDashboardImportStrategy.CorrectiveActionDraft::eventDate)
+        List<String> titles = correctiveActions.stream()
+            .map(LocationDashboardImportStrategy.CorrectiveActionDraft::title)
             .distinct()
             .toList();
-        Map<String, ServiceEvent> existingByIdentity = new LinkedHashMap<>();
-        for (ServiceEvent existingCorrectiveAction : serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndEventDateIn(
+        Map<String, ServiceEvent> existingByTitle = new LinkedHashMap<>();
+        for (ServiceEvent existingCorrectiveAction : serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(
             location.getId(),
-            eventDates
+            titles
         )) {
-            existingByIdentity.putIfAbsent(identity(existingCorrectiveAction.getEventDate(), existingCorrectiveAction.getTitle()), existingCorrectiveAction);
+            existingByTitle.putIfAbsent(normalizeKey(existingCorrectiveAction.getTitle()), existingCorrectiveAction);
         }
 
         List<ServiceEvent> eventsToPersist = new ArrayList<>();
         for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
-            ServiceEvent serviceEvent = existingByIdentity.get(identity(draft.eventDate(), draft.title()));
+            ServiceEvent serviceEvent = existingByTitle.get(normalizeKey(draft.title()));
+            boolean newEvent = serviceEvent == null;
             if (serviceEvent == null) {
                 serviceEvent = new ServiceEvent();
                 serviceEvent.setLocation(location);
@@ -380,45 +421,59 @@ public class LocationDashboardImportService {
             }
             serviceEvent.setTitle(draft.title());
             serviceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
-            serviceEvent.setEventDate(draft.eventDate());
-            serviceEvent.setEventTime(ALL_DAY_START_TIME);
-            serviceEvent.setEndEventDate(draft.eventDate());
-            serviceEvent.setEndEventTime(ALL_DAY_END_TIME);
+            if (newEvent) {
+                serviceEvent.setEventDate(draft.observedDate());
+                serviceEvent.setEventTime(ALL_DAY_START_TIME);
+                serviceEvent.setEndEventDate(draft.observedDate());
+                serviceEvent.setEndEventTime(ALL_DAY_END_TIME);
+                serviceEvent.setStatus(resolveImportedCorrectiveActionStatus(draft.observedDate()));
+            }
             serviceEvent.setDescription(draft.description());
-            serviceEvent.setStatus(resolveCorrectiveActionStatus(draft.eventDate()));
             eventsToPersist.add(serviceEvent);
         }
 
-        serviceEventRepository.saveAllAndFlush(eventsToPersist);
+        List<ServiceEvent> persistedEvents = serviceEventRepository.saveAllAndFlush(eventsToPersist);
+        Map<String, ServiceEvent> persistedByTitle = persistedEvents.stream()
+            .filter(serviceEvent -> serviceEvent.getTitle() != null)
+            .collect(Collectors.toMap(
+                serviceEvent -> normalizeKey(serviceEvent.getTitle()),
+                serviceEvent -> serviceEvent,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+        return correctiveActions.stream()
+            .map(draft -> new LocationDashboardDerivedGraphSupport.CorrectiveActionState(
+                draft,
+                persistedByTitle.get(normalizeKey(draft.title()))
+            ))
+            .toList();
     }
 
-    private ServiceEventStatus resolveCorrectiveActionStatus(LocalDate eventDate) {
+    private ServiceEventStatus resolveImportedCorrectiveActionStatus(LocalDate observedDate) {
         LocalDate today = LocalDate.now(clock);
-        if (eventDate.isBefore(today)) {
-            return ServiceEventStatus.COMPLETED;
+        if (observedDate.isBefore(today)) {
+            return ServiceEventStatus.OVERDUE;
         }
-        if (eventDate.isEqual(today)) {
+        if (observedDate.isEqual(today)) {
             return ServiceEventStatus.CURRENT;
         }
         return ServiceEventStatus.UPCOMING;
     }
 
-    private String identity(LocalDate eventDate, String title) {
-        return eventDate + "|" + normalizeKey(title);
-    }
-
-    private List<GraphResponse> buildResponsesInDefinitionOrder(
-        List<GraphConfig> graphDefinitions,
-        Map<String, Graph> matchedGraphsByDefinitionId,
-        Map<Long, Graph> lockedGraphsById
+    private List<GraphResponse> buildResponsesInGraphOrder(
+        List<Graph> assignedGraphs,
+        Map<Long, Graph> lockedGraphsById,
+        Collection<Long> updatedGraphIds
     ) {
         List<GraphResponse> responses = new ArrayList<>();
-        for (GraphConfig graphDefinition : graphDefinitions) {
-            Graph matchedGraph = matchedGraphsByDefinitionId.get(normalizeKey(graphDefinition.id()));
-            if (matchedGraph == null || matchedGraph.getId() == null) {
+        Set<Long> updatedGraphIdSet = updatedGraphIds instanceof Set<?>
+            ? updatedGraphIds.stream().collect(Collectors.toCollection(LinkedHashSet::new))
+            : new LinkedHashSet<>(updatedGraphIds);
+        for (Graph assignedGraph : assignedGraphs) {
+            if (assignedGraph == null || assignedGraph.getId() == null || !updatedGraphIdSet.contains(assignedGraph.getId())) {
                 continue;
             }
-            Graph lockedGraph = lockedGraphsById.get(matchedGraph.getId());
+            Graph lockedGraph = lockedGraphsById.get(assignedGraph.getId());
             if (lockedGraph == null) {
                 continue;
             }
