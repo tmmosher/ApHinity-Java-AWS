@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.zip.CRC32;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SublocationConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeConfig;
@@ -65,6 +66,11 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     @Override
     public List<GraphConfig> graphDefinitions() {
         return config.graphs();
+    }
+
+    @Override
+    public List<DerivedGraphConfig> derivedGraphDefinitions() {
+        return config.derivedGraphs() == null ? List.of() : config.derivedGraphs();
     }
 
     @Override
@@ -223,16 +229,63 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
 
         Set<String> graphIds = new LinkedHashSet<>();
+        Set<String> graphNameTitles = new LinkedHashSet<>();
         for (GraphConfig graph : rawConfig.graphs()) {
             String normalizedGraphId = normalizeKey(graph.id());
             if (normalizedGraphId == null || !graphIds.add(normalizedGraphId)) {
                 throw new IllegalStateException("Dashboard import strategy graph ids must be unique");
+            }
+            String normalizedGraphName = normalizeKey(graph.name());
+            if (normalizedGraphName == null) {
+                throw new IllegalStateException("Dashboard import graphs must declare a graph name: " + graph.id());
+            }
+            String normalizedGraphTitle = normalizeKey(graph.title());
+            if (normalizedGraphTitle == null) {
+                throw new IllegalStateException("Dashboard import graphs must declare a graph title: " + graph.id());
+            }
+            String graphNameTitle = normalizedGraphName + "|" + normalizedGraphTitle;
+            if (!graphNameTitles.add(graphNameTitle)) {
+                throw new IllegalStateException("Dashboard import strategy graph name/title combinations must be unique");
             }
             if (graph.importType() == null) {
                 throw new IllegalStateException("Dashboard import graphs must declare an import type: " + graph.id());
             }
             if (!sublocationKeys.contains(normalizeKey(graph.sublocationKey()))) {
                 throw new IllegalStateException("Dashboard import graph references an unknown sublocation key: " + graph.sublocationKey());
+            }
+        }
+
+        Set<String> derivedGraphIds = new LinkedHashSet<>();
+        Set<String> derivedNameTitles = new LinkedHashSet<>();
+        if (rawConfig.derivedGraphs() != null) {
+            for (DerivedGraphConfig derivedGraph : rawConfig.derivedGraphs()) {
+                String normalizedDerivedGraphId = normalizeKey(derivedGraph.id());
+                if (normalizedDerivedGraphId == null || !derivedGraphIds.add(normalizedDerivedGraphId)) {
+                    throw new IllegalStateException("Dashboard import strategy derived graph ids must be unique");
+                }
+                String normalizedDerivedGraphName = normalizeKey(derivedGraph.name());
+                if (normalizedDerivedGraphName == null) {
+                    throw new IllegalStateException(
+                        "Dashboard import derived graphs must declare a graph name: " + derivedGraph.id()
+                    );
+                }
+                String normalizedDerivedGraphTitle = normalizeKey(derivedGraph.title());
+                String derivedNameTitle = normalizedDerivedGraphName + "|" + nullSafe(normalizedDerivedGraphTitle);
+                if (!derivedNameTitles.add(derivedNameTitle)) {
+                    throw new IllegalStateException(
+                        "Dashboard import strategy derived graph name/title combinations must be unique"
+                    );
+                }
+                if (derivedGraph.derivedType() == null) {
+                    throw new IllegalStateException(
+                        "Dashboard import derived graphs must declare a derived type: " + derivedGraph.id()
+                    );
+                }
+                if (graphNameTitles.contains(derivedNameTitle)) {
+                    throw new IllegalStateException(
+                        "Dashboard import strategy graph name/title combinations must be unique across imported and derived graphs"
+                    );
+                }
             }
         }
 
@@ -363,28 +416,55 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         List<String> formattedCommentLines = formatCommentLines(cell.commentText());
 
         List<String> descriptionLines = new ArrayList<>();
-        descriptionLines.add("Measurement: " + cell.metricName());
-        descriptionLines.add("Observed At: " + cell.observedDate());
+        addDescriptionLine(
+            descriptionLines,
+            LocationDashboardCorrectiveActionMetadataSupport.measurementLine(cell.metricName())
+        );
+        addDescriptionLine(
+            descriptionLines,
+            LocationDashboardCorrectiveActionMetadataSupport.observedAtLine(cell.observedDate())
+        );
         String facilityName = resolveFacilityName(sublocation, resolvedFacility);
         if (sublocation != null && sublocation.displayName() != null && !sublocation.displayName().isBlank()) {
-            descriptionLines.add("Sublocation: " + sublocation.displayName());
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.sublocationLine(sublocation.displayName())
+            );
         } else if (facilityName != null) {
-            descriptionLines.add("Facility: " + facilityName);
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.facilityLine(facilityName)
+            );
         }
         if (resolvedBuilding != null && !resolvedBuilding.isBlank()) {
-            descriptionLines.add("Building: " + resolvedBuilding);
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.buildingLine(resolvedBuilding)
+            );
         }
         String systemTypeName = resolveSystemTypeName(systemType, resolvedSystem);
         if (systemType != null && systemType.displayName() != null && !systemType.displayName().isBlank()) {
-            descriptionLines.add("System: " + systemType.displayName());
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemType.displayName())
+            );
         } else if (systemTypeName != null) {
-            descriptionLines.add("System: " + systemTypeName);
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemTypeName)
+            );
         }
         if (row.pointOfUse() != null) {
-            descriptionLines.add("Point of Use: " + row.pointOfUse());
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.pointOfUseLine(row.pointOfUse())
+            );
         }
         if (row.basis() != null) {
-            descriptionLines.add("Basis: " + row.basis());
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.basisLine(row.basis())
+            );
         }
         if (!formattedCommentLines.isEmpty()) {
             descriptionLines.add("");
@@ -427,6 +507,12 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             nullSafe(basis)
         )));
         return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+    }
+
+    private void addDescriptionLine(List<String> descriptionLines, String value) {
+        if (value != null) {
+            descriptionLines.add(value);
+        }
     }
 
     private String buildFingerprint(String rawIdentity) {
@@ -509,11 +595,19 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             List<Double> yValues = observedDates.stream()
                 .map(observedDate -> graphAggregation.percentage(traceName, observedDate))
                 .toList();
+            List<Map<String, Object>> customData = observedDates.stream()
+                .map(observedDate -> Map.<String, Object>of(
+                    "sampleCount", graphAggregation.total(traceName, observedDate),
+                    "compliantCount", graphAggregation.compliant(traceName, observedDate),
+                    "nonConformingCount", graphAggregation.nonConforming(traceName, observedDate)
+                ))
+                .toList();
             traces.add(new LinkedHashMap<>(Map.of(
                 "type", "scatter",
                 "name", traceName,
                 "x", xValues,
                 "y", yValues,
+                "customdata", customData,
                 "mode", "lines+markers",
                 "line", Map.of(
                     "color", resolveTraceColor(graphDefinition, traceName, traceIndex),
@@ -646,6 +740,30 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 return 0.0d;
             }
             return (counter.compliant * 100.0d) / counter.total;
+        }
+
+        int total(String traceName, LocalDate observedDate) {
+            ComplianceCounter counter = countersByTrace
+                .getOrDefault(traceName, Map.of())
+                .get(observedDate);
+            return counter == null ? 0 : counter.total;
+        }
+
+        int compliant(String traceName, LocalDate observedDate) {
+            ComplianceCounter counter = countersByTrace
+                .getOrDefault(traceName, Map.of())
+                .get(observedDate);
+            return counter == null ? 0 : counter.compliant;
+        }
+
+        int nonConforming(String traceName, LocalDate observedDate) {
+            ComplianceCounter counter = countersByTrace
+                .getOrDefault(traceName, Map.of())
+                .get(observedDate);
+            if (counter == null) {
+                return 0;
+            }
+            return counter.total - counter.compliant;
         }
     }
 

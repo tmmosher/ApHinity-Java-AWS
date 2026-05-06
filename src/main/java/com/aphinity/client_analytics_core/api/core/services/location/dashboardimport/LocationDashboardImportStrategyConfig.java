@@ -14,7 +14,8 @@ public record LocationDashboardImportStrategyConfig(
     String locationName,
     List<SublocationConfig> sublocations,
     List<SystemTypeConfig> systems,
-    List<GraphConfig> graphs
+    List<GraphConfig> graphs,
+    List<DerivedGraphConfig> derivedGraphs
 ) {
     public record SublocationConfig(
         String key,
@@ -35,11 +36,21 @@ public record LocationDashboardImportStrategyConfig(
 
     public record GraphConfig(
         String id,
+        String name,
         String title,
         ImportType importType,
         String sublocationKey,
         List<String> traceOrder,
         Map<String, String> traceColors,
+        String graphType
+    ) {
+    }
+
+    public record DerivedGraphConfig(
+        String id,
+        String name,
+        String title,
+        DerivedGraphType derivedType,
         String graphType
     ) {
     }
@@ -133,6 +144,45 @@ public record LocationDashboardImportStrategyConfig(
                 return false;
             }
             return true;
+        }
+    }
+
+    public enum DerivedGraphType {
+        TOTAL_SAMPLES("total_samples"),
+        TOTAL_NON_CONFORMANCES("total_non_conformances"),
+        ACTIVE_NON_CONFORMANCE_PERCENT("active_non_conformance_percent"),
+        PERCENT_CONFORMANCE("percent_conformance"),
+        PERCENT_RESOLVED("percent_resolved"),
+        NON_CONFORMANCES_BY_FACILITY("non_conformances_by_facility"),
+        NON_CONFORMANCES_BY_SYSTEM_TYPE("non_conformances_by_system_type"),
+        NON_CONFORMANCES_BY_CATEGORY("non_conformances_by_category"),
+        NON_CONFORMANCE_STATUS_BY_FACILITY("non_conformance_status_by_facility"),
+        NON_CONFORMANCE_TURNAROUND_TIME("non_conformance_turnaround_time");
+
+        private final String value;
+
+        DerivedGraphType(String value) {
+            this.value = value;
+        }
+
+        @JsonValue
+        public String value() {
+            return value;
+        }
+
+        @JsonCreator
+        public static DerivedGraphType fromValue(String rawValue) {
+            if (rawValue == null || rawValue.isBlank()) {
+                return null;
+            }
+            String normalized = rawValue.strip().toLowerCase(Locale.ROOT);
+            return Arrays.stream(values())
+                .filter(derivedGraphType ->
+                    derivedGraphType.value.equals(normalized)
+                        || derivedGraphType.name().equalsIgnoreCase(normalized)
+                )
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown dashboard derived graph type: " + rawValue));
         }
     }
 }

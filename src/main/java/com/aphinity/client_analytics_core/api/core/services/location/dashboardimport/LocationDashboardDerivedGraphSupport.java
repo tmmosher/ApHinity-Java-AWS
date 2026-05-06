@@ -13,11 +13,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,116 +27,28 @@ final class LocationDashboardDerivedGraphSupport {
     private static final String ACTIVE_GRAPH_COLOR = "#dc2626";
     private static final String RESOLVED_GRAPH_COLOR = "#16a34a";
     private static final String KPI_REMAINDER_COLOR = "rgba(15, 23, 42, 0.12)";
+    private static final List<String> TURNAROUND_BUCKETS = List.of("< 3 days", "< 1 week", "< 1 month", "< 3 months");
 
     private LocationDashboardDerivedGraphSupport() {
     }
 
-    static List<DerivedGraphUpdate> buildUpdates(
-        Collection<Graph> assignedGraphs,
-        List<LocationDashboardImportStrategy.ImportedObservation> observations,
-        List<CorrectiveActionState> correctiveActionStates
-    ) {
-        List<DerivedGraphUpdate> updates = new ArrayList<>();
-        for (Graph graph : assignedGraphs) {
-            Optional<DerivedGraphType> derivedGraphType = classify(graph);
-            if (derivedGraphType.isEmpty()) {
-                continue;
-            }
-            updates.add(new DerivedGraphUpdate(
-                graph,
-                derivedGraphType.get(),
-                buildPayload(derivedGraphType.get(), graph, observations, correctiveActionStates)
-            ));
-        }
-        return List.copyOf(updates);
+    static String metadataValue(LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType) {
+        return derivedGraphType == null ? null : derivedGraphType.value();
     }
 
-    private static Optional<DerivedGraphType> classify(Graph graph) {
-        if (graph == null || isClearlyTestingGraphName(graph.getName())) {
-            return Optional.empty();
-        }
-
-        String metadataType = readDerivedGraphTypeMetadata(graph);
-        if (metadataType != null) {
-            return DerivedGraphType.fromMetadataValue(metadataType);
-        }
-
-        String normalizedName = normalizeKey(graph.getName());
-        String normalizedTitle = normalizeKey(readLayoutTitleText(graph));
-        String normalizedGraphType = normalizeKey(resolveGraphType(graph));
-
-        if (Objects.equals(normalizedGraphType, "pie")) {
-            if (Objects.equals(normalizedName, "total number of samples")) {
-                return Optional.of(DerivedGraphType.TOTAL_SAMPLES);
-            }
-            if (Objects.equals(normalizedName, "total non-conformances")) {
-                return Optional.of(DerivedGraphType.TOTAL_NON_CONFORMANCES);
-            }
-            if (Objects.equals(normalizedName, "active non-conformance percent")) {
-                return Optional.of(DerivedGraphType.ACTIVE_NON_CONFORMANCE_PERCENT);
-            }
-            if (Objects.equals(normalizedName, "percent conformance")
-                || Objects.equals(normalizedName, "conformance percent")
-                || Objects.equals(normalizedName, "compliance percent")) {
-                return Optional.of(DerivedGraphType.PERCENT_CONFORMANCE);
-            }
-            if (Objects.equals(normalizedName, "percent resolved")
-                || Objects.equals(normalizedName, "resolution percent")) {
-                return Optional.of(DerivedGraphType.PERCENT_RESOLVED);
-            }
-        }
-
-        if (Objects.equals(normalizedGraphType, "indicator")) {
-            if (Objects.equals(normalizedName, "percent conformance")
-                || Objects.equals(normalizedName, "conformance percent")
-                || Objects.equals(normalizedName, "compliance percent")) {
-                return Optional.of(DerivedGraphType.PERCENT_CONFORMANCE);
-            }
-            if (Objects.equals(normalizedName, "percent resolved")
-                || Objects.equals(normalizedName, "resolution percent")) {
-                return Optional.of(DerivedGraphType.PERCENT_RESOLVED);
-            }
-        }
-
-        if (Objects.equals(normalizedGraphType, "bar")) {
-            if (Objects.equals(normalizedName, "non-conformances")) {
-                if (Objects.equals(normalizedTitle, "by facility")) {
-                    return Optional.of(DerivedGraphType.NON_CONFORMANCES_BY_FACILITY);
-                }
-                if (Objects.equals(normalizedTitle, "by water system type")) {
-                    return Optional.of(DerivedGraphType.NON_CONFORMANCES_BY_SYSTEM_TYPE);
-                }
-                if (Objects.equals(normalizedTitle, "by water quality category")) {
-                    return Optional.of(DerivedGraphType.NON_CONFORMANCES_BY_CATEGORY);
-                }
-            }
-            if (Objects.equals(normalizedName, "non-conformance status")) {
-                if (Objects.equals(normalizedTitle, "by facility")) {
-                    return Optional.of(DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY);
-                }
-                if (Objects.equals(normalizedTitle, "turnaround time")) {
-                    return Optional.of(DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME);
-                }
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    static String metadataValue(DerivedGraphType derivedGraphType) {
-        return derivedGraphType.metadataValue();
-    }
-
-    private static List<Map<String, Object>> buildPayload(
-        DerivedGraphType derivedGraphType,
+    static List<Map<String, Object>> buildPayload(
+        LocationDashboardImportStrategyConfig.DerivedGraphConfig derivedGraphDefinition,
         Graph graph,
-        List<LocationDashboardImportStrategy.ImportedObservation> observations,
-        List<CorrectiveActionState> correctiveActionStates
+        HistoricalDerivedData historicalData
     ) {
-        long totalSamples = observations.size();
-        long compliantSamples = observations.stream().filter(LocationDashboardImportStrategy.ImportedObservation::compliant).count();
-        long totalNonConformances = correctiveActionStates.size();
-        long resolvedNonConformances = correctiveActionStates.stream().filter(CorrectiveActionState::resolved).count();
+        LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType = derivedGraphDefinition.derivedType();
+        List<HistoricalSamplePoint> samplePoints = historicalData.allSamplePoints();
+        List<HistoricalCorrectiveAction> correctiveActions = historicalData.correctiveActions();
+
+        long totalSamples = samplePoints.stream().mapToLong(HistoricalSamplePoint::sampleCount).sum();
+        long compliantSamples = samplePoints.stream().mapToLong(HistoricalSamplePoint::compliantCount).sum();
+        long totalNonConformances = correctiveActions.size();
+        long resolvedNonConformances = correctiveActions.stream().filter(HistoricalCorrectiveAction::resolved).count();
         long activeNonConformances = totalNonConformances - resolvedNonConformances;
 
         return switch (derivedGraphType) {
@@ -174,29 +87,29 @@ final class LocationDashboardDerivedGraphSupport {
             case NON_CONFORMANCES_BY_FACILITY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActionStates, state -> state.draft().facilityName()),
+                countLabels(correctiveActions, HistoricalCorrectiveAction::facilityName),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_SYSTEM_TYPE -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActionStates, state -> state.draft().systemTypeName()),
+                countLabels(correctiveActions, HistoricalCorrectiveAction::systemTypeName),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_CATEGORY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActionStates, state -> state.draft().measurementName()),
+                countLabels(correctiveActions, HistoricalCorrectiveAction::measurementName),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
-            case NON_CONFORMANCE_STATUS_BY_FACILITY -> buildStatusByFacilityPayload(graph, correctiveActionStates);
+            case NON_CONFORMANCE_STATUS_BY_FACILITY -> buildStatusByFacilityPayload(graph, correctiveActions);
             case NON_CONFORMANCE_TURNAROUND_TIME -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Resolved",
-                countLabelsByTurnaround(correctiveActionStates),
+                countLabelsByTurnaround(correctiveActions),
                 RESOLVED_GRAPH_COLOR,
                 0
             ));
@@ -224,16 +137,16 @@ final class LocationDashboardDerivedGraphSupport {
 
     private static List<Map<String, Object>> buildStatusByFacilityPayload(
         Graph graph,
-        List<CorrectiveActionState> correctiveActionStates
+        List<HistoricalCorrectiveAction> correctiveActions
     ) {
         Map<String, long[]> countsByFacility = new LinkedHashMap<>();
-        for (CorrectiveActionState correctiveActionState : correctiveActionStates) {
-            String facilityName = normalizeLabel(correctiveActionState.draft().facilityName());
+        for (HistoricalCorrectiveAction correctiveAction : correctiveActions) {
+            String facilityName = normalizeLabel(correctiveAction.facilityName());
             if (facilityName == null) {
                 continue;
             }
             long[] counts = countsByFacility.computeIfAbsent(facilityName, ignored -> new long[2]);
-            if (correctiveActionState.resolved()) {
+            if (correctiveAction.resolved()) {
                 counts[1] += 1;
             } else {
                 counts[0] += 1;
@@ -246,15 +159,9 @@ final class LocationDashboardDerivedGraphSupport {
                 .thenComparing(Map.Entry::getKey))
             .toList();
 
-        List<String> facilityLabels = orderedCounts.stream()
-            .map(Map.Entry::getKey)
-            .toList();
-        List<Long> activeCounts = orderedCounts.stream()
-            .map(entry -> entry.getValue()[0])
-            .toList();
-        List<Long> resolvedCounts = orderedCounts.stream()
-            .map(entry -> entry.getValue()[1])
-            .toList();
+        List<String> facilityLabels = orderedCounts.stream().map(Map.Entry::getKey).toList();
+        List<Long> activeCounts = orderedCounts.stream().map(entry -> entry.getValue()[0]).toList();
+        List<Long> resolvedCounts = orderedCounts.stream().map(entry -> entry.getValue()[1]).toList();
 
         return List.of(
             buildHorizontalBarTrace(graph, "Active", facilityLabels, activeCounts, ACTIVE_GRAPH_COLOR, 0),
@@ -263,10 +170,10 @@ final class LocationDashboardDerivedGraphSupport {
     }
 
     private static Map<String, Long> countLabels(
-        List<CorrectiveActionState> correctiveActionStates,
-        Function<CorrectiveActionState, String> labelExtractor
+        List<HistoricalCorrectiveAction> correctiveActions,
+        Function<HistoricalCorrectiveAction, String> labelExtractor
     ) {
-        return correctiveActionStates.stream()
+        return correctiveActions.stream()
             .map(labelExtractor)
             .map(LocationDashboardDerivedGraphSupport::normalizeLabel)
             .filter(Objects::nonNull)
@@ -287,16 +194,17 @@ final class LocationDashboardDerivedGraphSupport {
             ));
     }
 
-    private static Map<String, Long> countLabelsByTurnaround(List<CorrectiveActionState> correctiveActionStates) {
+    private static Map<String, Long> countLabelsByTurnaround(List<HistoricalCorrectiveAction> correctiveActions) {
         Map<String, Long> countsByTurnaround = new LinkedHashMap<>();
-        correctiveActionStates.stream()
-            .filter(CorrectiveActionState::resolved)
+        TURNAROUND_BUCKETS.forEach(label -> countsByTurnaround.put(label, 0L));
+        correctiveActions.stream()
+            .filter(HistoricalCorrectiveAction::resolved)
             .map(LocationDashboardDerivedGraphSupport::turnaroundLabel)
             .filter(Objects::nonNull)
             .forEach(label -> countsByTurnaround.merge(label, 1L, Long::sum));
 
         return countsByTurnaround.entrySet().stream()
-            .sorted(Comparator.comparingInt(entry -> parseLeadingInteger(entry.getKey())))
+            .filter(entry -> entry.getValue() > 0L)
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
                 Map.Entry::getValue,
@@ -305,9 +213,9 @@ final class LocationDashboardDerivedGraphSupport {
             ));
     }
 
-    private static String turnaroundLabel(CorrectiveActionState correctiveActionState) {
-        LocalDate observedDate = correctiveActionState.draft().observedDate();
-        ServiceEvent serviceEvent = correctiveActionState.serviceEvent();
+    private static String turnaroundLabel(HistoricalCorrectiveAction correctiveAction) {
+        LocalDate observedDate = correctiveAction.observedDate();
+        ServiceEvent serviceEvent = correctiveAction.serviceEvent();
         if (observedDate == null || serviceEvent == null || serviceEvent.getEndEventDate() == null) {
             return null;
         }
@@ -317,20 +225,19 @@ final class LocationDashboardDerivedGraphSupport {
             serviceEvent.getEndEventTime() == null ? LocalTime.MIDNIGHT : serviceEvent.getEndEventTime()
         );
         long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(observedAt, resolvedAt));
-        return turnaroundDays == 1L ? "1 day" : turnaroundDays + " days";
-    }
-
-    private static int parseLeadingInteger(String value) {
-        if (value == null) {
-            return Integer.MAX_VALUE;
+        if (turnaroundDays < 3L) {
+            return "< 3 days";
         }
-        int index = value.indexOf(' ');
-        String numericPortion = index >= 0 ? value.substring(0, index) : value;
-        try {
-            return Integer.parseInt(numericPortion);
-        } catch (NumberFormatException ex) {
-            return Integer.MAX_VALUE;
+        if (turnaroundDays < 7L) {
+            return "< 1 week";
         }
+        if (turnaroundDays < 31L) {
+            return "< 1 month";
+        }
+        if (turnaroundDays < 92L) {
+            return "< 3 months";
+        }
+        return null;
     }
 
     private static Map<String, Object> buildPieTrace(
@@ -374,9 +281,7 @@ final class LocationDashboardDerivedGraphSupport {
         int traceIndex
     ) {
         List<String> labels = new ArrayList<>(countsByLabel.keySet());
-        List<Long> values = labels.stream()
-            .map(countsByLabel::get)
-            .toList();
+        List<Long> values = labels.stream().map(countsByLabel::get).toList();
         return buildHorizontalBarTrace(graph, traceName, labels, values, color, traceIndex);
     }
 
@@ -490,23 +395,6 @@ final class LocationDashboardDerivedGraphSupport {
         return Math.round((numerator * 100.0d) / denominator);
     }
 
-    private static String readLayoutTitleText(Graph graph) {
-        if (graph == null || graph.getLayout() == null) {
-            return null;
-        }
-        Object title = graph.getLayout().get("title");
-        if (title instanceof String stringTitle) {
-            return stringTitle;
-        }
-        if (title instanceof Map<?, ?> titleMap) {
-            Object text = titleMap.get("text");
-            if (text instanceof String stringText) {
-                return stringText;
-            }
-        }
-        return null;
-    }
-
     private static String resolveGraphType(Graph graph) {
         if (graph == null) {
             return null;
@@ -521,34 +409,6 @@ final class LocationDashboardDerivedGraphSupport {
         }
         Object traceType = currentData.getFirst().get("type");
         return traceType == null ? null : String.valueOf(traceType);
-    }
-
-    private static String readDerivedGraphTypeMetadata(Graph graph) {
-        if (graph == null || graph.getLayout() == null) {
-            return null;
-        }
-        Object meta = graph.getLayout().get("meta");
-        if (!(meta instanceof Map<?, ?> metaMap)) {
-            return null;
-        }
-        Object importMeta = metaMap.get("aphinityImport");
-        if (!(importMeta instanceof Map<?, ?> importMetaMap)) {
-            return null;
-        }
-        Object derivedGraphType = importMetaMap.get("derivedGraphType");
-        return derivedGraphType == null ? null : String.valueOf(derivedGraphType);
-    }
-
-    private static boolean isClearlyTestingGraphName(String graphName) {
-        String normalizedName = normalizeKey(graphName);
-        if (normalizedName == null) {
-            return false;
-        }
-        return normalizedName.contains("test")
-            || normalizedName.contains("renaming")
-            || normalizedName.contains("i'm renaming")
-            || normalizedName.contains("new plot graph")
-            || Objects.equals(normalizedName, "beats");
     }
 
     private static String normalizeLabel(String value) {
@@ -567,8 +427,23 @@ final class LocationDashboardDerivedGraphSupport {
         return normalized.isBlank() ? null : normalized;
     }
 
-    record CorrectiveActionState(
-        LocationDashboardImportStrategy.CorrectiveActionDraft draft,
+    record HistoricalSamplePoint(
+        LocalDate observedDate,
+        String facilityName,
+        String measurementName,
+        long sampleCount,
+        long compliantCount
+    ) {
+        long nonConformingCount() {
+            return Math.max(0L, sampleCount - compliantCount);
+        }
+    }
+
+    record HistoricalCorrectiveAction(
+        LocalDate observedDate,
+        String facilityName,
+        String systemTypeName,
+        String measurementName,
         ServiceEvent serviceEvent
     ) {
         boolean resolved() {
@@ -576,46 +451,30 @@ final class LocationDashboardDerivedGraphSupport {
         }
     }
 
-    record DerivedGraphUpdate(
-        Graph graph,
-        DerivedGraphType derivedGraphType,
-        List<Map<String, Object>> data
+    record HistoricalDerivedData(
+        Map<LocalDate, List<HistoricalSamplePoint>> samplesByDate,
+        List<HistoricalCorrectiveAction> correctiveActions
     ) {
-    }
-
-    enum DerivedGraphType {
-        TOTAL_SAMPLES("total_samples"),
-        TOTAL_NON_CONFORMANCES("total_non_conformances"),
-        ACTIVE_NON_CONFORMANCE_PERCENT("active_non_conformance_percent"),
-        PERCENT_CONFORMANCE("percent_conformance"),
-        PERCENT_RESOLVED("percent_resolved"),
-        NON_CONFORMANCES_BY_FACILITY("non_conformances_by_facility"),
-        NON_CONFORMANCES_BY_SYSTEM_TYPE("non_conformances_by_system_type"),
-        NON_CONFORMANCES_BY_CATEGORY("non_conformances_by_category"),
-        NON_CONFORMANCE_STATUS_BY_FACILITY("non_conformance_status_by_facility"),
-        NON_CONFORMANCE_TURNAROUND_TIME("non_conformance_turnaround_time");
-
-        private final String metadataValue;
-
-        DerivedGraphType(String metadataValue) {
-            this.metadataValue = metadataValue;
+        HistoricalDerivedData {
+            Map<LocalDate, List<HistoricalSamplePoint>> normalizedSamplesByDate = new LinkedHashMap<>();
+            if (samplesByDate != null) {
+                samplesByDate.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> normalizedSamplesByDate.put(
+                        entry.getKey(),
+                        entry.getValue() == null ? List.of() : List.copyOf(entry.getValue())
+                    ));
+            }
+            samplesByDate = Map.copyOf(normalizedSamplesByDate);
+            correctiveActions = correctiveActions == null ? List.of() : List.copyOf(correctiveActions);
         }
 
-        String metadataValue() {
-            return metadataValue;
-        }
-
-        static Optional<DerivedGraphType> fromMetadataValue(String rawValue) {
-            String normalized = normalizeKey(rawValue);
-            if (normalized == null) {
-                return Optional.empty();
+        List<HistoricalSamplePoint> allSamplePoints() {
+            Set<HistoricalSamplePoint> samplePoints = new LinkedHashSet<>();
+            for (List<HistoricalSamplePoint> bucket : samplesByDate.values()) {
+                samplePoints.addAll(bucket);
             }
-            for (DerivedGraphType value : values()) {
-                if (Objects.equals(value.metadataValue, normalized)) {
-                    return Optional.of(value);
-                }
-            }
-            return Optional.empty();
+            return List.copyOf(samplePoints);
         }
     }
 }

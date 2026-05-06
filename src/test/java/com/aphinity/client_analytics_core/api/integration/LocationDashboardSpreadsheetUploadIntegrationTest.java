@@ -6,9 +6,9 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.Comment;
 import org.apache.poi.ss.usermodel.CreationHelper;
-import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -41,23 +41,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         seedMeasurement(location, "HPC", new BigDecimal("10"));
         seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
 
-        Graph waterQualityGraph = createGraph("Water Quality Compliance", blankScatterData());
-        Graph systemTypeGraph = createGraph("System Type Compliance", blankScatterData());
-        Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
-        Graph totalNonConformancesGraph = createGraph("Total Non-Conformances", blankPieData());
-        Graph activePercentGraph = createGraph("Active Non-Conformance Percent", blankPieData());
-        Graph nonConformancesByFacilityGraph = createGraphWithLayout(
-            "Non-Conformances",
-            blankBarData(),
-            Map.of("title", Map.of("text", "By Facility"))
-        );
-        addLocationGraph(location, waterQualityGraph);
-        addLocationGraph(location, systemTypeGraph);
-        addLocationGraph(location, totalSamplesGraph);
-        addLocationGraph(location, totalNonConformancesGraph);
-        addLocationGraph(location, activePercentGraph);
-        addLocationGraph(location, nonConformancesByFacilityGraph);
-
+        HoagGraphFixture graphs = seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload@example.com", PASSWORD);
 
         mockMvc.perform(
@@ -73,31 +57,40 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(6))
+            .andExpect(jsonPath("$.length()").value(17))
             .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
             .andExpect(jsonPath("$[0].data[0].y[0]").value(0))
             .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
-            .andExpect(jsonPath("$[0].data[1].y[0]").value(0))
+            .andExpect(jsonPath("$[0].data[1].y[0]").value(33.333333333333336d))
             .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
             .andExpect(jsonPath("$[1].data[5].name").value("Cooling Towers"))
-            .andExpect(jsonPath("$[1].data[5].y[0]").value(0))
+            .andExpect(jsonPath("$[1].data[5].y[0]").value(16.666666666666668d))
             .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
             .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
             .andExpect(jsonPath("$[3].data[0].values[0]").value(1))
-            .andExpect(jsonPath("$[4].name").value("Active Non-Conformance Percent"))
-            .andExpect(jsonPath("$[4].data[0].values[0]").value(100))
-            .andExpect(jsonPath("$[5].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[5].data[0].x[0]").value(1))
-            .andExpect(jsonPath("$[5].data[0].y[0]").value("Newport Beach"));
+            .andExpect(jsonPath("$[4].name").value("Resolution Percent"))
+            .andExpect(jsonPath("$[4].data[0].value").value(0))
+            .andExpect(jsonPath("$[5].name").value("Percent Conformance"))
+            .andExpect(jsonPath("$[5].data[0].value").value(17))
+            .andExpect(jsonPath("$[6].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[6].data[0].x[0]").value(1))
+            .andExpect(jsonPath("$[6].data[0].y[0]").value("HPC"))
+            .andExpect(jsonPath("$[7].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[7].data[0].x[0]").value(1))
+            .andExpect(jsonPath("$[7].data[0].y[0]").value("Cooling Towers"))
+            .andExpect(jsonPath("$[8].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[8].data[0].x[0]").value(1))
+            .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
 
-        Graph persistedWaterQualityGraph = reloadGraph(waterQualityGraph.getId());
-        Graph persistedSystemTypeGraph = reloadGraph(systemTypeGraph.getId());
-        Graph persistedTotalSamplesGraph = reloadGraph(totalSamplesGraph.getId());
-        Graph persistedTotalNonConformancesGraph = reloadGraph(totalNonConformancesGraph.getId());
-        Graph persistedActivePercentGraph = reloadGraph(activePercentGraph.getId());
-        Graph persistedNonConformancesByFacilityGraph = reloadGraph(nonConformancesByFacilityGraph.getId());
+        Graph persistedWaterQualityGraph = reloadGraph(graphs.waterQualityGraph().getId());
+        Graph persistedSystemTypeGraph = reloadGraph(graphs.systemTypeGraph().getId());
+        Graph persistedTotalSamplesGraph = reloadGraph(graphs.totalSamplesGraph().getId());
+        Graph persistedTotalNonConformancesGraph = reloadGraph(graphs.totalNonConformancesGraph().getId());
+        Graph persistedResolutionPercentGraph = reloadGraph(graphs.resolutionPercentGraph().getId());
+        Graph persistedPercentConformanceGraph = reloadGraph(graphs.percentConformanceGraph().getId());
+        Graph persistedByFacilityGraph = reloadGraph(graphs.byFacilityGraph().getId());
 
         assertThat(graphData(persistedWaterQualityGraph))
             .extracting(trace -> trace.get("name"))
@@ -123,9 +116,10 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         assertEquals("Cooling Towers", graphData(persistedSystemTypeGraph).get(5).get("name"));
         assertEquals(List.of(6L), graphData(persistedTotalSamplesGraph).getFirst().get("values"));
         assertEquals(List.of(1L), graphData(persistedTotalNonConformancesGraph).getFirst().get("values"));
-        assertEquals(List.of(100L, 0L), graphData(persistedActivePercentGraph).getFirst().get("values"));
-        assertEquals(List.of(1L), graphData(persistedNonConformancesByFacilityGraph).getFirst().get("x"));
-        assertEquals(List.of("Newport Beach"), graphData(persistedNonConformancesByFacilityGraph).getFirst().get("y"));
+        assertEquals(0L, ((Number) graphData(persistedResolutionPercentGraph).getFirst().get("value")).longValue());
+        assertEquals(17L, ((Number) graphData(persistedPercentConformanceGraph).getFirst().get("value")).longValue());
+        assertEquals(List.of(1L), graphData(persistedByFacilityGraph).getFirst().get("x"));
+        assertEquals(List.of("Newport Beach"), graphData(persistedByFacilityGraph).getFirst().get("y"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(1, persistedEvents.size());
@@ -143,13 +137,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         seedMeasurement(location, "HPC", new BigDecimal("10"));
         seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
 
-        Graph waterQualityGraph = createGraph("Water Quality Compliance", blankScatterData());
-        Graph systemTypeGraph = createGraph("System Type Compliance", blankScatterData());
-        Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
-        addLocationGraph(location, waterQualityGraph);
-        addLocationGraph(location, systemTypeGraph);
-        addLocationGraph(location, totalSamplesGraph);
-
+        seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-shifted@example.com", PASSWORD);
 
         mockMvc.perform(
@@ -165,7 +153,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$.length()").value(17))
             .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
             .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6));
@@ -183,11 +171,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         seedMeasurement(location, "HPC", new BigDecimal("10"));
         seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
 
-        Graph waterQualityGraph = createGraph("Water Quality Compliance", blankScatterData());
-        Graph systemTypeGraph = createGraph("System Type Compliance", blankScatterData());
-        addLocationGraph(location, waterQualityGraph);
-        addLocationGraph(location, systemTypeGraph);
-
+        seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-reupload@example.com", PASSWORD);
 
         uploadDashboardSpreadsheet(location.getId(), authCookies, createDashboardSpreadsheet(
@@ -269,6 +253,17 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         ));
     }
 
+    private List<Map<String, Object>> blankIndicatorData() {
+        return List.of(Map.of(
+            "type", "indicator",
+            "name", "Trace 1",
+            "mode", "gauge+number",
+            "value", 0,
+            "number", Map.of("suffix", "%"),
+            "gauge", Map.of("axis", Map.of("range", List.of(0, 100)))
+        ));
+    }
+
     private List<Map<String, Object>> blankBarData() {
         return List.of(Map.of(
             "type", "bar",
@@ -283,6 +278,72 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         Graph graph = createGraph(name, data);
         graph.setLayout(layout);
         return graphRepository.saveAndFlush(graph);
+    }
+
+    private Graph createGraphWithTitle(String name, String titleText, Object data) {
+        return createGraphWithLayout(name, data, Map.of("title", Map.of("text", titleText)));
+    }
+
+    private HoagGraphFixture seedHoagStrategyGraphs(Location location) {
+        Graph waterQualityGraph = createGraphWithTitle("Water Quality Compliance", "Newport Beach", blankScatterData());
+        Graph systemTypeGraph = createGraphWithTitle("System Type Compliance", "Newport Beach", blankScatterData());
+        Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
+        Graph totalNonConformancesGraph = createGraph("Total Non-Conformances", blankPieData());
+        Graph resolutionPercentGraph = createGraph("Resolution Percent", blankIndicatorData());
+        Graph percentConformanceGraph = createGraph("Percent Conformance", blankIndicatorData());
+        Graph byWaterQualityGraph = createGraphWithLayout(
+            "Non-Conformances",
+            blankBarData(),
+            Map.of("title", Map.of("text", "By Water Quality"))
+        );
+        Graph bySystemTypeGraph = createGraphWithLayout(
+            "Non-Conformances",
+            blankBarData(),
+            Map.of("title", Map.of("text", "By System Type"))
+        );
+        Graph byFacilityGraph = createGraphWithLayout(
+            "Non-Conformances",
+            blankBarData(),
+            Map.of("title", Map.of("text", "By Facility"))
+        );
+        Graph turnaroundTimeGraph = createGraphWithLayout(
+            "Non-Conformance Status",
+            blankBarData(),
+            Map.of("title", Map.of("text", "Turnaround Time"))
+        );
+        Graph statusByFacilityGraph = createGraphWithLayout(
+            "Non-Conformance Status",
+            blankBarData(),
+            Map.of("title", Map.of("text", "By Facility"))
+        );
+
+        addLocationGraph(location, waterQualityGraph);
+        addLocationGraph(location, systemTypeGraph);
+        addLocationGraph(location, totalSamplesGraph);
+        addLocationGraph(location, totalNonConformancesGraph);
+        addLocationGraph(location, resolutionPercentGraph);
+        addLocationGraph(location, percentConformanceGraph);
+        addLocationGraph(location, byWaterQualityGraph);
+        addLocationGraph(location, bySystemTypeGraph);
+        addLocationGraph(location, byFacilityGraph);
+        addLocationGraph(location, turnaroundTimeGraph);
+        addLocationGraph(location, statusByFacilityGraph);
+        addLocationGraph(location, createGraphWithTitle("Water Quality Compliance", "Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("System Type Compliance", "Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("Water Quality Compliance", "16405 Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("System Type Compliance", "16405 Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("Water Quality Compliance", "Surgical Pavilion", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("System Type Compliance", "Surgical Pavilion", blankScatterData()));
+
+        return new HoagGraphFixture(
+            waterQualityGraph,
+            systemTypeGraph,
+            totalSamplesGraph,
+            totalNonConformancesGraph,
+            resolutionPercentGraph,
+            percentConformanceGraph,
+            byFacilityGraph
+        );
     }
 
     private byte[] createDashboardSpreadsheet(
@@ -333,7 +394,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             dataRow.createCell(5).setCellValue(10);
             dataRow.createCell(6).setCellValue(10);
             dataRow.createCell(7).setCellValue(10);
-            dataRow.createCell(8).setCellValue(2);
+            dataRow.createCell(8).setCellValue(0.5);
             dataRow.createCell(9).setCellValue(2);
             dataRow.createCell(10).setCellValue(2);
 
@@ -400,7 +461,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             dataRow.createCell(5).setCellValue(10);
             dataRow.createCell(6).setCellValue(10);
             dataRow.createCell(7).setCellValue(10);
-            dataRow.createCell(8).setCellValue(2);
+            dataRow.createCell(8).setCellValue(0.5);
             dataRow.createCell(9).setCellValue(2);
             dataRow.createCell(10).setCellValue(2);
 
@@ -439,5 +500,16 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         Comment comment = drawing.createCellComment(anchor);
         comment.setString(creationHelper.createRichTextString(value));
         cell.setCellComment(comment);
+    }
+
+    private record HoagGraphFixture(
+        Graph waterQualityGraph,
+        Graph systemTypeGraph,
+        Graph totalSamplesGraph,
+        Graph totalNonConformancesGraph,
+        Graph resolutionPercentGraph,
+        Graph percentConformanceGraph,
+        Graph byFacilityGraph
+    ) {
     }
 }

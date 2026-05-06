@@ -11,6 +11,8 @@ public interface LocationDashboardImportStrategy {
 
     List<LocationDashboardImportStrategyConfig.GraphConfig> graphDefinitions();
 
+    List<LocationDashboardImportStrategyConfig.DerivedGraphConfig> derivedGraphDefinitions();
+
     LocationDashboardImportComputation computeImport(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
         List<MeasurementBound> measurementBounds

@@ -34,6 +34,8 @@ public interface ServiceEventRepository extends JpaRepository<ServiceEvent, Long
         Collection<String> titles
     );
 
+    List<ServiceEvent> findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(Long locationId);
+
     Optional<ServiceEvent> findByIdAndLocation_Id(Long eventId, Long locationId);
 
     @Modifying(flushAutomatically = true)

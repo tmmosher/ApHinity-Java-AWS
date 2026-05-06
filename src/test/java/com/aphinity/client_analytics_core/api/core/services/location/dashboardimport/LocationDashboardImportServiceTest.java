@@ -65,102 +65,242 @@ class LocationDashboardImportServiceTest {
     private LocationRepository locationRepository;
 
     @Test
-    void importLocationDashboardUpdatesConfiguredAndDerivedGraphs() {
+    void importLocationDashboardUpsertsImportedTimeSeriesAndRebuildsDerivedGraphsFromHistoricalData() {
         LocationDashboardImportService importService = buildImportService();
-
-        MockMultipartFile file = new MockMultipartFile(
-            "file",
-            "dashboard.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            new byte[] {1, 2, 3}
-        );
-        Location location = new Location();
-        location.setId(9L);
-        location.setName("Newport Beach");
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
         when(spreadsheetParser.parse(file)).thenReturn(workbook);
 
-        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance");
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance");
+        Graph waterQualityGraph = graph(
+            18L,
+            "Water Quality Compliance",
+            "scatter",
+            Map.of("title", Map.of("text", "Newport Beach")),
+            List.of(
+                scatterTrace(
+                    "HPC",
+                    List.of("2025-07-01", "2025-08-01"),
+                    List.of(100.0d, 100.0d),
+                    List.of(
+                        Map.of("sampleCount", 3, "compliantCount", 3, "nonConformingCount", 0),
+                        Map.of("sampleCount", 9, "compliantCount", 9, "nonConformingCount", 0)
+                    )
+                ),
+                scatterTrace("Endotoxin", List.of(), List.of(), List.of())
+            )
+        );
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
         Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples");
         Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
-        Graph activePercentGraph = pieGraph(22L, "Active Non-Conformance Percent");
-        Graph nonConformancesByFacilityGraph = barGraph(23L, "Non-Conformances", "By Facility");
-        Graph nonConformanceStatusByFacilityGraph = barGraph(24L, "Non-Conformance Status", "By Facility");
-        Graph turnaroundTimeGraph = barGraph(25L, "Non-Conformance Status", "Turnaround Time");
+        Graph resolutionPercentGraph = indicatorGraph(22L, "Resolution Percent");
+        Graph percentConformanceGraph = indicatorGraph(23L, "Percent Conformance");
+        Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality");
+        Graph bySystemTypeGraph = barGraph(25L, "Non-Conformances", "By System Type");
+        Graph byFacilityGraph = barGraph(26L, "Non-Conformances", "By Facility");
+        Graph statusByFacilityGraph = barGraph(27L, "Non-Conformance Status", "By Facility");
+        Graph turnaroundTimeGraph = barGraph(28L, "Non-Conformance Status", "Turnaround Time");
+
         List<Graph> graphs = List.of(
-            locationGraph(9L, waterQualityGraph),
-            locationGraph(9L, systemTypeGraph),
-            locationGraph(9L, totalSamplesGraph),
-            locationGraph(9L, totalNonConformancesGraph),
-            locationGraph(9L, activePercentGraph),
-            locationGraph(9L, nonConformancesByFacilityGraph),
-            locationGraph(9L, nonConformanceStatusByFacilityGraph),
-            locationGraph(9L, turnaroundTimeGraph)
-        ).stream().map(LocationGraph::getGraph).toList();
+            waterQualityGraph,
+            systemTypeGraph,
+            totalSamplesGraph,
+            totalNonConformancesGraph,
+            resolutionPercentGraph,
+            percentConformanceGraph,
+            byWaterQualityGraph,
+            bySystemTypeGraph,
+            byFacilityGraph,
+            statusByFacilityGraph,
+            turnaroundTimeGraph
+        );
         when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
             .map(graph -> locationGraph(9L, graph))
             .toList());
-        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList()))
-            .thenReturn(graphs);
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList())).thenReturn(graphs);
+        when(graphRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LocationDashboardImportStrategy.CorrectiveActionDraft importedDraft = strategy.computeImport(workbook, measurementBounds())
+            .correctiveActions()
+            .getFirst();
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(eq(9L), anyList()))
             .thenReturn(List.of());
+        when(serviceEventRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(
+                correctiveActionEvent(
+                    location,
+                    501L,
+                    "CA: Historic HPC",
+                    correctiveActionDescription("HPC", LocalDate.parse("2025-07-01"), "Newport Beach", "Cooling Towers", "Historic cleanup"),
+                    LocalDate.parse("2025-07-01"),
+                    LocalDate.parse("2025-07-03"),
+                    LocalTime.NOON,
+                    ServiceEventStatus.COMPLETED
+                ),
+                correctiveActionEvent(
+                    location,
+                    502L,
+                    importedDraft.title(),
+                    importedDraft.description(),
+                    LocalDate.parse("2025-08-01"),
+                    LocalDate.parse("2025-08-01"),
+                    LocalTime.of(23, 59, 59),
+                    ServiceEventStatus.OVERDUE
+                )
+            ));
+
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+
+        assertEquals(11, responses.size());
+        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("x"));
+        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 0.0d);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> hpcCustomData = (List<Map<String, Object>>) findResponseByName(responses, "Water Quality Compliance")
+            .data()
+            .getFirst()
+            .get("customdata");
+        assertEquals(2L, ((Number) hpcCustomData.get(1).get("sampleCount")).longValue());
+
+        assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
+        assertEquals(List.of(2L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        assertEquals(50L, ((Number) findResponseByName(responses, "Resolution Percent").data().getFirst().get("value")).longValue());
+        assertEquals(57L, ((Number) findResponseByName(responses, "Percent Conformance").data().getFirst().get("value")).longValue());
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality").data().getFirst().get("x"));
+        assertEquals(List.of("HPC"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality").data().getFirst().get("y"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By System Type").data().getFirst().get("x"));
+        assertEquals(List.of("Cooling Towers"), findResponseByNameAndTitle(responses, "Non-Conformances", "By System Type").data().getFirst().get("y"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
+        assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) findResponseByName(responses, "Percent Conformance").layout().get("meta");
+        assertTrue(meta.containsKey("aphinityImport"));
+        verify(locationRepository).touchUpdatedAt(eq(9L), any(Instant.class));
+    }
+
+    private void assertNumericValues(Object rawValues, double... expectedValues) {
+        @SuppressWarnings("unchecked")
+        List<Number> values = (List<Number>) rawValues;
+        assertEquals(expectedValues.length, values.size());
+        for (int index = 0; index < expectedValues.length; index += 1) {
+            assertEquals(expectedValues[index], values.get(index).doubleValue());
+        }
+    }
+
+    @Test
+    void importLocationDashboardMatchesGraphsByGraphNameAndLayoutTitle() {
+        LocationDashboardImportService importService = buildImportService();
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
+        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+
+        ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Newport Beach",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "newport-beach",
+                        "Newport Beach",
+                        List.of("Newport Beach"),
+                        List.of(),
+                        true
+                    ),
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "irvine",
+                        "Irvine",
+                        List.of("Irvine"),
+                        List.of(),
+                        true
+                    )
+                ),
+                List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                    "cooling-towers",
+                    "Cooling Towers",
+                    LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                    List.of("Cooling Towers")
+                )),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.GraphConfig(
+                        "newport-beach-water-quality-compliance",
+                        "Water Quality Compliance",
+                        "Newport Beach",
+                        LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                        "newport-beach",
+                        List.of("HPC", "Endotoxin"),
+                        Map.of("HPC", "#1f77b4", "Endotoxin", "#2ca02c"),
+                        "scatter"
+                    ),
+                    new LocationDashboardImportStrategyConfig.GraphConfig(
+                        "irvine-water-quality-compliance",
+                        "Water Quality Compliance",
+                        "Irvine",
+                        LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                        "irvine",
+                        List.of("HPC", "Endotoxin"),
+                        Map.of("HPC", "#1f77b4", "Endotoxin", "#2ca02c"),
+                        "scatter"
+                    )
+                ),
+                List.of()
+            )
+        );
+
+        when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
+        when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
+
+        Graph newportQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
+        Graph irvineQualityGraph = scatterGraph(19L, "Water Quality Compliance", "Irvine");
+        List<Graph> graphs = List.of(newportQualityGraph, irvineQualityGraph);
+        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
+            .map(graph -> locationGraph(9L, graph))
+            .toList());
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList())).thenReturn(graphs);
         when(graphRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(eq(9L), anyList()))
+            .thenReturn(List.of());
         when(serviceEventRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        assertEquals(8, responses.size());
-        assertEquals(List.of(0L), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"));
-        assertEquals(List.of(0L), findResponseByName(responses, "System Type Compliance").data().getFirst().get("y"));
-        assertEquals(List.of(2L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
-        assertEquals(List.of(1L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
-        assertEquals(List.of(100L, 0L), findResponseByName(responses, "Active Non-Conformance Percent").data().getFirst().get("values"));
-        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
-        assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
-        assertEquals("Active", findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("name"));
-        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
-        assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
+        assertEquals(2, responses.size());
         @SuppressWarnings("unchecked")
-        Map<String, Object> meta = (Map<String, Object>) findResponseByName(responses, "Water Quality Compliance").layout().get("meta");
-        assertTrue(meta.containsKey("aphinityImport"));
-
-        verify(serviceEventRepository).saveAllAndFlush(org.mockito.ArgumentMatchers.argThat((Iterable<ServiceEvent> events) -> {
-            List<ServiceEvent> eventList = new java.util.ArrayList<>();
-            events.forEach(eventList::add);
-            if (eventList.size() != 1) {
-                return false;
-            }
-            ServiceEvent event = eventList.getFirst();
-            return event.isCorrectiveAction()
-                && event.getTitle().startsWith("CA: HPC 2025-08-01")
-                && event.getDescription().contains("CA: Drain Tank, install new DI bottles")
-                && event.getStatus() == ServiceEventStatus.OVERDUE;
-        }));
-        verify(locationRepository).touchUpdatedAt(eq(9L), org.mockito.ArgumentMatchers.any(Instant.class));
+        Map<String, Object> importMeta = (Map<String, Object>) ((Map<String, Object>) responses.getFirst().layout().get("meta")).get("aphinityImport");
+        assertEquals("Water Quality Compliance", importMeta.get("graphName"));
+        assertEquals("Newport Beach", importMeta.get("graphTitle"));
+        assertEquals(
+            List.of("Newport Beach", "Irvine"),
+            responses.stream()
+                .map(response -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> title = (Map<String, Object>) response.layout().get("title");
+                    return (String) title.get("text");
+                })
+                .toList()
+        );
     }
 
     @Test
     void importLocationDashboardRejectsWorkbookTitleMismatchBeforeLoadingMeasurements() {
         LocationDashboardImportService importService = buildImportService();
-        MockMultipartFile file = new MockMultipartFile(
-            "file",
-            "dashboard.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            new byte[] {1, 2, 3}
-        );
-        Location location = new Location();
-        location.setId(9L);
-        location.setName("Newport Beach");
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
 
         when(spreadsheetParser.parse(file)).thenReturn(workbook("Wrong Beach", "Drain Tank, install new DI bottles", "F5"));
-        when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(buildStrategy()));
+        when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(buildStrategy(allDerivedGraphDefinitions())));
 
         ApiClientException error = assertThrows(
             ApiClientException.class,
@@ -174,64 +314,63 @@ class LocationDashboardImportServiceTest {
     @Test
     void importLocationDashboardPreservesExistingCorrectiveActionResolutionStateOnReimport() {
         LocationDashboardImportService importService = buildImportService();
-        MockMultipartFile file = new MockMultipartFile(
-            "file",
-            "dashboard.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            new byte[] {1, 2, 3}
-        );
-        Location location = new Location();
-        location.setId(9L);
-        location.setName("Newport Beach");
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
 
-        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(List.of(
+            derivedGraphDefinition("resolution-percent", "Resolution Percent", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
+            derivedGraphDefinition("non-conformance-status-by-turnaround-time", "Non-Conformance Status", "Turnaround Time", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME, "bar"),
+            derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")
+        ));
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
         when(spreadsheetParser.parse(file)).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance");
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance");
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
         Graph resolutionPercentGraph = indicatorGraph(20L, "Resolution Percent");
         Graph turnaroundTimeGraph = barGraph(21L, "Non-Conformance Status", "Turnaround Time");
-        Graph nonConformanceStatusByFacilityGraph = barGraph(22L, "Non-Conformance Status", "By Facility");
+        Graph statusByFacilityGraph = barGraph(22L, "Non-Conformance Status", "By Facility");
         List<Graph> graphs = List.of(
-            locationGraph(9L, waterQualityGraph),
-            locationGraph(9L, systemTypeGraph),
-            locationGraph(9L, resolutionPercentGraph),
-            locationGraph(9L, turnaroundTimeGraph),
-            locationGraph(9L, nonConformanceStatusByFacilityGraph)
-        ).stream().map(LocationGraph::getGraph).toList();
+            waterQualityGraph,
+            systemTypeGraph,
+            resolutionPercentGraph,
+            turnaroundTimeGraph,
+            statusByFacilityGraph
+        );
         when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
             .map(graph -> locationGraph(9L, graph))
             .toList());
-        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList()))
-            .thenReturn(graphs);
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(9L), anyList())).thenReturn(graphs);
+        when(graphRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ServiceEvent existingEvent = new ServiceEvent();
-        existingEvent.setId(501L);
-        existingEvent.setLocation(location);
-        existingEvent.setCorrectiveAction(true);
-        existingEvent.setEventDate(LocalDate.parse("2025-08-01"));
-        existingEvent.setEventTime(LocalTime.MIDNIGHT);
-        existingEvent.setEndEventDate(LocalDate.parse("2025-08-03"));
-        existingEvent.setEndEventTime(LocalTime.NOON);
-        existingEvent.setStatus(ServiceEventStatus.COMPLETED);
-        existingEvent.setTitle(strategy.computeImport(
+        LocationDashboardImportStrategy.CorrectiveActionDraft originalDraft = strategy.computeImport(
             workbook("Newport Beach", "Initial DI bottle change", "F5"),
             measurementBounds()
-        ).correctiveActions().getFirst().title());
+        ).correctiveActions().getFirst();
+
+        ServiceEvent existingEvent = correctiveActionEvent(
+            location,
+            501L,
+            originalDraft.title(),
+            originalDraft.description(),
+            LocalDate.parse("2025-08-01"),
+            LocalDate.parse("2025-08-03"),
+            LocalTime.NOON,
+            ServiceEventStatus.COMPLETED
+        );
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(eq(9L), anyList()))
             .thenReturn(List.of(existingEvent));
-
-        when(graphRepository.saveAllAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(serviceEventRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(existingEvent));
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(5, responses.size());
         assertEquals(100L, ((Number) findResponseByName(responses, "Resolution Percent").data().getFirst().get("value")).longValue());
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
-        assertEquals(List.of("2 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+        assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
         assertEquals(List.of(0L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
 
@@ -265,7 +404,9 @@ class LocationDashboardImportServiceTest {
         );
     }
 
-    private ConfiguredLocationDashboardImportStrategy buildStrategy() {
+    private ConfiguredLocationDashboardImportStrategy buildStrategy(
+        List<LocationDashboardImportStrategyConfig.DerivedGraphConfig> derivedGraphs
+    ) {
         return new ConfiguredLocationDashboardImportStrategy(
             new LocationDashboardImportStrategyConfig(
                 "Newport Beach",
@@ -286,6 +427,7 @@ class LocationDashboardImportServiceTest {
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "water-quality",
                         "Water Quality Compliance",
+                        "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                         "newport-beach",
                         List.of("HPC", "Endotoxin"),
@@ -295,15 +437,41 @@ class LocationDashboardImportServiceTest {
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "system-type",
                         "System Type Compliance",
+                        "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "newport-beach",
                         List.of("Cooling Towers"),
                         Map.of("Cooling Towers", "#d62728"),
                         "scatter"
                     )
-                )
+                ),
+                derivedGraphs
             )
         );
+    }
+
+    private List<LocationDashboardImportStrategyConfig.DerivedGraphConfig> allDerivedGraphDefinitions() {
+        return List.of(
+            derivedGraphDefinition("total-samples", "Total Number of Samples", null, LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_SAMPLES, "pie"),
+            derivedGraphDefinition("total-non-conformances", "Total Non-Conformances", null, LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_NON_CONFORMANCES, "pie"),
+            derivedGraphDefinition("resolution-percent", "Resolution Percent", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
+            derivedGraphDefinition("percent-conformance", "Percent Conformance", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_CONFORMANCE, "indicator"),
+            derivedGraphDefinition("non-conformances-by-water-quality", "Non-Conformances", "By Water Quality", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_CATEGORY, "bar"),
+            derivedGraphDefinition("non-conformances-by-system-type", "Non-Conformances", "By System Type", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_SYSTEM_TYPE, "bar"),
+            derivedGraphDefinition("non-conformances-by-facility", "Non-Conformances", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_FACILITY, "bar"),
+            derivedGraphDefinition("non-conformance-status-by-turnaround-time", "Non-Conformance Status", "Turnaround Time", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME, "bar"),
+            derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")
+        );
+    }
+
+    private LocationDashboardImportStrategyConfig.DerivedGraphConfig derivedGraphDefinition(
+        String id,
+        String name,
+        String title,
+        LocationDashboardImportStrategyConfig.DerivedGraphType derivedType,
+        String graphType
+    ) {
+        return new LocationDashboardImportStrategyConfig.DerivedGraphConfig(id, name, title, derivedType, graphType);
     }
 
     private List<MeasurementBound> measurementBounds() {
@@ -311,6 +479,22 @@ class LocationDashboardImportServiceTest {
             measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("10")),
             measurementBound(2L, "Endotoxin", null, null, null, null, null, null, null, new BigDecimal("1"))
         );
+    }
+
+    private MockMultipartFile dashboardFile() {
+        return new MockMultipartFile(
+            "file",
+            "dashboard.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[] {1, 2, 3}
+        );
+    }
+
+    private Location location(Long id, String name) {
+        Location location = new Location();
+        location.setId(id);
+        location.setName(name);
+        return location;
     }
 
     private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook(
@@ -340,10 +524,36 @@ class LocationDashboardImportServiceTest {
                         new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
                             "Endotoxin",
                             LocalDate.parse("2025-08-01"),
+                            "0",
+                            new BigDecimal("0"),
+                            null,
+                            "I5"
+                        )
+                    )
+                ),
+                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    6,
+                    null,
+                    null,
+                    null,
+                    "Recirc Line",
+                    "CTI/514P",
+                    List.of(
+                        new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "HPC",
+                            LocalDate.parse("2025-08-01"),
+                            "11",
+                            new BigDecimal("11"),
+                            null,
+                            "F6"
+                        ),
+                        new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "Endotoxin",
+                            LocalDate.parse("2025-08-01"),
                             "2",
                             new BigDecimal("2"),
                             null,
-                            "I5"
+                            "I6"
                         )
                     )
                 )
@@ -351,21 +561,12 @@ class LocationDashboardImportServiceTest {
         );
     }
 
-    private Graph scatterGraph(Long id, String name) {
-        return graph(id, name, "scatter", Map.of(), List.of());
+    private Graph scatterGraph(Long id, String name, String titleText) {
+        return graph(id, name, "scatter", Map.of("title", Map.of("text", titleText)), List.of());
     }
 
     private Graph pieGraph(Long id, String name) {
-        return graph(id, name, "pie", Map.of(
-            "annotations", List.of(Map.of(
-                "x", 0.5,
-                "y", 0.5,
-                "text", "<b>0</b>",
-                "xref", "paper",
-                "yref", "paper",
-                "showarrow", false
-            ))
-        ), List.of(Map.of(
+        return graph(id, name, "pie", Map.of(), List.of(Map.of(
             "type", "pie",
             "name", "Trace 1",
             "hole", 0.72,
@@ -386,15 +587,29 @@ class LocationDashboardImportServiceTest {
     }
 
     private Graph barGraph(Long id, String name, String titleText) {
-        return graph(id, name, "bar", Map.of(
-            "title", Map.of("text", titleText)
-        ), List.of(Map.of(
+        return graph(id, name, "bar", Map.of("title", Map.of("text", titleText)), List.of(Map.of(
             "type", "bar",
             "name", "Trace 1",
             "x", List.of(),
             "y", List.of(),
             "orientation", "h"
         )));
+    }
+
+    private Map<String, Object> scatterTrace(
+        String name,
+        List<String> x,
+        List<Double> y,
+        List<Map<String, Object>> customData
+    ) {
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("type", "scatter");
+        trace.put("name", name);
+        trace.put("x", x);
+        trace.put("y", y);
+        trace.put("customdata", customData);
+        trace.put("mode", "lines+markers");
+        return trace;
     }
 
     private Graph graph(Long id, String name, String graphType, Map<String, Object> layout, List<Map<String, Object>> data) {
@@ -409,6 +624,47 @@ class LocationDashboardImportServiceTest {
         graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
         graph.setData(data);
         return graph;
+    }
+
+    private ServiceEvent correctiveActionEvent(
+        Location location,
+        Long id,
+        String title,
+        String description,
+        LocalDate observedDate,
+        LocalDate endDate,
+        LocalTime endTime,
+        ServiceEventStatus status
+    ) {
+        ServiceEvent serviceEvent = new ServiceEvent();
+        serviceEvent.setId(id);
+        serviceEvent.setLocation(location);
+        serviceEvent.setCorrectiveAction(true);
+        serviceEvent.setTitle(title);
+        serviceEvent.setDescription(description);
+        serviceEvent.setEventDate(observedDate);
+        serviceEvent.setEventTime(LocalTime.MIDNIGHT);
+        serviceEvent.setEndEventDate(endDate);
+        serviceEvent.setEndEventTime(endTime);
+        serviceEvent.setStatus(status);
+        return serviceEvent;
+    }
+
+    private String correctiveActionDescription(
+        String measurementName,
+        LocalDate observedDate,
+        String sublocation,
+        String systemType,
+        String actionText
+    ) {
+        return String.join("\n", List.of(
+            "Measurement: " + measurementName,
+            "Observed At: " + observedDate,
+            "Sublocation: " + sublocation,
+            "System: " + systemType,
+            "",
+            "CA: " + actionText
+        ));
     }
 
     private GraphResponse findResponseByName(List<GraphResponse> responses, String graphName) {

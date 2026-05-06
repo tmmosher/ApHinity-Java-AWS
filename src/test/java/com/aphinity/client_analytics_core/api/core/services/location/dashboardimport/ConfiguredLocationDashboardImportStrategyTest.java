@@ -107,12 +107,14 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                     "16405-irvine-water-quality",
                     "Water Quality Compliance",
+                    "16405 Irvine",
                     LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                     "16405-irvine",
                     List.of("HPC"),
                     Map.of("HPC", "#1f77b4"),
                     "scatter"
-                ))
+                )),
+                List.of()
             )
         );
 
@@ -194,7 +196,8 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         null,
                         List.of("Cooling Towers")
                     )),
-                    List.of(validWaterQualityGraphConfig())
+                    List.of(validWaterQualityGraphConfig()),
+                    List.of()
                 )
             )
         );
@@ -225,17 +228,95 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                         "water-quality",
                         "Water Quality Compliance",
+                        "Newport Beach",
                         null,
                         "newport-beach",
                         List.of("HPC", "Endotoxin"),
                         Map.of("HPC", "#1f77b4", "Endotoxin", "#2ca02c"),
                         "scatter"
-                    ))
+                    )),
+                    List.of()
                 )
             )
         );
 
         assertTrue(error.getMessage().contains("import type"));
+    }
+
+    @Test
+    void constructorRejectsDuplicateGraphNameTitleCombination() {
+        IllegalStateException error = assertThrows(
+            IllegalStateException.class,
+            () -> new ConfiguredLocationDashboardImportStrategy(
+                new LocationDashboardImportStrategyConfig(
+                    "Newport Beach",
+                    List.of(new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "newport-beach",
+                        "Newport Beach",
+                        List.of("Newport Beach"),
+                        List.of(),
+                        true
+                    )),
+                    List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "cooling-towers",
+                        "Cooling Towers",
+                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        List.of("Cooling Towers")
+                    )),
+                    List.of(
+                        validWaterQualityGraphConfig(),
+                        new LocationDashboardImportStrategyConfig.GraphConfig(
+                            "water-quality-duplicate",
+                            "Water Quality Compliance",
+                            "Newport Beach",
+                            LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                            "newport-beach",
+                            List.of("HPC", "Endotoxin"),
+                            Map.of("HPC", "#1f77b4", "Endotoxin", "#2ca02c"),
+                            "scatter"
+                        )
+                    ),
+                    List.of()
+                )
+            )
+        );
+
+        assertTrue(error.getMessage().contains("name/title combinations"));
+    }
+
+    @Test
+    void constructorRejectsImportedAndDerivedGraphNameTitleCollision() {
+        IllegalStateException error = assertThrows(
+            IllegalStateException.class,
+            () -> new ConfiguredLocationDashboardImportStrategy(
+                new LocationDashboardImportStrategyConfig(
+                    "Newport Beach",
+                    List.of(new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "newport-beach",
+                        "Newport Beach",
+                        List.of("Newport Beach"),
+                        List.of(),
+                        true
+                    )),
+                    List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "cooling-towers",
+                        "Cooling Towers",
+                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        List.of("Cooling Towers")
+                    )),
+                    List.of(validWaterQualityGraphConfig()),
+                    List.of(new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                        "water-quality-summary",
+                        "Water Quality Compliance",
+                        "Newport Beach",
+                        LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_SAMPLES,
+                        "pie"
+                    ))
+                )
+            )
+        );
+
+        assertTrue(error.getMessage().contains("across imported and derived graphs"));
     }
 
     private ConfiguredLocationDashboardImportStrategy buildStrategy() {
@@ -260,13 +341,15 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "system-type",
                         "System Type Compliance",
+                        "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "newport-beach",
                         List.of("Cooling Towers"),
                         Map.of("Cooling Towers", "#d62728"),
                         "scatter"
                     )
-                )
+                ),
+                List.of()
             )
         );
     }
@@ -275,6 +358,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         return new LocationDashboardImportStrategyConfig.GraphConfig(
             "water-quality",
             "Water Quality Compliance",
+            "Newport Beach",
             LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
             "newport-beach",
             List.of("HPC", "Endotoxin"),
