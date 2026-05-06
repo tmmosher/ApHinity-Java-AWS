@@ -80,8 +80,8 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
             .andExpect(jsonPath("$[0].data[1].y[0]").value(0))
             .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
-            .andExpect(jsonPath("$[1].data[0].name").value("Cooling Towers"))
-            .andExpect(jsonPath("$[1].data[0].y[0]").value(0))
+            .andExpect(jsonPath("$[1].data[5].name").value("Cooling Towers"))
+            .andExpect(jsonPath("$[1].data[5].y[0]").value(0))
             .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
             .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
@@ -101,10 +101,26 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         assertThat(graphData(persistedWaterQualityGraph))
             .extracting(trace -> trace.get("name"))
-            .containsExactly("HPC", "Endotoxin", "pH");
+            .containsExactly(
+                "HPC",
+                "Endotoxin",
+                "Legionella",
+                "pH",
+                "Conductivity",
+                "Alkalinity",
+                "Hardness"
+            );
         assertThat(graphData(persistedSystemTypeGraph))
             .extracting(trace -> trace.get("name"))
-            .containsExactly("Cooling Towers");
+            .containsExactly(
+                "Utility-HLD",
+                "Utility",
+                "Steam",
+                "Critical",
+                "Utility-Hot",
+                "Cooling Towers"
+            );
+        assertEquals("Cooling Towers", graphData(persistedSystemTypeGraph).get(5).get("name"));
         assertEquals(List.of(6L), graphData(persistedTotalSamplesGraph).getFirst().get("values"));
         assertEquals(List.of(1L), graphData(persistedTotalNonConformancesGraph).getFirst().get("values"));
         assertEquals(List.of(100L, 0L), graphData(persistedActivePercentGraph).getFirst().get("values"));
