@@ -99,10 +99,10 @@ class LocationDashboardImportServiceTest {
         Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
         Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples");
         Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
-        Graph resolutionPercentGraph = indicatorGraph(22L, "Resolution Percent");
+        Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved");
         Graph percentConformanceGraph = indicatorGraph(23L, "Percent Conformance");
-        Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality");
-        Graph bySystemTypeGraph = barGraph(25L, "Non-Conformances", "By System Type");
+        Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality Category");
+        Graph bySystemTypeGraph = barGraph(25L, "Non-Conformances", "By Water System Type");
         Graph byFacilityGraph = barGraph(26L, "Non-Conformances", "By Facility");
         Graph statusByFacilityGraph = barGraph(27L, "Non-Conformance Status", "By Facility");
         Graph turnaroundTimeGraph = barGraph(28L, "Non-Conformance Status", "Turnaround Time");
@@ -170,12 +170,12 @@ class LocationDashboardImportServiceTest {
 
         assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
         assertEquals(List.of(2L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
-        assertEquals(50L, ((Number) findResponseByName(responses, "Resolution Percent").data().getFirst().get("value")).longValue());
+        assertEquals(50L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         assertEquals(57L, ((Number) findResponseByName(responses, "Percent Conformance").data().getFirst().get("value")).longValue());
-        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality").data().getFirst().get("x"));
-        assertEquals(List.of("HPC"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality").data().getFirst().get("y"));
-        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By System Type").data().getFirst().get("x"));
-        assertEquals(List.of("Cooling Towers"), findResponseByNameAndTitle(responses, "Non-Conformances", "By System Type").data().getFirst().get("y"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("x"));
+        assertEquals(List.of("HPC"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("y"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("x"));
+        assertEquals(List.of("Cooling Towers"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("y"));
         assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
@@ -318,7 +318,7 @@ class LocationDashboardImportServiceTest {
         Location location = location(9L, "Newport Beach");
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(List.of(
-            derivedGraphDefinition("resolution-percent", "Resolution Percent", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
+            derivedGraphDefinition("resolution-percent", "Percent Resolved", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
             derivedGraphDefinition("non-conformance-status-by-turnaround-time", "Non-Conformance Status", "Turnaround Time", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME, "bar"),
             derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")
         ));
@@ -328,7 +328,7 @@ class LocationDashboardImportServiceTest {
 
         Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
         Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
-        Graph resolutionPercentGraph = indicatorGraph(20L, "Resolution Percent");
+        Graph resolutionPercentGraph = indicatorGraph(20L, "Percent Resolved");
         Graph turnaroundTimeGraph = barGraph(21L, "Non-Conformance Status", "Turnaround Time");
         Graph statusByFacilityGraph = barGraph(22L, "Non-Conformance Status", "By Facility");
         List<Graph> graphs = List.of(
@@ -368,7 +368,7 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(5, responses.size());
-        assertEquals(100L, ((Number) findResponseByName(responses, "Resolution Percent").data().getFirst().get("value")).longValue());
+        assertEquals(100L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
         assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
         assertEquals(List.of(0L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
@@ -454,10 +454,10 @@ class LocationDashboardImportServiceTest {
         return List.of(
             derivedGraphDefinition("total-samples", "Total Number of Samples", null, LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_SAMPLES, "pie"),
             derivedGraphDefinition("total-non-conformances", "Total Non-Conformances", null, LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_NON_CONFORMANCES, "pie"),
-            derivedGraphDefinition("resolution-percent", "Resolution Percent", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
+            derivedGraphDefinition("resolution-percent", "Percent Resolved", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
             derivedGraphDefinition("percent-conformance", "Percent Conformance", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_CONFORMANCE, "indicator"),
-            derivedGraphDefinition("non-conformances-by-water-quality", "Non-Conformances", "By Water Quality", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_CATEGORY, "bar"),
-            derivedGraphDefinition("non-conformances-by-system-type", "Non-Conformances", "By System Type", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_SYSTEM_TYPE, "bar"),
+            derivedGraphDefinition("non-conformances-by-water-quality", "Non-Conformances", "By Water Quality Category", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_CATEGORY, "bar"),
+            derivedGraphDefinition("non-conformances-by-system-type", "Non-Conformances", "By Water System Type", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_SYSTEM_TYPE, "bar"),
             derivedGraphDefinition("non-conformances-by-facility", "Non-Conformances", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_FACILITY, "bar"),
             derivedGraphDefinition("non-conformance-status-by-turnaround-time", "Non-Conformance Status", "Turnaround Time", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME, "bar"),
             derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")

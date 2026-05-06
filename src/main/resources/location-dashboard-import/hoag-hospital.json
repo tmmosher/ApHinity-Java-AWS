@@ -320,7 +320,7 @@
       "graphType": "pie"
     },
     {
-      "id": "percent-resolved",
+      "id": "resolution-percent",
       "name": "Percent Resolved",
       "derivedType": "percent_resolved",
       "graphType": "indicator"
@@ -332,14 +332,14 @@
       "graphType": "indicator"
     },
     {
-      "id": "non-conformances-by-water-quality-category",
+      "id": "non-conformances-by-water-quality",
       "name": "Non-Conformances",
       "title": "By Water Quality Category",
       "derivedType": "non_conformances_by_category",
       "graphType": "bar"
     },
     {
-      "id": "non-conformances-by-water-system-type",
+      "id": "non-conformances-by-system-type",
       "name": "Non-Conformances",
       "title": "By Water System Type",
       "derivedType": "non_conformances_by_system_type",

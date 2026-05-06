@@ -70,7 +70,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
             .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
             .andExpect(jsonPath("$[3].data[0].values[0]").value(1))
-            .andExpect(jsonPath("$[4].name").value("Resolution Percent"))
+            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
             .andExpect(jsonPath("$[4].data[0].value").value(0))
             .andExpect(jsonPath("$[5].name").value("Percent Conformance"))
             .andExpect(jsonPath("$[5].data[0].value").value(17))
@@ -289,17 +289,17 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         Graph systemTypeGraph = createGraphWithTitle("System Type Compliance", "Newport Beach", blankScatterData());
         Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
         Graph totalNonConformancesGraph = createGraph("Total Non-Conformances", blankPieData());
-        Graph resolutionPercentGraph = createGraph("Resolution Percent", blankIndicatorData());
+        Graph resolutionPercentGraph = createGraph("Percent Resolved", blankIndicatorData());
         Graph percentConformanceGraph = createGraph("Percent Conformance", blankIndicatorData());
         Graph byWaterQualityGraph = createGraphWithLayout(
             "Non-Conformances",
             blankBarData(),
-            Map.of("title", Map.of("text", "By Water Quality"))
+            Map.of("title", Map.of("text", "By Water Quality Category"))
         );
         Graph bySystemTypeGraph = createGraphWithLayout(
             "Non-Conformances",
             blankBarData(),
-            Map.of("title", Map.of("text", "By System Type"))
+            Map.of("title", Map.of("text", "By Water System Type"))
         );
         Graph byFacilityGraph = createGraphWithLayout(
             "Non-Conformances",

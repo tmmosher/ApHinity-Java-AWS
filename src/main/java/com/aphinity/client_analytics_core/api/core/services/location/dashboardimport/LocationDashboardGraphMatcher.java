@@ -17,7 +17,8 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 
 /**
  * Resolves persisted location graphs against strategy definitions.
- * Import metadata is preferred, then graph name/title, then graph name alone as the last fallback.
+ * Import metadata is preferred. When a strategy definition declares a title, matching must be
+ * exact on name + title so same-name graphs remain unambiguous.
  */
 final class LocationDashboardGraphMatcher {
     Map<String, Graph> matchImportGraphs(List<GraphConfig> graphDefinitions, List<Graph> assignedGraphs, String locationName) {
@@ -95,6 +96,18 @@ final class LocationDashboardGraphMatcher {
                 reservedGraphIds.add(matchedGraph.getId());
                 matchedGraphsByDefinitionId.put(normalizedDefinitionId, matchedGraph);
                 continue;
+            }
+
+            if (normalizedDefinitionTitle != null) {
+                if (nameAndTitleMatches.size() > 1) {
+                    throw ambiguousGraph("name/title", graphDefinition);
+                }
+                throw new ApiClientException(
+                    HttpStatus.BAD_REQUEST,
+                    "location_dashboard_graph_not_found",
+                    "Required dashboard graph was not found for "
+                        + locationName + ": " + graphDefinition.name() + " / " + graphDefinition.title() + "."
+                );
             }
 
             List<Graph> nameMatches = assignedGraphs.stream()
