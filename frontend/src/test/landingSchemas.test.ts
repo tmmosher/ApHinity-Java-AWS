@@ -73,7 +73,7 @@ describe("parseSignupFormData", () => {
     const formData = makeFormData({
       name: "  Jane Doe  ",
       email: "  JANE@Example.com  ",
-      password: "  Abcdef1!  "
+      password: "  Abcdef12345!  "
     });
 
     const payload = parseSignupFormData(formData);
@@ -81,15 +81,33 @@ describe("parseSignupFormData", () => {
     expect(payload).toEqual({
       name: "Jane Doe",
       email: "jane@example.com",
-      password: "Abcdef1!"
+      password: "Abcdef12345!"
     });
+  });
+
+  it("throws FieldError for password shorter than 12 characters", () => {
+    const formData = makeFormData({
+      name: "Jane Doe",
+      email: "jane@example.com",
+      password: "Abcdef12345"
+    });
+
+    let error: unknown;
+    try {
+      parseSignupFormData(formData);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(FieldError);
+    expect((error as FieldError).message).toContain("Password: Must be at least 12 characters");
   });
 
   it("throws FieldError for password without special character", () => {
     const formData = makeFormData({
       name: "Jane Doe",
       email: "jane@example.com",
-      password: "Abcdef12"
+      password: "Abcdef123456"
     });
 
     let error: unknown;

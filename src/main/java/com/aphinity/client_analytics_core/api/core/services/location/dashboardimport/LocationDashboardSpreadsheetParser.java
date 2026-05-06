@@ -40,6 +40,8 @@ import java.util.regex.Pattern;
  */
 @Service
 public class LocationDashboardSpreadsheetParser {
+    private static final int HEADER_SCAN_LIMIT = 20;
+    private static final int MIN_DATE_ROW_SCORE = 1;
     private static final String HEADER_FACILITY = "facility";
     private static final String HEADER_BUILDING = "bldg (collated if unrecognized)";
     private static final String HEADER_SYSTEM = "system (collated if unrecognized)";
@@ -109,7 +111,7 @@ public class LocationDashboardSpreadsheetParser {
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
-        for (int rowIndex = 0; rowIndex <= Math.min(sheet.getLastRowNum(), 12); rowIndex += 1) {
+        for (int rowIndex = 0; rowIndex <= Math.min(sheet.getLastRowNum(), HEADER_SCAN_LIMIT); rowIndex += 1) {
             Row row = sheet.getRow(rowIndex);
             if (row == null) {
                 continue;
@@ -122,21 +124,14 @@ public class LocationDashboardSpreadsheetParser {
             }
 
             int headerRowIndex = row.getRowNum();
-            int titleRowIndex = headerRowIndex - 2;
-            int metricHeaderRowIndex = headerRowIndex - 3;
-            int dateRowIndex = headerRowIndex - 1;
-            if (titleRowIndex < 0 || metricHeaderRowIndex < 0 || dateRowIndex < 0) {
-                throw invalidSpreadsheet("Spreadsheet template header rows are incomplete.");
-            }
-
-            Row titleRow = sheet.getRow(titleRowIndex);
-            String locationTitle = firstNonBlankCellText(titleRow, formatter, evaluator);
-            if (locationTitle == null || locationTitle.isBlank()) {
-                throw invalidSpreadsheet("Spreadsheet is missing the location title.");
-            }
+            int basisColumnIndex = headers.getOrDefault(HEADER_BASIS, 4);
+            int titleRowIndex = resolveTitleRowIndex(sheet, headerRowIndex, basisColumnIndex, formatter, evaluator);
+            int dateRowIndex = resolveDateRowIndex(sheet, headerRowIndex, basisColumnIndex, formatter, evaluator);
+            int metricHeaderRowIndex = resolveMetricRowIndex(sheet, dateRowIndex, basisColumnIndex, formatter, evaluator);
+            String locationTitle = firstNonBlankCellText(sheet.getRow(titleRowIndex), formatter, evaluator);
 
             return new WorksheetLayout(
-                locationTitle.strip(),
+                locationTitle == null ? null : locationTitle.strip(),
                 headerRowIndex,
                 metricHeaderRowIndex,
                 dateRowIndex,
@@ -144,11 +139,161 @@ public class LocationDashboardSpreadsheetParser {
                 headers.getOrDefault(HEADER_BUILDING, 1),
                 headers.getOrDefault(HEADER_SYSTEM, 2),
                 headers.getOrDefault(HEADER_POINT_OF_USE, 3),
-                headers.getOrDefault(HEADER_BASIS, 4),
+                basisColumnIndex,
                 row.getLastCellNum()
             );
         }
         throw invalidSpreadsheet("Spreadsheet is missing the dashboard header row.");
+    }
+
+    private int resolveTitleRowIndex(
+        Sheet sheet,
+        int headerRowIndex,
+        int basisColumnIndex,
+        DataFormatter formatter,
+        FormulaEvaluator evaluator
+    ) {
+        // Different spreadsheet generators insert a little extra vertical spacing.
+        // Treat the title as the contiguous label block immediately above the header.
+        int rowIndex = headerRowIndex - 1;
+        while (rowIndex >= 0 && !hasLeadingLabelText(sheet.getRow(rowIndex), basisColumnIndex, formatter, evaluator)) {
+            rowIndex -= 1;
+        }
+        if (rowIndex < 0) {
+            throw invalidSpreadsheet("Spreadsheet is missing the location title.");
+        }
+        while (rowIndex - 1 >= 0 && hasLeadingLabelText(sheet.getRow(rowIndex - 1), basisColumnIndex, formatter, evaluator)) {
+            rowIndex -= 1;
+        }
+        return rowIndex;
+    }
+
+    private int resolveDateRowIndex(
+        Sheet sheet,
+        int headerRowIndex,
+        int basisColumnIndex,
+        DataFormatter formatter,
+        FormulaEvaluator evaluator
+    ) {
+        // Date rows are the strongest signal in the worksheet because they repeat across the metric columns.
+        int bestRowIndex = -1;
+        int bestScore = 0;
+        for (int rowIndex = 0; rowIndex < headerRowIndex; rowIndex += 1) {
+            Row row = sheet.getRow(rowIndex);
+            int score = scoreDateRow(row, basisColumnIndex, formatter, evaluator);
+            if (score > bestScore) {
+                bestScore = score;
+                bestRowIndex = rowIndex;
+            }
+        }
+        if (bestRowIndex < 0 || bestScore < MIN_DATE_ROW_SCORE) {
+            throw invalidSpreadsheet("Spreadsheet is missing the date row.");
+        }
+        return bestRowIndex;
+    }
+
+    private int resolveMetricRowIndex(
+        Sheet sheet,
+        int dateRowIndex,
+        int basisColumnIndex,
+        DataFormatter formatter,
+        FormulaEvaluator evaluator
+    ) {
+        // The metric header is the topmost data row above the date row that still contains metric text/merges.
+        int bestRowIndex = -1;
+        int bestScore = 0;
+        for (int rowIndex = 0; rowIndex < dateRowIndex; rowIndex += 1) {
+            Row row = sheet.getRow(rowIndex);
+            int score = scoreMetricRow(sheet, row, basisColumnIndex, formatter, evaluator);
+            if (score > bestScore) {
+                bestScore = score;
+                bestRowIndex = rowIndex;
+            }
+        }
+        if (bestRowIndex < 0 || bestScore == 0) {
+            throw invalidSpreadsheet("Spreadsheet does not contain any metric columns.");
+        }
+        return bestRowIndex;
+    }
+
+    private int scoreDateRow(Row row, int basisColumnIndex, DataFormatter formatter, FormulaEvaluator evaluator) {
+        if (row == null) {
+            return 0;
+        }
+        int score = 0;
+        short lastCellNumber = row.getLastCellNum();
+        for (int cellIndex = basisColumnIndex + 1; cellIndex < lastCellNumber; cellIndex += 1) {
+            if (isDateLikeCell(row.getCell(cellIndex), formatter, evaluator)) {
+                score += 1;
+            }
+        }
+        return score;
+    }
+
+    private int scoreMetricRow(
+        Sheet sheet,
+        Row row,
+        int basisColumnIndex,
+        DataFormatter formatter,
+        FormulaEvaluator evaluator
+    ) {
+        if (row == null) {
+            return 0;
+        }
+
+        int score = 0;
+        short lastCellNumber = row.getLastCellNum();
+        for (int cellIndex = basisColumnIndex + 1; cellIndex < lastCellNumber; cellIndex += 1) {
+            if (!normalizeCellText(row.getCell(cellIndex), formatter, evaluator).isBlank()) {
+                score += 1;
+            }
+        }
+
+        for (CellRangeAddress mergedRegion : sheet.getMergedRegions()) {
+            if (mergedRegion.getFirstRow() != row.getRowNum()
+                || mergedRegion.getLastRow() != row.getRowNum()
+                || mergedRegion.getFirstColumn() <= basisColumnIndex) {
+                continue;
+            }
+            String metricName = normalizeCellText(row.getCell(mergedRegion.getFirstColumn()), formatter, evaluator);
+            if (!metricName.isBlank()) {
+                score += 2;
+            }
+        }
+        return score;
+    }
+
+    private boolean hasLeadingLabelText(
+        Row row,
+        int basisColumnIndex,
+        DataFormatter formatter,
+        FormulaEvaluator evaluator
+    ) {
+        if (row == null) {
+            return false;
+        }
+        short lastCellNumber = row.getLastCellNum();
+        for (int cellIndex = 0; cellIndex <= basisColumnIndex && cellIndex < lastCellNumber; cellIndex += 1) {
+            if (!normalizeCellText(row.getCell(cellIndex), formatter, evaluator).isBlank()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isDateLikeCell(Cell cell, DataFormatter formatter, FormulaEvaluator evaluator) {
+        String normalizedText = blankToNull(normalizeCellText(cell, formatter, evaluator));
+        if (normalizedText == null) {
+            return false;
+        }
+        for (DateTimeFormatter dateFormatter : DATE_FORMATTERS) {
+            try {
+                LocalDate.parse(normalizedText, dateFormatter);
+                return true;
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+        return false;
     }
 
     private Map<String, Integer> resolveHeaderColumns(Row row, DataFormatter formatter, FormulaEvaluator evaluator) {

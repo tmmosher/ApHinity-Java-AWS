@@ -70,6 +70,111 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportResolvesHoagWorkbookBuildingAndSystemAliases() {
+        ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "irvine",
+                        "Irvine",
+                        List.of("Irvine"),
+                        List.of(),
+                        true
+                    ),
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "16405-irvine",
+                        "16405 Irvine",
+                        List.of("Irvine"),
+                        List.of("16405", "16105", "SPD-16405"),
+                        false
+                    )
+                ),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "utility-hld",
+                        "Utility-HLD",
+                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        List.of("Utility- HLD")
+                    ),
+                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "utility-hot",
+                        "Utility-Hot",
+                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        List.of("Utility- Main Hot 120F")
+                    )
+                ),
+                List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
+                    "16405-irvine-water-quality",
+                    "Water Quality Compliance",
+                    LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                    "16405-irvine",
+                    List.of("HPC"),
+                    Map.of("HPC", "#1f77b4"),
+                    "scatter"
+                ))
+            )
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        68,
+                        "Irvine",
+                        "SPD-16405",
+                        "Utility- HLD",
+                        "DI Source",
+                        "Source to SPD",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "4",
+                                new BigDecimal("4"),
+                                null,
+                                "K68"
+                            )
+                        )
+                    ),
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        73,
+                        null,
+                        "16105",
+                        "Utility- Main Hot 120F",
+                        "DHWR",
+                        "Feeds Storage Tank",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "5",
+                                new BigDecimal("5"),
+                                null,
+                                "K73"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            List.of(measurementBound(1L, "HPC", null, null, null, new BigDecimal("500"), null, null, null, null))
+        );
+
+        assertEquals(1, result.graphs().size());
+        assertEquals("16405-irvine-water-quality", result.graphs().getFirst().graphId());
+        assertEquals(List.of(100.0d), result.graphs().getFirst().data().getFirst().get("y"));
+        assertEquals(2, result.observations().size());
+        assertEquals("16405 Irvine", result.observations().getFirst().facilityName());
+        assertEquals("Utility-HLD", result.observations().getFirst().systemTypeName());
+        assertEquals("16405 Irvine", result.observations().get(1).facilityName());
+        assertEquals("Utility-Hot", result.observations().get(1).systemTypeName());
+    }
+
+    @Test
     void constructorRejectsMissingSystemRangeProfile() {
         IllegalStateException error = assertThrows(
             IllegalStateException.class,

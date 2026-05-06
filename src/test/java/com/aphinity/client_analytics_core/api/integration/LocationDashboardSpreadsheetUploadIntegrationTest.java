@@ -32,12 +32,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiIntegrationTest {
-    private static final String PASSWORD = "ValidPass1!";
+    private static final String PASSWORD = "ValidPass12!";
 
     @Test
     void uploadLocationDashboardSpreadsheetPersistsGraphUpdatesAndCorrectiveActions() throws Exception {
         createUser("partner-dashboard-upload@example.com", PASSWORD, true, "partner");
-        Location location = createLocation("Newport Beach");
+        Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
         seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
 
@@ -66,7 +66,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                         "file",
                         "dashboard.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        createDashboardSpreadsheet("Newport Beach", "Drain Tank, install new DI bottles", 4)
+                        createDashboardSpreadsheet("Hoag Hospital", "Drain Tank, install new DI bottles", 4)
                     ))
                     .contentType("multipart/form-data")
                     .cookie(authCookies(authCookies))
@@ -121,9 +121,49 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     }
 
     @Test
+    void uploadLocationDashboardSpreadsheetAcceptsShiftedHeaderSpacing() throws Exception {
+        createUser("partner-dashboard-shifted@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedMeasurement(location, "HPC", new BigDecimal("10"));
+        seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
+
+        Graph waterQualityGraph = createGraph("Water Quality Compliance", blankScatterData());
+        Graph systemTypeGraph = createGraph("System Type Compliance", blankScatterData());
+        Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
+        addLocationGraph(location, waterQualityGraph);
+        addLocationGraph(location, systemTypeGraph);
+        addLocationGraph(location, totalSamplesGraph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-shifted@example.com", PASSWORD);
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        createShiftedDashboardSpreadsheet("Hoag Hospital", "Drain Tank, install new DI bottles")
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
+            .andExpect(jsonPath("$[2].data[0].values[0]").value(6));
+
+        List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
+        assertEquals(1, persistedEvents.size());
+        assertTrue(persistedEvents.getFirst().isCorrectiveAction());
+        assertTrue(persistedEvents.getFirst().getTitle().startsWith("CA: HPC 2025-08-01"));
+    }
+
+    @Test
     void reuploadingShiftedSpreadsheetUpdatesExistingCorrectiveActionInsteadOfCreatingDuplicate() throws Exception {
         createUser("partner-dashboard-reupload@example.com", PASSWORD, true, "partner");
-        Location location = createLocation("Newport Beach");
+        Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
         seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
 
@@ -135,12 +175,12 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-reupload@example.com", PASSWORD);
 
         uploadDashboardSpreadsheet(location.getId(), authCookies, createDashboardSpreadsheet(
-            "Newport Beach",
+            "Hoag Hospital",
             "Drain Tank, install new DI bottles",
             4
         ));
         uploadDashboardSpreadsheet(location.getId(), authCookies, createDashboardSpreadsheet(
-            "Newport Beach",
+            "Hoag Hospital",
             "Replace DI bottles",
             5
         ));
@@ -246,13 +286,20 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
             Row titleRow = sheet.createRow(1);
             titleRow.createCell(0).setCellValue(locationTitle);
+            titleRow.createCell(5).setCellValue("Data Range (Ignored)");
+            titleRow.createCell(8).setCellValue("Data Range (Ignored)");
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 3));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 8, 10));
 
             Row dateRow = sheet.createRow(2);
+            dateRow.createCell(0).setCellValue("Subtitle (Ignored)");
             CreationHelper creationHelper = workbook.getCreationHelper();
             CellStyle dateStyle = workbook.createCellStyle();
             dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("m/d/yyyy"));
             writeDateCells(dateRow, 5, repeatedDateColumns(), dateStyle);
             writeDateCells(dateRow, 8, repeatedDateColumns(), dateStyle);
+            sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, 3));
 
             Row headerRow = sheet.createRow(3);
             headerRow.createCell(0).setCellValue("Facility");
@@ -262,7 +309,74 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             headerRow.createCell(4).setCellValue("Basis (ignored)");
 
             Row dataRow = sheet.createRow(dataRowIndex);
-            dataRow.createCell(0).setCellValue("Newport Beach");
+            dataRow.createCell(0).setCellValue("NB");
+            dataRow.createCell(1).setCellValue("Hospital");
+            dataRow.createCell(2).setCellValue("Cooling Towers");
+            dataRow.createCell(3).setCellValue("Recirc Line");
+            dataRow.createCell(4).setCellValue("CTI/514P");
+            dataRow.createCell(5).setCellValue(10);
+            dataRow.createCell(6).setCellValue(10);
+            dataRow.createCell(7).setCellValue(10);
+            dataRow.createCell(8).setCellValue(2);
+            dataRow.createCell(9).setCellValue(2);
+            dataRow.createCell(10).setCellValue(2);
+
+            addComment(
+                workbook,
+                sheet,
+                dataRow.getCell(5),
+                "Test 1;350;CA;" + correctiveActionDescription
+            );
+
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        }
+    }
+
+    private byte[] createShiftedDashboardSpreadsheet(
+        String locationTitle,
+        String correctiveActionDescription
+    ) throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Dashboard");
+
+            Row metricRow = sheet.createRow(4);
+            metricRow.createCell(5).setCellValue("HPC");
+            metricRow.createCell(8).setCellValue("Endotoxin");
+            sheet.addMergedRegion(new CellRangeAddress(4, 4, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(4, 4, 8, 10));
+
+            Row spacerRow = sheet.createRow(5);
+            spacerRow.createCell(5).setCellValue("Critical <10 CFU/ml");
+            spacerRow.createCell(8).setCellValue("Critical <10 CFU/ml");
+            sheet.addMergedRegion(new CellRangeAddress(5, 5, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(5, 5, 8, 10));
+
+            Row dateRow = sheet.createRow(6);
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("m/d/yyyy"));
+            writeDateCells(dateRow, 5, repeatedDateColumns(), dateStyle);
+            writeDateCells(dateRow, 8, repeatedDateColumns(), dateStyle);
+
+            Row titleRow = sheet.createRow(9);
+            titleRow.createCell(0).setCellValue(locationTitle);
+            sheet.addMergedRegion(new CellRangeAddress(9, 9, 0, 3));
+
+            Row subtitleRow = sheet.createRow(10);
+            subtitleRow.createCell(0).setCellValue("Subtitle (Ignored)");
+            sheet.addMergedRegion(new CellRangeAddress(10, 10, 0, 3));
+
+            Row headerRow = sheet.createRow(11);
+            headerRow.createCell(0).setCellValue("Facility");
+            headerRow.createCell(1).setCellValue("Bldg (Collated if unrecognized)");
+            headerRow.createCell(2).setCellValue("System (Collated if unrecognized)");
+            headerRow.createCell(3).setCellValue("Point of Use (Ignored)");
+            headerRow.createCell(4).setCellValue("Basis (ignored)");
+
+            Row dataRow = sheet.createRow(12);
+            dataRow.createCell(0).setCellValue("NB");
             dataRow.createCell(1).setCellValue("Hospital");
             dataRow.createCell(2).setCellValue("Cooling Towers");
             dataRow.createCell(3).setCellValue("Recirc Line");

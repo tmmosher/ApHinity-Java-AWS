@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
-    private static final String PASSWORD = "ValidPass1!";
+    private static final String PASSWORD = "ValidPass12!";
 
     @Test
     void locationsRejectMissingAuthentication() throws Exception {

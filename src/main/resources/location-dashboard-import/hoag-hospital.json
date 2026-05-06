@@ -1,0 +1,157 @@
+{
+  "locationName": "Hoag Hospital",
+  "sublocations": [
+    {
+      "key": "newport-beach",
+      "displayName": "Newport Beach",
+      "facilityAliases": [
+        "Newport Beach",
+        "NB"
+      ],
+      "buildingAliases": [],
+      "defaultForFacility": true
+    },
+    {
+      "key": "irvine",
+      "displayName": "Irvine",
+      "facilityAliases": [
+        "Irvine"
+      ],
+      "buildingAliases": [],
+      "defaultForFacility": true
+    },
+    {
+      "key": "16405-irvine",
+      "displayName": "16405 Irvine",
+      "facilityAliases": [
+        "Irvine"
+      ],
+      "buildingAliases": [
+        "16405",
+        "16105",
+        "SPD-16405"
+      ],
+      "defaultForFacility": false
+    },
+    {
+      "key": "surgical-pavilion",
+      "displayName": "Surgical Pavilion",
+      "facilityAliases": [
+        "Irvine"
+      ],
+      "buildingAliases": [
+        "Surgical Pavilion"
+      ],
+      "defaultForFacility": false
+    }
+  ],
+  "systems": [
+    {
+      "key": "utility-hld",
+      "displayName": "Utility-HLD",
+      "rangeProfile": "utility",
+      "aliases": [
+        "Utility- HLD"
+      ]
+    },
+    {
+      "key": "utility",
+      "displayName": "Utility",
+      "rangeProfile": "utility",
+      "aliases": []
+    },
+    {
+      "key": "steam",
+      "displayName": "Steam",
+      "rangeProfile": "utility",
+      "aliases": []
+    },
+    {
+      "key": "critical",
+      "displayName": "Critical",
+      "rangeProfile": "critical",
+      "aliases": []
+    },
+    {
+      "key": "utility-hot",
+      "displayName": "Utility-Hot",
+      "rangeProfile": "utility",
+      "aliases": [
+        "Utility- Main Hot 120F"
+      ]
+    },
+    {
+      "key": "cooling-towers",
+      "displayName": "Cooling Towers",
+      "rangeProfile": "towers",
+      "aliases": [
+        "Cooling Towers",
+        "Cooling Tower"
+      ]
+    },
+    {
+      "key": "utility-water",
+      "displayName": "Utility Water",
+      "rangeProfile": "potable",
+      "aliases": [
+        "Utility Water"
+      ]
+    },
+    {
+      "key": "utility-soft",
+      "displayName": "Utility-Soft",
+      "rangeProfile": "utility",
+      "aliases": []
+    }
+  ],
+  "graphs": [
+    {
+      "id": "newport-beach-water-quality-compliance",
+      "title": "Water Quality Compliance",
+      "importType": "water_quality_compliance",
+      "sublocationKey": "newport-beach",
+      "traceOrder": [
+        "HPC",
+        "Endotoxin",
+        "Legionella",
+        "pH",
+        "Conductivity",
+        "Alkalinity",
+        "Hardness"
+      ],
+      "traceColors": {
+        "HPC": "#1f77b4",
+        "Endotoxin": "#2ca02c",
+        "Legionella": "#d62728",
+        "pH": "#ff7f0e",
+        "Conductivity": "#9467bd",
+        "Alkalinity": "#8c564b",
+        "Hardness": "#e377c2"
+      },
+      "graphType": "scatter"
+    },
+    {
+      "id": "newport-beach-system-type-compliance",
+      "title": "System Type Compliance",
+      "importType": "system_type_compliance",
+      "sublocationKey": "newport-beach",
+      "traceOrder": [
+        "Utility-HLD",
+        "Utility",
+        "Steam",
+        "Critical",
+        "Utility-Hot",
+        "Cooling Towers"
+      ],
+      "traceColors": {
+        "Utility-HLD": "#1f77b4",
+        "Utility": "#ff7f0e",
+        "Steam": "#2ca02c",
+        "Critical": "#d62728",
+        "Utility-Hot": "#9467bd",
+        "Cooling Towers": "#8c564b"
+      },
+      "graphType": "scatter"
+    }
+  ]
+}

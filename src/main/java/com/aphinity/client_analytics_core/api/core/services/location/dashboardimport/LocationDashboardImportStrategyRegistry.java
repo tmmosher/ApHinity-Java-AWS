@@ -23,14 +23,14 @@ public class LocationDashboardImportStrategyRegistry {
     private final Map<String, LocationDashboardImportStrategy> strategiesByLocationName;
 
     public LocationDashboardImportStrategyRegistry() {
-        this.strategiesByLocationName = loadStrategies(STRATEGY_CONFIG_OBJECT_MAPPER);
+        this.strategiesByLocationName = loadStrategies();
     }
 
     public Optional<LocationDashboardImportStrategy> resolve(String locationName) {
         return Optional.ofNullable(strategiesByLocationName.get(normalizeKey(locationName)));
     }
 
-    private Map<String, LocationDashboardImportStrategy> loadStrategies(ObjectMapper objectMapper) {
+    private Map<String, LocationDashboardImportStrategy> loadStrategies() {
         Map<String, LocationDashboardImportStrategy> strategies = new LinkedHashMap<>();
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         try {
@@ -38,7 +38,7 @@ public class LocationDashboardImportStrategyRegistry {
             for (Resource resource : resources) {
                 try (InputStream inputStream = resource.getInputStream()) {
                     LocationDashboardImportStrategyConfig config =
-                        objectMapper.readValue(inputStream, LocationDashboardImportStrategyConfig.class);
+                        LocationDashboardImportStrategyRegistry.STRATEGY_CONFIG_OBJECT_MAPPER.readValue(inputStream, LocationDashboardImportStrategyConfig.class);
                     ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(config);
                     String normalizedLocationName = normalizeKey(strategy.locationName());
                     if (normalizedLocationName == null) {

@@ -104,7 +104,7 @@ class AuthServiceTest {
             .thenThrow(new DataIntegrityViolationException("duplicate"));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            authService.signup("user@example.com", "Abcd123!","John", "10.0.0.1", "agent")
+            authService.signup("user@example.com", "Abcd1234!xyz","John", "10.0.0.1", "agent")
         );
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
@@ -124,14 +124,14 @@ class AuthServiceTest {
     @Test
     void signupCreatesClientRoleForExternalEmail() {
         when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
-        when(passwordEncoder.encode("Abcd123!")).thenReturn("hashed");
+        when(passwordEncoder.encode("Abcd1234!xyz")).thenReturn("hashed");
         when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> {
             AppUser saved = invocation.getArgument(0);
             saved.setId(42L);
             return saved;
         });
 
-        authService.signup("user@example.com", "Abcd123!", "John","10.0.0.1", "agent");
+        authService.signup("user@example.com", "Abcd1234!xyz", "John","10.0.0.1", "agent");
 
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(appUserRepository).saveAndFlush(captor.capture());
@@ -160,14 +160,14 @@ class AuthServiceTest {
     @Test
     void signupCreatesOnlyClientRoleForAphinityEmail() {
         when(roleRepository.findByName("client")).thenReturn(Optional.of(clientRole(17L)));
-        when(passwordEncoder.encode("Abcd123!")).thenReturn("hashed");
+        when(passwordEncoder.encode("Abcd1234!xyz")).thenReturn("hashed");
         when(appUserRepository.saveAndFlush(any(AppUser.class))).thenAnswer(invocation -> {
             AppUser saved = invocation.getArgument(0);
             saved.setId(42L);
             return saved;
         });
 
-        authService.signup("user@aphinitytech.com", "Abcd123!","John" ,"10.0.0.1", "agent");
+        authService.signup("user@aphinitytech.com", "Abcd1234!xyz","John" ,"10.0.0.1", "agent");
 
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(appUserRepository).saveAndFlush(captor.capture());
@@ -186,7 +186,7 @@ class AuthServiceTest {
         when(appUserRepository.findByEmail("user@example.com")).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            authService.login("user@example.com", "Abcd123!", "10.0.0.1", "agent", null)
+            authService.login("user@example.com", "Abcd1234!xyz", "10.0.0.1", "agent", null)
         );
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
@@ -216,7 +216,7 @@ class AuthServiceTest {
         AppUser user = buildUser("user@example.com");
 
         when(appUserRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("Abcd123!", "hashed")).thenReturn(true);
+        when(passwordEncoder.matches("Abcd1234!xyz", "hashed")).thenReturn(true);
         when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
         when(jwtService.getRefreshTokenTtlSeconds()).thenReturn(3600L);
         when(authSessionRepository.save(any(AuthSession.class))).thenAnswer(invocation -> {
@@ -227,7 +227,7 @@ class AuthServiceTest {
         when(jwtService.createAccessToken(eq(user), anyLong())).thenReturn("access-token");
 
         Instant before = Instant.now();
-        IssuedTokens tokens = authService.login("user@example.com", "Abcd123!", "10.0.0.1", "agent", null);
+        IssuedTokens tokens = authService.login("user@example.com", "Abcd1234!xyz", "10.0.0.1", "agent", null);
         Instant after = Instant.now();
 
         ArgumentCaptor<AuthSession> sessionCaptor = ArgumentCaptor.forClass(AuthSession.class);
@@ -257,7 +257,7 @@ class AuthServiceTest {
         when(loginAttemptService.isCaptchaRequired("user@example.com")).thenReturn(true);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            authService.login("user@example.com", "Abcd123!", "10.0.0.1", "agent", null)
+            authService.login("user@example.com", "Abcd1234!xyz", "10.0.0.1", "agent", null)
         );
 
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatusCode());
@@ -271,7 +271,7 @@ class AuthServiceTest {
         when(turnstileValidationService.validateTurnstileResponse("bad", "10.0.0.1")).thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            authService.login("user@example.com", "Abcd123!", "10.0.0.1", "agent", "bad")
+            authService.login("user@example.com", "Abcd1234!xyz", "10.0.0.1", "agent", "bad")
         );
 
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatusCode());
@@ -285,7 +285,7 @@ class AuthServiceTest {
             .thenThrow(new RuntimeException("no config"));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            authService.login("user@example.com", "Abcd123!", "10.0.0.1", "agent", "token")
+            authService.login("user@example.com", "Abcd1234!xyz", "10.0.0.1", "agent", "token")
         );
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatusCode());

@@ -172,10 +172,10 @@ class ProfileServiceTest {
 
         when(appUserRepository.findById(6L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("current-pass", "encoded")).thenReturn(true);
-        when(passwordEncoder.matches("NewPass1!", "encoded")).thenReturn(false);
-        when(passwordEncoder.encode("NewPass1!")).thenReturn("new-hash");
+        when(passwordEncoder.matches("NewPassword12!", "encoded")).thenReturn(false);
+        when(passwordEncoder.encode("NewPassword12!")).thenReturn("new-hash");
 
-        profileService.updatePassword(6L, "current-pass", "NewPass1!");
+        profileService.updatePassword(6L, "current-pass", "NewPassword12!");
 
         assertEquals("new-hash", user.getPasswordHash());
         verify(appUserRepository).save(user);
@@ -312,7 +312,7 @@ class ProfileServiceTest {
         when(appUserRepository.findById(11L)).thenReturn(Optional.of(user));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-            profileService.updatePassword(11L, "current-pass", "NewPass1!")
+            profileService.updatePassword(11L, "current-pass", "NewPassword12!")
         );
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());

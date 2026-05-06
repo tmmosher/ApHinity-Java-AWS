@@ -19,7 +19,7 @@ const emailSchema = z
 const passwordSchema = z.string().trim().min(1, "Password is required");
 
 const signupPasswordSchema = passwordSchema
-  .min(8, "Must be at least 8 characters")
+  .min(12, "Must be at least 12 characters")
   .regex(/\d/, "Must contain at least one digit")
   .regex(/\p{L}/u, "Must contain at least one letter")
   .regex(/[!@#$%^&*()_+\-={};':"\\|,.<>/?`~]/, "Must contain at least one special character");

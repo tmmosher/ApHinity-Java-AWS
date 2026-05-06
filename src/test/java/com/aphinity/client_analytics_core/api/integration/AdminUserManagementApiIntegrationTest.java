@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AdminUserManagementApiIntegrationTest extends AbstractApiIntegrationTest {
-    private static final String PASSWORD = "ValidPass1!";
+    private static final String PASSWORD = "ValidPass12!";
 
     @Autowired
     private UserDeletionService userDeletionService;

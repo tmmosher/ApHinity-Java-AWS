@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.core;
 
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardSpreadsheetParser;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LocationDashboardSpreadsheetParserTest {
     private final LocationDashboardSpreadsheetParser parser = new LocationDashboardSpreadsheetParser();
@@ -56,6 +58,35 @@ class LocationDashboardSpreadsheetParserTest {
         assertEquals(new BigDecimal("1"), secondCell.numericValue());
     }
 
+    @Test
+    void parseAcceptsDashboardHeadersWithExtraSpacerRows() throws IOException {
+        MockMultipartFile file = createShiftedWorkbook();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+
+        assertEquals("Newport Beach", workbook.locationTitle());
+        assertEquals(1, workbook.rows().size());
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row = workbook.rows().getFirst();
+        assertEquals("Newport Beach", row.facility());
+        assertEquals("Hospital", row.building());
+        assertEquals("Cooling Towers", row.system());
+        assertEquals("Recirc Line", row.pointOfUse());
+        assertEquals("CTI/514P", row.basis());
+        assertEquals(9, row.cells().size());
+        assertEquals("HPC", row.cells().getFirst().metricName());
+        assertEquals(LocalDate.parse("2025-08-01"), row.cells().getFirst().observedDate());
+    }
+
+    @Test
+    void parseRejectsTemplateShellWithoutRealDates() throws IOException {
+        MockMultipartFile file = createTemplateShellWorkbook();
+
+        ApiClientException error = assertThrows(ApiClientException.class, () -> parser.parse(file));
+
+        assertEquals("Spreadsheet is missing the date row.", error.getMessage());
+    }
+
     private MockMultipartFile createWorkbook() throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -71,8 +102,16 @@ class LocationDashboardSpreadsheetParserTest {
 
             Row titleRow = sheet.createRow(1);
             titleRow.createCell(0).setCellValue("Newport Beach");
+            titleRow.createCell(5).setCellValue("Data Range (Ignored)");
+            titleRow.createCell(8).setCellValue("Data Range (Ignored)");
+            titleRow.createCell(11).setCellValue("Data Range (Ignored)");
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 3));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 8, 10));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 11, 13));
 
             Row dateRow = sheet.createRow(2);
+            dateRow.createCell(0).setCellValue("Subtitle (Ignored)");
             CreationHelper creationHelper = workbook.getCreationHelper();
             CellStyle dateStyle = workbook.createCellStyle();
             dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("m/d/yyyy"));
@@ -84,6 +123,7 @@ class LocationDashboardSpreadsheetParserTest {
             writeDateCells(dateRow, 5, dates, dateStyle);
             writeDateCells(dateRow, 8, dates, dateStyle);
             writeDateCells(dateRow, 11, dates, dateStyle);
+            sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, 3));
 
             Row headerRow = sheet.createRow(3);
             headerRow.createCell(0).setCellValue("Facility");
@@ -114,6 +154,141 @@ class LocationDashboardSpreadsheetParserTest {
                 dataRow.getCell(5),
                 "Test 1;350;CA;Drain Tank, install new DI bottles; Test 2;10"
             );
+
+            workbook.write(outputStream);
+            return new MockMultipartFile(
+                "file",
+                "dashboard.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                outputStream.toByteArray()
+            );
+        }
+    }
+
+    private MockMultipartFile createShiftedWorkbook() throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Dashboard");
+
+            Row metricRow = sheet.createRow(4);
+            metricRow.createCell(5).setCellValue("HPC");
+            metricRow.createCell(8).setCellValue("Endotoxin");
+            metricRow.createCell(11).setCellValue("pH");
+            sheet.addMergedRegion(new CellRangeAddress(4, 4, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(4, 4, 8, 10));
+            sheet.addMergedRegion(new CellRangeAddress(4, 4, 11, 13));
+
+            Row criteriaRow = sheet.createRow(5);
+            criteriaRow.createCell(5).setCellValue("(Critical <10 CFU/ml, Utility <500 CFU/ml)");
+            criteriaRow.createCell(8).setCellValue("(Critical <10 CFU/ml)");
+            criteriaRow.createCell(11).setCellValue("(Critical 5.0-7.5, Utility 6.5-9.5)");
+            sheet.addMergedRegion(new CellRangeAddress(5, 5, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(5, 5, 8, 10));
+            sheet.addMergedRegion(new CellRangeAddress(5, 5, 11, 13));
+
+            Row dateRow = sheet.createRow(6);
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("m/d/yyyy"));
+            List<LocalDate> dates = List.of(
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-09-01"),
+                LocalDate.parse("2025-10-01")
+            );
+            writeDateCells(dateRow, 5, dates, dateStyle);
+            writeDateCells(dateRow, 8, dates, dateStyle);
+            writeDateCells(dateRow, 11, dates, dateStyle);
+
+            Row titleRow = sheet.createRow(9);
+            titleRow.createCell(0).setCellValue("Newport Beach");
+            sheet.addMergedRegion(new CellRangeAddress(9, 9, 0, 3));
+
+            Row subtitleRow = sheet.createRow(10);
+            subtitleRow.createCell(0).setCellValue("Subtitle (Ignored)");
+            sheet.addMergedRegion(new CellRangeAddress(10, 10, 0, 3));
+
+            Row headerRow = sheet.createRow(11);
+            headerRow.createCell(0).setCellValue("Facility");
+            headerRow.createCell(1).setCellValue("Bldg (Collated if unrecognized)");
+            headerRow.createCell(2).setCellValue("System (Collated if unrecognized)");
+            headerRow.createCell(3).setCellValue("Point of Use (Ignored)");
+            headerRow.createCell(4).setCellValue("Basis (ignored)");
+
+            Row dataRow = sheet.createRow(12);
+            dataRow.createCell(0).setCellValue("Newport Beach");
+            dataRow.createCell(1).setCellValue("Hospital");
+            dataRow.createCell(2).setCellValue("Cooling Towers");
+            dataRow.createCell(3).setCellValue("Recirc Line");
+            dataRow.createCell(4).setCellValue("CTI/514P");
+            dataRow.createCell(5).setCellValue(10);
+            dataRow.createCell(6).setCellValue("<1");
+            dataRow.createCell(7).setCellValue(3);
+            dataRow.createCell(8).setCellValue(0);
+            dataRow.createCell(9).setCellValue(2);
+            dataRow.createCell(10).setCellValue(1);
+            dataRow.createCell(11).setCellValue(4);
+            dataRow.createCell(12).setCellValue(5);
+            dataRow.createCell(13).setCellValue(6);
+
+            addComment(
+                workbook,
+                sheet,
+                dataRow.getCell(5),
+                "Test 1;350;CA;Drain Tank, install new DI bottles; Test 2;10"
+            );
+
+            workbook.write(outputStream);
+            return new MockMultipartFile(
+                "file",
+                "dashboard.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                outputStream.toByteArray()
+            );
+        }
+    }
+
+    private MockMultipartFile createTemplateShellWorkbook() throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Dashboard");
+
+            Row metricRow = sheet.createRow(0);
+            metricRow.createCell(5).setCellValue("Metric 1");
+            metricRow.createCell(8).setCellValue("Metric 2");
+            metricRow.createCell(11).setCellValue("Metric 3");
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 8, 10));
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 11, 13));
+
+            Row titleRow = sheet.createRow(1);
+            titleRow.createCell(0).setCellValue("Title of Location");
+            titleRow.createCell(5).setCellValue("Data Range (Ignored)");
+            titleRow.createCell(8).setCellValue("Data Range (Ignored)");
+            titleRow.createCell(11).setCellValue("Data Range (Ignored)");
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 3));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 5, 7));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 8, 10));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 11, 13));
+
+            Row labelRow = sheet.createRow(2);
+            labelRow.createCell(0).setCellValue("Subtitle (Ignored)");
+            labelRow.createCell(5).setCellValue("Date 1");
+            labelRow.createCell(6).setCellValue("Date 2");
+            labelRow.createCell(7).setCellValue("Date 3");
+            labelRow.createCell(8).setCellValue("Date 1");
+            labelRow.createCell(9).setCellValue("Date 2");
+            labelRow.createCell(10).setCellValue("Date 3");
+            labelRow.createCell(11).setCellValue("Date 1");
+            labelRow.createCell(12).setCellValue("Date 2");
+            labelRow.createCell(13).setCellValue("Date 3");
+            sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, 3));
+
+            Row headerRow = sheet.createRow(3);
+            headerRow.createCell(0).setCellValue("Facility");
+            headerRow.createCell(1).setCellValue("Bldg (Collated if unrecognized)");
+            headerRow.createCell(2).setCellValue("System (Collated if unrecognized)");
+            headerRow.createCell(3).setCellValue("Point of Use (Ignored)");
+            headerRow.createCell(4).setCellValue("Basis (ignored)");
 
             workbook.write(outputStream);
             return new MockMultipartFile(

@@ -21,12 +21,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
-    private static final String PASSWORD = "ValidPass1!";
+    private static final String PASSWORD = "ValidPass12!";
 
     @Test
     void signupCreatesUserWithClientRoleAndVerificationToken() throws Exception {
         String body = """
-            {"email":"NewUser@Example.com","password":"ValidPass1!","name":"  jane doe  "}
+            {"email":"NewUser@Example.com","password":"ValidPass12!","name":"  jane doe  "}
             """;
 
         mockMvc.perform(
@@ -51,6 +51,20 @@ class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void signupRejectsPasswordShorterThanTwelveCharacters() throws Exception {
+        mockMvc.perform(
+                post("/api/auth/signup")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"email":"NewUser@Example.com","password":"Abcdef12345","name":"  jane doe  "}
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("password_too_short"))
+            .andExpect(jsonPath("$.message").value("Must be at least 12 characters"));
+    }
+
+    @Test
     void loginIssuesCookiesAndPersistsSession() throws Exception {
         createUser("client@example.com", PASSWORD, true, "client");
 
@@ -58,7 +72,7 @@ class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
                 post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
-                        {"email":"Client@Example.com","password":"ValidPass1!"}
+                        {"email":"Client@Example.com","password":"ValidPass12!"}
                         """)
             )
             .andExpect(status().isNoContent())
@@ -91,7 +105,7 @@ class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
                 post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
-                        {"email":"locked@example.com","password":"ValidPass1!"}
+                        {"email":"locked@example.com","password":"ValidPass12!"}
                         """)
             )
             .andExpect(status().isTooManyRequests())
