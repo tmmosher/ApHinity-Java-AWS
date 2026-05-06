@@ -1,4 +1,5 @@
 import {LocationDashboardToolbarActions} from "./LocationDashboardToolbarActions";
+import type {LocationGraph} from "../../types/Types";
 
 type LocationDashboardToolbarProps = {
   canEditGraphs: boolean;
@@ -15,7 +16,7 @@ type LocationDashboardToolbarProps = {
   onAddGraph: () => void;
   onApply: () => void;
   onEditLayout: () => void;
-  onUploadSpreadsheetSuccess?: () => Promise<void> | void;
+  onUploadSpreadsheetSuccess?: (uploadedGraphs: LocationGraph[]) => Promise<void> | void;
   onUndo: () => void;
 };
 

@@ -29,9 +29,10 @@ final class LocationDashboardHistoricalDataAssembler {
     LocationDashboardDerivedGraphSupport.HistoricalDerivedData buildHistoricalDerivedData(
         List<GraphConfig> graphDefinitions,
         Map<String, Graph> matchedImportGraphsByDefinitionId,
-        Map<Long, Graph> lockedGraphsById,
-        Map<Long, Graph> graphsToPersistById,
-        List<ServiceEvent> persistedCorrectiveActions
+        Map<Long, Graph> assignedGraphsById,
+        Map<Long, Graph> previewGraphsById,
+        List<LocationDashboardImportStrategy.ImportedObservation> importedObservations,
+        List<ServiceEvent> effectiveCorrectiveActions
     ) {
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity = new LinkedHashMap<>();
         for (GraphConfig graphDefinition : graphDefinitions) {
@@ -45,9 +46,9 @@ final class LocationDashboardHistoricalDataAssembler {
             if (matchedGraph == null || matchedGraph.getId() == null) {
                 continue;
             }
-            Graph effectiveGraph = graphsToPersistById.getOrDefault(
+            Graph effectiveGraph = previewGraphsById.getOrDefault(
                 matchedGraph.getId(),
-                lockedGraphsById.get(matchedGraph.getId())
+                assignedGraphsById.get(matchedGraph.getId())
             );
             if (effectiveGraph == null) {
                 continue;
@@ -92,6 +93,8 @@ final class LocationDashboardHistoricalDataAssembler {
             }
         }
 
+        mergeImportedObservationSamplePoints(samplePointsByIdentity, importedObservations);
+
         Map<LocalDate, List<LocationDashboardDerivedGraphSupport.HistoricalSamplePoint>> samplesByDate = new LinkedHashMap<>();
         samplePointsByIdentity.values().stream()
             .sorted(Comparator
@@ -102,7 +105,7 @@ final class LocationDashboardHistoricalDataAssembler {
                 .computeIfAbsent(samplePoint.observedDate(), ignored -> new ArrayList<>())
                 .add(samplePoint));
 
-        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> correctiveActions = persistedCorrectiveActions.stream()
+        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> correctiveActions = effectiveCorrectiveActions.stream()
             .map(correctiveActionService::toHistoricalCorrectiveAction)
             .filter(Objects::nonNull)
             .toList();
@@ -116,5 +119,71 @@ final class LocationDashboardHistoricalDataAssembler {
             return null;
         }
         return traceName;
+    }
+
+    private void mergeImportedObservationSamplePoints(
+        Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity,
+        List<LocationDashboardImportStrategy.ImportedObservation> importedObservations
+    ) {
+        Map<String, ImportedObservationAggregate> importedObservationsByIdentity = new LinkedHashMap<>();
+        for (LocationDashboardImportStrategy.ImportedObservation observation : importedObservations) {
+            if (observation == null
+                || observation.observedDate() == null
+                || observation.facilityName() == null
+                || observation.measurementName() == null) {
+                continue;
+            }
+
+            String sampleIdentity = observation.observedDate()
+                + "|"
+                + LocationDashboardGraphMetadataSupport.nullSafeNormalized(observation.facilityName())
+                + "|"
+                + LocationDashboardGraphMetadataSupport.nullSafeNormalized(observation.measurementName());
+            importedObservationsByIdentity
+                .computeIfAbsent(
+                    sampleIdentity,
+                    ignored -> new ImportedObservationAggregate(
+                        observation.observedDate(),
+                        observation.facilityName(),
+                        observation.measurementName()
+                    )
+                )
+                .record(observation.compliant());
+        }
+
+        importedObservationsByIdentity.forEach((sampleIdentity, aggregate) ->
+            samplePointsByIdentity.put(sampleIdentity, aggregate.toHistoricalSamplePoint())
+        );
+    }
+
+    private static final class ImportedObservationAggregate {
+        private final LocalDate observedDate;
+        private final String facilityName;
+        private final String measurementName;
+        private long sampleCount;
+        private long compliantCount;
+
+        private ImportedObservationAggregate(LocalDate observedDate, String facilityName, String measurementName) {
+            this.observedDate = observedDate;
+            this.facilityName = facilityName;
+            this.measurementName = measurementName;
+        }
+
+        void record(boolean compliant) {
+            sampleCount += 1L;
+            if (compliant) {
+                compliantCount += 1L;
+            }
+        }
+
+        LocationDashboardDerivedGraphSupport.HistoricalSamplePoint toHistoricalSamplePoint() {
+            return new LocationDashboardDerivedGraphSupport.HistoricalSamplePoint(
+                observedDate,
+                facilityName,
+                measurementName,
+                sampleCount,
+                compliantCount
+            );
+        }
     }
 }

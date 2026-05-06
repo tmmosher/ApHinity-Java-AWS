@@ -394,6 +394,57 @@ export const reconcileLocationGraphRefreshState = (
 };
 
 /**
+ * Merges a preview spreadsheet upload response into the current working graph list.
+ *
+ * The upload endpoint only returns the graphs that were affected by the import,
+ * so untouched graphs must remain in place locally until the user applies the
+ * change. Existing graph objects are preserved when the preview payload is
+ * identical so the dashboard does not create a fake undo step.
+ */
+export const reconcileLocationGraphUploadState = (
+  currentGraphs: LocationGraph[],
+  uploadedGraphs: LocationGraph[]
+): LocationGraph[] => {
+  if (uploadedGraphs.length === 0) {
+    return currentGraphs;
+  }
+
+  const currentById = new Map(currentGraphs.map((graph) => [graph.id, graph]));
+  const uploadedById = new Map(uploadedGraphs.map((graph) => [graph.id, graph]));
+  let changed = false;
+
+  const nextGraphs: LocationGraph[] = [];
+  for (const currentGraph of currentGraphs) {
+    const uploadedGraph = uploadedById.get(currentGraph.id);
+    if (!uploadedGraph) {
+      nextGraphs.push(currentGraph);
+      continue;
+    }
+
+    const samePayload = graphStateSignature(currentGraph) === graphStateSignature(uploadedGraph);
+    const sameVersion = currentGraph.updatedAt === uploadedGraph.updatedAt;
+    if (samePayload && sameVersion) {
+      nextGraphs.push(currentGraph);
+      continue;
+    }
+
+    nextGraphs.push(cloneLocationGraphs([uploadedGraph])[0]);
+    changed = true;
+  }
+
+  for (const uploadedGraph of uploadedGraphs) {
+    if (currentById.has(uploadedGraph.id)) {
+      continue;
+    }
+
+    nextGraphs.push(cloneLocationGraphs([uploadedGraph])[0]);
+    changed = true;
+  }
+
+  return changed ? nextGraphs : currentGraphs;
+};
+
+/**
  * Applies a graph edit to the current working set and records an undo snapshot
  * only when the effective payload actually changes.
  */

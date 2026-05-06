@@ -1,5 +1,6 @@
 import {renderToString} from "solid-js/web";
 import {describe, expect, it, vi} from "vitest";
+import type {LocationGraph} from "../types/Types";
 
 const refetchGraphsMock = vi.fn(async () => undefined);
 const capturedToolbarProps: Array<Record<string, unknown>> = [];
@@ -64,7 +65,7 @@ vi.mock("../components/common/Chart", () => ({
 import {LocationDashboardPanel} from "../pages/authenticated/panels/location/LocationDashboardPanel";
 
 describe("LocationDashboardPanel upload refresh", () => {
-  it("passes refetchGraphs through the toolbar upload success callback", async () => {
+  it("passes uploaded graphs through the toolbar upload success callback", async () => {
     capturedToolbarProps.length = 0;
     refetchGraphsMock.mockClear();
 
@@ -74,8 +75,21 @@ describe("LocationDashboardPanel upload refresh", () => {
     const onUploadSpreadsheetSuccess = capturedToolbarProps[0].onUploadSpreadsheetSuccess;
     expect(typeof onUploadSpreadsheetSuccess).toBe("function");
 
-    await (onUploadSpreadsheetSuccess as () => Promise<void>)();
+    const uploadedGraphs: LocationGraph[] = [
+      {
+        id: 99,
+        name: "Water Quality Compliance",
+        data: [],
+        layout: null,
+        config: null,
+        style: null,
+        createdAt: "2026-05-06T00:00:00Z",
+        updatedAt: "2026-05-06T00:00:00Z"
+      }
+    ];
 
-    expect(refetchGraphsMock).toHaveBeenCalledTimes(1);
+    await (onUploadSpreadsheetSuccess as (graphs: LocationGraph[]) => Promise<void>)(uploadedGraphs);
+
+    expect(refetchGraphsMock).not.toHaveBeenCalled();
   });
 });

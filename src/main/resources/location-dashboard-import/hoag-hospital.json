@@ -366,5 +366,36 @@
       "derivedType": "non_conformance_status_by_facility",
       "graphType": "bar"
     }
+  ],
+  "systemTypeAliases": [
+    {
+      "Utility SPD" : [
+        "Utility- HLD",
+        "Utility-HLD",
+        "Utility",
+        "Utility SPD",
+        "Utility Water SPD",
+        "Utility-Soft",
+        "Utility Water"
+      ]
+    },
+    {
+      "Critical SPD" : [
+        "Critical"
+
+      ]
+    },
+    {
+      "Utility Domestic Hot" : [
+        "Utility-Hot",
+        "Utility-Main Hot 120F"
+      ]
+    },
+    {
+      "Cooling Tower" : [
+        "Cooling Tower",
+        "Cooling Towers"
+      ]
+    }
   ]
 }

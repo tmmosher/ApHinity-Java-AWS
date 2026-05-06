@@ -21,6 +21,7 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SublocationConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeAliasConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeConfig;
 
 /**
@@ -44,17 +45,20 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
 
     private final LocationDashboardImportStrategyConfig config;
     private final Map<String, SystemTypeConfig> systemsByAlias;
+    private final Map<String, SystemTypeAliasGroup> systemTypeAliasGroupsByAlias;
     private final Map<String, List<SublocationConfig>> sublocationsByFacilityAlias;
     private final Map<String, SublocationConfig> defaultSublocationsByFacilityAlias;
-    private final Map<String, GraphConfig> graphDefinitionsById;
     private final Map<String, List<GraphConfig>> graphsBySublocationKey;
 
     public ConfiguredLocationDashboardImportStrategy(LocationDashboardImportStrategyConfig config) {
         this.config = validate(config);
         this.systemsByAlias = buildSystemsByAlias(this.config.systems());
+        this.systemTypeAliasGroupsByAlias = buildSystemTypeAliasGroupsByAlias(
+            this.config.systemTypeAliases(),
+            this.systemsByAlias
+        );
         this.sublocationsByFacilityAlias = buildSublocationsByFacilityAlias(this.config.sublocations());
         this.defaultSublocationsByFacilityAlias = buildDefaultSublocationsByFacilityAlias(this.config.sublocations());
-        this.graphDefinitionsById = buildGraphDefinitionsById(this.config.graphs());
         this.graphsBySublocationKey = buildGraphsBySublocationKey(this.config.graphs());
     }
 
@@ -95,7 +99,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         List<CorrectiveActionDraft> correctiveActions = new ArrayList<>();
         String activeFacility = null;
         String activeBuilding = null;
-        String activeSystem = null;
+        String activeSystemRaw = null;
         SublocationConfig activeSublocation = null;
         SystemTypeConfig activeSystemType = null;
 
@@ -107,18 +111,18 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 activeBuilding = row.building();
             }
             if (row.system() != null) {
-                activeSystem = row.system();
+                activeSystemRaw = row.system();
             }
 
             String resolvedFacility = activeFacility;
             String resolvedBuilding = row.building() != null ? row.building() : activeBuilding;
-            String resolvedSystem = row.system() != null ? row.system() : activeSystem;
+            String resolvedSystem = row.system() != null ? row.system() : activeSystemRaw;
 
             activeSublocation = resolveSublocation(resolvedFacility, resolvedBuilding, activeSublocation);
             activeSystemType = resolveSystemType(resolvedSystem, activeSystemType);
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
-                if (cell.commentText() != null) {
+                if (cell.commentText() != null && activeSystemType != null) {
                     buildCorrectiveActionDraft(
                         cell,
                         row,
@@ -228,6 +232,30 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
         }
 
+        Set<String> systemTypeAliases = new LinkedHashSet<>();
+        if (rawConfig.systemTypeAliases() != null) {
+            for (SystemTypeAliasConfig systemTypeAlias : rawConfig.systemTypeAliases()) {
+                if (normalizeKey(systemTypeAlias.canonicalName()) == null) {
+                    throw new IllegalStateException("Dashboard import strategy system type alias names are required");
+                }
+                if (systemTypeAlias.aliases() == null || systemTypeAlias.aliases().isEmpty()) {
+                    throw new IllegalStateException(
+                        "Dashboard import strategy system type aliases must define at least one alias: "
+                            + systemTypeAlias.canonicalName()
+                    );
+                }
+                for (String alias : systemTypeAlias.aliases()) {
+                    String normalizedAlias = normalizeKey(alias);
+                    if (normalizedAlias == null) {
+                        continue;
+                    }
+                    if (!systemTypeAliases.add(normalizedAlias)) {
+                        throw new IllegalStateException("Dashboard import system type aliases must be unique: " + alias);
+                    }
+                }
+            }
+        }
+
         Set<String> graphIds = new LinkedHashSet<>();
         Set<String> graphNameTitles = new LinkedHashSet<>();
         for (GraphConfig graph : rawConfig.graphs()) {
@@ -305,6 +333,48 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         return Map.copyOf(systemsByAlias);
     }
 
+    private Map<String, SystemTypeAliasGroup> buildSystemTypeAliasGroupsByAlias(
+        List<SystemTypeAliasConfig> configuredAliases,
+        Map<String, SystemTypeConfig> configuredSystemsByAlias
+    ) {
+        if (configuredAliases == null || configuredAliases.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, SystemTypeAliasGroup> aliasGroupsByAlias = new LinkedHashMap<>();
+        for (SystemTypeAliasConfig configuredAlias : configuredAliases) {
+            SystemTypeAliasGroup aliasGroup = new SystemTypeAliasGroup(
+                resolveRepresentativeSystemType(configuredAlias, configuredSystemsByAlias)
+            );
+            for (String alias : configuredAlias.aliases()) {
+                String normalizedAlias = normalizeKey(alias);
+                if (normalizedAlias == null) {
+                    continue;
+                }
+                aliasGroupsByAlias.put(normalizedAlias, aliasGroup);
+            }
+        }
+        return Map.copyOf(aliasGroupsByAlias);
+    }
+
+    private SystemTypeConfig resolveRepresentativeSystemType(
+        SystemTypeAliasConfig configuredAlias,
+        Map<String, SystemTypeConfig> configuredSystemsByAlias
+    ) {
+        if (configuredAlias.aliases() == null) {
+            return null;
+        }
+        // Alias order is the contract: the first alias that maps to a configured
+        // system becomes the canonical display label for the grouped workbook values.
+        for (String alias : configuredAlias.aliases()) {
+            SystemTypeConfig systemType = configuredSystemsByAlias.get(normalizeKey(alias));
+            if (systemType != null) {
+                return systemType;
+            }
+        }
+        return null;
+    }
+
     private Map<String, List<SublocationConfig>> buildSublocationsByFacilityAlias(List<SublocationConfig> sublocations) {
         Map<String, List<SublocationConfig>> sublocationsByFacilityAlias = new LinkedHashMap<>();
         for (SublocationConfig sublocation : sublocations) {
@@ -336,14 +406,6 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
         }
         return Map.copyOf(defaultsByFacilityAlias);
-    }
-
-    private Map<String, GraphConfig> buildGraphDefinitionsById(List<GraphConfig> graphDefinitions) {
-        Map<String, GraphConfig> graphDefinitionsById = new LinkedHashMap<>();
-        for (GraphConfig graphDefinition : graphDefinitions) {
-            graphDefinitionsById.put(normalizeKey(graphDefinition.id()), graphDefinition);
-        }
-        return Map.copyOf(graphDefinitionsById);
     }
 
     private Map<String, List<GraphConfig>> buildGraphsBySublocationKey(List<GraphConfig> graphDefinitions) {
@@ -401,7 +463,25 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         if (normalizedSystem == null) {
             return previousSystemType;
         }
-        return systemsByAlias.getOrDefault(normalizedSystem, previousSystemType);
+
+        // Hoag alias groups define the coercion contract for workbook spellings.
+        // A raw value that is part of a configured alias group should collapse to
+        // that group's representative system before we consider direct passthrough.
+        SystemTypeAliasGroup aliasGroup = systemTypeAliasGroupsByAlias.get(normalizedSystem);
+        if (aliasGroup != null && aliasGroup.representativeSystemType() != null) {
+            return aliasGroup.representativeSystemType();
+        }
+
+        SystemTypeConfig resolvedSystemType = systemsByAlias.get(normalizedSystem);
+        if (resolvedSystemType != null) {
+            return resolvedSystemType;
+        }
+
+        if (!systemTypeAliasGroupsByAlias.isEmpty()) {
+            return null;
+        }
+
+        return previousSystemType;
     }
 
     private java.util.Optional<CorrectiveActionDraft> buildCorrectiveActionDraft(
@@ -443,12 +523,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             );
         }
         String systemTypeName = resolveSystemTypeName(systemType, resolvedSystem);
-        if (systemType != null && systemType.displayName() != null && !systemType.displayName().isBlank()) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemType.displayName())
-            );
-        } else if (systemTypeName != null) {
+        if (systemTypeName != null) {
             addDescriptionLine(
                 descriptionLines,
                 LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemTypeName)
@@ -778,4 +853,10 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
         }
     }
+
+    private record SystemTypeAliasGroup(
+        SystemTypeConfig representativeSystemType
+    ) {
+    }
+
 }

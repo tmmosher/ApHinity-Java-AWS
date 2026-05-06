@@ -76,7 +76,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
         onAddGraph={dashboard.openCreateGraphModal}
         onApply={() => void dashboard.applyGraphChanges()}
         onEditLayout={dashboard.openLayoutEditor}
-        onUploadSpreadsheetSuccess={refetchGraphs}
+        onUploadSpreadsheetSuccess={dashboard.applySpreadsheetUploadPreview}
         onUndo={dashboard.undoLastDashboardEdit}
       />
 

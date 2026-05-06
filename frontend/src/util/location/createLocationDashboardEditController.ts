@@ -8,6 +8,7 @@ import {
   cloneLocationGraphs,
   type GraphBaselineEntry,
   pruneDeletedLocationGraphState,
+  reconcileLocationGraphUploadState,
   reconcileLocationGraphRefreshState,
   type EditableGraphPayload
 } from "../graph/graphEditor";
@@ -231,6 +232,25 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       createDashboardSnapshot()
     ]);
     setWorkingSectionLayout(cloneLocationSectionLayout(nextSectionLayout));
+  };
+
+  // Spreadsheet uploads are preview-only on the backend, so stage the returned
+  // graphs locally as an undoable dashboard edit instead of refetching.
+  const applySpreadsheetUploadPreview = (uploadedGraphs: LocationGraph[]) => {
+    if (isGraphMutationBusy() || !props.canEditGraphs()) {
+      return;
+    }
+
+    const nextGraphs = reconcileLocationGraphUploadState(workingGraphs(), uploadedGraphs);
+    if (nextGraphs === workingGraphs()) {
+      return;
+    }
+
+    setDashboardUndoStack((currentUndoStack) => [
+      ...currentUndoStack,
+      createDashboardSnapshot()
+    ]);
+    setWorkingGraphs(nextGraphs);
   };
 
   const renameGraphFromModal = async (graphId: number, name: string): Promise<void> => {
@@ -577,6 +597,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     missingGraphIds,
     applyLocalGraphEdit,
     applyLocalSectionLayoutEdit,
+    applySpreadsheetUploadPreview,
     renameGraphFromModal,
     createGraphFromModal,
     deleteGraphFromModal,

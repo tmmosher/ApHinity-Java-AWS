@@ -1,6 +1,5 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
-import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
@@ -13,9 +12,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * Owns corrective-action persistence rules and historical corrective-action reconstruction.
+ * Owns corrective-action preview rules and historical corrective-action reconstruction.
  */
 final class LocationDashboardCorrectiveActionService {
     private static final LocalTime ALL_DAY_START_TIME = LocalTime.MIDNIGHT;
@@ -29,58 +29,40 @@ final class LocationDashboardCorrectiveActionService {
         this.clock = clock;
     }
 
-    void upsertCorrectiveActions(
-        Location location,
+    List<ServiceEvent> buildPreviewCorrectiveActions(
+        Long locationId,
         List<LocationDashboardImportStrategy.CorrectiveActionDraft> correctiveActions
     ) {
+        List<ServiceEvent> persistedCorrectiveActions =
+            serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
         if (correctiveActions.isEmpty()) {
-            return;
+            return persistedCorrectiveActions;
         }
 
-        List<String> titles = correctiveActions.stream()
-            .map(LocationDashboardImportStrategy.CorrectiveActionDraft::title)
-            .distinct()
-            .toList();
-        Map<String, ServiceEvent> existingByTitle = new LinkedHashMap<>();
-        for (ServiceEvent existingCorrectiveAction : serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueAndTitleIn(
-            location.getId(),
-            titles
-        )) {
-            existingByTitle.putIfAbsent(
+        Map<String, Integer> persistedIndexesByTitle = new LinkedHashMap<>();
+        List<ServiceEvent> previewCorrectiveActions = new ArrayList<>();
+        for (int index = 0; index < persistedCorrectiveActions.size(); index += 1) {
+            ServiceEvent existingCorrectiveAction = persistedCorrectiveActions.get(index);
+            previewCorrectiveActions.add(copyServiceEvent(existingCorrectiveAction));
+            persistedIndexesByTitle.putIfAbsent(
                 LocationDashboardGraphMetadataSupport.normalizeKey(existingCorrectiveAction.getTitle()),
-                existingCorrectiveAction
+                index
             );
         }
 
-        List<ServiceEvent> eventsToPersist = new ArrayList<>();
         for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
-            ServiceEvent serviceEvent = existingByTitle.get(
-                LocationDashboardGraphMetadataSupport.normalizeKey(draft.title())
-            );
-            boolean newEvent = serviceEvent == null;
-            if (serviceEvent == null) {
-                serviceEvent = new ServiceEvent();
-                serviceEvent.setLocation(location);
-                serviceEvent.setCorrectiveAction(true);
+            String normalizedTitle = LocationDashboardGraphMetadataSupport.normalizeKey(draft.title());
+            Integer existingIndex = persistedIndexesByTitle.get(normalizedTitle);
+            if (existingIndex != null) {
+                ServiceEvent previewEvent = previewCorrectiveActions.get(existingIndex);
+                previewEvent.setTitle(draft.title());
+                previewEvent.setDescription(draft.description());
+                continue;
             }
-            serviceEvent.setTitle(draft.title());
-            serviceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
-            if (newEvent) {
-                serviceEvent.setEventDate(draft.observedDate());
-                serviceEvent.setEventTime(ALL_DAY_START_TIME);
-                serviceEvent.setEndEventDate(draft.observedDate());
-                serviceEvent.setEndEventTime(ALL_DAY_END_TIME);
-                serviceEvent.setStatus(resolveImportedCorrectiveActionStatus(draft.observedDate()));
-            }
-            serviceEvent.setDescription(draft.description());
-            eventsToPersist.add(serviceEvent);
+            previewCorrectiveActions.add(createPreviewServiceEvent(draft));
         }
 
-        serviceEventRepository.saveAllAndFlush(eventsToPersist);
-    }
-
-    List<ServiceEvent> findPersistedCorrectiveActions(Long locationId) {
-        return serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
+        return List.copyOf(previewCorrectiveActions);
     }
 
     LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction toHistoricalCorrectiveAction(ServiceEvent serviceEvent) {
@@ -115,5 +97,40 @@ final class LocationDashboardCorrectiveActionService {
             return ServiceEventStatus.CURRENT;
         }
         return ServiceEventStatus.UPCOMING;
+    }
+
+    private ServiceEvent createPreviewServiceEvent(LocationDashboardImportStrategy.CorrectiveActionDraft draft) {
+        ServiceEvent serviceEvent = new ServiceEvent();
+        serviceEvent.setCorrectiveAction(true);
+        serviceEvent.setTitle(draft.title());
+        serviceEvent.setDescription(draft.description());
+        serviceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
+        serviceEvent.setEventDate(draft.observedDate());
+        serviceEvent.setEventTime(ALL_DAY_START_TIME);
+        serviceEvent.setEndEventDate(draft.observedDate());
+        serviceEvent.setEndEventTime(ALL_DAY_END_TIME);
+        serviceEvent.setStatus(resolveImportedCorrectiveActionStatus(draft.observedDate()));
+        return serviceEvent;
+    }
+
+    private ServiceEvent copyServiceEvent(ServiceEvent source) {
+        if (source == null) {
+            return null;
+        }
+        ServiceEvent copy = new ServiceEvent();
+        copy.setId(source.getId());
+        copy.setLocation(source.getLocation());
+        copy.setTitle(source.getTitle());
+        copy.setDescription(source.getDescription());
+        copy.setCorrectiveAction(source.isCorrectiveAction());
+        copy.setResponsibility(Objects.requireNonNullElse(source.getResponsibility(), ServiceEventResponsibility.PARTNER));
+        copy.setEventDate(source.getEventDate());
+        copy.setEventTime(source.getEventTime());
+        copy.setEndEventDate(source.getEndEventDate());
+        copy.setEndEventTime(source.getEndEventTime());
+        copy.setStatus(source.getStatus());
+        copy.setCreatedAt(source.getCreatedAt());
+        copy.setUpdatedAt(source.getUpdatedAt());
+        return copy;
     }
 }

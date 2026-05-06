@@ -5,10 +5,8 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
@@ -20,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -42,8 +39,6 @@ public class LocationDashboardImportService {
     private final LocationDashboardImportStrategyRegistry strategyRegistry;
     private final MeasurementBoundRepository measurementBoundRepository;
     private final LocationGraphRepository locationGraphRepository;
-    private final GraphRepository graphRepository;
-    private final LocationRepository locationRepository;
     private final LocationDashboardMutationLockService mutationLockService;
     private final LocationDashboardGraphMatcher graphMatcher;
     private final LocationDashboardImportedGraphMerger importedGraphMerger;
@@ -56,9 +51,7 @@ public class LocationDashboardImportService {
         LocationDashboardImportStrategyRegistry strategyRegistry,
         MeasurementBoundRepository measurementBoundRepository,
         LocationGraphRepository locationGraphRepository,
-        GraphRepository graphRepository,
         ServiceEventRepository serviceEventRepository,
-        LocationRepository locationRepository,
         LocationDashboardMutationLockService mutationLockService
     ) {
         this(
@@ -66,9 +59,7 @@ public class LocationDashboardImportService {
             strategyRegistry,
             measurementBoundRepository,
             locationGraphRepository,
-            graphRepository,
             serviceEventRepository,
-            locationRepository,
             mutationLockService,
             Clock.systemDefaultZone()
         );
@@ -79,9 +70,7 @@ public class LocationDashboardImportService {
         LocationDashboardImportStrategyRegistry strategyRegistry,
         MeasurementBoundRepository measurementBoundRepository,
         LocationGraphRepository locationGraphRepository,
-        GraphRepository graphRepository,
         ServiceEventRepository serviceEventRepository,
-        LocationRepository locationRepository,
         LocationDashboardMutationLockService mutationLockService,
         Clock clock
     ) {
@@ -90,8 +79,6 @@ public class LocationDashboardImportService {
             strategyRegistry,
             measurementBoundRepository,
             locationGraphRepository,
-            graphRepository,
-            locationRepository,
             mutationLockService,
             new LocationDashboardGraphMatcher(),
             new LocationDashboardImportedGraphMerger(),
@@ -104,8 +91,6 @@ public class LocationDashboardImportService {
         LocationDashboardImportStrategyRegistry strategyRegistry,
         MeasurementBoundRepository measurementBoundRepository,
         LocationGraphRepository locationGraphRepository,
-        GraphRepository graphRepository,
-        LocationRepository locationRepository,
         LocationDashboardMutationLockService mutationLockService,
         LocationDashboardGraphMatcher graphMatcher,
         LocationDashboardImportedGraphMerger importedGraphMerger,
@@ -115,8 +100,6 @@ public class LocationDashboardImportService {
         this.strategyRegistry = strategyRegistry;
         this.measurementBoundRepository = measurementBoundRepository;
         this.locationGraphRepository = locationGraphRepository;
-        this.graphRepository = graphRepository;
-        this.locationRepository = locationRepository;
         this.mutationLockService = mutationLockService;
         this.graphMatcher = graphMatcher;
         this.importedGraphMerger = importedGraphMerger;
@@ -175,10 +158,14 @@ public class LocationDashboardImportService {
             location.getName()
         );
 
-        Map<Long, Graph> lockedGraphsById = lockAssignedGraphs(location, assignedGraphs);
+        Map<Long, Graph> assignedGraphsById = assignedGraphs.stream()
+            .filter(graph -> graph != null && graph.getId() != null)
+            .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
+        Map<Long, Graph> previewGraphsById = cloneAssignedGraphsById(assignedGraphs);
         LocationDashboardImportStrategy.LocationDashboardImportComputation computation =
             strategy.computeImport(workbook, measurementBounds);
-        correctiveActionService.upsertCorrectiveActions(location, computation.correctiveActions());
+        List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions =
+            correctiveActionService.buildPreviewCorrectiveActions(location.getId(), computation.correctiveActions());
 
         Map<String, GraphConfig> graphDefinitionsById = strategy.graphDefinitions().stream()
             .collect(Collectors.toMap(
@@ -195,65 +182,37 @@ public class LocationDashboardImportService {
                 LinkedHashMap::new
             ));
 
-        Map<Long, Graph> graphsToPersistById = applyImportedGraphUpdates(
+        Map<Long, Graph> updatedPreviewGraphsById = applyImportedGraphUpdates(
             strategy,
             computation.graphs(),
             matchedImportGraphsByDefinitionId,
-            lockedGraphsById,
+            previewGraphsById,
             graphDefinitionsById
         );
         applyDerivedGraphUpdates(
-            location.getId(),
             strategy,
+            computation,
             matchedImportGraphsByDefinitionId,
             matchedDerivedGraphsByDefinitionId,
-            lockedGraphsById,
-            graphsToPersistById,
+            assignedGraphsById,
+            previewGraphsById,
+            updatedPreviewGraphsById,
+            previewCorrectiveActions,
             derivedGraphDefinitionsById
         );
 
-        try {
-            graphRepository.saveAllAndFlush(new ArrayList<>(graphsToPersistById.values()));
-            List<GraphResponse> responses = buildResponsesInGraphOrder(
-                assignedGraphs,
-                lockedGraphsById,
-                graphsToPersistById.keySet()
-            );
-            locationRepository.touchUpdatedAt(location.getId(), Instant.now());
-            return responses;
-        } catch (RuntimeException ex) {
-            log.error(
-                "Dashboard spreadsheet import persistence failed locationId={} locationName={}",
-                location.getId(),
-                location.getName(),
-                ex
-            );
-            throw ex;
-        }
-    }
-
-    private Map<Long, Graph> lockAssignedGraphs(Location location, List<Graph> assignedGraphs) {
-        List<Long> targetGraphIds = assignedGraphs.stream()
-            .map(Graph::getId)
-            .filter(Objects::nonNull)
-            .toList();
-        List<Graph> lockedGraphs = graphRepository.findByLocationIdAndGraphIdInForUpdate(location.getId(), targetGraphIds);
-        if (lockedGraphs.size() != targetGraphIds.size()) {
-            throw new ApiClientException(
-                HttpStatus.CONFLICT,
-                "graph_update_conflict",
-                "Graph update conflict"
-            );
-        }
-        return lockedGraphs.stream()
-            .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
+        return buildResponsesInGraphOrder(
+            assignedGraphs,
+            previewGraphsById,
+            updatedPreviewGraphsById.keySet()
+        );
     }
 
     private Map<Long, Graph> applyImportedGraphUpdates(
         LocationDashboardImportStrategy strategy,
         List<LocationDashboardImportStrategy.ComputedGraphPayload> computedGraphs,
         Map<String, Graph> matchedImportGraphsByDefinitionId,
-        Map<Long, Graph> lockedGraphsById,
+        Map<Long, Graph> previewGraphsById,
         Map<String, GraphConfig> graphDefinitionsById
     ) {
         Map<Long, Graph> graphsToPersistById = new LinkedHashMap<>();
@@ -264,8 +223,8 @@ public class LocationDashboardImportService {
             if (matchedGraph == null || matchedGraph.getId() == null) {
                 continue;
             }
-            Graph lockedGraph = lockedGraphsById.get(matchedGraph.getId());
-            if (lockedGraph == null) {
+            Graph previewGraph = previewGraphsById.get(matchedGraph.getId());
+            if (previewGraph == null) {
                 continue;
             }
             GraphConfig graphDefinition = graphDefinitionsById.get(
@@ -275,25 +234,27 @@ public class LocationDashboardImportService {
                 continue;
             }
 
-            lockedGraph.setLayout(LocationDashboardGraphMetadataSupport.withImportMetadataAndDefaults(
-                lockedGraph.getLayout(),
+            previewGraph.setLayout(LocationDashboardGraphMetadataSupport.withImportMetadataAndDefaults(
+                previewGraph.getLayout(),
                 graphDefinition,
                 strategy.locationName()
             ));
-            lockedGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(graphDefinition.graphType()));
-            lockedGraph.setData(importedGraphMerger.mergeImportedGraphData(lockedGraph, computedGraphPayload.data()));
-            graphsToPersistById.put(lockedGraph.getId(), lockedGraph);
+            previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(graphDefinition.graphType()));
+            previewGraph.setData(importedGraphMerger.mergeImportedGraphData(previewGraph, computedGraphPayload.data()));
+            graphsToPersistById.put(previewGraph.getId(), previewGraph);
         }
         return graphsToPersistById;
     }
 
     private void applyDerivedGraphUpdates(
-        Long locationId,
         LocationDashboardImportStrategy strategy,
+        LocationDashboardImportStrategy.LocationDashboardImportComputation computation,
         Map<String, Graph> matchedImportGraphsByDefinitionId,
         Map<String, Graph> matchedDerivedGraphsByDefinitionId,
-        Map<Long, Graph> lockedGraphsById,
-        Map<Long, Graph> graphsToPersistById,
+        Map<Long, Graph> assignedGraphsById,
+        Map<Long, Graph> previewGraphsById,
+        Map<Long, Graph> updatedPreviewGraphsById,
+        List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions,
         Map<String, DerivedGraphConfig> derivedGraphDefinitionsById
     ) {
         if (derivedGraphDefinitionsById.isEmpty()) {
@@ -304,9 +265,10 @@ public class LocationDashboardImportService {
             historicalDataAssembler.buildHistoricalDerivedData(
                 strategy.graphDefinitions(),
                 matchedImportGraphsByDefinitionId,
-                lockedGraphsById,
-                graphsToPersistById,
-                correctiveActionService.findPersistedCorrectiveActions(locationId)
+                assignedGraphsById,
+                updatedPreviewGraphsById,
+                computation.observations(),
+                previewCorrectiveActions
             );
 
         for (Map.Entry<String, DerivedGraphConfig> entry : derivedGraphDefinitionsById.entrySet()) {
@@ -314,24 +276,24 @@ public class LocationDashboardImportService {
             if (matchedGraph == null || matchedGraph.getId() == null) {
                 continue;
             }
-            Graph lockedGraph = lockedGraphsById.get(matchedGraph.getId());
-            if (lockedGraph == null) {
+            Graph previewGraph = previewGraphsById.get(matchedGraph.getId());
+            if (previewGraph == null) {
                 continue;
             }
 
             DerivedGraphConfig derivedGraphDefinition = entry.getValue();
-            lockedGraph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
-                lockedGraph.getLayout(),
+            previewGraph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
+                previewGraph.getLayout(),
                 derivedGraphDefinition,
                 strategy.locationName()
             ));
-            lockedGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
-            lockedGraph.setData(LocationDashboardDerivedGraphSupport.buildPayload(
+            previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
+            previewGraph.setData(LocationDashboardDerivedGraphSupport.buildPayload(
                 derivedGraphDefinition,
-                lockedGraph,
+                previewGraph,
                 historicalDerivedData
             ));
-            graphsToPersistById.put(lockedGraph.getId(), lockedGraph);
+            updatedPreviewGraphsById.put(previewGraph.getId(), previewGraph);
         }
     }
 
@@ -350,7 +312,7 @@ public class LocationDashboardImportService {
 
     private List<GraphResponse> buildResponsesInGraphOrder(
         List<Graph> assignedGraphs,
-        Map<Long, Graph> lockedGraphsById,
+        Map<Long, Graph> previewGraphsById,
         Collection<Long> updatedGraphIds
     ) {
         List<GraphResponse> responses = new ArrayList<>();
@@ -361,13 +323,34 @@ public class LocationDashboardImportService {
             if (assignedGraph == null || assignedGraph.getId() == null || !updatedGraphIdSet.contains(assignedGraph.getId())) {
                 continue;
             }
-            Graph lockedGraph = lockedGraphsById.get(assignedGraph.getId());
-            if (lockedGraph == null) {
+            Graph previewGraph = previewGraphsById.get(assignedGraph.getId());
+            if (previewGraph == null) {
                 continue;
             }
-            responses.add(toGraphResponse(lockedGraph));
+            responses.add(toGraphResponse(previewGraph));
         }
         return List.copyOf(responses);
+    }
+
+    private Map<Long, Graph> cloneAssignedGraphsById(List<Graph> assignedGraphs) {
+        return assignedGraphs.stream()
+            .filter(graph -> graph != null && graph.getId() != null)
+            .map(this::copyGraph)
+            .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
+    }
+
+    private Graph copyGraph(Graph source) {
+        Graph copy = new Graph();
+        copy.setId(source.getId());
+        copy.setName(source.getName());
+        copy.setGraphType(source.getGraphType());
+        copy.setCreatedAt(source.getCreatedAt());
+        copy.setUpdatedAt(source.getUpdatedAt());
+        copy.setLayout(LocationDashboardGraphMetadataSupport.copyMutableMap(source.getLayout()));
+        copy.setConfig(LocationDashboardGraphMetadataSupport.copyMutableMap(source.getConfig()));
+        copy.setStyle(LocationDashboardGraphMetadataSupport.copyMutableMap(source.getStyle()));
+        copy.setData(LocationDashboardGraphMetadataSupport.currentTraceList(source));
+        return copy;
     }
 
     private GraphResponse toGraphResponse(Graph graph) {

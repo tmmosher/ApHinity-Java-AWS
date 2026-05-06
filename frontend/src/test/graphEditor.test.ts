@@ -10,6 +10,7 @@ import {
   parseEditableGraphPayload,
   pruneDeletedLocationGraphState,
   reconcileLocationGraphRefreshState,
+  reconcileLocationGraphUploadState,
   reconcileLocationGraphs,
   serializeEditableGraphPayload,
   updateEditableGraphTitle,
@@ -311,5 +312,47 @@ describe("graphEditor", () => {
         expectedUpdatedAt: "2026-01-02T00:00:00Z"
       }
     ]);
+  });
+
+  it("merges uploaded spreadsheet graphs into the local dashboard state", () => {
+    const uploadedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        data: [{type: "bar", x: ["A"], y: [12]}]
+      },
+      {
+        id: 12,
+        name: "New Graph",
+        data: [{type: "pie", labels: ["Open"], values: [1]}],
+        layout: null,
+        config: null,
+        style: null,
+        createdAt: "2026-01-06T00:00:00Z",
+        updatedAt: "2026-01-06T00:00:00Z"
+      }
+    ];
+
+    const merged = reconcileLocationGraphUploadState(baseGraphs, uploadedGraphs);
+
+    expect(merged).toHaveLength(3);
+    expect(merged[0].data).toEqual([{type: "bar", x: ["A"], y: [12]}]);
+    expect(merged[1]).toBe(baseGraphs[1]);
+    expect(merged[2].id).toBe(12);
+  });
+
+  it("replaces a graph when the backend preview returns a newer timestamp", () => {
+    const uploadedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        updatedAt: "2026-01-03T00:00:00Z"
+      }
+    ];
+
+    const merged = reconcileLocationGraphUploadState(baseGraphs, uploadedGraphs);
+
+    expect(merged).toHaveLength(2);
+    expect(merged[0]).not.toBe(baseGraphs[0]);
+    expect(merged[0].updatedAt).toBe("2026-01-03T00:00:00Z");
+    expect(merged[1]).toBe(baseGraphs[1]);
   });
 });

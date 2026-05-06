@@ -8,6 +8,7 @@ import LocationDashboardToolbarOverflowMenuUploadSpreadsheetAction from "./Locat
 import LocationOverflowMenuIcon from "./LocationOverflowMenuIcon";
 import {locationToolbarIconButtonClass} from "./locationToolbarStyles";
 import {uploadLocationDashboardSpreadsheetById} from "../../util/graph/locationDetailApi";
+import type {LocationGraph} from "../../types/Types";
 
 const overflowMenuProps = {
   placement: "bottom-end" as const,
@@ -27,7 +28,7 @@ type LocationDashboardToolbarOverflowMenuProps = {
   createGraphDisabledReason?: string;
   onAddGraph: () => void;
   onEditLayout: () => void;
-  onUploadSpreadsheetSuccess?: () => Promise<void> | void;
+  onUploadSpreadsheetSuccess?: (uploadedGraphs: LocationGraph[]) => Promise<void> | void;
 };
 
 export const LocationDashboardToolbarOverflowMenu = (
@@ -63,8 +64,8 @@ export const LocationDashboardToolbarOverflowMenu = (
 
     setIsUploadingSpreadsheet(true);
     try {
-      await uploadLocationDashboardSpreadsheetById(props.apiHost, props.locationId, file);
-      await props.onUploadSpreadsheetSuccess?.();
+      const uploadedGraphs = await uploadLocationDashboardSpreadsheetById(props.apiHost, props.locationId, file);
+      await props.onUploadSpreadsheetSuccess?.(uploadedGraphs);
       toast.success("Spreadsheet uploaded");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to upload dashboard spreadsheet");

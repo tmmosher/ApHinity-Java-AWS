@@ -3,7 +3,6 @@ package com.aphinity.client_analytics_core.api.integration;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
-import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
@@ -21,12 +20,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,7 +36,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     private static final String PASSWORD = "ValidPass12!";
 
     @Test
-    void uploadLocationDashboardSpreadsheetPersistsGraphUpdatesAndCorrectiveActions() throws Exception {
+    void uploadLocationDashboardSpreadsheetReturnsPreviewWithoutPersistingGraphUpdatesOrCorrectiveActions() throws Exception {
         createUser("partner-dashboard-upload@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
@@ -94,40 +95,66 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         assertThat(graphData(persistedWaterQualityGraph))
             .extracting(trace -> trace.get("name"))
-            .containsExactly(
-                "HPC",
-                "Endotoxin",
-                "Legionella",
-                "pH",
-                "Conductivity",
-                "Alkalinity",
-                "Hardness"
-            );
+            .containsExactly("Trace 1");
         assertThat(graphData(persistedSystemTypeGraph))
             .extracting(trace -> trace.get("name"))
-            .containsExactly(
-                "Utility-HLD",
-                "Utility",
-                "Steam",
-                "Critical",
-                "Utility-Hot",
-                "Cooling Towers"
-            );
-        assertEquals("Cooling Towers", graphData(persistedSystemTypeGraph).get(5).get("name"));
-        assertEquals(List.of(6L), graphData(persistedTotalSamplesGraph).getFirst().get("values"));
-        assertEquals(List.of(1L), graphData(persistedTotalNonConformancesGraph).getFirst().get("values"));
+            .containsExactly("Trace 1");
+        assertEquals(List.of(0L), graphData(persistedTotalSamplesGraph).getFirst().get("values"));
+        assertEquals(List.of(0L), graphData(persistedTotalNonConformancesGraph).getFirst().get("values"));
         assertEquals(0L, ((Number) graphData(persistedResolutionPercentGraph).getFirst().get("value")).longValue());
-        assertEquals(17L, ((Number) graphData(persistedPercentConformanceGraph).getFirst().get("value")).longValue());
-        assertEquals(List.of(1L), graphData(persistedByFacilityGraph).getFirst().get("x"));
-        assertEquals(List.of("Newport Beach"), graphData(persistedByFacilityGraph).getFirst().get("y"));
+        assertEquals(0L, ((Number) graphData(persistedPercentConformanceGraph).getFirst().get("value")).longValue());
+        assertEquals(List.of(), graphData(persistedByFacilityGraph).getFirst().get("x"));
+        assertEquals(List.of(), graphData(persistedByFacilityGraph).getFirst().get("y"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(1, persistedEvents.size());
-        assertTrue(persistedEvents.getFirst().isCorrectiveAction());
-        assertTrue(persistedEvents.getFirst().getTitle().startsWith("CA: HPC 2025-08-01"));
-        assertTrue(persistedEvents.getFirst().getTitle().length() <= 42);
-        assertTrue(persistedEvents.getFirst().getDescription().contains("CA: Drain Tank, install new DI bottles"));
-        assertEquals(ServiceEventStatus.OVERDUE, persistedEvents.getFirst().getStatus());
+        assertEquals(0, persistedEvents.size());
+    }
+
+    @Test
+    void uploadLocationDashboardSpreadsheetExampleTwoCoercesHoagSystemAliasesAndPopulatesWaterQualityGraphs() throws Exception {
+        createUser("partner-dashboard-upload-example2@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedHoagMeasurement(location, "HPC");
+        seedHoagMeasurement(location, "Endotoxin");
+        seedHoagMeasurement(location, "Legionella");
+        seedHoagMeasurement(location, "pH");
+        seedHoagMeasurement(location, "Conductivity");
+        seedHoagMeasurement(location, "Alkalinity");
+        seedHoagMeasurement(location, "Hardness");
+
+        seedHoagStrategyGraphs(location);
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-example2@example.com", PASSWORD);
+        byte[] spreadsheet = Files.readAllBytes(Path.of("dashboard_upload_template_example_2.xlsx"));
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard_upload_template_example_2.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(17))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].data.length()").value(7))
+            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").exists())
+            .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
+            .andExpect(jsonPath("$[1].data.length()").value(6))
+            .andExpect(jsonPath("$[1].data[0].name").value("Utility-HLD"))
+            .andExpect(jsonPath("$[1].data[5].name").value("Cooling Towers"))
+            .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
+            .andExpect(jsonPath("$[2].data[0].values[0]").value(greaterThan(0)))
+            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$[5].name").value("Percent Conformance"));
+
+        List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
+        assertEquals(0, persistedEvents.size());
     }
 
     @Test
@@ -159,13 +186,11 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(1, persistedEvents.size());
-        assertTrue(persistedEvents.getFirst().isCorrectiveAction());
-        assertTrue(persistedEvents.getFirst().getTitle().startsWith("CA: HPC 2025-08-01"));
+        assertEquals(0, persistedEvents.size());
     }
 
     @Test
-    void reuploadingShiftedSpreadsheetUpdatesExistingCorrectiveActionInsteadOfCreatingDuplicate() throws Exception {
+    void reuploadingShiftedSpreadsheetDoesNotPersistCorrectiveActions() throws Exception {
         createUser("partner-dashboard-reupload@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
@@ -186,8 +211,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         ));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(1, persistedEvents.size());
-        assertTrue(persistedEvents.getFirst().getDescription().contains("CA: Replace DI bottles"));
+        assertEquals(0, persistedEvents.size());
     }
 
     private void uploadDashboardSpreadsheet(Long locationId, AuthCookies authCookies, byte[] spreadsheet) throws Exception {
@@ -207,14 +231,42 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     }
 
     private void seedMeasurement(Location location, String measurementName, BigDecimal towersRangeMax) {
+        seedMeasurement(location, measurementName, null, null, null, towersRangeMax);
+    }
+
+    private void seedHoagMeasurement(Location location, String measurementName) {
+        seedMeasurement(
+            location,
+            measurementName,
+            new BigDecimal("100"),
+            new BigDecimal("100"),
+            new BigDecimal("100"),
+            new BigDecimal("100")
+        );
+    }
+
+    private void seedMeasurement(
+        Location location,
+        String measurementName,
+        BigDecimal criticalRangeMax,
+        BigDecimal utilityRangeMax,
+        BigDecimal potableRangeMax,
+        BigDecimal towersRangeMax
+    ) {
         jdbcTemplate.update(
             """
                 insert into measurement_bounds (
                     measurement_name,
+                    critical_range_max,
+                    utility_range_max,
+                    potable_range_max,
                     towers_range_max
-                ) values (?, ?)
+                ) values (?, ?, ?, ?, ?)
                 """,
             measurementName,
+            criticalRangeMax,
+            utilityRangeMax,
+            potableRangeMax,
             towersRangeMax
         );
         Long measurementId = jdbcTemplate.queryForObject(

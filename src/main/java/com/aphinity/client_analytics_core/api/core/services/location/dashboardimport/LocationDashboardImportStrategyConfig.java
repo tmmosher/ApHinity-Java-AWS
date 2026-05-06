@@ -15,7 +15,8 @@ public record LocationDashboardImportStrategyConfig(
     List<SublocationConfig> sublocations,
     List<SystemTypeConfig> systems,
     List<GraphConfig> graphs,
-    List<DerivedGraphConfig> derivedGraphs
+    List<DerivedGraphConfig> derivedGraphs,
+    List<SystemTypeAliasConfig> systemTypeAliases
 ) {
     public record SublocationConfig(
         String key,
@@ -32,6 +33,23 @@ public record LocationDashboardImportStrategyConfig(
         RangeProfile rangeProfile,
         List<String> aliases
     ) {
+    }
+
+    public record SystemTypeAliasConfig(
+        String canonicalName,
+        List<String> aliases
+    ) {
+        @JsonCreator
+        public static SystemTypeAliasConfig fromValue(Map<String, List<String>> rawValue) {
+            if (rawValue == null || rawValue.isEmpty()) {
+                return null;
+            }
+            if (rawValue.size() != 1) {
+                throw new IllegalArgumentException("Dashboard system type aliases must define exactly one canonical name");
+            }
+            Map.Entry<String, List<String>> entry = rawValue.entrySet().iterator().next();
+            return new SystemTypeAliasConfig(entry.getKey(), entry.getValue());
+        }
     }
 
     public record GraphConfig(
