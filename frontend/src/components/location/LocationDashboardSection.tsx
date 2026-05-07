@@ -58,6 +58,7 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
                     <div class="w-full" style={{height: resolveGraphHeight(graph.style)}}>
                       <PlotlyChart
                         name={graph.name}
+                        version={graph.updatedAt}
                         data={graph.data as PlotlyData[]}
                         layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
                         config={(graph.config ?? undefined) as PlotlyConfig | undefined}

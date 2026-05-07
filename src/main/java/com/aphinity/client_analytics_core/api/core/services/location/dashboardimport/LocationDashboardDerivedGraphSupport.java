@@ -250,10 +250,10 @@ final class LocationDashboardDerivedGraphSupport {
         Map<String, Object> trace = piePrototype(graph, traceName);
         trace.put("labels", List.copyOf(labels));
         trace.put("values", List.copyOf(values));
-        trace.put("marker", Map.of(
-            "color", colors.isEmpty() ? DEFAULT_GRAPH_COLOR : colors.getFirst(),
-            "colors", List.copyOf(colors)
-        ));
+        Map<String, Object> marker = copyMap(trace.get("marker"));
+        marker.putIfAbsent("color", colors.isEmpty() ? DEFAULT_GRAPH_COLOR : colors.getFirst());
+        marker.putIfAbsent("colors", List.copyOf(colors));
+        trace.put("marker", marker);
         return trace;
     }
 
@@ -267,7 +267,7 @@ final class LocationDashboardDerivedGraphSupport {
         trace.put("value", value);
         Map<String, Object> gauge = copyMap(trace.get("gauge"));
         Map<String, Object> bar = copyMap(gauge.get("bar"));
-        bar.put("color", color);
+        bar.putIfAbsent("color", color);
         gauge.put("bar", bar);
         trace.put("gauge", gauge);
         return trace;
@@ -294,10 +294,18 @@ final class LocationDashboardDerivedGraphSupport {
         int traceIndex
     ) {
         Map<String, Object> trace = barPrototype(graph, traceName, traceIndex);
-        trace.put("x", List.copyOf(values));
-        trace.put("y", List.copyOf(labels));
+        // Preserve the configured bar direction so uploads only refresh values, not chart layout.
+        String orientation = resolveBarOrientation(trace);
+        trace.put("orientation", orientation);
+        if ("v".equals(orientation)) {
+            trace.put("x", List.copyOf(labels));
+            trace.put("y", List.copyOf(values));
+        } else {
+            trace.put("x", List.copyOf(values));
+            trace.put("y", List.copyOf(labels));
+        }
         Map<String, Object> marker = copyMap(trace.get("marker"));
-        marker.put("color", color);
+        marker.putIfAbsent("color", color);
         trace.put("marker", marker);
         return trace;
     }
@@ -344,8 +352,19 @@ final class LocationDashboardDerivedGraphSupport {
         }
         trace.put("type", "bar");
         trace.put("name", traceName);
-        trace.put("orientation", "h");
+        trace.putIfAbsent("orientation", "h");
         return trace;
+    }
+
+    private static String resolveBarOrientation(Map<String, Object> trace) {
+        Object rawOrientation = trace.get("orientation");
+        if (rawOrientation instanceof String orientation) {
+            String normalized = orientation.strip().toLowerCase(Locale.ROOT);
+            if ("h".equals(normalized) || "v".equals(normalized)) {
+                return normalized;
+            }
+        }
+        return "h";
     }
 
     private static Map<String, Object> findExistingTrace(Graph graph, String expectedType, int traceIndex) {

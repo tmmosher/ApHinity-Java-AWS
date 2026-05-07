@@ -16,6 +16,7 @@ let plotlyModulePromise: Promise<PlotlyModule> | null = null;
 
 export type PlotlyChartProps = {
     name: string;
+    version?: string;
     data: PlotlyData[];
     layout?: PlotlyLayout;
     config?: PlotlyConfig;
@@ -259,6 +260,11 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
             return;
         }
 
+        // The upload preview flow can hand Plotly a fresh graph payload without
+        // changing the trace array identity. Treat the backend timestamp as a
+        // render version so regenerated graphs are always repainted locally.
+        const renderVersion = props.version;
+        void renderVersion;
         const activeTheme = themePreference();
         const data = props.data;
         const layout = resolveThemedGraphLayout(props.layout, props.style, activeTheme);

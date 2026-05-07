@@ -70,6 +70,36 @@ class LocationDashboardImportedGraphMergerTest {
         assertEquals(2L, ((Number) customData.get(1).get("sampleCount")).longValue());
     }
 
+    @Test
+    void mergeImportedGraphDataPreservesExistingTracePresentationFields() {
+        Graph graph = graph(List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of("2025-07-01"),
+            "y", List.of(100.0d),
+            "customdata", List.of(Map.of("sampleCount", 3, "compliantCount", 3, "nonConformingCount", 0)),
+            "mode", "lines+markers",
+            "line", Map.of("color", "#123456", "width", 4),
+            "marker", Map.of("size", 9)
+        )));
+
+        List<Map<String, Object>> merged = merger.mergeImportedGraphData(graph, List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of("2025-08-01"),
+            "y", List.of(0.0d),
+            "customdata", List.of(Map.of("sampleCount", 2, "compliantCount", 0, "nonConformingCount", 2)),
+            "mode", "lines+markers",
+            "line", Map.of("color", "#abcdef", "width", 1),
+            "marker", Map.of("size", 2)
+        )));
+
+        assertEquals(List.of("2025-07-01", "2025-08-01"), merged.getFirst().get("x"));
+        assertNumericValues(merged.getFirst().get("y"), 100.0d, 0.0d);
+        assertEquals(Map.of("color", "#123456", "width", 4), merged.getFirst().get("line"));
+        assertEquals(Map.of("size", 9), merged.getFirst().get("marker"));
+    }
+
     private void assertNumericValues(Object rawValues, double... expectedValues) {
         @SuppressWarnings("unchecked")
         List<Number> values = (List<Number>) rawValues;

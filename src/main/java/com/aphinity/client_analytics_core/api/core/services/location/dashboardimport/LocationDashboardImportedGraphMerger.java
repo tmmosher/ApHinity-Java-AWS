@@ -59,10 +59,14 @@ final class LocationDashboardImportedGraphMerger {
         boolean existingTimeSeries = isTimeSeriesScatterTrace(existingTrace);
         boolean importedTimeSeries = isTimeSeriesScatterTrace(importedTrace);
         if (existingTimeSeries && importedTraceHasNoNewPoints(importedTrace)) {
-            return mergeTraceWithExistingSeries(existingTrace, importedTrace);
+            // Sparse uploads should preserve the existing trace exactly, including styling.
+            return new LinkedHashMap<>(existingTrace);
         }
         if (!existingTimeSeries || !importedTimeSeries) {
-            return importedTrace;
+            // Let persisted presentation fields win so workbook data cannot reset graph styling.
+            Map<String, Object> mergedTrace = new LinkedHashMap<>(importedTrace);
+            mergedTrace.putAll(existingTrace);
+            return mergedTrace;
         }
 
         Map<String, TracePointValue> pointsByDate = new LinkedHashMap<>();
@@ -75,8 +79,8 @@ final class LocationDashboardImportedGraphMerger {
             .toList();
 
         Map<String, Object> mergedTrace = new LinkedHashMap<>();
-        mergedTrace.putAll(existingTrace);
         mergedTrace.putAll(importedTrace);
+        mergedTrace.putAll(existingTrace);
         mergedTrace.put("x", orderedPoints.stream().map(Map.Entry::getKey).toList());
         mergedTrace.put("y", orderedPoints.stream().map(entry -> entry.getValue().yValue()).toList());
 
@@ -85,20 +89,6 @@ final class LocationDashboardImportedGraphMerger {
             .toList();
         if (mergedCustomData.stream().anyMatch(Objects::nonNull)) {
             mergedTrace.put("customdata", mergedCustomData);
-        } else {
-            mergedTrace.remove("customdata");
-        }
-        return mergedTrace;
-    }
-
-    private Map<String, Object> mergeTraceWithExistingSeries(Map<String, Object> existingTrace, Map<String, Object> importedTrace) {
-        Map<String, Object> mergedTrace = new LinkedHashMap<>();
-        mergedTrace.putAll(existingTrace);
-        mergedTrace.putAll(importedTrace);
-        mergedTrace.put("x", existingTrace.get("x"));
-        mergedTrace.put("y", existingTrace.get("y"));
-        if (existingTrace.containsKey("customdata")) {
-            mergedTrace.put("customdata", existingTrace.get("customdata"));
         } else {
             mergedTrace.remove("customdata");
         }
