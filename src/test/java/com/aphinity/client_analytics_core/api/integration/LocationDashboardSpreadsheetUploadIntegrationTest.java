@@ -111,6 +111,73 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     }
 
     @Test
+    void uploadLocationDashboardSpreadsheetCountsOutOfSpecStructuredCommentSamplesInDerivedNonConformanceGraphs() throws Exception {
+        createUser("partner-dashboard-upload-structured-comments@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedMeasurement(location, "HPC", new BigDecimal("10"));
+        seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
+
+        seedHoagStrategyGraphs(location);
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-structured-comments@example.com", PASSWORD);
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": "Cooling Tower Sample Port",
+              "primarySample": {
+                "sampledOn": "2025-08-01",
+                "resultReceivedOn": "2025-08-05",
+                "resultRaw": "10 CFU.mL",
+                "resultValue": 10,
+                "resultUnit": "CFU.mL"
+              },
+              "followUpSamples": [
+                {
+                  "sampledOn": "2025-08-15",
+                  "resultReceivedOn": "2025-08-20",
+                  "resultRaw": "15 CFU.mL",
+                  "resultValue": 15,
+                  "resultUnit": "CFU.mL",
+                  "correctiveActions": [
+                    {
+                      "text": "Disinfect and retest"
+                    }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        createDashboardSpreadsheetWithRawComment("Hoag Hospital", structuredComment, 4)
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
+            .andExpect(jsonPath("$[3].data[0].values[0]").value(2))
+            .andExpect(jsonPath("$[6].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[6].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$[6].data[0].y[0]").value("HPC"))
+            .andExpect(jsonPath("$[7].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[7].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$[7].data[0].y[0]").value("Cooling Towers"))
+            .andExpect(jsonPath("$[8].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$[8].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
+
+        List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
+        assertEquals(0, persistedEvents.size());
+    }
+
+    @Test
     void uploadLocationDashboardSpreadsheetExampleTwoCoercesHoagSystemAliasesAndPopulatesWaterQualityGraphs() throws Exception {
         createUser("partner-dashboard-upload-example2@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
@@ -155,6 +222,87 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(0, persistedEvents.size());
+    }
+
+    @Test
+    void uploadLocationDashboardSpreadsheetExampleTwoReplacesNamedEmptyWaterQualityPlaceholderTraceData() throws Exception {
+        createUser("partner-dashboard-upload-placeholders@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedHoagMeasurement(location, "HPC");
+        seedHoagMeasurement(location, "Endotoxin");
+        seedHoagMeasurement(location, "Legionella");
+        seedHoagMeasurement(location, "pH");
+        seedHoagMeasurement(location, "Conductivity");
+        seedHoagMeasurement(location, "Alkalinity");
+        seedHoagMeasurement(location, "Hardness");
+
+        HoagGraphFixture graphs = seedHoagStrategyGraphs(location);
+        graphs.waterQualityGraph().setData(namedEmptyScatterData(List.of(
+            "HPC",
+            "Endotoxin",
+            "Legionella",
+            "pH",
+            "Conductivity",
+            "Alkalinity",
+            "Hardness"
+        )));
+        graphRepository.saveAndFlush(graphs.waterQualityGraph());
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-placeholders@example.com", PASSWORD);
+        byte[] spreadsheet = Files.readAllBytes(Path.of("dashboard_upload_template_example_2.xlsx"));
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard_upload_template_example_2.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").exists())
+            .andExpect(jsonPath("$[0].data[0].y[0]").isNumber());
+    }
+
+    @Test
+    void uploadLocationDashboardSpreadsheetExampleTwoNormalizesMeasurementBoundNamesForWaterQualityGraphs() throws Exception {
+        createUser("partner-dashboard-upload-measurement-names@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedMeasurement(location, " hpc ", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+        seedMeasurement(location, "ENDOTOXIN", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+        seedMeasurement(location, " legionella ", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+        seedMeasurement(location, "PH", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+        seedMeasurement(location, " conductivity ", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+        seedMeasurement(location, "ALKALINITY", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+        seedMeasurement(location, " hardness ", new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"), new BigDecimal("100"));
+
+        seedHoagStrategyGraphs(location);
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-measurement-names@example.com", PASSWORD);
+        byte[] spreadsheet = Files.readAllBytes(Path.of("dashboard_upload_template_example_2.xlsx"));
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard_upload_template_example_2.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").exists())
+            .andExpect(jsonPath("$[0].data[0].y[0]").isNumber());
     }
 
     @Test
@@ -295,6 +443,20 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         ));
     }
 
+    private List<Map<String, Object>> namedEmptyScatterData(List<String> traceNames) {
+        return traceNames.stream()
+            .map(traceName -> Map.<String, Object>of(
+                "type", "scatter",
+                "name", traceName,
+                "x", List.of(),
+                "y", List.of(),
+                "mode", "lines+markers",
+                "line", Map.of("color", "#1f77b4", "width", 2),
+                "marker", Map.of("size", 6)
+            ))
+            .toList();
+    }
+
     private List<Map<String, Object>> blankPieData() {
         return List.of(Map.of(
             "type", "pie",
@@ -403,6 +565,18 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         String correctiveActionDescription,
         int dataRowIndex
     ) throws IOException {
+        return createDashboardSpreadsheetWithRawComment(
+            locationTitle,
+            "Test 1;350;CA;" + correctiveActionDescription,
+            dataRowIndex
+        );
+    }
+
+    private byte[] createDashboardSpreadsheetWithRawComment(
+        String locationTitle,
+        String commentText,
+        int dataRowIndex
+    ) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Dashboard");
@@ -454,7 +628,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                 workbook,
                 sheet,
                 dataRow.getCell(5),
-                "Test 1;350;CA;" + correctiveActionDescription
+                commentText
             );
 
             workbook.write(outputStream);

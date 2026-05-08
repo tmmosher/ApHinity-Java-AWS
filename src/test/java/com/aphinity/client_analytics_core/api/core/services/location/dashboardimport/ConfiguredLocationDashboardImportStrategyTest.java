@@ -19,7 +19,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
-            workbookWithCommentCell("Drain Tank, install new DI bottles", "F5");
+            workbookWithCommentCell("Test 1;350;CA;Drain Tank, install new DI bottles", "F5");
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbook,
@@ -38,9 +38,237 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertEquals(4, result.observations().size());
         assertEquals(1, result.observations().stream().filter(observation -> observation.compliant()).count());
+        assertEquals(3, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            draft.title().startsWith("CA: HPC 2025-08-01")
+                && draft.description().contains("CA: Drain Tank, install new DI bottles")
+        ));
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            "Endotoxin".equals(draft.measurementName())
+                && draft.description().contains("out-of-spec worksheet sample without cell comment metadata")
+        ));
+    }
+
+    @Test
+    void computeImportReadsStructuredCommentSamplesAsSupplementalObservations() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": "Cooling Tower Sample Port",
+              "primarySample": {
+                "sampledOn": "2025-08-01",
+                "resultReceivedOn": "2025-08-05",
+                "resultRaw": "10 CFU.mL",
+                "resultValue": 10,
+                "resultUnit": "CFU.mL",
+                "notes": ["30 sec. flush with sample port wipe down."],
+                "correctiveActions": [
+                  {
+                    "text": "New sample port installed"
+                  }
+                ]
+              },
+              "followUpSamples": [
+                {
+                  "sampledOn": "2025-08-15",
+                  "resultReceivedOn": "2025-08-20",
+                  "resultRaw": "5 CFU.mL",
+                  "resultValue": 5,
+                  "resultUnit": "CFU.mL",
+                  "correctiveActions": [
+                    {
+                      "text": "Flush and retest"
+                    }
+                  ]
+                }
+              ],
+              "correctiveActions": [
+                {
+                  "text": "External note"
+                }
+              ],
+              "notes": [
+                "General comment note"
+              ]
+            }
+            """;
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            workbookWithCommentCell(structuredComment, "F5");
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        assertEquals(5, result.observations().size());
+        assertTrue(result.observations().stream().anyMatch(observation ->
+            LocalDate.parse("2025-08-15").equals(observation.observedDate())
+                && "Newport Beach".equals(observation.facilityName())
+                && "Cooling Towers".equals(observation.systemTypeName())
+        ));
+        Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
+        assertEquals(List.of("2025-08-01", "2025-08-15"), waterQualityHpcTrace.get("x"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) waterQualityHpcTrace.get("customdata");
+        assertEquals(2L, ((Number) customData.getFirst().get("sampleCount")).longValue());
+        assertEquals(1L, ((Number) customData.get(1).get("sampleCount")).longValue());
+        assertEquals(3, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            draft.description().contains("Primary Sample: sampled on 2025-08-01")
+                && draft.description().contains("Sample Location: Cooling Tower Sample Port")
+                && draft.description().contains("CA: External note")
+        ));
+    }
+
+    @Test
+    void computeImportCreatesCorrectiveActionsForOutOfSpecStructuredCommentSamples() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": "Cooling Tower Sample Port",
+              "primarySample": {
+                "sampledOn": "2025-08-01",
+                "resultReceivedOn": "2025-08-05",
+                "resultRaw": "10 CFU.mL",
+                "resultValue": 10,
+                "resultUnit": "CFU.mL"
+              },
+              "followUpSamples": [
+                {
+                  "sampledOn": "2025-08-15",
+                  "resultReceivedOn": "2025-08-20",
+                  "resultRaw": "15 CFU.mL",
+                  "resultValue": 15,
+                  "resultUnit": "CFU.mL",
+                  "correctiveActions": [
+                    {
+                      "text": "Disinfect and retest"
+                    }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            workbookWithCommentCell(structuredComment, "F5");
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        assertEquals(4, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-15").equals(draft.observedDate())
+                && "Newport Beach".equals(draft.facilityName())
+                && "Cooling Towers".equals(draft.systemTypeName())
+                && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Supplemental Sample 1: sampled on 2025-08-15")
+                && draft.description().contains("Supplemental Sample 1 CA: Disinfect and retest")
+        ));
+    }
+
+    @Test
+    void computeImportTreatsPrimaryStructuredCommentSamplesAsDistinctDataWhenTheyCarryActualSampleDates() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": "Cooling Tower Sample Port",
+              "primarySample": {
+                "sampledOn": "2025-08-15",
+                "resultReceivedOn": "2025-08-20",
+                "resultRaw": "10 CFU.mL",
+                "resultValue": 10,
+                "resultUnit": "CFU.mL"
+              }
+            }
+            """;
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbookWithCommentCell(structuredComment, "F5"),
+            measurementBounds()
+        );
+
+        assertTrue(result.observations().stream().anyMatch(observation ->
+            LocalDate.parse("2025-08-15").equals(observation.observedDate())
+                && "HPC".equals(observation.measurementName())
+                && !observation.compliant()
+        ));
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-15").equals(draft.observedDate())
+                && "HPC".equals(draft.measurementName())
+        ));
+    }
+
+    @Test
+    void computeImportCreatesSyntheticCorrectiveActionsForStandaloneWorksheetFailuresWithoutComments() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        5,
+                        "Newport Beach",
+                        "Hospital",
+                        "Cooling Towers",
+                        "Recirc Line",
+                        "CTI/514P",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "11",
+                                new BigDecimal("11"),
+                                null,
+                                "F5"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
         assertEquals(1, result.correctiveActions().size());
-        assertTrue(result.correctiveActions().getFirst().title().startsWith("CA: HPC 2025-08-01"));
-        assertTrue(result.correctiveActions().getFirst().description().contains("CA: Drain Tank, install new DI bottles"));
+        assertEquals(LocalDate.parse("2025-08-01"), result.correctiveActions().getFirst().observedDate());
+        assertTrue(result.correctiveActions().getFirst().description().contains(
+            "out-of-spec worksheet sample without cell comment metadata"
+        ));
+    }
+
+    @Test
+    void computeImportUsesWorkbookMetricNamesWhenMeasurementBoundsUseDifferentFormatting() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            workbookWithCommentCell("Test 1;350;CA;Drain Tank, install new DI bottles", "F5");
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            List.of(
+                measurementBound(1L, " hpc ", null, null, null, null, null, null, null, new BigDecimal("10")),
+                measurementBound(2L, "ENDOTOXIN", null, null, null, null, null, null, null, new BigDecimal("1"))
+            )
+        );
+
+        Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
+        assertEquals("HPC", waterQualityHpcTrace.get("name"));
+        assertEquals(List.of("2025-08-01"), waterQualityHpcTrace.get("x"));
+        assertEquals(List.of(0.0d), waterQualityHpcTrace.get("y"));
+        assertTrue(result.observations().stream().anyMatch(observation -> "HPC".equals(observation.measurementName())));
     }
 
     @Test
@@ -57,12 +285,12 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String originalTitle = strategy.computeImport(
-            workbookWithCommentCell("Drain Tank, install new DI bottles", "F5"),
+            workbookWithCommentCell("Test 1;350;CA;Drain Tank, install new DI bottles", "F5"),
             measurementBounds()
         ).correctiveActions().getFirst().title();
 
         String shiftedTitle = strategy.computeImport(
-            workbookWithCommentCell("Drain Tank, install new DI bottles", "F6"),
+            workbookWithCommentCell("Test 1;350;CA;Drain Tank, install new DI bottles", "F6"),
             measurementBounds()
         ).correctiveActions().getFirst().title();
 
@@ -102,6 +330,12 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         "Utility-Hot",
                         LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
                         List.of("Utility- Main Hot 120F")
+                    ),
+                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "steam",
+                        "Steam",
+                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        List.of()
                     )
                 ),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
@@ -576,9 +810,11 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbookWithCommentCell(
-        String correctiveActionDescription,
+        String commentText,
         String firstCellReference
     ) {
+        // Keep the workbook comment text verbatim so the tests can cover both
+        // the legacy semicolon-delimited format and the new structured JSON payload.
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             "Newport Beach",
             List.of(
@@ -595,7 +831,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             LocalDate.parse("2025-08-01"),
                             "10",
                             new BigDecimal("10"),
-                            "Test 1;350;CA;" + correctiveActionDescription,
+                            commentText,
                             firstCellReference
                         ),
                         new LocationDashboardSpreadsheetParser.ParsedDashboardCell(

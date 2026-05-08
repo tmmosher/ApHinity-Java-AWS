@@ -27,6 +27,9 @@ final class LocationDashboardDerivedGraphSupport {
     private static final String ACTIVE_GRAPH_COLOR = "#dc2626";
     private static final String RESOLVED_GRAPH_COLOR = "#16a34a";
     private static final String KPI_REMAINDER_COLOR = "rgba(15, 23, 42, 0.12)";
+    private static final String UNKNOWN_FACILITY_LABEL = "Unknown Facility";
+    private static final String UNKNOWN_SYSTEM_TYPE_LABEL = "Unknown System Type";
+    private static final String UNKNOWN_CATEGORY_LABEL = "Unknown Category";
     private static final List<String> TURNAROUND_BUCKETS = List.of("< 3 days", "< 1 week", "< 1 month", "< 3 months");
 
     private LocationDashboardDerivedGraphSupport() {
@@ -87,21 +90,21 @@ final class LocationDashboardDerivedGraphSupport {
             case NON_CONFORMANCES_BY_FACILITY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActions, HistoricalCorrectiveAction::facilityName),
+                countLabels(correctiveActions, HistoricalCorrectiveAction::facilityName, UNKNOWN_FACILITY_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_SYSTEM_TYPE -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActions, HistoricalCorrectiveAction::systemTypeName),
+                countLabels(correctiveActions, HistoricalCorrectiveAction::systemTypeName, UNKNOWN_SYSTEM_TYPE_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_CATEGORY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActions, HistoricalCorrectiveAction::measurementName),
+                countLabels(correctiveActions, HistoricalCorrectiveAction::measurementName, UNKNOWN_CATEGORY_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
@@ -141,10 +144,9 @@ final class LocationDashboardDerivedGraphSupport {
     ) {
         Map<String, long[]> countsByFacility = new LinkedHashMap<>();
         for (HistoricalCorrectiveAction correctiveAction : correctiveActions) {
-            String facilityName = normalizeLabel(correctiveAction.facilityName());
-            if (facilityName == null) {
-                continue;
-            }
+            // Historical corrective actions can predate structured import metadata. Keep
+            // those incidents visible instead of silently dropping them from grouped totals.
+            String facilityName = labelOrFallback(correctiveAction.facilityName(), UNKNOWN_FACILITY_LABEL);
             long[] counts = countsByFacility.computeIfAbsent(facilityName, ignored -> new long[2]);
             if (correctiveAction.resolved()) {
                 counts[1] += 1;
@@ -171,12 +173,12 @@ final class LocationDashboardDerivedGraphSupport {
 
     private static Map<String, Long> countLabels(
         List<HistoricalCorrectiveAction> correctiveActions,
-        Function<HistoricalCorrectiveAction, String> labelExtractor
+        Function<HistoricalCorrectiveAction, String> labelExtractor,
+        String fallbackLabel
     ) {
         return correctiveActions.stream()
             .map(labelExtractor)
-            .map(LocationDashboardDerivedGraphSupport::normalizeLabel)
-            .filter(Objects::nonNull)
+            .map(label -> labelOrFallback(label, fallbackLabel))
             .collect(Collectors.groupingBy(
                 Function.identity(),
                 LinkedHashMap::new,
@@ -436,6 +438,11 @@ final class LocationDashboardDerivedGraphSupport {
         }
         String normalized = value.strip();
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private static String labelOrFallback(String value, String fallbackLabel) {
+        String normalizedLabel = normalizeLabel(value);
+        return normalizedLabel == null ? fallbackLabel : normalizedLabel;
     }
 
     private static String normalizeKey(String value) {

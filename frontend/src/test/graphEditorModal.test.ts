@@ -394,6 +394,39 @@ describe("GraphEditorModal trace controls", () => {
     }
   });
 
+  it("stages invalid cartesian x values while the modal is open", async () => {
+    const scatterGraph: LocationGraph = {
+      id: 20,
+      name: "Trend X",
+      data: [{
+        type: "scatter",
+        name: "Daily",
+        x: [9],
+        y: [12]
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(scatterGraph);
+    try {
+      await Promise.resolve();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      cartesianProps.onUpdateX(0, "abc");
+      await flushSolidUpdates();
+
+      const invalidProps = getCartesianTraceEditorProps();
+      expect(invalidProps.xValues).toEqual([9]);
+      expect(invalidProps.xDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
+  });
+
   it("swaps bar trace axes when the orientation changes", async () => {
     const barGraph: LocationGraph = {
       id: 19,

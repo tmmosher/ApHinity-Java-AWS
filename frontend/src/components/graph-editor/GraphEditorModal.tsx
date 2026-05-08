@@ -92,8 +92,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const [yRangeMinDraft, setYRangeMinDraft] = createSignal<string | undefined>(undefined);
   const [yRangeMaxDraft, setYRangeMaxDraft] = createSignal<string | undefined>(undefined);
   const [indicatorValueDraft, setIndicatorValueDraft] = createSignal<string | undefined>(undefined);
-  // Once the editor is closed or the graph disappears, render the empty state
-  // immediately instead of showing stale trace data for one more pass.
+  // Keep this as a direct accessor so nested editors read the latest draft
+  // state from the current render pass instead of a cached snapshot.
   const visibleEditablePayload = () =>
     props.isOpen && props.graph !== undefined ? editablePayload() : EMPTY_EDITABLE_GRAPH_PAYLOAD;
 
@@ -380,8 +380,10 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     }
 
     const currentValue = getTraceArray(trace, "x")[rowIndex];
+    // Numeric X values need the same draft buffer as Y values so the user can
+    // type through invalid intermediate text without mutating the trace.
     const shouldStageDraft =
-      typeof currentValue === "number" && parseNumericInput(rawValue) === null && isIncompleteNumericInput(rawValue);
+      typeof currentValue === "number" && parseNumericInput(rawValue) === null;
 
     if (shouldStageDraft) {
       batch(() => {

@@ -17,6 +17,15 @@ import java.util.Set;
  * configured traces that happen to have no points in the current workbook.
  */
 final class LocationDashboardImportedGraphMerger {
+    private static final Set<String> TRACE_DATA_KEYS = Set.of(
+        "x",
+        "y",
+        "labels",
+        "values",
+        "value",
+        "customdata"
+    );
+
     List<Map<String, Object>> mergeImportedGraphData(Graph graph, List<Map<String, Object>> importedData) {
         List<Map<String, Object>> existingData = LocationDashboardGraphMetadataSupport.currentTraceList(graph);
         if (existingData.isEmpty()) {
@@ -63,10 +72,7 @@ final class LocationDashboardImportedGraphMerger {
             return new LinkedHashMap<>(existingTrace);
         }
         if (!existingTimeSeries || !importedTimeSeries) {
-            // Let persisted presentation fields win so workbook data cannot reset graph styling.
-            Map<String, Object> mergedTrace = new LinkedHashMap<>(importedTrace);
-            mergedTrace.putAll(existingTrace);
-            return mergedTrace;
+            return mergeTracePreservingPresentation(existingTrace, importedTrace);
         }
 
         Map<String, TracePointValue> pointsByDate = new LinkedHashMap<>();
@@ -92,6 +98,21 @@ final class LocationDashboardImportedGraphMerger {
         } else {
             mergedTrace.remove("customdata");
         }
+        return mergedTrace;
+    }
+
+    private Map<String, Object> mergeTracePreservingPresentation(
+        Map<String, Object> existingTrace,
+        Map<String, Object> importedTrace
+    ) {
+        // Persisted trace styling should win, but blank placeholder payloads must not wipe
+        // out the imported workbook points for the same named trace.
+        Map<String, Object> mergedTrace = new LinkedHashMap<>(importedTrace);
+        existingTrace.forEach((key, value) -> {
+            if (!TRACE_DATA_KEYS.contains(key)) {
+                mergedTrace.put(key, value);
+            }
+        });
         return mergedTrace;
     }
 

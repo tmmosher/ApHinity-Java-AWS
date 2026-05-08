@@ -96,8 +96,41 @@ class LocationDashboardImportedGraphMergerTest {
 
         assertEquals(List.of("2025-07-01", "2025-08-01"), merged.getFirst().get("x"));
         assertNumericValues(merged.getFirst().get("y"), 100.0d, 0.0d);
-        assertEquals(Map.of("color", "#123456", "width", 4), merged.getFirst().get("line"));
-        assertEquals(Map.of("size", 9), merged.getFirst().get("marker"));
+        assertEquals(Map.of("color", "#123456", "width", 4L), merged.getFirst().get("line"));
+        assertEquals(Map.of("size", 9L), merged.getFirst().get("marker"));
+    }
+
+    @Test
+    void mergeImportedGraphDataDoesNotLetEmptyNamedPlaceholderTracesEraseImportedPoints() {
+        Graph graph = graph(List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of(),
+            "y", List.of(),
+            "customdata", List.of(),
+            "mode", "lines+markers",
+            "line", Map.of("color", "#123456", "width", 4),
+            "marker", Map.of("size", 9)
+        )));
+
+        List<Map<String, Object>> merged = merger.mergeImportedGraphData(graph, List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of("2025-08-01"),
+            "y", List.of(0.0d),
+            "customdata", List.of(Map.of("sampleCount", 2, "compliantCount", 0, "nonConformingCount", 2)),
+            "mode", "lines+markers",
+            "line", Map.of("color", "#abcdef", "width", 1),
+            "marker", Map.of("size", 2)
+        )));
+
+        assertEquals(List.of("2025-08-01"), merged.getFirst().get("x"));
+        assertNumericValues(merged.getFirst().get("y"), 0.0d);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) merged.getFirst().get("customdata");
+        assertEquals(2L, ((Number) customData.getFirst().get("sampleCount")).longValue());
+        assertEquals(Map.of("color", "#123456", "width", 4L), merged.getFirst().get("line"));
+        assertEquals(Map.of("size", 9L), merged.getFirst().get("marker"));
     }
 
     private void assertNumericValues(Object rawValues, double... expectedValues) {

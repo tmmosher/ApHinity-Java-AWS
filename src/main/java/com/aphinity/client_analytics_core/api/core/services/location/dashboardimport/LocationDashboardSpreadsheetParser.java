@@ -40,14 +40,28 @@ import java.util.regex.Pattern;
  */
 @Service
 public class LocationDashboardSpreadsheetParser {
-    private static final int HEADER_SCAN_LIMIT = 20;
     private static final int MIN_DATE_ROW_SCORE = 1;
     private static final String HEADER_FACILITY = "facility";
     private static final String HEADER_BUILDING = "bldg (collated if unrecognized)";
     private static final String HEADER_SYSTEM = "system (collated if unrecognized)";
     private static final String HEADER_POINT_OF_USE = "point of use (ignored)";
     private static final String HEADER_BASIS = "basis (ignored)";
-    private static final Pattern NUMERIC_TEXT_PATTERN = Pattern.compile("^[<>]=?\\s*([-+]?\\d+(?:\\.\\d+)?)$|^([-+]?\\d+(?:\\.\\d+)?)$");
+    // Accept both the verbose template labels and the shorter workbook labels.
+    private static final Map<String, String> HEADER_ALIASES = Map.ofEntries(
+        Map.entry("facility", HEADER_FACILITY),
+        Map.entry("bldg", HEADER_BUILDING),
+        Map.entry("building", HEADER_BUILDING),
+        Map.entry(HEADER_BUILDING, HEADER_BUILDING),
+        Map.entry("system", HEADER_SYSTEM),
+        Map.entry(HEADER_SYSTEM, HEADER_SYSTEM),
+        Map.entry("point of use", HEADER_POINT_OF_USE),
+        Map.entry(HEADER_POINT_OF_USE, HEADER_POINT_OF_USE),
+        Map.entry("basis", HEADER_BASIS),
+        Map.entry(HEADER_BASIS, HEADER_BASIS)
+    );
+    private static final Pattern NUMERIC_TEXT_PATTERN = Pattern.compile(
+        "^[<>]=?\\s*([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))$|^([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))$"
+    );
     private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
         DateTimeFormatter.ISO_LOCAL_DATE,
         new DateTimeFormatterBuilder()
@@ -111,19 +125,31 @@ public class LocationDashboardSpreadsheetParser {
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
-        for (int rowIndex = 0; rowIndex <= Math.min(sheet.getLastRowNum(), HEADER_SCAN_LIMIT); rowIndex += 1) {
+        HeaderMatch bestHeaderMatch = null;
+        // Some generated workbooks shift the header block downward, so scan the whole sheet
+        // instead of assuming the header lives near the top.
+        for (int rowIndex = 0; rowIndex <= sheet.getLastRowNum(); rowIndex += 1) {
             Row row = sheet.getRow(rowIndex);
             if (row == null) {
                 continue;
             }
             Map<String, Integer> headers = resolveHeaderColumns(row, formatter, evaluator);
-            if (!headers.containsKey(HEADER_FACILITY)
-                || !headers.containsKey(HEADER_BUILDING)
-                || !headers.containsKey(HEADER_SYSTEM)) {
+            if (!containsRequiredHeaders(headers)) {
                 continue;
             }
 
-            int headerRowIndex = row.getRowNum();
+            int headerScore = scoreHeaderColumns(headers);
+            if (bestHeaderMatch == null
+                || headerScore > bestHeaderMatch.score()
+                || (headerScore == bestHeaderMatch.score() && row.getRowNum() < bestHeaderMatch.rowIndex())) {
+                bestHeaderMatch = new HeaderMatch(row.getRowNum(), headers, headerScore);
+            }
+        }
+
+        if (bestHeaderMatch != null) {
+            int headerRowIndex = bestHeaderMatch.rowIndex();
+            Map<String, Integer> headers = bestHeaderMatch.headers();
+            Row headerRow = sheet.getRow(headerRowIndex);
             int basisColumnIndex = headers.getOrDefault(HEADER_BASIS, 4);
             int titleRowIndex = resolveTitleRowIndex(sheet, headerRowIndex, basisColumnIndex, formatter, evaluator);
             int dateRowIndex = resolveDateRowIndex(sheet, headerRowIndex, basisColumnIndex, formatter, evaluator);
@@ -140,7 +166,7 @@ public class LocationDashboardSpreadsheetParser {
                 headers.getOrDefault(HEADER_SYSTEM, 2),
                 headers.getOrDefault(HEADER_POINT_OF_USE, 3),
                 basisColumnIndex,
-                row.getLastCellNum()
+                headerRow == null ? 0 : headerRow.getLastCellNum()
             );
         }
         throw invalidSpreadsheet("Spreadsheet is missing the dashboard header row.");
@@ -301,11 +327,38 @@ public class LocationDashboardSpreadsheetParser {
         short lastCellNumber = row.getLastCellNum();
         for (int cellIndex = 0; cellIndex < lastCellNumber; cellIndex += 1) {
             String normalizedHeader = normalizeHeader(normalizeCellText(row.getCell(cellIndex), formatter, evaluator));
-            if (!normalizedHeader.isBlank()) {
-                columns.put(normalizedHeader, cellIndex);
+            String canonicalHeader = resolveCanonicalHeader(normalizedHeader);
+            if (canonicalHeader != null) {
+                columns.put(canonicalHeader, cellIndex);
             }
         }
         return columns;
+    }
+
+    private boolean containsRequiredHeaders(Map<String, Integer> headers) {
+        return headers.containsKey(HEADER_FACILITY)
+            && headers.containsKey(HEADER_BUILDING)
+            && headers.containsKey(HEADER_SYSTEM);
+    }
+
+    private int scoreHeaderColumns(Map<String, Integer> headers) {
+        int score = 0;
+        if (headers.containsKey(HEADER_FACILITY)) {
+            score += 3;
+        }
+        if (headers.containsKey(HEADER_BUILDING)) {
+            score += 3;
+        }
+        if (headers.containsKey(HEADER_SYSTEM)) {
+            score += 3;
+        }
+        if (headers.containsKey(HEADER_POINT_OF_USE)) {
+            score += 1;
+        }
+        if (headers.containsKey(HEADER_BASIS)) {
+            score += 1;
+        }
+        return score;
     }
 
     private List<MetricColumn> resolveMetricColumns(
@@ -495,10 +548,23 @@ public class LocationDashboardSpreadsheetParser {
             return null;
         }
         try {
-            return new BigDecimal(numericPortion);
+            return new BigDecimal(normalizeNumericPortion(numericPortion));
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private String normalizeNumericPortion(String numericPortion) {
+        if (numericPortion.startsWith("+.")) {
+            return "+0" + numericPortion.substring(1);
+        }
+        if (numericPortion.startsWith("-.")) {
+            return "-0" + numericPortion.substring(1);
+        }
+        if (numericPortion.startsWith(".")) {
+            return "0" + numericPortion;
+        }
+        return numericPortion;
     }
 
     private String parseComment(Cell cell) {
@@ -544,6 +610,13 @@ public class LocationDashboardSpreadsheetParser {
         return header == null ? "" : header.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 
+    private String resolveCanonicalHeader(String normalizedHeader) {
+        if (normalizedHeader == null || normalizedHeader.isBlank()) {
+            return null;
+        }
+        return HEADER_ALIASES.get(normalizedHeader);
+    }
+
     private String blankToNull(String value) {
         if (value == null) {
             return null;
@@ -571,6 +644,13 @@ public class LocationDashboardSpreadsheetParser {
         int pointOfUseColumnIndex,
         int basisColumnIndex,
         int lastCellNumber
+    ) {
+    }
+
+    private record HeaderMatch(
+        int rowIndex,
+        Map<String, Integer> headers,
+        int score
     ) {
     }
 

@@ -1,6 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
+import com.aphinity.client_analytics_core.api.error.ApiClientException;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +51,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     private final Map<String, List<SublocationConfig>> sublocationsByFacilityAlias;
     private final Map<String, SublocationConfig> defaultSublocationsByFacilityAlias;
     private final Map<String, List<GraphConfig>> graphsBySublocationKey;
+    private final LocationDashboardCommentParser commentParser;
 
     public ConfiguredLocationDashboardImportStrategy(LocationDashboardImportStrategyConfig config) {
         this.config = validate(config);
@@ -60,6 +63,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         this.sublocationsByFacilityAlias = buildSublocationsByFacilityAlias(this.config.sublocations());
         this.defaultSublocationsByFacilityAlias = buildDefaultSublocationsByFacilityAlias(this.config.sublocations());
         this.graphsBySublocationKey = buildGraphsBySublocationKey(this.config.graphs());
+        this.commentParser = new LocationDashboardCommentParser();
     }
 
     @Override
@@ -94,7 +98,6 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         for (GraphConfig graphDefinition : config.graphs()) {
             aggregationsByGraphId.put(graphDefinition.id(), new GraphAggregation());
         }
-
         List<ImportedObservation> observations = new ArrayList<>();
         List<CorrectiveActionDraft> correctiveActions = new ArrayList<>();
         String activeFacility = null;
@@ -120,9 +123,15 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
 
             activeSublocation = resolveSublocation(resolvedFacility, resolvedBuilding, activeSublocation);
             activeSystemType = resolveSystemType(resolvedSystem, activeSystemType);
+            String facilityName = resolveFacilityName(activeSublocation, resolvedFacility);
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
-                if (cell.commentText() != null && activeSystemType != null) {
+                LocationDashboardCommentParser.ParsedComment parsedCellComment = null;
+                MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
+                boolean hasUsableCommentPayload = hasUsableCommentPayload(cell.commentText());
+                if (hasUsableCommentPayload && activeSystemType != null) {
+                    parsedCellComment = parseComment(cell, row);
+                    validatePrimaryCommentSample(parsedCellComment, cell, row);
                     buildCorrectiveActionDraft(
                         cell,
                         row,
@@ -130,41 +139,70 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                         activeSystemType,
                         resolvedFacility,
                         resolvedBuilding,
-                        resolvedSystem
+                        resolvedSystem,
+                        parsedCellComment,
+                        cell.commentText()
                     ).ifPresent(correctiveActions::add);
-                }
-
-                if (cell.numericValue() == null || activeSystemType == null) {
-                    continue;
-                }
-                MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
-                if (measurementBound == null) {
-                    continue;
-                }
-                boolean compliant = activeSystemType.rangeProfile().isCompliant(cell.numericValue(), measurementBound);
-                String facilityName = resolveFacilityName(activeSublocation, resolvedFacility);
-                if (facilityName != null) {
-                    observations.add(new ImportedObservation(
-                        cell.observedDate(),
-                        facilityName,
-                        activeSystemType.displayName(),
-                        measurementBound.getMeasurementName(),
-                        compliant
+                    correctiveActions.addAll(buildCommentSampleCorrectiveActionDrafts(
+                        cell,
+                        row,
+                        activeSublocation,
+                        activeSystemType,
+                        resolvedFacility,
+                        resolvedBuilding,
+                        resolvedSystem,
+                        measurementBound,
+                        parsedCellComment
                     ));
                 }
 
-                if (activeSublocation != null) {
-                    List<GraphConfig> graphDefinitions = graphsBySublocationKey.getOrDefault(
-                        normalizeKey(activeSublocation.key()),
-                        List.of()
+                if (cell.numericValue() == null || activeSystemType == null || measurementBound == null) {
+                    addCommentSampleObservations(
+                        parsedCellComment,
+                        measurementBound,
+                        activeSystemType,
+                        facilityName,
+                        activeSublocation,
+                        cell,
+                        observations,
+                        aggregationsByGraphId
                     );
-                    for (GraphConfig graphDefinition : graphDefinitions) {
-                        String traceName = switch (graphDefinition.importType()) {
-                            case SYSTEM_TYPE_COMPLIANCE -> activeSystemType.displayName();
-                            case WATER_QUALITY_COMPLIANCE -> measurementBound.getMeasurementName();
-                        };
-                        aggregationsByGraphId.get(graphDefinition.id()).record(traceName, cell.observedDate(), compliant);
-                    }
+                    continue;
+                }
+                boolean compliant = activeSystemType.rangeProfile().isCompliant(cell.numericValue(), measurementBound);
+                String measurementName = resolveMeasurementName(cell.metricName(), measurementBound);
+                recordObservation(
+                    cell.observedDate(),
+                    facilityName,
+                    measurementName,
+                    measurementBound,
+                    activeSystemType,
+                    activeSublocation,
+                    compliant,
+                    observations,
+                    aggregationsByGraphId
+                );
+                addCommentSampleObservations(
+                    parsedCellComment,
+                    measurementBound,
+                    activeSystemType,
+                    facilityName,
+                    activeSublocation,
+                    cell,
+                    observations,
+                    aggregationsByGraphId
+                );
+                if (!compliant && !hasUsableCommentPayload) {
+                    buildSyntheticCorrectiveActionDraft(
+                        cell,
+                        row,
+                        activeSublocation,
+                        activeSystemType,
+                        resolvedFacility,
+                        resolvedBuilding,
+                        resolvedSystem,
+                        measurementName
+                    ).ifPresent(correctiveActions::add);
                 }
             }
         }
@@ -183,6 +221,37 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             List.copyOf(observations),
             List.copyOf(deduplicateCorrectiveActions(correctiveActions))
         );
+    }
+
+    private void validatePrimaryCommentSample(
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row
+    ) {
+        if (parsedComment == null || !parsedComment.structured() || parsedComment.primarySample() == null) {
+            return;
+        }
+
+        LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
+        // The worksheet buckets samples by month, while structured comments can carry the
+        // actual sample day inside that month. Keep the anchor loose enough for the workbook
+        // we receive, but still reject comments that drift into a different reporting bucket.
+        if (cell.observedDate() != null
+            && primarySample.sampledOn() != null
+            && !sameObservationMonth(cell.observedDate(), primarySample.sampledOn())) {
+            throw invalidSpreadsheet(
+                "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
+                    + ": structured comment primary sample date must stay within the worksheet month bucket."
+            );
+        }
+        if (cell.numericValue() != null
+            && primarySample.resultValue() != null
+            && cell.numericValue().compareTo(primarySample.resultValue()) != 0) {
+            throw invalidSpreadsheet(
+                "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
+                    + ": structured comment primary sample result does not match the worksheet cell."
+            );
+        }
     }
 
     private LocationDashboardImportStrategyConfig validate(LocationDashboardImportStrategyConfig rawConfig) {
@@ -491,59 +560,26 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         SystemTypeConfig systemType,
         String resolvedFacility,
         String resolvedBuilding,
-        String resolvedSystem
+        String resolvedSystem,
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        String rawCommentText
     ) {
-        List<String> formattedCommentLines = formatCommentLines(cell.commentText());
-
-        List<String> descriptionLines = new ArrayList<>();
-        addDescriptionLine(
-            descriptionLines,
-            LocationDashboardCorrectiveActionMetadataSupport.measurementLine(cell.metricName())
-        );
-        addDescriptionLine(
-            descriptionLines,
-            LocationDashboardCorrectiveActionMetadataSupport.observedAtLine(cell.observedDate())
-        );
         String facilityName = resolveFacilityName(sublocation, resolvedFacility);
-        if (sublocation != null && sublocation.displayName() != null && !sublocation.displayName().isBlank()) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.sublocationLine(sublocation.displayName())
-            );
-        } else if (facilityName != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.facilityLine(facilityName)
-            );
-        }
-        if (resolvedBuilding != null && !resolvedBuilding.isBlank()) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.buildingLine(resolvedBuilding)
-            );
-        }
         String systemTypeName = resolveSystemTypeName(systemType, resolvedSystem);
-        if (systemTypeName != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemTypeName)
-            );
-        }
-        if (row.pointOfUse() != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.pointOfUseLine(row.pointOfUse())
-            );
-        }
-        if (row.basis() != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.basisLine(row.basis())
-            );
-        }
-        if (!formattedCommentLines.isEmpty()) {
+        List<String> descriptionLines = buildCorrectiveActionDescriptionLines(
+            cell.metricName(),
+            cell.observedDate(),
+            sublocation,
+            facilityName,
+            resolvedBuilding,
+            systemTypeName,
+            row.pointOfUse(),
+            row.basis()
+        );
+        List<String> commentLines = buildCommentDescriptionLines(parsedComment, rawCommentText);
+        if (!commentLines.isEmpty()) {
             descriptionLines.add("");
-            descriptionLines.addAll(formattedCommentLines);
+            descriptionLines.addAll(commentLines);
         }
 
         String title = buildCorrectiveActionTitle(
@@ -564,6 +600,523 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         ));
     }
 
+    private List<CorrectiveActionDraft> buildCommentSampleCorrectiveActionDrafts(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        SublocationConfig sublocation,
+        SystemTypeConfig systemType,
+        String resolvedFacility,
+        String resolvedBuilding,
+        String resolvedSystem,
+        MeasurementBound measurementBound,
+        LocationDashboardCommentParser.ParsedComment parsedComment
+    ) {
+        if (parsedComment == null || measurementBound == null || systemType == null) {
+            return List.of();
+        }
+
+        String facilityName = resolveFacilityName(sublocation, resolvedFacility);
+        String systemTypeName = resolveSystemTypeName(systemType, resolvedSystem);
+        String measurementName = resolveMeasurementName(cell.metricName(), measurementBound);
+        List<CorrectiveActionDraft> drafts = new ArrayList<>();
+
+        LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
+        if (shouldCreateCommentSampleCorrectiveAction(primarySample, cell, systemType, measurementBound)) {
+            drafts.add(buildCommentSampleCorrectiveActionDraft(
+                cell,
+                row,
+                sublocation,
+                facilityName,
+                resolvedBuilding,
+                systemType,
+                systemTypeName,
+                measurementName,
+                parsedComment,
+                "Primary Sample",
+                primarySample,
+                buildCommentSampleIdentity("primary-sample", primarySample)
+            ));
+        }
+
+        int sampleIndex = 1;
+        for (LocationDashboardCommentParser.ParsedCommentSample sample : parsedComment.followUpSamples()) {
+            if (!shouldCreateCommentSampleCorrectiveAction(sample, cell, systemType, measurementBound)) {
+                sampleIndex += 1;
+                continue;
+            }
+            drafts.add(buildCommentSampleCorrectiveActionDraft(
+                cell,
+                row,
+                sublocation,
+                facilityName,
+                resolvedBuilding,
+                systemType,
+                systemTypeName,
+                measurementName,
+                parsedComment,
+                "Supplemental Sample " + sampleIndex,
+                sample,
+                buildCommentSampleIdentity("supplemental-sample-" + sampleIndex, sample)
+            ));
+            sampleIndex += 1;
+        }
+
+        return List.copyOf(drafts);
+    }
+
+    private java.util.Optional<CorrectiveActionDraft> buildSyntheticCorrectiveActionDraft(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        SublocationConfig sublocation,
+        SystemTypeConfig systemType,
+        String resolvedFacility,
+        String resolvedBuilding,
+        String resolvedSystem,
+        String measurementName
+    ) {
+        String facilityName = resolveFacilityName(sublocation, resolvedFacility);
+        String systemTypeName = resolveSystemTypeName(systemType, resolvedSystem);
+        if (measurementName == null) {
+            return java.util.Optional.empty();
+        }
+
+        // A failed worksheet sample is a non-conformance even when the analyst never
+        // attached a comment to that exact cell. Promote every raw failed cell into
+        // a corrective action so derived incident totals stay sample-complete.
+        List<String> descriptionLines = buildCorrectiveActionDescriptionLines(
+            measurementName,
+            cell.observedDate(),
+            sublocation,
+            facilityName,
+            resolvedBuilding,
+            systemTypeName,
+            row.pointOfUse(),
+            row.basis()
+        );
+        descriptionLines.add("");
+        descriptionLines.add("Note: Imported from an out-of-spec worksheet sample without cell comment metadata.");
+
+        return java.util.Optional.of(new CorrectiveActionDraft(
+            cell.observedDate(),
+            buildSyntheticCorrectiveActionTitle(
+                measurementName,
+                cell.observedDate(),
+                sublocation == null ? null : sublocation.key(),
+                systemType == null ? null : systemType.key(),
+                row.pointOfUse(),
+                row.basis()
+            ),
+            String.join("\n", descriptionLines),
+            facilityName,
+            systemTypeName,
+            measurementName
+        ));
+    }
+
+    private LocationDashboardCommentParser.ParsedComment parseComment(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row
+    ) {
+        try {
+            return commentParser.parse(cell.commentText());
+        } catch (IllegalArgumentException ex) {
+            throw invalidSpreadsheet(
+                "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
+                    + ": " + ex.getMessage()
+            );
+        }
+    }
+
+    private List<String> buildCommentDescriptionLines(
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        String rawCommentText
+    ) {
+        if (parsedComment == null || !parsedComment.hasMeaningfulContent()) {
+            return formatCommentLines(rawCommentText);
+        }
+
+        List<String> lines = new ArrayList<>();
+        if (parsedComment.sampleLocation() != null) {
+            lines.add("Sample Location: " + parsedComment.sampleLocation());
+        }
+        if (parsedComment.primarySample() != null) {
+            appendSampleSummary(lines, "Primary Sample", parsedComment.primarySample());
+            appendSampleDetails(lines, "Primary Sample", parsedComment.primarySample());
+        }
+        appendNotes(lines, parsedComment.notes(), null);
+        appendCorrectiveActions(lines, parsedComment.correctiveActions(), null);
+
+        int sampleIndex = 1;
+        for (LocationDashboardCommentParser.ParsedCommentSample sample : parsedComment.followUpSamples()) {
+            appendSampleSummary(lines, "Supplemental Sample " + sampleIndex, sample);
+            appendSampleDetails(lines, "Supplemental Sample " + sampleIndex, sample);
+            sampleIndex += 1;
+        }
+        return lines;
+    }
+
+    private List<String> buildCommentSampleDescriptionLines(
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        String sampleLabel,
+        LocationDashboardCommentParser.ParsedCommentSample sample
+    ) {
+        if (parsedComment == null || sample == null) {
+            return List.of();
+        }
+
+        List<String> lines = new ArrayList<>();
+        if (parsedComment.sampleLocation() != null) {
+            lines.add("Sample Location: " + parsedComment.sampleLocation());
+        }
+        appendSampleSummary(lines, sampleLabel, sample);
+        appendSampleDetails(lines, sampleLabel, sample);
+        appendNotes(lines, parsedComment.notes(), null);
+        appendCorrectiveActions(lines, parsedComment.correctiveActions(), null);
+        return lines;
+    }
+
+    private void appendSampleSummary(
+        List<String> lines,
+        String label,
+        LocationDashboardCommentParser.ParsedCommentSample sample
+    ) {
+        if (sample == null || sample.sampledOn() == null) {
+            return;
+        }
+        StringBuilder summary = new StringBuilder();
+        summary.append(label).append(": sampled on ").append(sample.sampledOn());
+        if (sample.resultReceivedOn() != null) {
+            summary.append("; result received on ").append(sample.resultReceivedOn());
+        }
+        if (sample.resultRaw() != null) {
+            summary.append("; result ").append(sample.resultRaw());
+        }
+        lines.add(summary.toString());
+    }
+
+    private void appendSampleDetails(
+        List<String> lines,
+        String label,
+        LocationDashboardCommentParser.ParsedCommentSample sample
+    ) {
+        if (sample == null) {
+            return;
+        }
+        appendNotes(lines, sample.notes(), label);
+        appendCorrectiveActions(lines, sample.correctiveActions(), label);
+    }
+
+    private void appendNotes(List<String> lines, List<String> notes, String prefix) {
+        if (notes == null || notes.isEmpty()) {
+            return;
+        }
+        for (String note : notes) {
+            if (note == null || note.isBlank()) {
+                continue;
+            }
+            lines.add((prefix == null ? "Note" : prefix + " Note") + ": " + note);
+        }
+    }
+
+    private void appendCorrectiveActions(
+        List<String> lines,
+        List<LocationDashboardCommentParser.ParsedCommentCorrectiveAction> actions,
+        String prefix
+    ) {
+        if (actions == null || actions.isEmpty()) {
+            return;
+        }
+        for (LocationDashboardCommentParser.ParsedCommentCorrectiveAction action : actions) {
+            if (action == null || action.text() == null || action.text().isBlank()) {
+                continue;
+            }
+            String actionPrefix = prefix == null ? "CA" : prefix + " CA";
+            lines.add(actionPrefix + ": " + action.text());
+            if (action.actionDate() != null) {
+                lines.add(actionPrefix + " Date: " + action.actionDate());
+            }
+            if (action.ticket() != null) {
+                lines.add(actionPrefix + " Ticket: " + action.ticket());
+            }
+            appendNotes(lines, action.notes(), actionPrefix);
+        }
+    }
+
+    private boolean hasUsableCommentPayload(String rawCommentText) {
+        if (rawCommentText == null || rawCommentText.isBlank()) {
+            return false;
+        }
+        String normalized = rawCommentText.replace("\r\n", "\n").strip();
+        int markerIndex = normalized.indexOf("Comment:");
+        String payload = markerIndex >= 0
+            ? normalized.substring(markerIndex + "Comment:".length()).strip()
+            : normalized;
+        if (payload.isBlank()) {
+            return false;
+        }
+        return true;
+    }
+
+    private void addCommentSampleObservations(
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        MeasurementBound measurementBound,
+        SystemTypeConfig activeSystemType,
+        String facilityName,
+        SublocationConfig activeSublocation,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
+        List<ImportedObservation> observations,
+        Map<String, GraphAggregation> aggregationsByGraphId
+    ) {
+        if (parsedComment == null || activeSystemType == null || facilityName == null || measurementBound == null) {
+            return;
+        }
+
+        LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
+        if (primarySample != null
+            && primarySample.sampledOn() != null
+            && primarySample.resultValue() != null
+            && !matchesPrimaryCellSample(primaryCell, primarySample)) {
+            boolean compliant = activeSystemType.rangeProfile().isCompliant(primarySample.resultValue(), measurementBound);
+            recordObservation(
+                primarySample.sampledOn(),
+                facilityName,
+                resolveMeasurementName(primaryCell.metricName(), measurementBound),
+                measurementBound,
+                activeSystemType,
+                activeSublocation,
+                compliant,
+                observations,
+                aggregationsByGraphId
+            );
+        }
+
+        // Follow-up samples are iterated directly so we do not allocate a synthetic combined list
+        // for every parsed comment cell.
+        for (LocationDashboardCommentParser.ParsedCommentSample sample : parsedComment.followUpSamples()) {
+            if (sample == null || sample.sampledOn() == null || sample.resultValue() == null) {
+                continue;
+            }
+            boolean compliant = activeSystemType.rangeProfile().isCompliant(sample.resultValue(), measurementBound);
+            recordObservation(
+                sample.sampledOn(),
+                facilityName,
+                resolveMeasurementName(primaryCell.metricName(), measurementBound),
+                measurementBound,
+                activeSystemType,
+                activeSublocation,
+                compliant,
+                observations,
+                aggregationsByGraphId
+            );
+        }
+    }
+
+    private boolean shouldCreateCommentSampleCorrectiveAction(
+        LocationDashboardCommentParser.ParsedCommentSample sample,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
+        SystemTypeConfig systemType,
+        MeasurementBound measurementBound
+    ) {
+        if (sample == null
+            || sample.sampledOn() == null
+            || sample.resultValue() == null
+            || systemType == null
+            || measurementBound == null) {
+            return false;
+        }
+        // The worksheet cell already anchors the primary corrective action for its own
+        // sample. Only distinct failed comment samples should create additional incidents.
+        if (matchesPrimaryCellSample(primaryCell, sample)) {
+            return false;
+        }
+        return !systemType.rangeProfile().isCompliant(sample.resultValue(), measurementBound);
+    }
+
+    private boolean matchesPrimaryCellSample(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
+        LocationDashboardCommentParser.ParsedCommentSample candidateSample
+    ) {
+        if (primaryCell == null || candidateSample == null) {
+            return false;
+        }
+        if (primaryCell.observedDate() == null || candidateSample.sampledOn() == null) {
+            return false;
+        }
+        if (!Objects.equals(primaryCell.observedDate(), candidateSample.sampledOn())) {
+            return false;
+        }
+        if (primaryCell.numericValue() == null || candidateSample.resultValue() == null) {
+            return false;
+        }
+        return primaryCell.numericValue().compareTo(candidateSample.resultValue()) == 0;
+    }
+
+    private boolean sameObservationMonth(LocalDate worksheetObservedDate, LocalDate commentSampleDate) {
+        if (worksheetObservedDate == null || commentSampleDate == null) {
+            return false;
+        }
+        return worksheetObservedDate.getYear() == commentSampleDate.getYear()
+            && worksheetObservedDate.getMonth() == commentSampleDate.getMonth();
+    }
+
+    private void recordObservation(
+        LocalDate observedDate,
+        String facilityName,
+        String measurementName,
+        MeasurementBound measurementBound,
+        SystemTypeConfig activeSystemType,
+        SublocationConfig activeSublocation,
+        boolean compliant,
+        List<ImportedObservation> observations,
+        Map<String, GraphAggregation> aggregationsByGraphId
+    ) {
+        if (observedDate == null
+            || facilityName == null
+            || measurementBound == null
+            || activeSystemType == null
+            || measurementName == null) {
+            return;
+        }
+        observations.add(new ImportedObservation(
+            observedDate,
+            facilityName,
+            activeSystemType.displayName(),
+            measurementName,
+            compliant
+        ));
+
+        if (activeSublocation == null) {
+            return;
+        }
+        List<GraphConfig> graphDefinitions = graphsBySublocationKey.getOrDefault(
+            normalizeKey(activeSublocation.key()),
+            List.of()
+        );
+        for (GraphConfig graphDefinition : graphDefinitions) {
+            String traceName = switch (graphDefinition.importType()) {
+                case SYSTEM_TYPE_COMPLIANCE -> activeSystemType.displayName();
+                case WATER_QUALITY_COMPLIANCE -> measurementName;
+            };
+            aggregationsByGraphId.get(graphDefinition.id()).record(traceName, observedDate, compliant);
+        }
+    }
+
+    private String resolveMeasurementName(String workbookMetricName, MeasurementBound measurementBound) {
+        if (workbookMetricName != null && !workbookMetricName.isBlank()) {
+            return workbookMetricName.strip();
+        }
+        if (measurementBound == null || measurementBound.getMeasurementName() == null) {
+            return null;
+        }
+        String fallbackMeasurementName = measurementBound.getMeasurementName().strip();
+        return fallbackMeasurementName.isBlank() ? null : fallbackMeasurementName;
+    }
+
+    private CorrectiveActionDraft buildCommentSampleCorrectiveActionDraft(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        SublocationConfig sublocation,
+        String facilityName,
+        String resolvedBuilding,
+        SystemTypeConfig systemType,
+        String systemTypeName,
+        String measurementName,
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        String sampleLabel,
+        LocationDashboardCommentParser.ParsedCommentSample sample,
+        String sampleIdentity
+    ) {
+        List<String> descriptionLines = buildCorrectiveActionDescriptionLines(
+            measurementName,
+            sample.sampledOn(),
+            sublocation,
+            facilityName,
+            resolvedBuilding,
+            systemTypeName,
+            row.pointOfUse(),
+            row.basis()
+        );
+        List<String> commentLines = buildCommentSampleDescriptionLines(parsedComment, sampleLabel, sample);
+        if (!commentLines.isEmpty()) {
+            descriptionLines.add("");
+            descriptionLines.addAll(commentLines);
+        }
+
+        return new CorrectiveActionDraft(
+            sample.sampledOn(),
+            buildSupplementalCorrectiveActionTitle(
+                cell.metricName(),
+                sample.sampledOn(),
+                sublocation == null ? null : sublocation.key(),
+                systemType == null ? null : systemType.key(),
+                row.pointOfUse(),
+                row.basis(),
+                sampleIdentity
+            ),
+            String.join("\n", descriptionLines),
+            facilityName,
+            systemTypeName,
+            measurementName
+        );
+    }
+
+    private List<String> buildCorrectiveActionDescriptionLines(
+        String measurementName,
+        LocalDate observedDate,
+        SublocationConfig sublocation,
+        String facilityName,
+        String resolvedBuilding,
+        String systemTypeName,
+        String pointOfUse,
+        String basis
+    ) {
+        List<String> descriptionLines = new ArrayList<>();
+        addDescriptionLine(
+            descriptionLines,
+            LocationDashboardCorrectiveActionMetadataSupport.measurementLine(measurementName)
+        );
+        addDescriptionLine(
+            descriptionLines,
+            LocationDashboardCorrectiveActionMetadataSupport.observedAtLine(observedDate)
+        );
+        if (sublocation != null && sublocation.displayName() != null && !sublocation.displayName().isBlank()) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.sublocationLine(sublocation.displayName())
+            );
+        } else if (facilityName != null) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.facilityLine(facilityName)
+            );
+        }
+        if (resolvedBuilding != null && !resolvedBuilding.isBlank()) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.buildingLine(resolvedBuilding)
+            );
+        }
+        if (systemTypeName != null) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemTypeName)
+            );
+        }
+        if (pointOfUse != null) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.pointOfUseLine(pointOfUse)
+            );
+        }
+        if (basis != null) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.basisLine(basis)
+            );
+        }
+        return descriptionLines;
+    }
+
     private String buildCorrectiveActionTitle(
         String metricName,
         LocalDate observedDate,
@@ -582,6 +1135,61 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             nullSafe(basis)
         )));
         return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+    }
+
+    private String buildSyntheticCorrectiveActionTitle(
+        String metricName,
+        LocalDate observedDate,
+        String sublocationKey,
+        String systemKey,
+        String pointOfUse,
+        String basis
+    ) {
+        String abbreviatedMetricName = abbreviate(metricName, 16);
+        String fingerprint = buildFingerprint(String.join("|", List.of(
+            nullSafe(metricName),
+            nullSafe(String.valueOf(observedDate)),
+            nullSafe(sublocationKey),
+            nullSafe(systemKey),
+            nullSafe(pointOfUse),
+            nullSafe(basis),
+            "worksheet-sample"
+        )));
+        return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+    }
+
+    private String buildSupplementalCorrectiveActionTitle(
+        String metricName,
+        LocalDate observedDate,
+        String sublocationKey,
+        String systemKey,
+        String pointOfUse,
+        String basis,
+        String sampleIdentity
+    ) {
+        String abbreviatedMetricName = abbreviate(metricName, 16);
+        String fingerprint = buildFingerprint(String.join("|", List.of(
+            nullSafe(metricName),
+            nullSafe(String.valueOf(observedDate)),
+            nullSafe(sublocationKey),
+            nullSafe(systemKey),
+            nullSafe(pointOfUse),
+            nullSafe(basis),
+            nullSafe(sampleIdentity)
+        )));
+        return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+    }
+
+    private String buildCommentSampleIdentity(
+        String sampleKind,
+        LocationDashboardCommentParser.ParsedCommentSample sample
+    ) {
+        return String.join("|", List.of(
+            nullSafe(sampleKind),
+            nullSafe(String.valueOf(sample == null ? null : sample.sampledOn())),
+            nullSafe(String.valueOf(sample == null ? null : sample.resultReceivedOn())),
+            nullSafe(sample == null ? null : sample.resultRaw())
+        ));
     }
 
     private void addDescriptionLine(List<String> descriptionLines, String value) {
@@ -637,7 +1245,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 lines.add(label + ": " + value);
             }
         }
-        return List.copyOf(lines);
+        return lines;
     }
 
     private List<Map<String, Object>> buildGraphData(GraphConfig graphDefinition, GraphAggregation graphAggregation) {
@@ -732,12 +1340,8 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         return false;
     }
 
-    private String normalizeKey(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalized = value.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
-        return normalized.isBlank() ? null : normalized;
+    private static String normalizeKey(String value) {
+        return LocationDashboardGraphMetadataSupport.normalizeKey(value);
     }
 
     private List<String> effectiveFacilityAliases(SublocationConfig sublocation) {
@@ -790,27 +1394,33 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     }
 
     private static final class GraphAggregation {
-        private final Map<String, Map<LocalDate, ComplianceCounter>> countersByTrace = new LinkedHashMap<>();
+        private final Map<String, TraceCounterBucket> countersByTrace = new LinkedHashMap<>();
 
         void record(String traceName, LocalDate observedDate, boolean compliant) {
+            String normalizedTraceName = normalizeKey(traceName);
+            if (normalizedTraceName == null || observedDate == null) {
+                return;
+            }
             countersByTrace
-                .computeIfAbsent(traceName, ignored -> new LinkedHashMap<>())
+                .computeIfAbsent(normalizedTraceName, ignored -> new TraceCounterBucket(traceName.strip()))
+                .countersByDate()
                 .computeIfAbsent(observedDate, ignored -> new ComplianceCounter())
                 .record(compliant);
         }
 
         Set<String> traceNames() {
-            return countersByTrace.keySet();
+            return countersByTrace.values().stream()
+                .map(TraceCounterBucket::displayName)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         }
 
         Set<LocalDate> observedDatesForTrace(String traceName) {
-            return countersByTrace.getOrDefault(traceName, Map.of()).keySet();
+            TraceCounterBucket bucket = countersByTrace.get(normalizeKey(traceName));
+            return bucket == null ? Set.of() : bucket.countersByDate().keySet();
         }
 
         double percentage(String traceName, LocalDate observedDate) {
-            ComplianceCounter counter = countersByTrace
-                .getOrDefault(traceName, Map.of())
-                .get(observedDate);
+            ComplianceCounter counter = counter(traceName, observedDate);
             if (counter == null || counter.total == 0) {
                 return 0.0d;
             }
@@ -818,27 +1428,38 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
 
         int total(String traceName, LocalDate observedDate) {
-            ComplianceCounter counter = countersByTrace
-                .getOrDefault(traceName, Map.of())
-                .get(observedDate);
+            ComplianceCounter counter = counter(traceName, observedDate);
             return counter == null ? 0 : counter.total;
         }
 
         int compliant(String traceName, LocalDate observedDate) {
-            ComplianceCounter counter = countersByTrace
-                .getOrDefault(traceName, Map.of())
-                .get(observedDate);
+            ComplianceCounter counter = counter(traceName, observedDate);
             return counter == null ? 0 : counter.compliant;
         }
 
         int nonConforming(String traceName, LocalDate observedDate) {
-            ComplianceCounter counter = countersByTrace
-                .getOrDefault(traceName, Map.of())
-                .get(observedDate);
+            ComplianceCounter counter = counter(traceName, observedDate);
             if (counter == null) {
                 return 0;
             }
             return counter.total - counter.compliant;
+        }
+
+        private ComplianceCounter counter(String traceName, LocalDate observedDate) {
+            TraceCounterBucket bucket = countersByTrace.get(normalizeKey(traceName));
+            if (bucket == null) {
+                return null;
+            }
+            return bucket.countersByDate().get(observedDate);
+        }
+    }
+
+    private record TraceCounterBucket(
+        String displayName,
+        Map<LocalDate, ComplianceCounter> countersByDate
+    ) {
+        private TraceCounterBucket(String displayName) {
+            this(displayName, new LinkedHashMap<>());
         }
     }
 
@@ -859,4 +1480,11 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     ) {
     }
 
+    private ApiClientException invalidSpreadsheet(String message) {
+        return new ApiClientException(
+                HttpStatus.BAD_REQUEST,
+                "location_dashboard_file_invalid",
+                message
+        );
+    }
 }
