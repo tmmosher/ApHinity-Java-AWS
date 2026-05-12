@@ -158,7 +158,12 @@ public record LocationDashboardImportStrategyConfig(
             if (min != null && numericValue.compareTo(min) < 0) {
                 return false;
             }
-            if (max != null && numericValue.compareTo(max) >= 0) {
+            if (max != null && numericValue.compareTo(max) > 0) {
+                return false;
+            }
+            // A zero upper bound represents a "not detected" style threshold in the
+            // Hoag workbook, so exact zero remains compliant.
+            if (max != null && numericValue.compareTo(max) == 0 && max.signum() != 0) {
                 return false;
             }
             return true;

@@ -281,6 +281,15 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void rangeProfileTreatsZeroMaximumAsCompliant() {
+        MeasurementBound measurementBound =
+            measurementBound(1L, "Legionella", null, null, null, null, null, null, null, BigDecimal.ZERO);
+
+        assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(BigDecimal.ZERO, measurementBound));
+        assertFalse(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("0.1"), measurementBound));
+    }
+
+    @Test
     void computeImportKeepsCorrectiveActionIdentityStableWhenCellReferenceChanges() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
@@ -320,16 +329,16 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
-                        "utility-hld",
-                        "Utility-HLD",
+                        "utility-spd",
+                        "Utility SPD",
                         LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
-                        List.of("Utility- HLD")
+                        List.of()
                     ),
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
-                        "utility-hot",
-                        "Utility-Hot",
+                        "utility-domestic-hot",
+                        "Utility Domestic Hot",
                         LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
-                        List.of("Utility- Main Hot 120F")
+                        List.of()
                     ),
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "steam",
@@ -352,11 +361,11 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(
                     new LocationDashboardImportStrategyConfig.SystemTypeAliasConfig(
                         "Utility SPD",
-                        List.of("Utility- HLD", "Utility-HLD", "Utility Water")
+                        List.of("Utility HLD", "Utility Water")
                     ),
                     new LocationDashboardImportStrategyConfig.SystemTypeAliasConfig(
                         "Utility Domestic Hot",
-                        List.of("Utility- Main Hot 120F")
+                        List.of("Utility Main Hot 120F")
                     )
                 )
             )
@@ -436,11 +445,102 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals(3L, ((Number) customData.getFirst().get("sampleCount")).longValue());
         assertEquals(3, result.observations().size());
         assertEquals("16405 Irvine", result.observations().getFirst().facilityName());
-        assertEquals("Utility-HLD", result.observations().getFirst().systemTypeName());
+        assertEquals("Utility SPD", result.observations().getFirst().systemTypeName());
         assertEquals("16405 Irvine", result.observations().get(1).facilityName());
-        assertEquals("Utility-Hot", result.observations().get(1).systemTypeName());
+        assertEquals("Utility Domestic Hot", result.observations().get(1).systemTypeName());
         assertEquals("Steam", result.observations().get(2).systemTypeName());
         assertEquals(0, result.correctiveActions().size());
+    }
+
+    @Test
+    void computeImportSkipsUnrecognizedWorkbookValuesInsteadOfReusingPreviousSystemType() {
+        ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "newport-beach",
+                        "Newport Beach",
+                        List.of("Newport Beach"),
+                        List.of(),
+                        true
+                    )
+                ),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "cooling-towers",
+                        "Cooling Towers",
+                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        List.of("Cooling Towers")
+                    )
+                ),
+                List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
+                    "newport-beach-system-type",
+                    "System Type Compliance",
+                    "Newport Beach",
+                    LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
+                    "newport-beach",
+                    List.of("Cooling Towers"),
+                    Map.of("Cooling Towers", "#1f77b4"),
+                    "scatter"
+                )),
+                List.of(),
+                List.of()
+            )
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        68,
+                        "Newport Beach",
+                        "Hospital",
+                        "Cooling Towers",
+                        "DI Source",
+                        "Source to SPD",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "4",
+                                new BigDecimal("4"),
+                                null,
+                                "K68"
+                            )
+                        )
+                    ),
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        69,
+                        null,
+                        null,
+                        "Unknown System Type",
+                        "DI Source",
+                        "Source to SPD",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "5",
+                                new BigDecimal("5"),
+                                null,
+                                "K69"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            List.of(measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("500")))
+        );
+
+        assertEquals(1, result.observations().size());
+        assertEquals("Cooling Towers", result.observations().getFirst().systemTypeName());
+        assertEquals(1, result.graphs().getFirst().data().size());
+        assertEquals("Cooling Towers", result.graphs().getFirst().data().getFirst().get("name"));
     }
 
     @Test
@@ -459,26 +559,8 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
-                        "utility-hld",
-                        "Utility-HLD",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
-                        List.of("Utility- HLD")
-                    ),
-                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
-                        "utility",
-                        "Utility",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
-                        List.of()
-                    ),
-                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
-                        "utility-water",
-                        "Utility Water",
-                        LocationDashboardImportStrategyConfig.RangeProfile.POTABLE,
-                        List.of("Utility Water")
-                    ),
-                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
-                        "utility-soft",
-                        "Utility-Soft",
+                        "utility-spd",
+                        "Utility SPD",
                         LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
                         List.of()
                     )
@@ -500,12 +582,9 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         "16405 Irvine",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "16405-irvine",
-                        List.of("Utility-HLD", "Utility", "Utility Water", "Utility-Soft"),
+                        List.of("Utility SPD"),
                         Map.of(
-                            "Utility-HLD", "#1f77b4",
-                            "Utility", "#ff7f0e",
-                            "Utility Water", "#2ca02c",
-                            "Utility-Soft", "#d62728"
+                            "Utility SPD", "#1f77b4"
                         ),
                         "scatter"
                     )
@@ -514,7 +593,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(
                     new LocationDashboardImportStrategyConfig.SystemTypeAliasConfig(
                         "Utility SPD",
-                        List.of("Utility- HLD", "Utility-HLD", "Utility", "Utility SPD", "Utility Water SPD", "Utility-Soft", "Utility Water")
+                        List.of("Utility HLD", "Utility", "Utility SPD", "Utility Water SPD", "Utility Soft", "Utility Water")
                     )
                 )
             )
@@ -588,9 +667,9 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertEquals(2, result.graphs().size());
         assertEquals(3, result.observations().size());
-        assertEquals("Utility-HLD", result.observations().getFirst().systemTypeName());
-        assertEquals("Utility-HLD", result.observations().get(1).systemTypeName());
-        assertEquals("Utility-HLD", result.observations().get(2).systemTypeName());
+        assertEquals("Utility SPD", result.observations().getFirst().systemTypeName());
+        assertEquals("Utility SPD", result.observations().get(1).systemTypeName());
+        assertEquals("Utility SPD", result.observations().get(2).systemTypeName());
 
         Map<String, Object> waterQualityTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityTrace.get("name"));
@@ -601,9 +680,82 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals(3L, ((Number) customData.getFirst().get("sampleCount")).longValue());
 
         Map<String, Object> systemTypeTrace = result.graphs().get(1).data().getFirst();
-        assertEquals("Utility-HLD", systemTypeTrace.get("name"));
+        assertEquals("Utility SPD", systemTypeTrace.get("name"));
         assertEquals(List.of("2025-08-01"), systemTypeTrace.get("x"));
         assertEquals(List.of(100.0d), systemTypeTrace.get("y"));
+    }
+
+    @Test
+    void computeImportResolvesSublocationDisplayNamesWithoutRequiringBuildingAliases() {
+        ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "surgical-pavilion",
+                        "Surgical Pavilion",
+                        List.of("Irvine"),
+                        List.of("Surgical Pavilion"),
+                        false
+                    )
+                ),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "cooling-towers",
+                        "Cooling Towers",
+                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        List.of("Cooling Towers")
+                    )
+                ),
+                List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
+                    "surgical-pavilion-water-quality",
+                    "Water Quality Compliance",
+                    "Surgical Pavilion",
+                    LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                    "surgical-pavilion",
+                    List.of("HPC"),
+                    Map.of("HPC", "#1f77b4"),
+                    "scatter"
+                )),
+                List.of(),
+                List.of()
+            )
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        68,
+                        "Surgical Pavilion",
+                        null,
+                        "Cooling Towers",
+                        "DI Source",
+                        "Source to SPD",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "4",
+                                new BigDecimal("4"),
+                                null,
+                                "K68"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            List.of(measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("500")))
+        );
+
+        assertEquals(1, result.observations().size());
+        assertEquals("Surgical Pavilion", result.observations().getFirst().facilityName());
+        assertEquals(1, result.graphs().size());
+        assertEquals("HPC", result.graphs().getFirst().data().getFirst().get("name"));
     }
 
     @Test

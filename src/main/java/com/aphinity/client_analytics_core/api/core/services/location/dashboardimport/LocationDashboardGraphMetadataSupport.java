@@ -226,7 +226,11 @@ final class LocationDashboardGraphMetadataSupport {
         if (value == null) {
             return null;
         }
-        String normalized = value.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        String normalized = value.strip()
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("[^\\p{Alnum}]+", " ")
+            .replaceAll("\\s+", " ")
+            .strip();
         return normalized.isBlank() ? null : normalized;
     }
 

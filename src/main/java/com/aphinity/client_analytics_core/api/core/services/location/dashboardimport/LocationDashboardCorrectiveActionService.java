@@ -23,10 +23,20 @@ final class LocationDashboardCorrectiveActionService {
 
     private final ServiceEventRepository serviceEventRepository;
     private final Clock clock;
+    private final LocationDashboardImportStrategyRegistry strategyRegistry;
 
     LocationDashboardCorrectiveActionService(ServiceEventRepository serviceEventRepository, Clock clock) {
+        this(serviceEventRepository, clock, null);
+    }
+
+    LocationDashboardCorrectiveActionService(
+        ServiceEventRepository serviceEventRepository,
+        Clock clock,
+        LocationDashboardImportStrategyRegistry strategyRegistry
+    ) {
         this.serviceEventRepository = serviceEventRepository;
         this.clock = clock;
+        this.strategyRegistry = strategyRegistry;
     }
 
     List<ServiceEvent> buildPreviewCorrectiveActions(
@@ -76,14 +86,32 @@ final class LocationDashboardCorrectiveActionService {
         if (observedDate == null) {
             observedDate = serviceEvent.getEventDate();
         }
+        String facilityName = LocationDashboardGraphMetadataSupport.firstNonBlank(
+            descriptionFields.get("sublocation"),
+            descriptionFields.get("facility")
+        );
+        String buildingName = descriptionFields.get("building");
+        String systemTypeName = descriptionFields.get("system");
+        String measurementName = descriptionFields.get("measurement");
+
+        LocationDashboardImportStrategy strategy = strategyRegistry == null || serviceEvent.getLocation() == null
+            ? null
+            : strategyRegistry.resolve(serviceEvent.getLocation().getName()).orElse(null);
+        if (strategy instanceof ConfiguredLocationDashboardImportStrategy configuredStrategy) {
+            facilityName = configuredStrategy.canonicalFacilityName(facilityName, buildingName);
+            systemTypeName = configuredStrategy.canonicalSystemTypeName(systemTypeName);
+        }
+
+        if (facilityName == null || facilityName.isBlank()
+            || systemTypeName == null || systemTypeName.isBlank()
+            || measurementName == null || measurementName.isBlank()) {
+            return null;
+        }
         return new LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction(
             observedDate,
-            LocationDashboardGraphMetadataSupport.firstNonBlank(
-                descriptionFields.get("sublocation"),
-                descriptionFields.get("facility")
-            ),
-            descriptionFields.get("system"),
-            descriptionFields.get("measurement"),
+            facilityName,
+            systemTypeName,
+            measurementName,
             serviceEvent
         );
     }

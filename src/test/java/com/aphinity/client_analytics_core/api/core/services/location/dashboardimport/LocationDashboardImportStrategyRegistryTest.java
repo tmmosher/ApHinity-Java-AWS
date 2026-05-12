@@ -25,7 +25,7 @@ class LocationDashboardImportStrategyRegistryTest {
             strategy.graphDefinitions().getFirst().traceOrder()
         );
         assertEquals(
-            List.of("Utility-HLD", "Utility", "Steam", "Critical", "Utility-Hot", "Cooling Towers"),
+            List.of("Utility SPD", "Steam", "Critical SPD", "Utility Domestic Hot", "Cooling Tower"),
             strategy.graphDefinitions().get(1).traceOrder()
         );
         assertEquals("irvine-water-quality-compliance", strategy.graphDefinitions().get(2).id());

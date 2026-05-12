@@ -536,7 +536,7 @@ class LocationDashboardImportServiceTest {
     }
 
     @Test
-    void importLocationDashboardKeepsMetadataLessCorrectiveActionsVisibleInFacilityBreakdowns() {
+    void importLocationDashboardDropsMetadataLessCorrectiveActionsFromFacilityBreakdowns() {
         LocationDashboardImportService importService = buildImportService();
         MockMultipartFile file = dashboardFile();
         Location location = location(9L, "Newport Beach");
@@ -604,19 +604,16 @@ class LocationDashboardImportServiceTest {
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        assertEquals(List.of(4L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
-        assertEquals(List.of(3L, 1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
-        assertEquals(
-            List.of("Newport Beach", "Unknown Facility"),
-            findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y")
-        );
+        assertEquals(List.of(3L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        assertEquals(List.of(3L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
 
         Map<String, Object> activeByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst();
         Map<String, Object> resolvedByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1);
-        assertEquals(List.of("Newport Beach", "Unknown Facility"), activeByFacility.get("x"));
-        assertEquals(List.of("Newport Beach", "Unknown Facility"), resolvedByFacility.get("x"));
-        assertEquals(List.of(3L, 0L), activeByFacility.get("y"));
-        assertEquals(List.of(0L, 1L), resolvedByFacility.get("y"));
+        assertEquals(List.of("Newport Beach"), activeByFacility.get("x"));
+        assertEquals(List.of("Newport Beach"), resolvedByFacility.get("x"));
+        assertEquals(List.of(3L), activeByFacility.get("y"));
+        assertEquals(List.of(0L), resolvedByFacility.get("y"));
     }
 
     private LocationDashboardImportService buildImportService() {

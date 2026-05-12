@@ -15,6 +15,7 @@ import java.time.LocalTime;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @ExtendWith(MockitoExtension.class)
 class LocationDashboardCorrectiveActionServiceTest {
@@ -49,5 +50,23 @@ class LocationDashboardCorrectiveActionServiceTest {
         assertEquals("Cooling Towers", historical.systemTypeName());
         assertEquals("HPC", historical.measurementName());
         assertEquals("Newport Beach", historical.facilityName());
+    }
+
+    @Test
+    void toHistoricalCorrectiveActionDropsEventsWithoutRequiredStructuredMetadata() {
+        LocationDashboardCorrectiveActionService service = new LocationDashboardCorrectiveActionService(
+            serviceEventRepository,
+            Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC)
+        );
+
+        ServiceEvent serviceEvent = new ServiceEvent();
+        serviceEvent.setId(2L);
+        serviceEvent.setLocation(new Location());
+        serviceEvent.setCorrectiveAction(true);
+        serviceEvent.setEventDate(LocalDate.parse("2025-08-01"));
+        serviceEvent.setEventTime(LocalTime.MIDNIGHT);
+        serviceEvent.setDescription("Legacy corrective action without import metadata");
+
+        assertNull(service.toHistoricalCorrectiveAction(serviceEvent));
     }
 }

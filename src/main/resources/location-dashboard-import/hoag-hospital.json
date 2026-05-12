@@ -47,16 +47,8 @@
   ],
   "systems": [
     {
-      "key": "utility-hld",
-      "displayName": "Utility-HLD",
-      "rangeProfile": "utility",
-      "aliases": [
-        "Utility- HLD"
-      ]
-    },
-    {
-      "key": "utility",
-      "displayName": "Utility",
+      "key": "utility-spd",
+      "displayName": "Utility SPD",
       "rangeProfile": "utility",
       "aliases": []
     },
@@ -67,40 +59,21 @@
       "aliases": []
     },
     {
-      "key": "critical",
-      "displayName": "Critical",
+      "key": "critical-spd",
+      "displayName": "Critical SPD",
       "rangeProfile": "critical",
       "aliases": []
     },
     {
-      "key": "utility-hot",
-      "displayName": "Utility-Hot",
+      "key": "utility-domestic-hot",
+      "displayName": "Utility Domestic Hot",
       "rangeProfile": "utility",
-      "aliases": [
-        "Utility- Main Hot 120F"
-      ]
+      "aliases": []
     },
     {
-      "key": "cooling-towers",
-      "displayName": "Cooling Towers",
+      "key": "cooling-tower",
+      "displayName": "Cooling Tower",
       "rangeProfile": "towers",
-      "aliases": [
-        "Cooling Towers",
-        "Cooling Tower"
-      ]
-    },
-    {
-      "key": "utility-water",
-      "displayName": "Utility Water",
-      "rangeProfile": "potable",
-      "aliases": [
-        "Utility Water"
-      ]
-    },
-    {
-      "key": "utility-soft",
-      "displayName": "Utility-Soft",
-      "rangeProfile": "utility",
       "aliases": []
     }
   ],
@@ -138,20 +111,18 @@
       "importType": "system_type_compliance",
       "sublocationKey": "newport-beach",
       "traceOrder": [
-        "Utility-HLD",
-        "Utility",
+        "Utility SPD",
         "Steam",
-        "Critical",
-        "Utility-Hot",
-        "Cooling Towers"
+        "Critical SPD",
+        "Utility Domestic Hot",
+        "Cooling Tower"
       ],
       "traceColors": {
-        "Utility-HLD": "#1f77b4",
-        "Utility": "#ff7f0e",
+        "Utility SPD": "#1f77b4",
         "Steam": "#2ca02c",
-        "Critical": "#d62728",
-        "Utility-Hot": "#9467bd",
-        "Cooling Towers": "#8c564b"
+        "Critical SPD": "#d62728",
+        "Utility Domestic Hot": "#9467bd",
+        "Cooling Tower": "#8c564b"
       },
       "graphType": "scatter"
     },
@@ -188,20 +159,18 @@
       "importType": "system_type_compliance",
       "sublocationKey": "irvine",
       "traceOrder": [
-        "Utility-HLD",
-        "Utility",
+        "Utility SPD",
         "Steam",
-        "Critical",
-        "Utility-Hot",
-        "Cooling Towers"
+        "Critical SPD",
+        "Utility Domestic Hot",
+        "Cooling Tower"
       ],
       "traceColors": {
-        "Utility-HLD": "#1f77b4",
-        "Utility": "#ff7f0e",
+        "Utility SPD": "#1f77b4",
         "Steam": "#2ca02c",
-        "Critical": "#d62728",
-        "Utility-Hot": "#9467bd",
-        "Cooling Towers": "#8c564b"
+        "Critical SPD": "#d62728",
+        "Utility Domestic Hot": "#9467bd",
+        "Cooling Tower": "#8c564b"
       },
       "graphType": "scatter"
     },
@@ -238,20 +207,18 @@
       "importType": "system_type_compliance",
       "sublocationKey": "16405-irvine",
       "traceOrder": [
-        "Utility-HLD",
-        "Utility",
+        "Utility SPD",
         "Steam",
-        "Critical",
-        "Utility-Hot",
-        "Cooling Towers"
+        "Critical SPD",
+        "Utility Domestic Hot",
+        "Cooling Tower"
       ],
       "traceColors": {
-        "Utility-HLD": "#1f77b4",
-        "Utility": "#ff7f0e",
+        "Utility SPD": "#1f77b4",
         "Steam": "#2ca02c",
-        "Critical": "#d62728",
-        "Utility-Hot": "#9467bd",
-        "Cooling Towers": "#8c564b"
+        "Critical SPD": "#d62728",
+        "Utility Domestic Hot": "#9467bd",
+        "Cooling Tower": "#8c564b"
       },
       "graphType": "scatter"
     },
@@ -288,20 +255,18 @@
       "importType": "system_type_compliance",
       "sublocationKey": "surgical-pavilion",
       "traceOrder": [
-        "Utility-HLD",
-        "Utility",
+        "Utility SPD",
         "Steam",
-        "Critical",
-        "Utility-Hot",
-        "Cooling Towers"
+        "Critical SPD",
+        "Utility Domestic Hot",
+        "Cooling Tower"
       ],
       "traceColors": {
-        "Utility-HLD": "#1f77b4",
-        "Utility": "#ff7f0e",
+        "Utility SPD": "#1f77b4",
         "Steam": "#2ca02c",
-        "Critical": "#d62728",
-        "Utility-Hot": "#9467bd",
-        "Cooling Towers": "#8c564b"
+        "Critical SPD": "#d62728",
+        "Utility Domestic Hot": "#9467bd",
+        "Cooling Tower": "#8c564b"
       },
       "graphType": "scatter"
     }
@@ -370,12 +335,11 @@
   "systemTypeAliases": [
     {
       "Utility SPD" : [
-        "Utility- HLD",
-        "Utility-HLD",
+        "Utility HLD",
         "Utility",
         "Utility SPD",
         "Utility Water SPD",
-        "Utility-Soft",
+        "Utility Soft",
         "Utility Water"
       ]
     },
@@ -387,8 +351,8 @@
     },
     {
       "Utility Domestic Hot" : [
-        "Utility-Hot",
-        "Utility-Main Hot 120F"
+        "Utility Hot",
+        "Utility Main Hot 120F"
       ]
     },
     {

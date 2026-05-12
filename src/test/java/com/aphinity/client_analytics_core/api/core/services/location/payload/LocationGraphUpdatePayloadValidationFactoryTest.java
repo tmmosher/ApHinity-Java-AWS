@@ -36,6 +36,51 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateSortsScatterDateSeriesChronologically() {
+        Map<String, Object> nextTrace = Map.of(
+            "type", "scatter",
+            "name", "Cooling Towers",
+            "x", List.of("2025-08-01", "2025-07-01", "2025-09-01"),
+            "y", List.of(90, 75, 100),
+            "customdata", List.of(
+                Map.of("sampleCount", 10),
+                Map.of("sampleCount", 8),
+                Map.of("sampleCount", 12)
+            ),
+            "marker", Map.of("color", "#1f77b4")
+        );
+
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(Map.of(
+                "type", "scatter",
+                "name", "Cooling Towers",
+                "x", List.of("2025-08-01", "2025-09-01"),
+                "y", List.of(90, 100),
+                "customdata", List.of(
+                    Map.of("sampleCount", 10),
+                    Map.of("sampleCount", 12)
+                ),
+                "marker", Map.of("color", "#1f77b4")
+            )),
+            List.of(nextTrace),
+            Map.of("showlegend", false)
+        );
+
+        assertEquals(List.of(Map.of(
+            "type", "scatter",
+            "name", "Cooling Towers",
+            "x", List.of("2025-07-01", "2025-08-01", "2025-09-01"),
+            "y", List.of(75, 90, 100),
+            "customdata", List.of(
+                Map.of("sampleCount", 8),
+                Map.of("sampleCount", 10),
+                Map.of("sampleCount", 12)
+            ),
+            "marker", Map.of("color", "#1f77b4")
+        )), payload.data());
+    }
+
+    @Test
     void validateForUpdateAcceptsLegacyCartesianPayloadsWithoutExplicitXValues() {
         Map<String, Object> storedTrace = Map.of("type", "bar", "y", List.of(1, 2, 3));
         Map<String, Object> nextTrace = Map.of("type", "bar", "y", List.of(4, 5, 6));

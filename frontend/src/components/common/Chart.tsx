@@ -44,6 +44,23 @@ export const buildPlotlyLayout = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === "object" && !Array.isArray(value);
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const normalizeIsoDateValue = (value: unknown): string | null => {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const normalized = value.trim();
+    if (!ISO_DATE_PATTERN.test(normalized)) {
+        return null;
+    }
+    const parsed = new Date(`${normalized}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+    return parsed.toISOString().slice(0, 10) === normalized ? normalized : null;
+};
+
 const toFiniteNumber = (value: unknown): number | null => {
     if (typeof value === "number" && Number.isFinite(value)) {
         return value;
@@ -118,6 +135,75 @@ const findDonutFillValue = (data: PlotlyData[]): number | null => {
     return null;
 };
 
+const sortDateSeriesTrace = (trace: PlotlyData): PlotlyData => {
+    if (!isRecord(trace)) {
+        return trace;
+    }
+
+    const traceType = String(trace.type ?? "").toLowerCase();
+    if (traceType !== "scatter" && traceType !== "scattergl") {
+        return trace;
+    }
+
+    const xValues = trace.x;
+    if (!Array.isArray(xValues) || xValues.length < 2) {
+        return trace;
+    }
+
+    let hasDateValue = false;
+    const datedPoints = xValues.map((value, index) => {
+        const normalizedDate = normalizeIsoDateValue(value);
+        if (normalizedDate !== null) {
+            hasDateValue = true;
+            return {index, normalizedDate, sortable: true as const};
+        }
+        if (value === null || value === undefined || (typeof value === "string" && value.trim().length === 0)) {
+            return {index, normalizedDate: "", sortable: false as const};
+        }
+        return null;
+    });
+
+    if (!hasDateValue || datedPoints.some((point) => point === null)) {
+        return trace;
+    }
+
+    const sortedPoints = [...datedPoints].sort((left, right) => {
+        if (left.sortable !== right.sortable) {
+            return left.sortable ? -1 : 1;
+        }
+        if (!left.sortable) {
+            return left.index - right.index;
+        }
+        return left.normalizedDate.localeCompare(right.normalizedDate) || left.index - right.index;
+    });
+
+    const alreadySorted = sortedPoints.every((point, index) => point.index === index);
+    if (alreadySorted) {
+        return trace;
+    }
+
+    const nextTrace: Record<string, unknown> = {...trace};
+    for (const [key, value] of Object.entries(trace)) {
+        if (!Array.isArray(value) || value.length !== xValues.length) {
+            continue;
+        }
+        nextTrace[key] = sortedPoints.map((point) => value[point.index]);
+    }
+    return nextTrace as PlotlyData;
+};
+
+const normalizeDateSeriesData = (data: PlotlyData[]): PlotlyData[] => {
+    let changed = false;
+    const normalizedData = data.map((trace) => {
+        const normalizedTrace = sortDateSeriesTrace(trace);
+        if (normalizedTrace !== trace) {
+            changed = true;
+        }
+        return normalizedTrace;
+    });
+    return changed ? normalizedData : data;
+};
+
 export const applyDonutCenterValueToLayout = (
     data: PlotlyData[],
     layout?: PlotlyLayout
@@ -189,7 +275,8 @@ export const renderPlotlyChart = async (
         themePreference
     );
     const finalConfig = buildPlotlyConfig(config);
-    await plotly.react(el, data as any, finalLayout as any, finalConfig as any);
+    const normalizedData = normalizeDateSeriesData(data);
+    await plotly.react(el, normalizedData as any, finalLayout as any, finalConfig as any);
 };
 
 export const attachPlotlyResizeListener = (

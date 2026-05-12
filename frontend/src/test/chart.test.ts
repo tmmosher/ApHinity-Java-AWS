@@ -55,7 +55,7 @@ describe("Chart helpers", () => {
     expect(react).toHaveBeenCalledTimes(1);
     const [calledElement, calledData, calledLayout, calledConfig] = react.mock.calls[0];
     expect(calledElement).toBe(element);
-    expect(calledData).toBe(data);
+    expect(calledData).toEqual(data);
     expect(calledLayout).toMatchObject({
       margin: {l: 40, r: 20, t: 20, b: 40},
       font: {size: 16}
@@ -63,6 +63,55 @@ describe("Chart helpers", () => {
     expect(calledConfig).toMatchObject({
       displayModeBar: true,
       responsive: true
+    });
+  });
+
+  it("sorts scatter date-series points chronologically before rendering", async () => {
+    const react = vi.fn().mockResolvedValue(undefined);
+    const plotly = {react} as unknown as {react: (...args: unknown[]) => Promise<unknown>};
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+    const data = [{
+      type: "scatter",
+      name: "Cooling Towers",
+      x: ["2025-08-01", "2025-07-01", "2025-09-01"],
+      y: [90, 75, 100],
+      customdata: [
+        {sampleCount: 10},
+        {sampleCount: 8},
+        {sampleCount: 12}
+      ]
+    }];
+
+    await renderPlotlyChart(
+      plotly as any,
+      element,
+      data,
+      undefined,
+      undefined
+    );
+
+    const [, calledData] = react.mock.calls[0];
+    expect(calledData).toEqual([{
+      type: "scatter",
+      name: "Cooling Towers",
+      x: ["2025-07-01", "2025-08-01", "2025-09-01"],
+      y: [75, 90, 100],
+      customdata: [
+        {sampleCount: 8},
+        {sampleCount: 10},
+        {sampleCount: 12}
+      ]
+    }]);
+    expect(data[0]).toEqual({
+      type: "scatter",
+      name: "Cooling Towers",
+      x: ["2025-08-01", "2025-07-01", "2025-09-01"],
+      y: [90, 75, 100],
+      customdata: [
+        {sampleCount: 10},
+        {sampleCount: 8},
+        {sampleCount: 12}
+      ]
     });
   });
 

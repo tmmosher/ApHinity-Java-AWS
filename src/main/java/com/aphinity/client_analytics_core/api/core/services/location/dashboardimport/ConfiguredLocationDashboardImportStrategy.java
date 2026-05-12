@@ -107,36 +107,35 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         SystemTypeConfig activeSystemType = null;
 
         for (LocationDashboardSpreadsheetParser.ParsedDashboardRow row : workbook.rows()) {
-            if (row.facility() != null) {
-                activeFacility = row.facility();
-            }
-            if (row.building() != null) {
-                activeBuilding = row.building();
-            }
-            if (row.system() != null) {
-                activeSystemRaw = row.system();
-            }
+            String rowFacility = row.facility();
+            String rowBuilding = row.building();
+            String rowSystem = row.system();
+            String resolvedFacility = rowFacility != null ? rowFacility : activeFacility;
+            String resolvedBuilding = rowBuilding != null ? rowBuilding : activeBuilding;
+            String resolvedSystem = rowSystem != null ? rowSystem : activeSystemRaw;
+            SublocationConfig currentSublocation = resolveSublocation(resolvedFacility, resolvedBuilding, activeSublocation);
+            SystemTypeConfig currentSystemType = resolveSystemType(resolvedSystem, activeSystemType);
+            String facilityName = currentSublocation == null
+                ? null
+                : resolveFacilityName(currentSublocation, resolvedFacility);
 
-            String resolvedFacility = activeFacility;
-            String resolvedBuilding = row.building() != null ? row.building() : activeBuilding;
-            String resolvedSystem = row.system() != null ? row.system() : activeSystemRaw;
-
-            activeSublocation = resolveSublocation(resolvedFacility, resolvedBuilding, activeSublocation);
-            activeSystemType = resolveSystemType(resolvedSystem, activeSystemType);
-            String facilityName = resolveFacilityName(activeSublocation, resolvedFacility);
+            // A comment on any cell in the row is the row's incident anchor, so do not
+            // auto-generate sibling worksheet-failure actions for the same row.
+            boolean rowHasUsableCommentPayload = row.cells().stream()
+                .anyMatch(cell -> hasUsableCommentPayload(cell.commentText()));
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
                 LocationDashboardCommentParser.ParsedComment parsedCellComment = null;
                 MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
                 boolean hasUsableCommentPayload = hasUsableCommentPayload(cell.commentText());
-                if (hasUsableCommentPayload && activeSystemType != null) {
+                if (hasUsableCommentPayload && currentSystemType != null) {
                     parsedCellComment = parseComment(cell, row);
                     validatePrimaryCommentSample(parsedCellComment, cell, row);
                     buildCorrectiveActionDraft(
                         cell,
                         row,
-                        activeSublocation,
-                        activeSystemType,
+                        currentSublocation,
+                        currentSystemType,
                         resolvedFacility,
                         resolvedBuilding,
                         resolvedSystem,
@@ -146,8 +145,8 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     correctiveActions.addAll(buildCommentSampleCorrectiveActionDrafts(
                         cell,
                         row,
-                        activeSublocation,
-                        activeSystemType,
+                        currentSublocation,
+                        currentSystemType,
                         resolvedFacility,
                         resolvedBuilding,
                         resolvedSystem,
@@ -156,28 +155,28 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     ));
                 }
 
-                if (cell.numericValue() == null || activeSystemType == null || measurementBound == null) {
+                if (cell.numericValue() == null || currentSystemType == null || measurementBound == null) {
                     addCommentSampleObservations(
                         parsedCellComment,
                         measurementBound,
-                        activeSystemType,
+                        currentSystemType,
                         facilityName,
-                        activeSublocation,
+                        currentSublocation,
                         cell,
                         observations,
                         aggregationsByGraphId
                     );
                     continue;
                 }
-                boolean compliant = activeSystemType.rangeProfile().isCompliant(cell.numericValue(), measurementBound);
+                boolean compliant = currentSystemType.rangeProfile().isCompliant(cell.numericValue(), measurementBound);
                 String measurementName = resolveMeasurementName(cell.metricName(), measurementBound);
                 recordObservation(
                     cell.observedDate(),
                     facilityName,
                     measurementName,
                     measurementBound,
-                    activeSystemType,
-                    activeSublocation,
+                    currentSystemType,
+                    currentSublocation,
                     compliant,
                     observations,
                     aggregationsByGraphId
@@ -185,25 +184,44 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 addCommentSampleObservations(
                     parsedCellComment,
                     measurementBound,
-                    activeSystemType,
+                    currentSystemType,
                     facilityName,
-                    activeSublocation,
+                    currentSublocation,
                     cell,
                     observations,
                     aggregationsByGraphId
                 );
-                if (!compliant && !hasUsableCommentPayload) {
+                if (!compliant && !hasUsableCommentPayload && !rowHasUsableCommentPayload) {
                     buildSyntheticCorrectiveActionDraft(
                         cell,
                         row,
-                        activeSublocation,
-                        activeSystemType,
+                        currentSublocation,
+                        currentSystemType,
                         resolvedFacility,
                         resolvedBuilding,
                         resolvedSystem,
                         measurementName
                     ).ifPresent(correctiveActions::add);
                 }
+            }
+
+            if (currentSublocation != null) {
+                if (rowFacility != null
+                    && (Objects.equals(normalizeKey(rowFacility), normalizeKey(currentSublocation.key()))
+                        || Objects.equals(normalizeKey(rowFacility), normalizeKey(currentSublocation.displayName()))
+                        || matchesAny(rowFacility, currentSublocation.facilityAliases()))) {
+                    activeFacility = resolvedFacility;
+                }
+                if (rowBuilding != null
+                    && (Objects.equals(normalizeKey(rowBuilding), normalizeKey(currentSublocation.displayName()))
+                        || matchesAny(rowBuilding, currentSublocation.buildingAliases()))) {
+                    activeBuilding = rowBuilding;
+                }
+                activeSublocation = currentSublocation;
+            }
+            if (currentSystemType != null) {
+                activeSystemRaw = resolvedSystem;
+                activeSystemType = currentSystemType;
             }
         }
 
@@ -290,22 +308,51 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
         }
 
+        Set<String> systemKeys = new LinkedHashSet<>();
+        Map<String, String> systemOwnersByAlias = new LinkedHashMap<>();
         for (SystemTypeConfig system : rawConfig.systems()) {
-            if (normalizeKey(system.key()) == null) {
+            String normalizedSystemKey = normalizeKey(system.key());
+            if (normalizedSystemKey == null) {
                 throw new IllegalStateException("Dashboard import strategy system keys are required");
+            }
+            if (!systemKeys.add(normalizedSystemKey)) {
+                throw new IllegalStateException("Dashboard import strategy system keys must be unique");
             }
             if (system.rangeProfile() == null) {
                 throw new IllegalStateException(
                     "Dashboard import strategy systems must declare a range profile: " + system.key()
                 );
             }
+            validateAliasOwnership(
+                systemOwnersByAlias,
+                normalizedSystemKey,
+                normalizedSystemKey,
+                "Dashboard import system aliases must be unique: " + system.key()
+            );
+            if (system.aliases() != null) {
+                for (String alias : system.aliases()) {
+                    validateAliasOwnership(
+                        systemOwnersByAlias,
+                        normalizeKey(alias),
+                        normalizedSystemKey,
+                        "Dashboard import system aliases must be unique: " + alias
+                    );
+                }
+            }
         }
 
-        Set<String> systemTypeAliases = new LinkedHashSet<>();
+        Map<String, String> systemTypeAliases = new LinkedHashMap<>();
         if (rawConfig.systemTypeAliases() != null) {
             for (SystemTypeAliasConfig systemTypeAlias : rawConfig.systemTypeAliases()) {
-                if (normalizeKey(systemTypeAlias.canonicalName()) == null) {
+                String normalizedCanonicalName = normalizeKey(systemTypeAlias.canonicalName());
+                if (normalizedCanonicalName == null) {
                     throw new IllegalStateException("Dashboard import strategy system type alias names are required");
+                }
+                if (!systemKeys.contains(normalizedCanonicalName)) {
+                    throw new IllegalStateException(
+                        "Dashboard import system type aliases must reference a configured canonical system: "
+                            + systemTypeAlias.canonicalName()
+                    );
                 }
                 if (systemTypeAlias.aliases() == null || systemTypeAlias.aliases().isEmpty()) {
                     throw new IllegalStateException(
@@ -314,13 +361,12 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     );
                 }
                 for (String alias : systemTypeAlias.aliases()) {
-                    String normalizedAlias = normalizeKey(alias);
-                    if (normalizedAlias == null) {
-                        continue;
-                    }
-                    if (!systemTypeAliases.add(normalizedAlias)) {
-                        throw new IllegalStateException("Dashboard import system type aliases must be unique: " + alias);
-                    }
+                    validateAliasOwnership(
+                        systemTypeAliases,
+                        normalizeKey(alias),
+                        normalizedCanonicalName,
+                        "Dashboard import system type aliases must be unique: " + alias
+                    );
                 }
             }
         }
@@ -413,35 +459,35 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         Map<String, SystemTypeAliasGroup> aliasGroupsByAlias = new LinkedHashMap<>();
         for (SystemTypeAliasConfig configuredAlias : configuredAliases) {
             SystemTypeAliasGroup aliasGroup = new SystemTypeAliasGroup(
-                resolveRepresentativeSystemType(configuredAlias, configuredSystemsByAlias)
+                resolveCanonicalSystemType(configuredAlias, configuredSystemsByAlias)
             );
             for (String alias : configuredAlias.aliases()) {
                 String normalizedAlias = normalizeKey(alias);
                 if (normalizedAlias == null) {
                     continue;
                 }
-                aliasGroupsByAlias.put(normalizedAlias, aliasGroup);
+                SystemTypeAliasGroup existingAliasGroup = aliasGroupsByAlias.putIfAbsent(normalizedAlias, aliasGroup);
+                if (existingAliasGroup != null
+                    && !sameSystemType(existingAliasGroup.representativeSystemType(), aliasGroup.representativeSystemType())) {
+                    throw new IllegalStateException("Dashboard import system type aliases must be unique: " + alias);
+                }
             }
         }
         return Map.copyOf(aliasGroupsByAlias);
     }
 
-    private SystemTypeConfig resolveRepresentativeSystemType(
+    private SystemTypeConfig resolveCanonicalSystemType(
         SystemTypeAliasConfig configuredAlias,
         Map<String, SystemTypeConfig> configuredSystemsByAlias
     ) {
-        if (configuredAlias.aliases() == null) {
-            return null;
+        SystemTypeConfig canonicalSystemType = configuredSystemsByAlias.get(normalizeKey(configuredAlias.canonicalName()));
+        if (canonicalSystemType == null) {
+            throw new IllegalStateException(
+                "Dashboard import system type aliases must reference a configured canonical system: "
+                    + configuredAlias.canonicalName()
+            );
         }
-        // Alias order is the contract: the first alias that maps to a configured
-        // system becomes the canonical display label for the grouped workbook values.
-        for (String alias : configuredAlias.aliases()) {
-            SystemTypeConfig systemType = configuredSystemsByAlias.get(normalizeKey(alias));
-            if (systemType != null) {
-                return systemType;
-            }
-        }
-        return null;
+        return canonicalSystemType;
     }
 
     private Map<String, List<SublocationConfig>> buildSublocationsByFacilityAlias(List<SublocationConfig> sublocations) {
@@ -491,9 +537,29 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         if (normalizedAlias == null) {
             return;
         }
-        if (systemsByAlias.putIfAbsent(normalizedAlias, systemType) != null) {
+        SystemTypeConfig existingSystemType = systemsByAlias.putIfAbsent(normalizedAlias, systemType);
+        if (existingSystemType != null && !sameSystemType(existingSystemType, systemType)) {
             throw new IllegalStateException("Dashboard import system aliases must be unique: " + rawAlias);
         }
+    }
+
+    private void validateAliasOwnership(
+        Map<String, String> ownersByAlias,
+        String normalizedAlias,
+        String normalizedOwner,
+        String errorMessage
+    ) {
+        if (normalizedAlias == null || normalizedOwner == null) {
+            return;
+        }
+        String existingOwner = ownersByAlias.putIfAbsent(normalizedAlias, normalizedOwner);
+        if (existingOwner != null && !Objects.equals(existingOwner, normalizedOwner)) {
+            throw new IllegalStateException(errorMessage);
+        }
+    }
+
+    private boolean sameSystemType(SystemTypeConfig left, SystemTypeConfig right) {
+        return Objects.equals(normalizeKey(left == null ? null : left.key()), normalizeKey(right == null ? null : right.key()));
     }
 
     private SublocationConfig resolveSublocation(String facility, String building, SublocationConfig previousSublocation) {
@@ -511,10 +577,21 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                         return sublocation;
                     }
                 }
+                SublocationConfig defaultSublocation = defaultSublocationsByFacilityAlias.get(normalizedFacility);
+                if (defaultSublocation != null) {
+                    return defaultSublocation;
+                }
             }
         }
 
-        if (belongsToFacility(previousSublocation, normalizedFacility)) {
+        for (SublocationConfig sublocation : config.sublocations()) {
+            if (Objects.equals(normalizedFacility, normalizeKey(sublocation.key()))
+                || Objects.equals(normalizedFacility, normalizeKey(sublocation.displayName()))) {
+                return sublocation;
+            }
+        }
+
+        if (building == null && belongsToFacility(previousSublocation, normalizedFacility)) {
             return previousSublocation;
         }
         return defaultSublocationsByFacilityAlias.get(normalizedFacility);
@@ -546,11 +623,10 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             return resolvedSystemType;
         }
 
-        if (!systemTypeAliasGroupsByAlias.isEmpty()) {
-            return null;
-        }
-
-        return previousSystemType;
+        // Only blank workbook cells inherit the prior row's system type. A nonblank
+        // but unrecognized value should stay unresolved rather than contaminating the
+        // previous system bucket.
+        return null;
     }
 
     private java.util.Optional<CorrectiveActionDraft> buildCorrectiveActionDraft(
@@ -1268,10 +1344,14 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
 
         List<Map<String, Object>> traces = new ArrayList<>();
         int traceIndex = 0;
+        boolean collapseEmptyTraces = graphDefinition.importType() == LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE;
         for (String traceName : traceOrder) {
             List<LocalDate> observedDates = graphAggregation.observedDatesForTrace(traceName).stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
+            if (collapseEmptyTraces && observedDates.isEmpty()) {
+                continue;
+            }
             List<String> xValues = observedDates.stream()
                 .map(LocalDate::toString)
                 .toList();
@@ -1382,6 +1462,16 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
         String normalized = resolvedSystem.strip();
         return normalized.isBlank() ? null : normalized;
+    }
+
+    String canonicalFacilityName(String rawFacility, String rawBuilding) {
+        SublocationConfig sublocation = resolveSublocation(rawFacility, rawBuilding, null);
+        return sublocation == null ? null : resolveFacilityName(sublocation, rawFacility);
+    }
+
+    String canonicalSystemTypeName(String rawSystem) {
+        SystemTypeConfig systemType = resolveSystemType(rawSystem, null);
+        return systemType == null ? null : resolveSystemTypeName(systemType, rawSystem);
     }
 
     private List<CorrectiveActionDraft> deduplicateCorrectiveActions(List<CorrectiveActionDraft> drafts) {

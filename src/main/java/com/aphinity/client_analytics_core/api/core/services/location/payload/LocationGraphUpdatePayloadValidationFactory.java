@@ -8,6 +8,8 @@ import java.util.Map;
 
 @Component
 public class LocationGraphUpdatePayloadValidationFactory {
+    private final CartesianTraceDateOrderCanonicalizer cartesianTraceDateOrderCanonicalizer =
+        new CartesianTraceDateOrderCanonicalizer();
     private final List<LocationGraphUpdateTraceValidator> validators = List.of(
         new PieGraphPayloadValidator(),
         new IndicatorGraphPayloadValidator(),
@@ -48,6 +50,11 @@ public class LocationGraphUpdatePayloadValidationFactory {
 
         if (expectedCanonicalType != null) {
             resolveValidator(expectedCanonicalType).validate(nextTraces, expectedCanonicalType);
+        }
+
+        if (expectedCanonicalType != null
+            && GraphPayloadValidationSupport.resolveFamily(expectedCanonicalType) == GraphPayloadFamily.CARTESIAN) {
+            nextTraces = cartesianTraceDateOrderCanonicalizer.canonicalize(nextTraces);
         }
 
         return new ValidatedGraphPayload(List.copyOf(nextTraces), normalizedLayout);
