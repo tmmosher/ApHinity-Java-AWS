@@ -163,10 +163,7 @@ public record LocationDashboardImportStrategyConfig(
             }
             // A zero upper bound represents a "not detected" style threshold in the
             // Hoag workbook, so exact zero remains compliant.
-            if (max != null && numericValue.compareTo(max) == 0 && max.signum() != 0) {
-                return false;
-            }
-            return true;
+            return max == null || numericValue.compareTo(max) != 0 || max.signum() == 0;
         }
     }
 

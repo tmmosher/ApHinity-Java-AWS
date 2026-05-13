@@ -3,6 +3,7 @@ import type * as Plotly from "plotly.js";
 import type { ThemePreference } from "../../util/common/themePreference";
 import { getDocumentThemePreference } from "../../util/common/themePreference";
 import { resolveThemedGraphLayout } from "../../util/graph/graphTheme";
+import { INDICATOR_THRESHOLD_COLOR } from "../../util/graph/graphTemplateFactory";
 
 export type PlotlyData = Partial<Plotly.PlotData>;
 export type PlotlyLayout = Partial<Plotly.Layout>;
@@ -223,6 +224,62 @@ const normalizeDateSeriesData = (data: PlotlyData[]): PlotlyData[] => {
     return changed ? normalizedData : data;
 };
 
+const syncIndicatorThresholdValue = (trace: PlotlyData): PlotlyData => {
+    if (!isRecord(trace) || String(trace.type ?? "").toLowerCase() !== "indicator") {
+        return trace;
+    }
+
+    const value = toFiniteNumber(trace.value);
+    if (value === null) {
+        return trace;
+    }
+
+    const gauge = isRecord(trace.gauge) ? trace.gauge : {};
+    const currentThreshold = isRecord(gauge.threshold) ? gauge.threshold : {};
+    const currentLine = isRecord(currentThreshold.line) ? currentThreshold.line : {};
+    const currentThresholdValue = toFiniteNumber(currentThreshold.value);
+    const currentThickness = toFiniteNumber(currentThreshold.thickness);
+    const currentLineWidth = toFiniteNumber(currentLine.width);
+
+    if (
+        currentThresholdValue === value &&
+        typeof currentLine.color === "string" &&
+        currentThickness !== null &&
+        currentLineWidth !== null
+    ) {
+        return trace;
+    }
+
+    return {
+        ...trace,
+        gauge: {
+            ...gauge,
+            threshold: {
+                ...currentThreshold,
+                line: {
+                    ...currentLine,
+                    color: typeof currentLine.color === "string" ? currentLine.color : INDICATOR_THRESHOLD_COLOR,
+                    width: currentLineWidth ?? 2
+                },
+                thickness: currentThickness ?? 0.75,
+                value
+            }
+        }
+    };
+};
+
+const normalizeIndicatorData = (data: PlotlyData[]): PlotlyData[] => {
+    let changed = false;
+    const normalizedData = data.map((trace) => {
+        const normalizedTrace = syncIndicatorThresholdValue(trace);
+        if (normalizedTrace !== trace) {
+            changed = true;
+        }
+        return normalizedTrace;
+    });
+    return changed ? normalizedData : data;
+};
+
 export const applyDonutCenterValueToLayout = (
     data: PlotlyData[],
     layout?: PlotlyLayout
@@ -289,12 +346,12 @@ export const renderPlotlyChart = async (
     config?: PlotlyConfig,
     themePreference: ThemePreference = getDocumentThemePreference()
 ) => {
+    const normalizedData = normalizeDateSeriesData(normalizeIndicatorData(data));
     const finalLayout = buildPlotlyLayout(
-        applyDonutCenterValueToLayout(data, layout),
+        applyDonutCenterValueToLayout(normalizedData, layout),
         themePreference
     );
     const finalConfig = buildPlotlyConfig(config);
-    const normalizedData = normalizeDateSeriesData(data);
     await plotly.react(el, normalizedData as any, finalLayout as any, finalConfig as any);
 };
 

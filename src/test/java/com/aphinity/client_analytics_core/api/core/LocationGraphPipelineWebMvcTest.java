@@ -203,13 +203,16 @@ class LocationGraphPipelineWebMvcTest {
             "gauge", Map.of(
                 "shape", "angular",
                 "axis", Map.of("range", List.of(0, 100)),
+                "bgcolor", "#6b728040",
                 "bar", Map.of("color", "#1f77b4"),
                 "borderwidth", 0,
                 "steps", List.of(
-                    Map.of("color", "#80000030", "range", List.of(0, 30)),
-                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
-                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
-                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                    Map.of("color", "#6b728040", "range", List.of(0, 100))
+                ),
+                "threshold", Map.of(
+                    "line", Map.of("color", "red", "width", 2),
+                    "thickness", 0.75,
+                    "value", 68
                 )
             )
         ));
@@ -235,9 +238,11 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$[0].data[0].number.suffix").value("%"))
             .andExpect(jsonPath("$[0].data[0].gauge.axis.range[0]").value(0))
             .andExpect(jsonPath("$[0].data[0].gauge.axis.range[1]").value(100))
+            .andExpect(jsonPath("$[0].data[0].gauge.bgcolor").value("#6b728040"))
             .andExpect(jsonPath("$[0].data[0].gauge.bar.color").value("#1f77b4"))
-            .andExpect(jsonPath("$[0].data[0].gauge.steps[0].color").value("#80000030"))
-            .andExpect(jsonPath("$[0].data[0].gauge.steps[3].range[1]").value(100))
+            .andExpect(jsonPath("$[0].data[0].gauge.steps[0].color").value("#6b728040"))
+            .andExpect(jsonPath("$[0].data[0].gauge.steps[0].range[1]").value(100))
+            .andExpect(jsonPath("$[0].data[0].gauge.threshold.value").value(68))
             .andExpect(jsonPath("$[0].layout.showlegend").value(false))
             .andExpect(jsonPath("$[0].config.displayModeBar").value(false))
             .andExpect(jsonPath("$[0].config.responsive").value(false))
@@ -676,9 +681,11 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].gauge.shape").value("angular"))
             .andExpect(jsonPath("$.data[0].gauge.axis.range[0]").value(0))
             .andExpect(jsonPath("$.data[0].gauge.axis.range[1]").value(100))
+            .andExpect(jsonPath("$.data[0].gauge.bgcolor").value("#6b728040"))
             .andExpect(jsonPath("$.data[0].gauge.bar.color").value("#1f77b4"))
-            .andExpect(jsonPath("$.data[0].gauge.steps[0].color").value("#80000030"))
-            .andExpect(jsonPath("$.data[0].gauge.steps[3].range[1]").value(100))
+            .andExpect(jsonPath("$.data[0].gauge.steps[0].color").value("#6b728040"))
+            .andExpect(jsonPath("$.data[0].gauge.steps[0].range[1]").value(100))
+            .andExpect(jsonPath("$.data[0].gauge.threshold.value").value(0))
             .andExpect(jsonPath("$.layout.margin.t").value(10))
             .andExpect(jsonPath("$.layout.showlegend").value(false))
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
@@ -989,13 +996,16 @@ class LocationGraphPipelineWebMvcTest {
             "gauge", Map.of(
                 "shape", "angular",
                 "axis", Map.of("range", List.of(0, 100)),
+                "bgcolor", "#6b728040",
                 "bar", Map.of("color", "#1f77b4"),
                 "borderwidth", 0,
                 "steps", List.of(
-                    Map.of("color", "#80000030", "range", List.of(0, 30)),
-                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
-                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
-                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                    Map.of("color", "#6b728040", "range", List.of(0, 100))
+                ),
+                "threshold", Map.of(
+                    "line", Map.of("color", "red", "width", 2),
+                    "thickness", 0.75,
+                    "value", 68
                 )
             )
         )));
@@ -1023,14 +1033,17 @@ class LocationGraphPipelineWebMvcTest {
                                   "gauge": {
                                     "shape": "angular",
                                     "axis": {"range": [0, 100]},
+                                    "bgcolor": "#6b728040",
                                     "bar": {"color": "#1f77b4"},
                                     "borderwidth": 0,
                                     "steps": [
-                                      {"color": "#80000030", "range": [0, 30]},
-                                      {"color": "#FF000030", "range": [30, 60]},
-                                      {"color": "#FFFF0030", "range": [60, 90]},
-                                      {"color": "#00800030", "range": [90, 100]}
-                                    ]
+                                      {"color": "#6b728040", "range": [0, 100]}
+                                    ],
+                                    "threshold": {
+                                      "line": {"color": "red", "width": 2},
+                                      "thickness": 0.75,
+                                      "value": 150
+                                    }
                                   }
                                 }
                               ]

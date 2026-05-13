@@ -661,18 +661,16 @@ class LocationServiceTest {
             Map.of(
                 "shape", "angular",
                 "axis", Map.of("range", List.of(0L, 100L)),
+                "bgcolor", "#6b728040",
                 "bar", Map.of("color", LEGACY_GRAPH_COLOR),
                 "borderwidth", 0L,
                 "steps", List.of(
-                    Map.of("color", "#80000030", "range", List.of(0L, 30L)),
-                    Map.of("color", "#FF000030", "range", List.of(30L, 60L)),
-                    Map.of("color", "#FFFF0030", "range", List.of(60L, 90L)),
-                    Map.of("color", "#00800030", "range", List.of(90L, 100L))
+                    Map.of("color", "#6b728040", "range", List.of(0L, 100L))
                 ),
                 "threshold", Map.of(
                     "line", Map.of("color", "red", "width", 2L),
                     "thickness", new BigDecimal("0.75"),
-                    "value", 90L
+                    "value", 0L
                 )
             ),
             traces.getFirst().get("gauge")
@@ -801,13 +799,16 @@ class LocationServiceTest {
             "gauge", Map.of(
                 "shape", "angular",
                 "axis", Map.of("range", List.of(0, 100)),
+                "bgcolor", "#6b728040",
                 "bar", Map.of("color", LEGACY_GRAPH_COLOR),
                 "borderwidth", 0,
                 "steps", List.of(
-                    Map.of("color", "#80000030", "range", List.of(0, 30)),
-                    Map.of("color", "#FF000030", "range", List.of(30, 60)),
-                    Map.of("color", "#FFFF0030", "range", List.of(60, 90)),
-                    Map.of("color", "#00800030", "range", List.of(90, 100))
+                    Map.of("color", "#6b728040", "range", List.of(0, 100))
+                ),
+                "threshold", Map.of(
+                    "line", Map.of("color", "red", "width", 2),
+                    "thickness", 0.75,
+                    "value", value
                 )
             )
         );

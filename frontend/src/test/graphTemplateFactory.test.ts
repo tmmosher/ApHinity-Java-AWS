@@ -1,5 +1,6 @@
 import {describe, expect, it} from "vitest";
 import {
+  INDICATOR_GAUGE_BACKGROUND_COLOR,
   INDICATOR_VALUE_MAX,
   INDICATOR_VALUE_MIN,
   createIndicatorTraceTemplate,
@@ -25,16 +26,30 @@ describe("graphTemplateFactory", () => {
         axis: {
           range: [INDICATOR_VALUE_MIN, INDICATOR_VALUE_MAX]
         },
+        bgcolor: INDICATOR_GAUGE_BACKGROUND_COLOR,
         bar: {
           color: "#1f77b4"
         },
         borderwidth: 0,
         steps: [
-          {color: "#80000030", range: [0, 30]},
-          {color: "#FF000030", range: [30, 60]},
-          {color: "#FFFF0030", range: [60, 90]},
-          {color: "#00800030", range: [90, 100]}
-        ]
+          {color: INDICATOR_GAUGE_BACKGROUND_COLOR, range: [0, 100]}
+        ],
+        threshold: {
+          line: {
+            color: "red",
+            width: 2
+          },
+          thickness: 0.75,
+          value: 0
+        }
+      }
+    });
+  });
+
+  it("creates indicator traces with a dynamic threshold seed", () => {
+    expect(createIndicatorTraceTemplate("Trace 1").gauge).toMatchObject({
+      threshold: {
+        value: 0
       }
     });
   });

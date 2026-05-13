@@ -1,4 +1,4 @@
-import { createRenderEffect, createRoot } from "solid-js";
+import { createRoot } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
@@ -37,34 +37,7 @@ vi.mock("../components/Chart", () => ({
 
 vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
-    createRenderEffect(() => {
-      latestCartesianTraceEditorProps = {
-        heading: props.heading,
-        rowIndexes: props.rowIndexes,
-        xValues: props.xValues,
-        yValues: props.yValues,
-        xLabel: props.xLabel,
-        yLabel: props.yLabel,
-        rangeLabel: props.rangeLabel,
-        barOrientation: props.barOrientation,
-        yRangeMin: props.yRangeMin,
-        yRangeMax: props.yRangeMax,
-        xDrafts: props.xDrafts,
-        yDrafts: props.yDrafts,
-        xInputMode: props.xInputMode,
-        yInputMode: props.yInputMode,
-        yRangeMinDraft: props.yRangeMinDraft,
-        yRangeMaxDraft: props.yRangeMaxDraft,
-        isBusy: props.isBusy,
-        onUpdateBarOrientation: props.onUpdateBarOrientation,
-        onAddRow: props.onAddRow,
-        onUpdateX: props.onUpdateX,
-        onUpdateY: props.onUpdateY,
-        onUpdateYRangeMin: props.onUpdateYRangeMin,
-        onUpdateYRangeMax: props.onUpdateYRangeMax,
-        onRemoveRow: props.onRemoveRow
-      };
-    });
+    latestCartesianTraceEditorProps = props;
     return null;
   }
 }));
@@ -311,16 +284,22 @@ describe("GraphEditorModal trace controls", () => {
           axis: {
             range: [0, 100]
           },
+          bgcolor: "#6b728040",
           bar: {
             color: "#1f77b4"
           },
           borderwidth: 0,
           steps: [
-            {color: "#80000030", range: [0, 30]},
-            {color: "#FF000030", range: [30, 60]},
-            {color: "#FFFF0030", range: [60, 90]},
-            {color: "#00800030", range: [90, 100]}
-          ]
+            {color: "#6b728040", range: [0, 100]}
+          ],
+          threshold: {
+            line: {
+              color: "red",
+              width: 2
+            },
+            thickness: 0.75,
+            value: 68
+          }
         }
       }],
       layout: {showlegend: false},

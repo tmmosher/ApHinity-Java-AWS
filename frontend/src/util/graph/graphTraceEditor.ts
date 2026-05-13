@@ -4,6 +4,7 @@ import {
   parseIndicatorValueInput,
   isIncompleteNumericInput,
   syncPieMarkerColors,
+  INDICATOR_THRESHOLD_COLOR,
   TRACE_COLOR_OPTIONS,
   type TraceType
 } from "./graphTemplateFactory";
@@ -486,9 +487,21 @@ export const updateIndicatorValue = (
     return trace;
   }
 
+  const gauge = isRecord(trace.gauge) ? {...trace.gauge} : {};
+  const threshold = isRecord(gauge.threshold) ? {...gauge.threshold} : {};
+  const line = isRecord(threshold.line) ? {...threshold.line} : {};
+  line.color = typeof line.color === "string" ? line.color : INDICATOR_THRESHOLD_COLOR;
+  line.width = typeof line.width === "number" && Number.isFinite(line.width) ? line.width : 2;
+  threshold.line = line;
+  threshold.thickness =
+    typeof threshold.thickness === "number" && Number.isFinite(threshold.thickness) ? threshold.thickness : 0.75;
+  threshold.value = parsedValue;
+  gauge.threshold = threshold;
+
   return {
     ...trace,
-    value: parsedValue
+    value: parsedValue,
+    gauge
   };
 };
 

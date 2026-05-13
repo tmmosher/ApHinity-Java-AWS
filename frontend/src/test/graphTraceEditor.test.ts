@@ -24,6 +24,7 @@ import {
   updateIndicatorValue
 } from "../util/graph/graphTraceEditor";
 import {
+  INDICATOR_GAUGE_BACKGROUND_COLOR,
   INDICATOR_VALUE_MAX,
   INDICATOR_VALUE_MIN,
   parseIndicatorValueInput
@@ -119,13 +120,11 @@ describe("graphTraceEditor", () => {
       gauge: {
         shape: "angular",
         axis: {range: [0, 100]},
+        bgcolor: INDICATOR_GAUGE_BACKGROUND_COLOR,
         bar: {color: "#1f77b4"},
         borderwidth: 0,
         steps: [
-          {color: "#80000030", range: [0, 30]},
-          {color: "#FF000030", range: [30, 60]},
-          {color: "#FFFF0030", range: [60, 90]},
-          {color: "#00800030", range: [90, 100]}
+          {color: INDICATOR_GAUGE_BACKGROUND_COLOR, range: [0, 100]}
         ]
       }
     };
@@ -136,13 +135,11 @@ describe("graphTraceEditor", () => {
     expect(nextTrace.gauge).toEqual({
       shape: "angular",
       axis: {range: [0, 100]},
+      bgcolor: INDICATOR_GAUGE_BACKGROUND_COLOR,
       bar: {color: "#d62728"},
       borderwidth: 0,
       steps: [
-        {color: "#80000030", range: [0, 30]},
-        {color: "#FF000030", range: [30, 60]},
-        {color: "#FFFF0030", range: [60, 90]},
-        {color: "#00800030", range: [90, 100]}
+        {color: INDICATOR_GAUGE_BACKGROUND_COLOR, range: [0, 100]}
       ]
     });
   });
@@ -329,16 +326,22 @@ describe("graphTraceEditor", () => {
         axis: {
           range: [0, 100]
         },
+        bgcolor: INDICATOR_GAUGE_BACKGROUND_COLOR,
         bar: {
           color: "#1f77b4"
         },
         borderwidth: 0,
         steps: [
-          {color: "#80000030", range: [0, 30]},
-          {color: "#FF000030", range: [30, 60]},
-          {color: "#FFFF0030", range: [60, 90]},
-          {color: "#00800030", range: [90, 100]}
-        ]
+          {color: INDICATOR_GAUGE_BACKGROUND_COLOR, range: [0, 100]}
+        ],
+        threshold: {
+          line: {
+            color: "red",
+            width: 2
+          },
+          thickness: 0.75,
+          value: 0
+        }
       }
     });
   });
@@ -366,6 +369,40 @@ describe("graphTraceEditor", () => {
     expect(updateIndicatorValue(trace, "150")).toEqual(trace);
     expect(updateIndicatorValue(trace, "-5")).toEqual(trace);
     expect(updateIndicatorValue(trace, "1.")).toEqual(trace);
+  });
+
+  it("syncs the indicator threshold value when the indicator value changes", () => {
+    const trace: Record<string, unknown> = {
+      type: "indicator",
+      value: 68,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"},
+        borderwidth: 0,
+        threshold: {
+          line: {color: "red", width: 2},
+          thickness: 0.75,
+          value: 90
+        }
+      }
+    };
+
+    expect(updateIndicatorValue(trace, "72")).toEqual({
+      type: "indicator",
+      value: 72,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"},
+        borderwidth: 0,
+        threshold: {
+          line: {color: "red", width: 2},
+          thickness: 0.75,
+          value: 72
+        }
+      }
+    });
   });
 
   it("renames traces and clears names when blank input is provided", () => {

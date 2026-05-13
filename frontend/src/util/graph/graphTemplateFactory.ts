@@ -14,13 +14,12 @@ export const TRACE_COLOR_OPTIONS: Record<string, string> = {
 
 export const INDICATOR_VALUE_MIN = 0;
 export const INDICATOR_VALUE_MAX = 100;
+export const INDICATOR_GAUGE_BACKGROUND_COLOR = "#6b728040";
+export const INDICATOR_THRESHOLD_COLOR = "red";
 
 const DEFAULT_TRACE_COLOR = Object.values(TRACE_COLOR_OPTIONS)[0];
 const INDICATOR_GAUGE_STEPS = [
-  {color: "#80000030", range: [0, 30] as const},
-  {color: "#FF000030", range: [30, 60] as const},
-  {color: "#FFFF0030", range: [60, 90] as const},
-  {color: "#00800030", range: [90, 100] as const}
+  {color: INDICATOR_GAUGE_BACKGROUND_COLOR, range: [0, 100] as const}
 ] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -68,6 +67,7 @@ const indicatorTraceSchema = z.object({
     axis: z.object({
       range: z.tuple([z.literal(INDICATOR_VALUE_MIN), z.literal(INDICATOR_VALUE_MAX)])
     }),
+    bgcolor: z.string(),
     bar: z.object({
       color: z.string()
     }),
@@ -75,7 +75,15 @@ const indicatorTraceSchema = z.object({
     steps: z.array(z.object({
       color: z.string(),
       range: z.tuple([z.number().finite(), z.number().finite()])
-    }))
+    })),
+    threshold: z.object({
+      line: z.object({
+        color: z.string(),
+        width: z.number().finite()
+      }),
+      thickness: z.number().finite(),
+      value: z.number().finite().min(INDICATOR_VALUE_MIN).max(INDICATOR_VALUE_MAX)
+    })
   })
 });
 
@@ -151,6 +159,7 @@ export const createIndicatorTraceTemplate = (traceName: string): Record<string, 
       axis: {
         range: [0, 100]
       },
+      bgcolor: INDICATOR_GAUGE_BACKGROUND_COLOR,
       bar: {
         color: DEFAULT_TRACE_COLOR
       },
@@ -158,7 +167,15 @@ export const createIndicatorTraceTemplate = (traceName: string): Record<string, 
       steps: INDICATOR_GAUGE_STEPS.map((step) => ({
         color: step.color,
         range: [...step.range]
-      }))
+      })),
+      threshold: {
+        line: {
+          color: INDICATOR_THRESHOLD_COLOR,
+          width: 2
+        },
+        thickness: 0.75,
+        value: 0
+      }
     }
   });
 

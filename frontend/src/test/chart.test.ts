@@ -66,6 +66,62 @@ describe("Chart helpers", () => {
     });
   });
 
+  it("syncs indicator threshold values to the current indicator value before rendering", async () => {
+    const react = vi.fn().mockResolvedValue(undefined);
+    const plotly = {react} as unknown as {react: (...args: unknown[]) => Promise<unknown>};
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+    const data = [{
+      type: "indicator",
+      value: 68,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"},
+        threshold: {
+          line: {color: "red", width: 2},
+          thickness: 0.75,
+          value: 90
+        }
+      }
+    }];
+
+    await renderPlotlyChart(
+      plotly as any,
+      element,
+      data
+    );
+
+    const [, calledData] = react.mock.calls[0];
+    expect(calledData).toEqual([{
+      type: "indicator",
+      value: 68,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"},
+        threshold: {
+          line: {color: "red", width: 2},
+          thickness: 0.75,
+          value: 68
+        }
+      }
+    }]);
+    expect(data[0]).toEqual({
+      type: "indicator",
+      value: 68,
+      gauge: {
+        shape: "angular",
+        axis: {range: [0, 100]},
+        bar: {color: "#1f77b4"},
+        threshold: {
+          line: {color: "red", width: 2},
+          thickness: 0.75,
+          value: 90
+        }
+      }
+    });
+  });
+
   it("sorts scatter date-series points chronologically before rendering", async () => {
     const react = vi.fn().mockResolvedValue(undefined);
     const plotly = {react} as unknown as {react: (...args: unknown[]) => Promise<unknown>};
