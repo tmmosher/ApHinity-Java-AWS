@@ -1,9 +1,12 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -59,38 +62,7 @@ final class LocationDashboardHistoricalDataAssembler {
                 graphDefinition.title(),
                 LocationDashboardGraphMetadataSupport.readGraphLayoutTitleText(effectiveGraph)
             );
-            for (Map<String, Object> trace : LocationDashboardGraphMetadataSupport.currentTraceList(effectiveGraph)) {
-                String measurementName = traceName(trace);
-                List<?> xValues = LocationDashboardGraphMetadataSupport.asList(trace.get("x"));
-                List<?> customDataValues = LocationDashboardGraphMetadataSupport.asList(trace.get("customdata"));
-                for (int index = 0; index < xValues.size(); index += 1) {
-                    LocalDate observedDate = LocationDashboardGraphMetadataSupport.parseLocalDate(xValues.get(index));
-                    if (observedDate == null) {
-                        continue;
-                    }
-                    Map<String, Object> pointMetadata = index < customDataValues.size()
-                        ? LocationDashboardGraphMetadataSupport.asMap(customDataValues.get(index))
-                        : Map.of();
-                    long sampleCount = LocationDashboardGraphMetadataSupport.asLong(pointMetadata.get("sampleCount"));
-                    long compliantCount = LocationDashboardGraphMetadataSupport.asLong(pointMetadata.get("compliantCount"));
-                    if (sampleCount <= 0L) {
-                        continue;
-                    }
-
-                    String sampleIdentity = observedDate
-                        + "|"
-                        + LocationDashboardGraphMetadataSupport.nullSafeNormalized(facilityName)
-                        + "|"
-                        + LocationDashboardGraphMetadataSupport.nullSafeNormalized(measurementName);
-                    samplePointsByIdentity.put(sampleIdentity, new LocationDashboardDerivedGraphSupport.HistoricalSamplePoint(
-                        observedDate,
-                        facilityName,
-                        measurementName,
-                        sampleCount,
-                        Math.max(0L, Math.min(compliantCount, sampleCount))
-                    ));
-                }
-            }
+            collectPersistedSamplePoints(samplePointsByIdentity, effectiveGraph, facilityName);
         }
 
         mergeImportedObservationSamplePoints(samplePointsByIdentity, importedObservations);
@@ -113,12 +85,104 @@ final class LocationDashboardHistoricalDataAssembler {
         return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(samplesByDate, correctiveActions);
     }
 
-    private String traceName(Map<String, Object> trace) {
-        Object rawName = trace.get("name");
-        if (!(rawName instanceof String traceName) || traceName.isBlank()) {
+    private void collectPersistedSamplePoints(
+        Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity,
+        Graph effectiveGraph,
+        String facilityName
+    ) {
+        if (effectiveGraph == null || effectiveGraph.getGraphTraces() == null) {
+            return;
+        }
+        for (GraphTrace trace : effectiveGraph.getGraphTraces()) {
+            if (!isSupportedHistoricalTrace(trace)) {
+                continue;
+            }
+            String measurementName = traceName(trace);
+            if (measurementName == null || trace.getTimeSeriesPoints() == null) {
+                continue;
+            }
+            List<?> legacyCustomDataValues = validatedLegacyCustomData(trace, trace.getTimeSeriesPoints().size());
+            for (int index = 0; index < trace.getTimeSeriesPoints().size(); index += 1) {
+                GraphTimeSeriesPoint point = trace.getTimeSeriesPoints().get(index);
+                if (point == null) {
+                    continue;
+                }
+                LocalDate observedDate = observedDate(point);
+                if (observedDate == null) {
+                    continue;
+                }
+                Map<String, Object> pointMetadata = pointMetadata(point, legacyCustomDataValues, index);
+                long sampleCount = LocationDashboardGraphMetadataSupport.asLong(pointMetadata.get("sampleCount"));
+                long compliantCount = LocationDashboardGraphMetadataSupport.asLong(pointMetadata.get("compliantCount"));
+                if (sampleCount <= 0L) {
+                    continue;
+                }
+
+                String sampleIdentity = observedDate
+                    + "|"
+                    + LocationDashboardGraphMetadataSupport.nullSafeNormalized(facilityName)
+                    + "|"
+                    + LocationDashboardGraphMetadataSupport.nullSafeNormalized(measurementName);
+                samplePointsByIdentity.put(sampleIdentity, new LocationDashboardDerivedGraphSupport.HistoricalSamplePoint(
+                    observedDate,
+                    facilityName,
+                    measurementName,
+                    sampleCount,
+                    Math.max(0L, Math.min(compliantCount, sampleCount))
+                ));
+            }
+        }
+    }
+
+    private boolean isSupportedHistoricalTrace(GraphTrace trace) {
+        if (trace == null) {
+            return false;
+        }
+        String normalizedTraceType = LocationDashboardGraphMetadataSupport.normalizeKey(trace.getTraceType());
+        String normalizedDataMode = LocationDashboardGraphMetadataSupport.normalizeKey(trace.getDataMode());
+        return (Objects.equals(normalizedTraceType, "scatter") || Objects.equals(normalizedTraceType, "scattergl"))
+            && Objects.equals(normalizedDataMode, "time series");
+    }
+
+    private String traceName(GraphTrace trace) {
+        String traceName = trace == null ? null : trace.getTraceName();
+        if (traceName == null || traceName.isBlank()) {
             return null;
         }
         return traceName;
+    }
+
+    private LocalDate observedDate(GraphTimeSeriesPoint point) {
+        if (point == null) {
+            return null;
+        }
+        Map<String, Object> pointMeta = LocationDashboardGraphMetadataSupport.asMap(point.getPointMeta());
+        LocalDate explicitDate = LocationDashboardGraphMetadataSupport.parseLocalDate(pointMeta.get("x"));
+        if (explicitDate != null) {
+            return explicitDate;
+        }
+        return point.getObservedAt() == null
+            ? null
+            : point.getObservedAt().atZone(ZoneOffset.UTC).toLocalDate();
+    }
+
+    private Map<String, Object> pointMetadata(GraphTimeSeriesPoint point, List<?> legacyCustomDataValues, int pointIndex) {
+        Map<String, Object> pointMeta = LocationDashboardGraphMetadataSupport.asMap(point == null ? null : point.getPointMeta());
+        Map<String, Object> customData = LocationDashboardGraphMetadataSupport.asMap(pointMeta.get("customdata"));
+        if (!customData.isEmpty()) {
+            return customData;
+        }
+        if (pointIndex < 0 || pointIndex >= legacyCustomDataValues.size()) {
+            return Map.of();
+        }
+        Map<String, Object> legacyCustomData = LocationDashboardGraphMetadataSupport.asMap(legacyCustomDataValues.get(pointIndex));
+        return legacyCustomData.isEmpty() ? Map.of() : legacyCustomData;
+    }
+
+    private List<?> validatedLegacyCustomData(GraphTrace trace, int expectedPointCount) {
+        Map<String, Object> traceConfig = LocationDashboardGraphMetadataSupport.asMap(trace == null ? null : trace.getTraceConfig());
+        List<?> customDataValues = LocationDashboardGraphMetadataSupport.asList(traceConfig.get("customdata"));
+        return customDataValues.size() == expectedPointCount ? customDataValues : List.of();
     }
 
     private void mergeImportedObservationSamplePoints(

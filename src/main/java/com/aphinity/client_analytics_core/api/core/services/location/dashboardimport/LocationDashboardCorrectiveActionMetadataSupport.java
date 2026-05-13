@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -18,6 +19,7 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
     private static final String IMPORT_SYSTEM_LABEL = "Import System";
     private static final String IMPORT_POINT_OF_USE_LABEL = "Import Point of Use";
     private static final String IMPORT_BASIS_LABEL = "Import Basis";
+    private static final String IMPORT_SAMPLE_IDENTITY_LABEL = "Import Sample Identity";
 
     private LocationDashboardCorrectiveActionMetadataSupport() {
     }
@@ -54,6 +56,10 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
         return metadataLine(IMPORT_BASIS_LABEL, basis);
     }
 
+    static String sampleIdentityLine(String sampleIdentity) {
+        return metadataLine(IMPORT_SAMPLE_IDENTITY_LABEL, sampleIdentity);
+    }
+
     static Map<String, String> parseStructuredMetadata(String description) {
         if (description == null || description.isBlank()) {
             return Map.of();
@@ -88,6 +94,33 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
         return Map.copyOf(valuesByField);
     }
 
+    static String identityKey(String title, String description) {
+        Map<String, String> metadata = parseStructuredMetadata(description);
+        String measurement = LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("measurement"));
+        String observedAt = LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("observed at"));
+        String facility = LocationDashboardGraphMetadataSupport.normalizeKey(
+            LocationDashboardGraphMetadataSupport.firstNonBlank(
+                metadata.get("sublocation"),
+                metadata.get("facility")
+            )
+        );
+        String building = nullSafeNormalized(metadata.get("building"));
+        String system = LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("system"));
+        if (measurement != null && observedAt != null && facility != null && system != null) {
+            return String.join("|", List.of(
+                measurement,
+                observedAt,
+                facility,
+                building,
+                system,
+                nullSafeNormalized(metadata.get("point of use")),
+                nullSafeNormalized(metadata.get("basis")),
+                nullSafeNormalized(metadata.get("sample identity"))
+            ));
+        }
+        return LocationDashboardGraphMetadataSupport.normalizeKey(title);
+    }
+
     private static String metadataLine(String label, String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -105,6 +138,7 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
             case "import system" -> "system";
             case "import point of use" -> "point of use";
             case "import basis" -> "basis";
+            case "import sample identity" -> "sample identity";
             default -> null;
         };
     }
@@ -121,5 +155,10 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
             case "basis" -> "basis";
             default -> null;
         };
+    }
+
+    private static String nullSafeNormalized(String value) {
+        String normalized = LocationDashboardGraphMetadataSupport.normalizeKey(value);
+        return normalized == null ? "" : normalized;
     }
 }

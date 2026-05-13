@@ -23,7 +23,7 @@ import java.time.LocalTime;
 @Entity
 @Table(name = "service_event")
 public class ServiceEvent {
-    public static final int TITLE_MAX_LENGTH = 42;
+    private static final int TITLE_COLUMN_LENGTH = 1024;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,7 +33,7 @@ public class ServiceEvent {
     @JoinColumn(name = "location_id", nullable = false)
     private Location location;
 
-    @Column(nullable = false, length = TITLE_MAX_LENGTH)
+    @Column(nullable = false, length = TITLE_COLUMN_LENGTH)
     private String title;
 
     @Convert(converter = ServiceEventResponsibilityConverter.class)

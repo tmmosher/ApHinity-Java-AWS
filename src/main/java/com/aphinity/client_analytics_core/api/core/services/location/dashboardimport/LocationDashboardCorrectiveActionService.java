@@ -55,14 +55,14 @@ final class LocationDashboardCorrectiveActionService {
             ServiceEvent existingCorrectiveAction = persistedCorrectiveActions.get(index);
             previewCorrectiveActions.add(copyServiceEvent(existingCorrectiveAction));
             persistedIndexesByTitle.putIfAbsent(
-                LocationDashboardGraphMetadataSupport.normalizeKey(existingCorrectiveAction.getTitle()),
+                correctiveActionIdentity(existingCorrectiveAction.getTitle(), existingCorrectiveAction.getDescription()),
                 index
             );
         }
 
         for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
-            String normalizedTitle = LocationDashboardGraphMetadataSupport.normalizeKey(draft.title());
-            Integer existingIndex = persistedIndexesByTitle.get(normalizedTitle);
+            String correctiveActionIdentity = correctiveActionIdentity(draft.title(), draft.description());
+            Integer existingIndex = persistedIndexesByTitle.get(correctiveActionIdentity);
             if (existingIndex != null) {
                 ServiceEvent previewEvent = previewCorrectiveActions.get(existingIndex);
                 previewEvent.setTitle(draft.title());
@@ -114,6 +114,10 @@ final class LocationDashboardCorrectiveActionService {
             measurementName,
             serviceEvent
         );
+    }
+
+    private String correctiveActionIdentity(String title, String description) {
+        return LocationDashboardCorrectiveActionMetadataSupport.identityKey(title, description);
     }
 
     private ServiceEventStatus resolveImportedCorrectiveActionStatus(LocalDate observedDate) {

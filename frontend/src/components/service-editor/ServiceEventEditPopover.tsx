@@ -93,7 +93,7 @@ const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
           <Show when={isCorrectiveActionServiceEvent(props.event)}>
             <CorrectiveActionIcon class="size-4 shrink-0 text-warning" />
           </Show>
-          <span class="min-w-0 flex-1 truncate">{props.event.title}</span>
+          <span class="min-w-0 max-w-[42ch] flex-1 truncate">{props.event.title}</span>
         </Popover.Label>
       </div>
 

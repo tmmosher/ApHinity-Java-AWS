@@ -161,13 +161,17 @@ final class LocationDashboardCommentParser {
             }
 
             if (isResultLine(line)) {
+                String rawValue = extractLineValue(line);
+                if (isIgnoredSemanticMeasurementValue(rawValue)) {
+                    continue;
+                }
                 if (currentSample == null && pendingSampleDate != null) {
                     currentSample = new MutableSample();
                     currentSample.sampledOn = pendingSampleDate;
                     pendingSampleDate = null;
                 }
                 if (currentSample != null) {
-                    ParsedMeasurement measurement = parseMeasurementValue(extractLineValue(line));
+                    ParsedMeasurement measurement = parseMeasurementValue(rawValue);
                     if (measurement != null && currentSample.resultRaw == null) {
                         currentSample.resultRaw = measurement.rawValue();
                         currentSample.resultValue = measurement.value();
@@ -479,6 +483,10 @@ final class LocationDashboardCommentParser {
             return new ParsedMeasurement(BigDecimal.ZERO, null, "ND");
         }
 
+        if (isIgnoredSemanticMeasurementValue(cleanedValue)) {
+            return null;
+        }
+
         Matcher matcher = MEASUREMENT_VALUE_PATTERN.matcher(cleanedValue);
         if (!matcher.matches()) {
             return null;
@@ -722,6 +730,16 @@ final class LocationDashboardCommentParser {
         return normalized.startsWith("ticket:")
             || normalized.startsWith("ticket ")
             || normalized.matches("^fcr\\d+.*");
+    }
+
+    private boolean isIgnoredSemanticMeasurementValue(String value) {
+        if (value == null) {
+            return false;
+        }
+        String cleanedValue = value.replace(",", "").strip();
+        return cleanedValue.equalsIgnoreCase("nt")
+            || cleanedValue.equalsIgnoreCase("n.t.")
+            || cleanedValue.equalsIgnoreCase("not tested");
     }
 
     private String extractTicket(String line) {

@@ -1,6 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
@@ -195,6 +197,94 @@ class LocationDashboardImportServiceTest {
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
         verifyNoInteractions(graphRepository, locationRepository);
         verifyNoMoreInteractions(serviceEventRepository);
+    }
+
+    @Test
+    void importLocationDashboardReadsHistoricalSampleCountsFromLegacyTraceLevelCustomData() {
+        LocationDashboardImportService importService = buildImportService();
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
+        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
+        when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
+        when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
+
+        Graph waterQualityGraph = legacyWaterQualityGraph(
+            18L,
+            "Water Quality Compliance",
+            "Newport Beach",
+            "HPC",
+            List.of("2025-07-01", "2025-08-01"),
+            List.of(100.0d, 100.0d),
+            List.of(
+                Map.of("sampleCount", 3, "compliantCount", 3, "nonConformingCount", 0),
+                Map.of("sampleCount", 9, "compliantCount", 9, "nonConformingCount", 0)
+            )
+        );
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples", "#0f766e");
+        Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
+        Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
+        Graph percentConformanceGraph = indicatorGraph(23L, "Percent Conformance");
+        Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality Category");
+        Graph bySystemTypeGraph = barGraph(25L, "Non-Conformances", "By Water System Type");
+        Graph byFacilityGraph = barGraph(26L, "Non-Conformances", "By Facility");
+        Graph statusByFacilityGraph = barGraph(27L, "Non-Conformance Status", "By Facility");
+        Graph turnaroundTimeGraph = barGraph(28L, "Non-Conformance Status", "Turnaround Time");
+
+        List<Graph> graphs = List.of(
+            waterQualityGraph,
+            systemTypeGraph,
+            totalSamplesGraph,
+            totalNonConformancesGraph,
+            resolutionPercentGraph,
+            percentConformanceGraph,
+            byWaterQualityGraph,
+            bySystemTypeGraph,
+            byFacilityGraph,
+            statusByFacilityGraph,
+            turnaroundTimeGraph
+        );
+        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
+            .map(graph -> locationGraph(9L, graph))
+            .toList());
+
+        LocationDashboardImportStrategy.CorrectiveActionDraft importedDraft = strategy.computeImport(workbook, measurementBounds())
+            .correctiveActions()
+            .getFirst();
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(
+                correctiveActionEvent(
+                    location,
+                    501L,
+                    "CA: Historic HPC",
+                    correctiveActionDescription("HPC", LocalDate.parse("2025-07-01"), "Newport Beach", "Cooling Towers", "Historic cleanup"),
+                    LocalDate.parse("2025-07-01"),
+                    LocalDate.parse("2025-07-03"),
+                    LocalTime.NOON,
+                    ServiceEventStatus.COMPLETED
+                ),
+                correctiveActionEvent(
+                    location,
+                    502L,
+                    importedDraft.title(),
+                    importedDraft.description(),
+                    LocalDate.parse("2025-08-01"),
+                    LocalDate.parse("2025-08-01"),
+                    LocalTime.of(23, 59, 59),
+                    ServiceEventStatus.OVERDUE
+                )
+            ));
+
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+
+        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("x"));
+        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 0.0d);
+        assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
     }
 
     @Test
@@ -886,6 +976,52 @@ class LocationDashboardImportServiceTest {
         trace.put("customdata", customData);
         trace.put("mode", "lines+markers");
         return trace;
+    }
+
+    private Graph legacyWaterQualityGraph(
+        Long id,
+        String name,
+        String titleText,
+        String traceName,
+        List<String> x,
+        List<Double> y,
+        List<Map<String, Object>> customData
+    ) {
+        Graph graph = new Graph();
+        graph.setId(id);
+        graph.setName(name);
+        graph.setGraphType("scatter");
+        graph.setLayout(new LinkedHashMap<>(Map.of("title", Map.of("text", titleText))));
+        graph.setConfig(Map.of());
+        graph.setStyle(Map.of());
+        graph.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
+
+        GraphTrace trace = new GraphTrace();
+        trace.setGraph(graph);
+        trace.setTraceKey("trace-0");
+        trace.setTraceName(traceName);
+        trace.setTraceType("scatter");
+        trace.setDataMode("time_series");
+        trace.setTraceOrder(0);
+        trace.setTraceConfig(new LinkedHashMap<>(Map.of(
+            "mode", "lines+markers",
+            "customdata", customData
+        )));
+
+        List<GraphTimeSeriesPoint> points = new java.util.ArrayList<>();
+        for (int index = 0; index < x.size(); index += 1) {
+            GraphTimeSeriesPoint point = new GraphTimeSeriesPoint();
+            point.setGraphTrace(trace);
+            point.setObservedAt(LocalDate.parse(x.get(index)).atStartOfDay().toInstant(ZoneOffset.UTC));
+            point.setPointOrder(index);
+            point.setYNumeric(BigDecimal.valueOf(y.get(index)));
+            point.setPointMeta(Map.of("x", x.get(index)));
+            points.add(point);
+        }
+        trace.setTimeSeriesPoints(points);
+        graph.setGraphTraces(List.of(trace));
+        return graph;
     }
 
     private Graph graph(Long id, String name, String graphType, Map<String, Object> layout, List<Map<String, Object>> data) {

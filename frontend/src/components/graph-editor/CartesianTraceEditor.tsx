@@ -14,6 +14,8 @@ type CartesianTraceEditorProps = {
   yRangeMax: unknown;
   xDrafts: Record<number, string>;
   yDrafts: Record<number, string>;
+  xInputMode?: "decimal";
+  yInputMode?: "decimal";
   yRangeMinDraft?: string;
   yRangeMaxDraft?: string;
   isBusy: boolean;
@@ -99,6 +101,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                   class={"input input-bordered input-sm" + (xDrafts()[rowIndex] !== undefined ? " input-error" : "")}
                   aria-invalid={xDrafts()[rowIndex] !== undefined}
                   type="text"
+                  inputmode={props.xInputMode}
                   placeholder={`${xLabel()} value`}
                   value={xDrafts()[rowIndex] ?? toInputValue(props.xValues[rowIndex])}
                   disabled={props.isBusy}
@@ -108,7 +111,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                   class={"input input-bordered input-sm" + (yDrafts()[rowIndex] !== undefined ? " input-error" : "")}
                   aria-invalid={yDrafts()[rowIndex] !== undefined}
                   type="text"
-                  inputmode="decimal"
+                  inputmode={props.yInputMode}
                   placeholder={`${yLabel()} value`}
                   value={yDrafts()[rowIndex] ?? toInputValue(props.yValues[rowIndex])}
                   disabled={props.isBusy}

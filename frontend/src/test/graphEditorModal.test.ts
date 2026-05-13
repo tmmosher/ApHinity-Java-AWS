@@ -51,6 +51,8 @@ vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
         yRangeMax: props.yRangeMax,
         xDrafts: props.xDrafts,
         yDrafts: props.yDrafts,
+        xInputMode: props.xInputMode,
+        yInputMode: props.yInputMode,
         yRangeMinDraft: props.yRangeMinDraft,
         yRangeMaxDraft: props.yRangeMaxDraft,
         isBusy: props.isBusy,
@@ -168,6 +170,8 @@ const getCartesianTraceEditorProps = () => {
     barOrientation?: "h" | "v";
     xDrafts: Record<number, string>;
     yDrafts: Record<number, string>;
+    xInputMode?: "decimal";
+    yInputMode?: "decimal";
     yRangeMinDraft?: string;
     yRangeMaxDraft?: string;
     onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
@@ -456,6 +460,8 @@ describe("GraphEditorModal trace controls", () => {
       expect(cartesianProps.barOrientation).toBe("h");
       expect(cartesianProps.xLabel).toBe("Value");
       expect(cartesianProps.yLabel).toBe("Category");
+      expect(cartesianProps.xInputMode).toBe("decimal");
+      expect(cartesianProps.yInputMode).toBeUndefined();
 
       cartesianProps.onUpdateBarOrientation?.("v");
       await flushSolidUpdates();
@@ -466,6 +472,74 @@ describe("GraphEditorModal trace controls", () => {
       expect(updatedProps.yValues).toEqual([3, 7]);
       expect(updatedProps.xLabel).toBe("Category");
       expect(updatedProps.yLabel).toBe("Value");
+      expect(updatedProps.xInputMode).toBeUndefined();
+      expect(updatedProps.yInputMode).toBe("decimal");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("accepts string bucket values on the y-axis for horizontal bars", async () => {
+    const barGraph: LocationGraph = {
+      id: 21,
+      name: "Counts",
+      data: [{
+        type: "bar",
+        orientation: "h",
+        x: [3],
+        y: ["North"]
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(barGraph);
+    try {
+      await Promise.resolve();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      cartesianProps.onUpdateY(0, "Irvine");
+      await flushSolidUpdates();
+
+      const updatedProps = getCartesianTraceEditorProps();
+      expect(updatedProps.yValues).toEqual(["Irvine"]);
+      expect(updatedProps.yDrafts[0]).toBeUndefined();
+    } finally {
+      dispose();
+    }
+  });
+
+  it("accepts string bucket values on the x-axis for vertical bars", async () => {
+    const barGraph: LocationGraph = {
+      id: 22,
+      name: "Counts",
+      data: [{
+        type: "bar",
+        orientation: "v",
+        x: ["North"],
+        y: [3]
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(barGraph);
+    try {
+      await Promise.resolve();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      cartesianProps.onUpdateX(0, "Irvine");
+      await flushSolidUpdates();
+
+      const updatedProps = getCartesianTraceEditorProps();
+      expect(updatedProps.xValues).toEqual(["Irvine"]);
+      expect(updatedProps.xDrafts[0]).toBeUndefined();
     } finally {
       dispose();
     }

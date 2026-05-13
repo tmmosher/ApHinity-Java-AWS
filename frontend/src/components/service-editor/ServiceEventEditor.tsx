@@ -3,7 +3,6 @@ import type {AccountRole, CreateLocationServiceEventRequest} from "../../types/T
 import {
   canChooseServiceEventResponsibility,
   createLocationServiceEventRequestFromDraft,
-  SERVICE_EVENT_TITLE_MAX_LENGTH,
   type ServiceEventDraft
 } from "../../util/location/serviceEventForm";
 
@@ -53,7 +52,6 @@ const ServiceEventTextFields = (props: Pick<ServiceEventFormFieldsProps, "draft"
         type="text"
         class="input input-bordered w-full"
         value={props.draft.title}
-        maxLength={SERVICE_EVENT_TITLE_MAX_LENGTH}
         disabled={props.isSaving}
         onInput={(event) => props.updateDraft("title", event.currentTarget.value)}
       />

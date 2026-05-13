@@ -12,6 +12,7 @@ import type { EditableGraphPayload } from "./graphEditor";
 export type {TraceType};
 export const AUTO_SIZE_TRACE_FLAG = "autoSize";
 export type BarOrientation = "h" | "v";
+export type CartesianAxisValueMode = "auto" | "numeric" | "categorical";
 
 export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
   pie: "pie",
@@ -112,6 +113,21 @@ export const getBarOrientation = (
   }
 
   return "h";
+};
+
+export const getCartesianAxisValueMode = (
+  trace: Record<string, unknown>,
+  axis: "x" | "y"
+): CartesianAxisValueMode => {
+  if (getTraceType(trace) !== "bar") {
+    return axis === "y" ? "numeric" : "auto";
+  }
+
+  const orientation = getBarOrientation(trace);
+  if (orientation === "h") {
+    return axis === "x" ? "numeric" : "categorical";
+  }
+  return axis === "x" ? "categorical" : "numeric";
 };
 
 export const isAutoSizingPieTrace = (trace: Record<string, unknown>): boolean =>
@@ -569,10 +585,11 @@ export const addCartesianRow = (trace: Record<string, unknown>): Record<string, 
 export const updateCartesianX = (
   trace: Record<string, unknown>,
   rowIndex: number,
-  rawValue: string
+  rawValue: string,
+  mode: CartesianAxisValueMode = "auto"
 ): Record<string, unknown> => {
   const xValues = getTraceArray(trace, "x");
-  xValues[rowIndex] = coerceInputValue(rawValue, xValues[rowIndex], false);
+  xValues[rowIndex] = coerceCartesianAxisValue(rawValue, xValues[rowIndex], mode);
   return {
     ...trace,
     x: xValues
@@ -582,14 +599,29 @@ export const updateCartesianX = (
 export const updateCartesianY = (
   trace: Record<string, unknown>,
   rowIndex: number,
-  rawValue: string
+  rawValue: string,
+  mode: CartesianAxisValueMode = "numeric"
 ): Record<string, unknown> => {
   const yValues = getTraceArray(trace, "y");
-  yValues[rowIndex] = coerceInputValue(rawValue, yValues[rowIndex], true);
+  yValues[rowIndex] = coerceCartesianAxisValue(rawValue, yValues[rowIndex], mode);
   return {
     ...trace,
     y: yValues
   };
+};
+
+const coerceCartesianAxisValue = (
+  rawValue: string,
+  previousValue: unknown,
+  mode: CartesianAxisValueMode
+): unknown => {
+  if (mode === "categorical") {
+    return rawValue;
+  }
+  if (mode === "numeric") {
+    return coerceInputValue(rawValue, 0, true);
+  }
+  return coerceInputValue(rawValue, previousValue, false);
 };
 
 export const removeCartesianRow = (

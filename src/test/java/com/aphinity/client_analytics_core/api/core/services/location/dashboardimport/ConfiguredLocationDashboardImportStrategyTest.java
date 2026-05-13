@@ -250,6 +250,45 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportDoesNotCreateCorrectiveActionsForCompliantCommentCells() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        5,
+                        "Newport Beach",
+                        "Hospital",
+                        "Cooling Towers",
+                        "Recirc Line",
+                        "CTI/514P",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "9",
+                                new BigDecimal("9"),
+                                "Routine note only",
+                                "F5"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        assertEquals(1, result.observations().size());
+        assertTrue(result.observations().getFirst().compliant());
+        assertEquals(0, result.correctiveActions().size());
+    }
+
+    @Test
     void computeImportUsesWorkbookMetricNamesWhenMeasurementBoundsUseDifferentFormatting() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 

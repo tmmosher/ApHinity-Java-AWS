@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
@@ -455,11 +454,14 @@ public class LocationDashboardSpreadsheetParser {
             for (MetricColumn metricColumn : metricColumns) {
                 Cell cell = row.getCell(metricColumn.columnIndex());
                 String rawValue = blankToNull(normalizeCellText(cell, formatter, evaluator));
-                BigDecimal numericValue = parseMeasurementValue(cell, rawValue, evaluator);
                 String commentText = parseComment(cell);
                 if (rawValue == null && commentText == null) {
                     continue;
                 }
+                if (rawValue != null && isIgnoredSemanticMeasurementValue(rawValue) && commentText == null) {
+                    continue;
+                }
+                BigDecimal numericValue = parseMeasurementValue(cell, rawValue, evaluator);
                 cells.add(new ParsedDashboardCell(
                     metricColumn.metricName(),
                     metricColumn.observedDate(),
@@ -495,12 +497,6 @@ public class LocationDashboardSpreadsheetParser {
         CellType effectiveType = cell.getCellType() == CellType.FORMULA
             ? evaluator.evaluateFormulaCell(cell)
             : cell.getCellType();
-        if (effectiveType == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-            return cell.getDateCellValue()
-                .toInstant()
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate();
-        }
         if (effectiveType == CellType.NUMERIC) {
             CellValue evaluatedCell = cell.getCellType() == CellType.FORMULA ? evaluator.evaluate(cell) : null;
             double numericDate = evaluatedCell == null ? cell.getNumericCellValue() : evaluatedCell.getNumberValue();
@@ -537,6 +533,14 @@ public class LocationDashboardSpreadsheetParser {
         }
 
         String cleanedValue = rawValue.replace(",", "").strip();
+        if (cleanedValue.equalsIgnoreCase("nd")
+            || cleanedValue.equalsIgnoreCase("n.d.")
+            || cleanedValue.equalsIgnoreCase("not detected")) {
+            return BigDecimal.ZERO;
+        }
+        if (isIgnoredSemanticMeasurementValue(cleanedValue)) {
+            return null;
+        }
         Matcher numericTextMatcher = NUMERIC_TEXT_PATTERN.matcher(cleanedValue);
         if (!numericTextMatcher.matches()) {
             return null;
@@ -565,6 +569,16 @@ public class LocationDashboardSpreadsheetParser {
             return "0" + numericPortion;
         }
         return numericPortion;
+    }
+
+    private boolean isIgnoredSemanticMeasurementValue(String value) {
+        if (value == null) {
+            return false;
+        }
+        String cleanedValue = value.replace(",", "").strip();
+        return cleanedValue.equalsIgnoreCase("nt")
+            || cleanedValue.equalsIgnoreCase("n.t.")
+            || cleanedValue.equalsIgnoreCase("not tested");
     }
 
     private String parseComment(Cell cell) {

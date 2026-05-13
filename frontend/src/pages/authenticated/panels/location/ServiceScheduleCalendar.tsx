@@ -218,6 +218,8 @@ const overflowTriggerClass =
 const overflowListItemClass =
   `${calendarInteractiveCardClass} flex flex-col gap-1 px-2 py-1.5 border-base-300/80 bg-base-100 text-base-content`;
 
+const eventTitleClass = "min-w-0 max-w-[42ch] truncate";
+
 const isStagedCalendarEvent = (event: LocationServiceEvent): boolean => (
   "isStaged" in event && event.isStaged === true
 );
@@ -281,7 +283,7 @@ const ServiceEventSegment = (props: ServiceEventSegmentProps) => (
       <ServiceCalendarEventLabel
         event={props.segment.event}
         iconClass="size-3 shrink-0"
-        titleClass="min-w-0 truncate"
+        titleClass={eventTitleClass}
       />
     </Popover.Trigger>
   </ServiceEventEditPopover>
@@ -326,7 +328,7 @@ const HiddenDayEventListItem = (props: {
       <ServiceCalendarEventLabel
         event={props.event}
         iconClass="size-3.5 shrink-0"
-        titleClass="min-w-0 truncate text-xs font-semibold leading-4"
+        titleClass={`${eventTitleClass} text-xs font-semibold leading-4`}
       />
       <span class="truncate text-[10px] font-medium leading-4 text-base-content/60">
         {formatEventDateRange(props.event)}

@@ -5,7 +5,6 @@ import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,11 +12,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.zip.CRC32;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
@@ -119,18 +116,28 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 ? null
                 : resolveFacilityName(currentSublocation, resolvedFacility);
 
-            // A comment on any cell in the row is the row's incident anchor, so do not
-            // auto-generate sibling worksheet-failure actions for the same row.
-            boolean rowHasUsableCommentPayload = row.cells().stream()
-                .anyMatch(cell -> hasUsableCommentPayload(cell.commentText()));
+            Map<LocationDashboardSpreadsheetParser.ParsedDashboardCell, LocationDashboardCommentParser.ParsedComment> parsedCommentsByCell =
+                new LinkedHashMap<>();
+            Set<LocationDashboardSpreadsheetParser.ParsedDashboardCell> anchoredCommentCells = new LinkedHashSet<>();
+            boolean rowHasAnchoredComment = false;
+            for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
+                if (!hasUsableCommentPayload(cell.commentText()) || currentSystemType == null) {
+                    continue;
+                }
+                LocationDashboardCommentParser.ParsedComment parsedComment = parseComment(cell, row);
+                validatePrimaryCommentSample(parsedComment, cell, row);
+                parsedCommentsByCell.put(cell, parsedComment);
+                MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
+                if (shouldCreateAnchoredCorrectiveAction(cell, parsedComment, measurementBound, currentSystemType)) {
+                    anchoredCommentCells.add(cell);
+                    rowHasAnchoredComment = true;
+                }
+            }
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
-                LocationDashboardCommentParser.ParsedComment parsedCellComment = null;
+                LocationDashboardCommentParser.ParsedComment parsedCellComment = parsedCommentsByCell.get(cell);
                 MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
-                boolean hasUsableCommentPayload = hasUsableCommentPayload(cell.commentText());
-                if (hasUsableCommentPayload && currentSystemType != null) {
-                    parsedCellComment = parseComment(cell, row);
-                    validatePrimaryCommentSample(parsedCellComment, cell, row);
+                if (anchoredCommentCells.contains(cell) && currentSystemType != null) {
                     buildCorrectiveActionDraft(
                         cell,
                         row,
@@ -142,6 +149,8 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                         parsedCellComment,
                         cell.commentText()
                     ).ifPresent(correctiveActions::add);
+                }
+                if (parsedCellComment != null && currentSystemType != null) {
                     correctiveActions.addAll(buildCommentSampleCorrectiveActionDrafts(
                         cell,
                         row,
@@ -191,7 +200,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     observations,
                     aggregationsByGraphId
                 );
-                if (!compliant && !hasUsableCommentPayload && !rowHasUsableCommentPayload) {
+                if (!compliant && parsedCellComment == null && !rowHasAnchoredComment) {
                     buildSyntheticCorrectiveActionDraft(
                         cell,
                         row,
@@ -270,6 +279,31 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                     + ": structured comment primary sample result does not match the worksheet cell."
             );
         }
+    }
+
+    private boolean shouldCreateAnchoredCorrectiveAction(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        MeasurementBound measurementBound,
+        SystemTypeConfig systemType
+    ) {
+        if (cell == null || measurementBound == null || systemType == null) {
+            return false;
+        }
+        BigDecimal anchoredResult = anchoredCorrectiveActionResultValue(cell, parsedComment);
+        return anchoredResult != null && !systemType.rangeProfile().isCompliant(anchoredResult, measurementBound);
+    }
+
+    private BigDecimal anchoredCorrectiveActionResultValue(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardCommentParser.ParsedComment parsedComment
+    ) {
+        if (parsedComment != null
+            && parsedComment.primarySample() != null
+            && parsedComment.primarySample().resultValue() != null) {
+            return parsedComment.primarySample().resultValue();
+        }
+        return cell == null ? null : cell.numericValue();
     }
 
     private LocationDashboardImportStrategyConfig validate(LocationDashboardImportStrategyConfig rawConfig) {
@@ -650,7 +684,8 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             resolvedBuilding,
             systemTypeName,
             row.pointOfUse(),
-            row.basis()
+            row.basis(),
+            null
         );
         List<String> commentLines = buildCommentDescriptionLines(parsedComment, rawCommentText);
         if (!commentLines.isEmpty()) {
@@ -660,11 +695,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
 
         String title = buildCorrectiveActionTitle(
             cell.metricName(),
-            cell.observedDate(),
-            sublocation == null ? null : sublocation.key(),
-            systemType == null ? null : systemType.key(),
-            row.pointOfUse(),
-            row.basis()
+            cell.observedDate()
         );
         return java.util.Optional.of(new CorrectiveActionDraft(
             cell.observedDate(),
@@ -767,21 +798,15 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             resolvedBuilding,
             systemTypeName,
             row.pointOfUse(),
-            row.basis()
+            row.basis(),
+            null
         );
         descriptionLines.add("");
         descriptionLines.add("Note: Imported from an out-of-spec worksheet sample without cell comment metadata.");
 
         return java.util.Optional.of(new CorrectiveActionDraft(
             cell.observedDate(),
-            buildSyntheticCorrectiveActionTitle(
-                measurementName,
-                cell.observedDate(),
-                sublocation == null ? null : sublocation.key(),
-                systemType == null ? null : systemType.key(),
-                row.pointOfUse(),
-                row.basis()
-            ),
+            buildSyntheticCorrectiveActionTitle(measurementName, cell.observedDate()),
             String.join("\n", descriptionLines),
             facilityName,
             systemTypeName,
@@ -1110,7 +1135,8 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             resolvedBuilding,
             systemTypeName,
             row.pointOfUse(),
-            row.basis()
+            row.basis(),
+            sampleIdentity
         );
         List<String> commentLines = buildCommentSampleDescriptionLines(parsedComment, sampleLabel, sample);
         if (!commentLines.isEmpty()) {
@@ -1121,13 +1147,9 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         return new CorrectiveActionDraft(
             sample.sampledOn(),
             buildSupplementalCorrectiveActionTitle(
-                cell.metricName(),
+                measurementName,
                 sample.sampledOn(),
-                sublocation == null ? null : sublocation.key(),
-                systemType == null ? null : systemType.key(),
-                row.pointOfUse(),
-                row.basis(),
-                sampleIdentity
+                sampleLabel
             ),
             String.join("\n", descriptionLines),
             facilityName,
@@ -1144,7 +1166,8 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         String resolvedBuilding,
         String systemTypeName,
         String pointOfUse,
-        String basis
+        String basis,
+        String sampleIdentity
     ) {
         List<String> descriptionLines = new ArrayList<>();
         addDescriptionLine(
@@ -1190,70 +1213,35 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 LocationDashboardCorrectiveActionMetadataSupport.basisLine(basis)
             );
         }
+        if (sampleIdentity != null) {
+            addDescriptionLine(
+                descriptionLines,
+                LocationDashboardCorrectiveActionMetadataSupport.sampleIdentityLine(sampleIdentity)
+            );
+        }
         return descriptionLines;
     }
 
     private String buildCorrectiveActionTitle(
         String metricName,
-        LocalDate observedDate,
-        String sublocationKey,
-        String systemKey,
-        String pointOfUse,
-        String basis
+        LocalDate observedDate
     ) {
-        String abbreviatedMetricName = abbreviate(metricName, 16);
-        String fingerprint = buildFingerprint(String.join("|", List.of(
-            nullSafe(metricName),
-            nullSafe(String.valueOf(observedDate)),
-            nullSafe(sublocationKey),
-            nullSafe(systemKey),
-            nullSafe(pointOfUse),
-            nullSafe(basis)
-        )));
-        return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+        return readableCorrectiveActionTitle(metricName, observedDate, null);
     }
 
     private String buildSyntheticCorrectiveActionTitle(
         String metricName,
-        LocalDate observedDate,
-        String sublocationKey,
-        String systemKey,
-        String pointOfUse,
-        String basis
+        LocalDate observedDate
     ) {
-        String abbreviatedMetricName = abbreviate(metricName, 16);
-        String fingerprint = buildFingerprint(String.join("|", List.of(
-            nullSafe(metricName),
-            nullSafe(String.valueOf(observedDate)),
-            nullSafe(sublocationKey),
-            nullSafe(systemKey),
-            nullSafe(pointOfUse),
-            nullSafe(basis),
-            "worksheet-sample"
-        )));
-        return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+        return readableCorrectiveActionTitle(metricName, observedDate, null);
     }
 
     private String buildSupplementalCorrectiveActionTitle(
         String metricName,
         LocalDate observedDate,
-        String sublocationKey,
-        String systemKey,
-        String pointOfUse,
-        String basis,
-        String sampleIdentity
+        String sampleLabel
     ) {
-        String abbreviatedMetricName = abbreviate(metricName, 16);
-        String fingerprint = buildFingerprint(String.join("|", List.of(
-            nullSafe(metricName),
-            nullSafe(String.valueOf(observedDate)),
-            nullSafe(sublocationKey),
-            nullSafe(systemKey),
-            nullSafe(pointOfUse),
-            nullSafe(basis),
-            nullSafe(sampleIdentity)
-        )));
-        return "CA: " + abbreviatedMetricName + " " + observedDate + " " + fingerprint;
+        return readableCorrectiveActionTitle(metricName, observedDate, sampleLabel);
     }
 
     private String buildCommentSampleIdentity(
@@ -1274,22 +1262,13 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
     }
 
-    private String buildFingerprint(String rawIdentity) {
-        CRC32 crc32 = new CRC32();
-        byte[] bytes = rawIdentity.getBytes(StandardCharsets.UTF_8);
-        crc32.update(bytes, 0, bytes.length);
-        return String.format(Locale.ROOT, "%04X", crc32.getValue() & 0xFFFF);
-    }
-
-    private String abbreviate(String rawValue, int maxLength) {
-        if (rawValue == null) {
-            return "Comment";
-        }
-        String normalized = rawValue.strip();
-        if (normalized.length() <= maxLength) {
-            return normalized;
-        }
-        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
+    private String readableCorrectiveActionTitle(String metricName, LocalDate observedDate, String suffix) {
+        String normalizedMetricName = metricName == null || metricName.isBlank() ? "Comment" : metricName.strip();
+        String normalizedDate = observedDate == null ? "undated" : observedDate.toString();
+        String normalizedSuffix = suffix == null || suffix.isBlank() ? null : suffix.strip();
+        return normalizedSuffix == null
+            ? "CA: " + normalizedMetricName + " " + normalizedDate
+            : "CA: " + normalizedMetricName + " " + normalizedDate + " " + normalizedSuffix;
     }
 
     private List<String> formatCommentLines(String rawCommentText) {
@@ -1477,7 +1456,10 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     private List<CorrectiveActionDraft> deduplicateCorrectiveActions(List<CorrectiveActionDraft> drafts) {
         Map<String, CorrectiveActionDraft> draftsByIdentity = new LinkedHashMap<>();
         for (CorrectiveActionDraft draft : drafts) {
-            String identity = draft.observedDate() + "|" + normalizeKey(draft.title());
+            String identity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+                draft.title(),
+                draft.description()
+            );
             draftsByIdentity.putIfAbsent(identity, draft);
         }
         return List.copyOf(draftsByIdentity.values());

@@ -2,6 +2,7 @@ import {describe, expect, it} from "vitest";
 import type {LocationServiceEvent} from "../types/Types";
 import {
   canCreateCorrectiveActionForSourceEvent,
+  createCorrectiveActionTitle,
   isCorrectiveActionServiceEvent
 } from "../util/location/serviceEventCorrectiveAction";
 
@@ -48,5 +49,11 @@ describe("serviceEventCorrectiveAction", () => {
 
   it("allows partners to create corrective actions for partner-responsibility events", () => {
     expect(canCreateCorrectiveActionForSourceEvent("partner", baseEvent({responsibility: "partner"}))).toBe(true);
+  });
+
+  it("preserves long source titles when generating corrective-action titles", () => {
+    const longSourceTitle = "Preventive maintenance follow-up with extended notes and sample date";
+
+    expect(createCorrectiveActionTitle(longSourceTitle)).toBe(`Corrective Action: ${longSourceTitle}`);
   });
 });

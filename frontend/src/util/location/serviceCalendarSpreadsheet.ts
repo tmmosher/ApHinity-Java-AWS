@@ -4,7 +4,7 @@ import type {
   ServiceEventResponsibility,
   ServiceEventStatus
 } from "../../types/Types";
-import {SERVICE_EVENT_TITLE_MAX_LENGTH, canChooseServiceEventResponsibility} from "./serviceEventForm";
+import {canChooseServiceEventResponsibility} from "./serviceEventForm";
 import {
   getFirstWorksheetFromWorkbook,
   isEmptyXlsxRow as isEmptySpreadsheetRow,
@@ -190,9 +190,6 @@ const parseSpreadsheetRow = (
   const title = normalizeCellString(row.Title);
   if (!title) {
     throw new Error(`Row ${rowNumber}: Title is required.`);
-  }
-  if (title.length > SERVICE_EVENT_TITLE_MAX_LENGTH) {
-    throw new Error(`Row ${rowNumber}: Title must be 42 characters or fewer.`);
   }
 
   const description = normalizeCellString(row.Description);

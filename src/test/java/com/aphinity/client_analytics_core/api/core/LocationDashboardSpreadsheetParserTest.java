@@ -121,6 +121,21 @@ class LocationDashboardSpreadsheetParserTest {
     }
 
     @Test
+    void parseCoercesNdToZeroAndSkipsNtCells() throws IOException {
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ndWorkbook = parser.parse(
+            createSemanticValueWorkbook("ND")
+        );
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell ndCell = ndWorkbook.rows().getFirst().cells().getFirst();
+        assertEquals("ND", ndCell.rawValue());
+        assertEquals(new BigDecimal("0"), ndCell.numericValue());
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ntWorkbook = parser.parse(
+            createSemanticValueWorkbook("NT")
+        );
+        assertTrue(ntWorkbook.rows().getFirst().cells().isEmpty());
+    }
+
+    @Test
     void parseReadsMigratedStructuredCommentsFromDataUploadWorkbook() throws IOException {
         MockMultipartFile file = new MockMultipartFile(
             "file",
@@ -480,6 +495,50 @@ class LocationDashboardSpreadsheetParserTest {
             dataRow.createCell(3).setCellValue("Recirc Line");
             dataRow.createCell(4).setCellValue("CTI/514P");
             dataRow.createCell(5).setCellValue("<.05");
+
+            workbook.write(outputStream);
+            return new MockMultipartFile(
+                "file",
+                "dashboard.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                outputStream.toByteArray()
+            );
+        }
+    }
+
+    private MockMultipartFile createSemanticValueWorkbook(String value) throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Dashboard");
+
+            Row metricRow = sheet.createRow(0);
+            metricRow.createCell(5).setCellValue("HPC");
+
+            Row titleRow = sheet.createRow(1);
+            titleRow.createCell(0).setCellValue("Newport Beach");
+
+            Row dateRow = sheet.createRow(2);
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("m/d/yyyy"));
+            Cell dateCell = dateRow.createCell(5);
+            dateCell.setCellValue(java.sql.Date.valueOf(LocalDate.parse("2025-08-01")));
+            dateCell.setCellStyle(dateStyle);
+
+            Row headerRow = sheet.createRow(3);
+            headerRow.createCell(0).setCellValue("Facility");
+            headerRow.createCell(1).setCellValue("Bldg");
+            headerRow.createCell(2).setCellValue("System");
+            headerRow.createCell(3).setCellValue("Point of Use");
+            headerRow.createCell(4).setCellValue("Basis");
+
+            Row dataRow = sheet.createRow(4);
+            dataRow.createCell(0).setCellValue("Newport Beach");
+            dataRow.createCell(1).setCellValue("Hospital");
+            dataRow.createCell(2).setCellValue("Cooling Towers");
+            dataRow.createCell(3).setCellValue("Recirc Line");
+            dataRow.createCell(4).setCellValue("CTI/514P");
+            dataRow.createCell(5).setCellValue(value);
 
             workbook.write(outputStream);
             return new MockMultipartFile(

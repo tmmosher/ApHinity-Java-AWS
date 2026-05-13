@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.services.servicecalendar;
 
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
-import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
@@ -215,9 +214,6 @@ public class ServiceCalendarSpreadsheetParser {
 
         if (title.isBlank()) {
             throw rowInvalid(rowNumber, "Title is required.");
-        }
-        if (title.length() > ServiceEvent.TITLE_MAX_LENGTH) {
-            throw rowInvalid(rowNumber, "Title must be 42 characters or fewer.");
         }
 
         if (startDate == null) {

@@ -355,9 +355,10 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void createLocationEventRejectsTitleLongerThanFortyTwoCharacters() throws Exception {
+    void createLocationEventAllowsTitleLongerThanFortyTwoCharacters() throws Exception {
         createUser("partner-events-invalid-title@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Chandler");
+        String longTitle = "1234567890123456789012345678901234567890123";
 
         AuthCookies authCookies = loginAndCaptureCookies("partner-events-invalid-title@example.com", PASSWORD);
 
@@ -368,21 +369,20 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                     .contentType(APPLICATION_JSON)
                     .content("""
                         {
-                          "title": "1234567890123456789012345678901234567890123",
+                          "title": "%s",
                           "responsibility": "partner",
                           "date": "2026-04-10",
                           "time": "08:45:00",
                           "endDate": "2026-04-10",
                           "endTime": "17:15:00",
-                          "description": "Should fail title validation",
+                          "description": "Should preserve the full title",
                           "status": "upcoming"
                         }
-                        """)
+                        """.formatted(longTitle))
             )
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("validation_failed"))
-            .andExpect(jsonPath("$.message").value("Validation failed"))
-            .andExpect(jsonPath("$.fieldErrors.title").value("invalid_length"));
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.title").value(longTitle))
+            .andExpect(jsonPath("$.description").value("Should preserve the full title"));
     }
 
     @Test

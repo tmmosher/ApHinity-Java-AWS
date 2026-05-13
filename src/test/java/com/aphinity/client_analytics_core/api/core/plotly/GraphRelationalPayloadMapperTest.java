@@ -38,6 +38,35 @@ class GraphRelationalPayloadMapperTest {
     }
 
     @Test
+    void setDataPreservesTimeSeriesCustomDataOnPoints() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "scatter",
+            "name", "Live",
+            "x", List.of("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"),
+            "y", List.of(10, 20),
+            "customdata", List.of(
+                Map.of("sampleCount", 1, "compliantCount", 1),
+                Map.of("sampleCount", 2, "compliantCount", 1)
+            )
+        )));
+
+        GraphTrace trace = graph.getGraphTraces().getFirst();
+        assertEquals("time_series", trace.getDataMode());
+        assertEquals(2, trace.getTimeSeriesPoints().size());
+        assertEquals(
+            Map.of("sampleCount", 1L, "compliantCount", 1L),
+            trace.getTimeSeriesPoints().getFirst().getPointMeta().get("customdata")
+        );
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(List.of(
+            Map.of("sampleCount", 1L, "compliantCount", 1L),
+            Map.of("sampleCount", 2L, "compliantCount", 1L)
+        ), traces.getFirst().get("customdata"));
+    }
+
+    @Test
     void getDataReturnsEmptyListWhenGraphHasNoTraces() {
         Graph graph = new Graph();
 

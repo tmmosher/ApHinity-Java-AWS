@@ -5,6 +5,7 @@ import {
   coerceInputValue,
   createTrace,
   getBarOrientation,
+  getCartesianAxisValueMode,
   getPieRowColor,
   getTraceYAxisRange,
   isAutoSizingPieTrace,
@@ -16,6 +17,8 @@ import {
   getTraceColor,
   setTraceColor,
   swapCartesianLayoutAxes,
+  updateCartesianX,
+  updateCartesianY,
   updateTraceYAxisRange,
   updatePieValue,
   updateIndicatorValue
@@ -230,6 +233,61 @@ describe("graphTraceEditor", () => {
     expect(horizontal.yaxis).toBe("y3");
     expect(horizontal.x).toEqual([3, 5]);
     expect(horizontal.y).toEqual(["Jan", "Feb"]);
+  });
+
+  it("derives numeric and categorical bar axes from the orientation", () => {
+    expect(getCartesianAxisValueMode({
+      type: "bar",
+      orientation: "h",
+      x: [3],
+      y: ["North"]
+    }, "x")).toBe("numeric");
+    expect(getCartesianAxisValueMode({
+      type: "bar",
+      orientation: "h",
+      x: [3],
+      y: ["North"]
+    }, "y")).toBe("categorical");
+    expect(getCartesianAxisValueMode({
+      type: "bar",
+      orientation: "v",
+      x: ["North"],
+      y: [3]
+    }, "x")).toBe("categorical");
+    expect(getCartesianAxisValueMode({
+      type: "bar",
+      orientation: "v",
+      x: ["North"],
+      y: [3]
+    }, "y")).toBe("numeric");
+  });
+
+  it("preserves categorical bucket text and coerces numeric bar values by axis mode", () => {
+    const horizontal = updateCartesianY(
+      {
+        type: "bar",
+        orientation: "h",
+        x: [0],
+        y: [""]
+      },
+      0,
+      "Irvine",
+      "categorical"
+    );
+    expect(horizontal.y).toEqual(["Irvine"]);
+
+    const vertical = updateCartesianX(
+      {
+        type: "bar",
+        orientation: "h",
+        x: [""],
+        y: [""]
+      },
+      0,
+      "5",
+      "numeric"
+    );
+    expect(vertical.x).toEqual([5]);
   });
 
   it("creates pie traces with donut defaults", () => {

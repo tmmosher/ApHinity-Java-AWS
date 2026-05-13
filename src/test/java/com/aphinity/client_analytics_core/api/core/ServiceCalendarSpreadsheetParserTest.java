@@ -160,6 +160,19 @@ class ServiceCalendarSpreadsheetParserTest {
     }
 
     @Test
+    void parseAllowsTitlesLongerThanTheOldFrontendLimit() throws IOException {
+        String longTitle = "Preventive maintenance follow-up with extended notes and sample date";
+        MockMultipartFile file = createWorkbook(
+            List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),
+            List.of(longTitle, "", "2026-04-14", "2026-04-14", "09:15", "11:45", "False", "Partner")
+        );
+
+        List<ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow> rows = parser.parse(file);
+
+        assertEquals(longTitle, rows.getFirst().request().title());
+    }
+
+    @Test
     void parseRejectsSpreadsheetsMissingRequiredColumns() throws IOException {
         MockMultipartFile file = createWorkbook(
             List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day"),

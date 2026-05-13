@@ -201,9 +201,11 @@ describe("serviceEventForm helpers", () => {
     }, "client")).toThrowError("Event title is required.");
   });
 
-  it("rejects titles longer than 42 characters", () => {
-    expect(() => createLocationServiceEventRequestFromDraft({
-      title: "1234567890123456789012345678901234567890123",
+  it("preserves titles longer than forty-two characters", () => {
+    const longTitle = "12345678901234567890123456789012345678901234567890";
+
+    const request = createLocationServiceEventRequestFromDraft({
+      title: longTitle,
       description: "",
       responsibility: "client",
       scheduleMode: "timed",
@@ -214,7 +216,9 @@ describe("serviceEventForm helpers", () => {
       allDayStartDate: "2026-04-01",
       allDayEndDate: "2026-04-02",
       status: "upcoming"
-    }, "client")).toThrowError("Event title must be 42 characters or fewer.");
+    }, "client");
+
+    expect(request.title).toBe(longTitle);
   });
 
   it("rejects timed ranges that end before they start", () => {

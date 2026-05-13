@@ -18,6 +18,7 @@ import {
   addPieRow,
   buildTraceLabel,
   createTrace,
+  getCartesianAxisValueMode,
   getBarOrientation,
   getPieRowColor,
   getTraceColor,
@@ -379,11 +380,11 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       return;
     }
 
+    const axisValueMode = getCartesianAxisValueMode(trace, "x");
     const currentValue = getTraceArray(trace, "x")[rowIndex];
-    // Numeric X values need the same draft buffer as Y values so the user can
-    // type through invalid intermediate text without mutating the trace.
-    const shouldStageDraft =
-      typeof currentValue === "number" && parseNumericInput(rawValue) === null;
+    const shouldStageDraft = axisValueMode === "numeric"
+      ? parseNumericInput(rawValue) === null
+      : axisValueMode === "auto" && typeof currentValue === "number" && parseNumericInput(rawValue) === null;
 
     if (shouldStageDraft) {
       batch(() => {
@@ -400,12 +401,19 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
 
     batch(() => {
       clearIndexedDraft(setCartesianXDrafts, rowIndex);
-      updateSelectedTrace((currentTrace) => updateCartesianX(currentTrace, rowIndex, rawValue));
+      updateSelectedTrace((currentTrace) => updateCartesianX(currentTrace, rowIndex, rawValue, axisValueMode));
     });
   };
 
   const updateCartesianYValue = (rowIndex: number, rawValue: string) => {
-    if (parseNumericInput(rawValue) === null) {
+    const trace = selectedTrace();
+    if (!trace) {
+      return;
+    }
+
+    const axisValueMode = getCartesianAxisValueMode(trace, "y");
+    const shouldStageDraft = axisValueMode === "numeric" && parseNumericInput(rawValue) === null;
+    if (shouldStageDraft) {
       batch(() => {
         setCartesianYDrafts((current) =>
           current[rowIndex] === rawValue ? current : {
@@ -420,7 +428,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
 
     batch(() => {
       clearIndexedDraft(setCartesianYDrafts, rowIndex);
-      updateSelectedTrace((trace) => updateCartesianY(trace, rowIndex, rawValue));
+      updateSelectedTrace((currentTrace) => updateCartesianY(currentTrace, rowIndex, rawValue, axisValueMode));
     });
   };
 
@@ -891,6 +899,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       barOrientation={selectedBarOrientation() ?? undefined}
                       xDrafts={cartesianXDrafts()}
                       yDrafts={cartesianYDrafts()}
+                      xInputMode={selectedBarOrientation() === "h" ? "decimal" : undefined}
+                      yInputMode={selectedBarOrientation() === "v" ? "decimal" : undefined}
                       yRangeMin={selectedTraceYAxisRange()[0]}
                       yRangeMax={selectedTraceYAxisRange()[1]}
                       yRangeMinDraft={yRangeMinDraft()}
@@ -923,6 +933,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yValues={cartesianYValues()}
                       xDrafts={cartesianXDrafts()}
                       yDrafts={cartesianYDrafts()}
+                      xInputMode={undefined}
+                      yInputMode="decimal"
                       yRangeMin={selectedTraceYAxisRange()[0]}
                       yRangeMax={selectedTraceYAxisRange()[1]}
                       yRangeMinDraft={yRangeMinDraft()}

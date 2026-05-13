@@ -22,6 +22,7 @@ import java.util.Map;
 public final class GraphRelationalPayloadMapper {
     private static final String INTERNAL_X_FIELD = "x";
     private static final String INTERNAL_LABEL_FIELD = "label";
+    private static final String INTERNAL_CUSTOMDATA_FIELD = "customdata";
 
     private GraphRelationalPayloadMapper() {
     }
@@ -118,6 +119,9 @@ public final class GraphRelationalPayloadMapper {
         graphTrace.setTraceOrder(index);
         graphTrace.setDataMode(resolveDataMode(canonicalType, trace));
         Map<String, Object> traceConfig = extractTraceConfig(trace);
+        if (timeSeriesTrace) {
+            traceConfig.remove(INTERNAL_CUSTOMDATA_FIELD);
+        }
         if ("bar".equals(canonicalType)) {
             String explicitBarOrientation = resolveExplicitBarOrientation(trace);
             traceConfig.put("orientation", explicitBarOrientation == null ? "h" : explicitBarOrientation);
@@ -193,11 +197,19 @@ public final class GraphRelationalPayloadMapper {
             case "scatter" -> {
                 List<Object> xValues = new ArrayList<>();
                 List<Object> yValues = new ArrayList<>();
+                List<Object> customDataValues = new ArrayList<>();
+                boolean hasPointCustomData = false;
 
                 if ("time_series".equals(trace.getDataMode())) {
                     for (GraphTimeSeriesPoint point : trace.getTimeSeriesPoints()) {
-                        xValues.add(resolveXValue(point.getPointMeta(), point.getObservedAt()));
+                        Map<String, Object> pointMeta = point.getPointMeta();
+                        xValues.add(resolveXValue(pointMeta, point.getObservedAt()));
                         yValues.add(resolveNumericValue(point.getYNumeric(), point.getYText()));
+                        Object customData = pointMeta == null ? null : pointMeta.get(INTERNAL_CUSTOMDATA_FIELD);
+                        customDataValues.add(normalizeJsonValue(customData));
+                        if (customData != null) {
+                            hasPointCustomData = true;
+                        }
                     }
                 } else {
                     for (GraphCategoryPoint point : trace.getCategoryPoints()) {
@@ -208,6 +220,9 @@ public final class GraphRelationalPayloadMapper {
 
                 result.put("x", List.copyOf(xValues));
                 result.put("y", List.copyOf(yValues));
+                if (hasPointCustomData) {
+                    result.put(INTERNAL_CUSTOMDATA_FIELD, List.copyOf(customDataValues));
+                }
             }
             default -> throw new IllegalArgumentException("Graph data is invalid");
         }
@@ -333,8 +348,12 @@ public final class GraphRelationalPayloadMapper {
     private static void populateTimeSeriesPoints(GraphTrace graphTrace, Map<String, Object> trace) {
         List<?> yValues = requireList(trace, "y");
         List<?> xValues = optionalList(trace, "x");
+        List<?> customDataValues = optionalList(trace, INTERNAL_CUSTOMDATA_FIELD);
         if (xValues == null) {
             xValues = List.of();
+        }
+        if (customDataValues == null) {
+            customDataValues = List.of();
         }
 
         for (int index = 0; index < yValues.size(); index++) {
@@ -349,7 +368,12 @@ public final class GraphRelationalPayloadMapper {
             point.setObservedAt(observedAt);
             point.setPointOrder(index);
             point.setYNumeric(toBigDecimal(number));
-            point.setPointMeta(Map.of(INTERNAL_X_FIELD, rawX));
+            Map<String, Object> pointMeta = new LinkedHashMap<>();
+            pointMeta.put(INTERNAL_X_FIELD, rawX);
+            if (index < customDataValues.size()) {
+                pointMeta.put(INTERNAL_CUSTOMDATA_FIELD, normalizeJsonValue(customDataValues.get(index)));
+            }
+            point.setPointMeta(pointMeta);
         }
         trimPoints(graphTrace.getTimeSeriesPoints(), yValues.size());
     }

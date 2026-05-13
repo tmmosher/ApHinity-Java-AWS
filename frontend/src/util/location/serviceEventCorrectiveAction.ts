@@ -2,17 +2,10 @@ import type {AccountRole, LocationServiceEvent} from "../../types/Types";
 import {
   createServiceEventDraftFromEvent,
   normalizeServiceEventResponsibilityForRole,
-  SERVICE_EVENT_TITLE_MAX_LENGTH,
   type ServiceEventDraft
 } from "./serviceEventForm";
 
 const CORRECTIVE_ACTION_TITLE_PREFIX = "Corrective Action:";
-
-const trimTitleToMaxLength = (value: string): string => (
-  value.length <= SERVICE_EVENT_TITLE_MAX_LENGTH
-    ? value
-    : value.slice(0, SERVICE_EVENT_TITLE_MAX_LENGTH)
-);
 
 export const isCorrectiveActionServiceEvent = (event: LocationServiceEvent): boolean => (
   event.isCorrectiveAction === true
@@ -32,10 +25,9 @@ export const canCreateCorrectiveActionForSourceEvent = (
 
 export const createCorrectiveActionTitle = (sourceTitle: string): string => {
   const normalizedSourceTitle = sourceTitle.trim();
-  const prefixedTitle = normalizedSourceTitle.toLowerCase().startsWith("corrective action:")
+  return normalizedSourceTitle.toLowerCase().startsWith("corrective action:")
     ? normalizedSourceTitle
     : `${CORRECTIVE_ACTION_TITLE_PREFIX} ${normalizedSourceTitle}`;
-  return trimTitleToMaxLength(prefixedTitle);
 };
 
 export const createCorrectiveActionDraftFromSourceEvent = (
