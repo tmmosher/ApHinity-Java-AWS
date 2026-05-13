@@ -152,8 +152,14 @@ public record LocationDashboardImportStrategyConfig(
                 case POTABLE -> measurementBound.getPotableRangeMax();
                 case TOWERS -> measurementBound.getTowersRangeMax();
             };
+            // this only occurs when we have a measurement for something that isn't supposed to be measured.
+            // for a while, this happened with endotoxin readings and utility water. Utility water isn't supposed to be
+            // measured, but it was for about 6 months - and has no determined range for what is valid. For situations like
+            // this, it's better to just pretend it is compliant. Ideally it'd be ignored, but this returns a boolean
+            // and not an optional of a boolean or something, so that isn't really possible. The manual data entry
+            // folks classified it as compliant anyway so
             if (min == null && max == null) {
-                return false;
+                return true;
             }
             if (min != null && numericValue.compareTo(min) < 0) {
                 return false;
