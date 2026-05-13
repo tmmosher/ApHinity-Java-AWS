@@ -1,7 +1,12 @@
 package com.aphinity.client_analytics_core.api.core.services.location.payload;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
+import java.time.format.SignStyle;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -10,6 +15,15 @@ import java.util.Locale;
 import java.util.Map;
 
 final class CartesianTraceDateOrderCanonicalizer {
+    private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
+        .appendValue(ChronoField.YEAR, 4)
+        .appendLiteral('-')
+        .appendValue(ChronoField.MONTH_OF_YEAR, 1, 2, SignStyle.NOT_NEGATIVE)
+        .appendLiteral('-')
+        .appendValue(ChronoField.DAY_OF_MONTH, 1, 2, SignStyle.NOT_NEGATIVE)
+        .toFormatter(Locale.ROOT)
+        .withResolverStyle(ResolverStyle.STRICT);
+
     List<Map<String, Object>> canonicalize(List<Map<String, Object>> traces) {
         if (traces == null || traces.isEmpty()) {
             return List.of();
@@ -113,8 +127,11 @@ final class CartesianTraceDateOrderCanonicalizer {
         }
         String normalized = stringValue.strip();
         try {
-            LocalDate parsed = LocalDate.parse(normalized);
-            return parsed.toString().equals(normalized) ? parsed : null;
+            return LocalDate.parse(normalized);
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return LocalDate.parse(normalized, FLEXIBLE_LOCAL_DATE_FORMATTER);
         } catch (DateTimeParseException ignored) {
             return null;
         }

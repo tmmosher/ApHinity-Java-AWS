@@ -115,6 +115,34 @@ describe("Chart helpers", () => {
     });
   });
 
+  it("sorts scatter date-series points with single-digit month or day before rendering", async () => {
+    const react = vi.fn().mockResolvedValue(undefined);
+    const plotly = {react} as unknown as {react: (...args: unknown[]) => Promise<unknown>};
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+    const data = [{
+      type: "scatter",
+      name: "Utility SPD",
+      x: ["2025-8-1", "2025-07-01", "2025-9-1"],
+      y: [90, 75, 100]
+    }];
+
+    await renderPlotlyChart(
+      plotly as any,
+      element,
+      data,
+      undefined,
+      undefined
+    );
+
+    const [, calledData] = react.mock.calls[0];
+    expect(calledData).toEqual([{
+      type: "scatter",
+      name: "Utility SPD",
+      x: ["2025-07-01", "2025-8-1", "2025-9-1"],
+      y: [75, 90, 100]
+    }]);
+  });
+
   it("purges Plotly state when a chart is torn down", () => {
     const purge = vi.fn();
     const element = {id: "chart-root"} as unknown as HTMLDivElement;

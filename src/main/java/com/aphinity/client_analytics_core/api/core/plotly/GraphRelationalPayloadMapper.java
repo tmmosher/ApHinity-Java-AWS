@@ -9,7 +9,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
+import java.time.format.SignStyle;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +28,14 @@ public final class GraphRelationalPayloadMapper {
     private static final String INTERNAL_X_FIELD = "x";
     private static final String INTERNAL_LABEL_FIELD = "label";
     private static final String INTERNAL_CUSTOMDATA_FIELD = "customdata";
+    private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
+        .appendValue(ChronoField.YEAR, 4)
+        .appendLiteral('-')
+        .appendValue(ChronoField.MONTH_OF_YEAR, 1, 2, SignStyle.NOT_NEGATIVE)
+        .appendLiteral('-')
+        .appendValue(ChronoField.DAY_OF_MONTH, 1, 2, SignStyle.NOT_NEGATIVE)
+        .toFormatter(Locale.ROOT)
+        .withResolverStyle(ResolverStyle.STRICT);
 
     private GraphRelationalPayloadMapper() {
     }
@@ -213,7 +226,7 @@ public final class GraphRelationalPayloadMapper {
                     }
                 } else {
                     for (GraphCategoryPoint point : trace.getCategoryPoints()) {
-                        xValues.add(resolveXValue(point.getPointMeta(), point.getPointOrder()));
+                        xValues.add(resolveCategoricalScatterXValue(point));
                         yValues.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
                     }
                 }
@@ -293,7 +306,9 @@ public final class GraphRelationalPayloadMapper {
             yValues = List.of();
         }
         boolean hasExplicitX = !xValues.isEmpty();
-        boolean barTrace = "bar".equals(resolveCanonicalTraceType(trace));
+        String canonicalType = resolveCanonicalTraceType(trace);
+        boolean barTrace = "bar".equals(canonicalType);
+        boolean scatterTrace = "scatter".equals(canonicalType);
         String explicitBarOrientation = barTrace ? resolveExplicitBarOrientation(trace) : null;
         boolean horizontalBarTrace = barTrace && isHorizontalBarInput(xValues, yValues, explicitBarOrientation);
 
@@ -340,7 +355,12 @@ public final class GraphRelationalPayloadMapper {
             point.setCategoryKey(String.valueOf(rawX));
             point.setCategoryLabel(rawX instanceof String ? (String) rawX : String.valueOf(rawX));
             point.setValueNumeric(toBigDecimal(number));
-            point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, point.getCategoryLabel()));
+            Map<String, Object> pointMeta = new LinkedHashMap<>();
+            pointMeta.put(INTERNAL_LABEL_FIELD, point.getCategoryLabel());
+            if (scatterTrace) {
+                pointMeta.put(INTERNAL_X_FIELD, rawX);
+            }
+            point.setPointMeta(pointMeta);
         }
         trimPoints(graphTrace.getCategoryPoints(), yValues.size());
     }
@@ -643,6 +663,23 @@ public final class GraphRelationalPayloadMapper {
         return fallback;
     }
 
+    private static Object resolveCategoricalScatterXValue(GraphCategoryPoint point) {
+        if (point == null) {
+            return null;
+        }
+        Map<String, Object> pointMeta = point.getPointMeta();
+        if (pointMeta != null && pointMeta.containsKey(INTERNAL_X_FIELD)) {
+            return pointMeta.get(INTERNAL_X_FIELD);
+        }
+        if (point.getCategoryLabel() != null) {
+            return point.getCategoryLabel();
+        }
+        if (point.getCategoryKey() != null) {
+            return point.getCategoryKey();
+        }
+        return point.getPointOrder();
+    }
+
     private static Object resolveLabelValue(GraphCategoryPoint point) {
         if (point.getPointMeta() != null && point.getPointMeta().containsKey(INTERNAL_LABEL_FIELD)) {
             return point.getPointMeta().get(INTERNAL_LABEL_FIELD);
@@ -672,6 +709,12 @@ public final class GraphRelationalPayloadMapper {
             }
             try {
                 return LocalDate.parse(value).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+            } catch (DateTimeParseException ignored) {
+            }
+            try {
+                return LocalDate.parse(value, FLEXIBLE_LOCAL_DATE_FORMATTER)
+                    .atStartOfDay(java.time.ZoneOffset.UTC)
+                    .toInstant();
             } catch (DateTimeParseException ignored) {
             }
         }

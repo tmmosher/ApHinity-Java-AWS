@@ -44,21 +44,40 @@ export const buildPlotlyLayout = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === "object" && !Array.isArray(value);
 
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
 
 const normalizeIsoDateValue = (value: unknown): string | null => {
     if (typeof value !== "string") {
         return null;
     }
     const normalized = value.trim();
-    if (!ISO_DATE_PATTERN.test(normalized)) {
+    const match = ISO_DATE_PATTERN.exec(normalized);
+    if (!match) {
         return null;
     }
-    const parsed = new Date(`${normalized}T00:00:00Z`);
-    if (Number.isNaN(parsed.getTime())) {
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
         return null;
     }
-    return parsed.toISOString().slice(0, 10) === normalized ? normalized : null;
+
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+        Number.isNaN(parsed.getTime()) ||
+        parsed.getUTCFullYear() !== year ||
+        parsed.getUTCMonth() + 1 !== month ||
+        parsed.getUTCDate() !== day
+    ) {
+        return null;
+    }
+
+    return [
+        String(year).padStart(4, "0"),
+        String(month).padStart(2, "0"),
+        String(day).padStart(2, "0")
+    ].join("-");
 };
 
 const toFiniteNumber = (value: unknown): number | null => {

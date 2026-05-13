@@ -5,6 +5,7 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphCateg
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,55 @@ class GraphRelationalPayloadMapperTest {
             Map.of("sampleCount", 1L, "compliantCount", 1L),
             Map.of("sampleCount", 2L, "compliantCount", 1L)
         ), traces.getFirst().get("customdata"));
+    }
+
+    @Test
+    void setDataPreservesScatterDateStringsWithFlexibleLocalDateFormatting() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "scatter",
+            "name", "System Type Compliance",
+            "x", List.of("2025-7-1", "2025-08-01"),
+            "y", List.of(97, 99)
+        )));
+
+        GraphTrace trace = graph.getGraphTraces().getFirst();
+        assertEquals("time_series", trace.getDataMode());
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(List.of("2025-7-1", "2025-08-01"), traces.getFirst().get("x"));
+        assertEquals(List.of(97L, 99L), traces.getFirst().get("y"));
+    }
+
+    @Test
+    void getDataRecoversScatterXValuesFromLegacyCategoricalPointsWithoutPointMetaX() {
+        Graph graph = new Graph();
+        GraphTrace trace = new GraphTrace();
+        trace.setTraceKey("scatter-1");
+        trace.setTraceName("System Type Compliance");
+        trace.setTraceType("scatter");
+        trace.setDataMode("categorical");
+
+        GraphCategoryPoint first = new GraphCategoryPoint();
+        first.setPointOrder(0);
+        first.setCategoryKey("2025-7-1");
+        first.setCategoryLabel("2025-7-1");
+        first.setValueNumeric(BigDecimal.valueOf(97));
+        first.setPointMeta(Map.of("label", "2025-7-1"));
+
+        GraphCategoryPoint second = new GraphCategoryPoint();
+        second.setPointOrder(1);
+        second.setCategoryKey("2025-08-01");
+        second.setCategoryLabel("2025-08-01");
+        second.setValueNumeric(BigDecimal.valueOf(99));
+        second.setPointMeta(Map.of("label", "2025-08-01"));
+
+        trace.setCategoryPoints(new ArrayList<>(List.of(first, second)));
+        graph.setGraphTraces(new ArrayList<>(List.of(trace)));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(List.of("2025-7-1", "2025-08-01"), traces.getFirst().get("x"));
+        assertEquals(List.of(97L, 99L), traces.getFirst().get("y"));
     }
 
     @Test

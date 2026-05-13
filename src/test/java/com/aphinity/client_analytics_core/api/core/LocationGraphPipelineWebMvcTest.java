@@ -460,6 +460,62 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void updateLocationGraphDataPreservesScatterDateStringsWithFlexibleLocalDateFormatting() throws Exception {
+        Long userId = 42L;
+        Long locationId = 78L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(310L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of(
+            "type", "scatter",
+            "name", "Utility SPD",
+            "x", List.of("2025-7-1", "2025-08-01"),
+            "y", List.of(97, 99)
+        )));
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": 310,
+                              "data": [
+                                {
+                                  "type": "scatter",
+                                  "name": "Utility SPD",
+                                  "x": ["2025-7-1", "2025-08-01"],
+                                  "y": [100, 99]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isNoContent());
+
+        verify(graphRepository).saveAll(List.of(graph));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("scatter", traces.getFirst().get("type"));
+        assertEquals(List.of("2025-7-1", "2025-08-01"), traces.getFirst().get("x"));
+        assertEquals(List.of(100L, 99L), traces.getFirst().get("y"));
+        assertEquals("time_series", graph.getGraphTraces().getFirst().getDataMode());
+    }
+
+    @Test
     void updateLocationGraphDataPersistsRenamedAndNewTracesThroughPipeline() throws Exception {
         Long userId = 43L;
         Long locationId = 79L;

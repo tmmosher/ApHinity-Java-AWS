@@ -81,6 +81,44 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateSortsScatterDateSeriesChronologicallyWhenDatesUseSingleDigitMonthOrDay() {
+        Map<String, Object> nextTrace = Map.of(
+            "type", "scatter",
+            "name", "Cooling Towers",
+            "x", List.of("2025-8-1", "2025-07-01", "2025-9-1"),
+            "y", List.of(90, 75, 100),
+            "customdata", List.of(
+                Map.of("sampleCount", 10),
+                Map.of("sampleCount", 8),
+                Map.of("sampleCount", 12)
+            )
+        );
+
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(Map.of(
+                "type", "scatter",
+                "name", "Cooling Towers",
+                "x", List.of("2025-07-01", "2025-08-01"),
+                "y", List.of(75, 90)
+            )),
+            List.of(nextTrace),
+            Map.of()
+        );
+
+        assertEquals(List.of(Map.of(
+            "type", "scatter",
+            "name", "Cooling Towers",
+            "x", List.of("2025-07-01", "2025-8-1", "2025-9-1"),
+            "y", List.of(75, 90, 100),
+            "customdata", List.of(
+                Map.of("sampleCount", 8),
+                Map.of("sampleCount", 10),
+                Map.of("sampleCount", 12)
+            )
+        )), payload.data());
+    }
+
+    @Test
     void validateForUpdateAcceptsLegacyCartesianPayloadsWithoutExplicitXValues() {
         Map<String, Object> storedTrace = Map.of("type", "bar", "y", List.of(1, 2, 3));
         Map<String, Object> nextTrace = Map.of("type", "bar", "y", List.of(4, 5, 6));
