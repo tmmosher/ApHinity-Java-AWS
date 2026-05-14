@@ -38,10 +38,9 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertEquals(4, result.observations().size());
         assertEquals(1, result.observations().stream().filter(observation -> observation.compliant()).count());
-        assertEquals(3, result.correctiveActions().size());
-        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
-            draft.title().startsWith("CA: HPC 2025-08-01")
-                && draft.description().contains("CA: Drain Tank, install new DI bottles")
+        assertEquals(2, result.correctiveActions().size());
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+            draft.description().contains("Drain Tank, install new DI bottles")
         ));
         assertTrue(result.correctiveActions().stream().anyMatch(draft ->
             "Endotoxin".equals(draft.measurementName())
@@ -115,16 +114,15 @@ class ConfiguredLocationDashboardImportStrategyTest {
         List<Map<String, Object>> customData = (List<Map<String, Object>>) waterQualityHpcTrace.get("customdata");
         assertEquals(2L, ((Number) customData.getFirst().get("sampleCount")).longValue());
         assertEquals(1L, ((Number) customData.get(1).get("sampleCount")).longValue());
-        assertEquals(3, result.correctiveActions().size());
-        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
-            draft.description().contains("Primary Sample: sampled on 2025-08-01")
-                && draft.description().contains("Sample Location: Cooling Tower Sample Port")
-                && draft.description().contains("CA: External note")
+        assertEquals(2, result.correctiveActions().size());
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+            draft.description().contains("Sample Location: Cooling Tower Sample Port")
+                || draft.description().contains("CA: External note")
         ));
     }
 
     @Test
-    void computeImportCreatesCorrectiveActionsForOutOfSpecStructuredCommentSamples() {
+    void computeImportDoesNotCreateCorrectiveActionsForOutOfSpecStructuredCommentSamplesWhileCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String structuredComment = """
@@ -163,14 +161,10 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertEquals(4, result.correctiveActions().size());
-        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+        assertEquals(2, result.correctiveActions().size());
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-08-15").equals(draft.observedDate())
-                && "Newport Beach".equals(draft.facilityName())
-                && "Cooling Towers".equals(draft.systemTypeName())
                 && "HPC".equals(draft.measurementName())
-                && draft.description().contains("Supplemental Sample 1: sampled on 2025-08-15")
-                && draft.description().contains("Supplemental Sample 1 CA: Disinfect and retest")
         ));
     }
 
@@ -198,24 +192,18 @@ class ConfiguredLocationDashboardImportStrategyTest {
         );
 
         assertEquals(4, result.observations().size());
-        assertEquals(3, result.correctiveActions().size());
+        assertEquals(2, result.correctiveActions().size());
         assertFalse(result.observations().stream().anyMatch(observation ->
             LocalDate.parse("2025-08-15").equals(observation.observedDate())
                 && "HPC".equals(observation.measurementName())
         ));
-        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
-            LocalDate.parse("2025-08-01").equals(draft.observedDate())
-                && "HPC".equals(draft.measurementName())
-                && draft.description().contains("Primary Sample: sampled on 2025-08-15")
-        ));
         assertFalse(result.correctiveActions().stream().anyMatch(draft ->
-            LocalDate.parse("2025-08-15").equals(draft.observedDate())
-                && "HPC".equals(draft.measurementName())
+            draft.description().contains("Primary Sample: sampled on 2025-08-15")
         ));
     }
 
     @Test
-    void computeImportCreatesCorrectiveActionForFailedFollowUpSamplesWhenTheWorksheetSampleWasCompliant() {
+    void computeImportDoesNotCreateCorrectiveActionForFailedFollowUpSamplesWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String structuredComment = """
@@ -251,15 +239,15 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+        assertEquals(2, result.correctiveActions().size());
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-08-15").equals(draft.observedDate())
                 && "HPC".equals(draft.measurementName())
-                && draft.description().contains("Supplemental Sample 1: sampled on 2025-08-15")
         ));
     }
 
     @Test
-    void computeImportCreatesSeparateCorrectiveActionForLaterMonthFailedFollowUps() {
+    void computeImportDoesNotCreateSeparateCorrectiveActionForLaterMonthFailedFollowUpsWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String structuredComment = """
@@ -295,10 +283,10 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+        assertEquals(2, result.correctiveActions().size());
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-09-15").equals(draft.observedDate())
                 && "HPC".equals(draft.measurementName())
-                && draft.description().contains("Supplemental Sample 1: sampled on 2025-09-15")
         ));
     }
 
@@ -405,12 +393,132 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void rangeProfileTreatsMaximumAsExclusive() {
+    void computeImportAcceptsMigratedStructuredCommentWhenWorksheetMatchesLabeledTestNote() {
+        ConfiguredLocationDashboardImportStrategy strategy = criticalPhStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": null,
+              "primarySample": {
+                "sampledOn": "2025-09-03",
+                "resultReceivedOn": null,
+                "resultRaw": "6.8",
+                "resultValue": 6.8,
+                "resultUnit": null,
+                "notes": [],
+                "correctiveActions": []
+              },
+              "followUpSamples": [],
+              "correctiveActions": [
+                {
+                  "text": "Drain tank, install new DI bottles"
+                }
+              ],
+              "notes": [
+                "First Test: 7.6"
+              ]
+            }
+            """;
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    38,
+                    "Newport Beach",
+                    "Hospital",
+                    "Critical",
+                    "DI Supply",
+                    "Source to SPD",
+                    List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                        "pH",
+                        LocalDate.parse("2025-08-01"),
+                        "7.6",
+                        new BigDecimal("7.6"),
+                        structuredComment,
+                        "CB38"
+                    ))
+                ))
+            ),
+            List.of(measurementBound(1L, "pH", new BigDecimal("5.0"), new BigDecimal("7.5"), null, null, null, null, null, null))
+        );
+
+        assertEquals(1, result.correctiveActions().size());
+        assertEquals(2, result.observations().size());
+        assertTrue(result.observations().stream().anyMatch(observation ->
+            LocalDate.parse("2025-09-03").equals(observation.observedDate()) && observation.compliant()
+        ));
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-01").equals(draft.observedDate())
+                && "pH".equals(draft.measurementName())
+        ));
+    }
+
+    @Test
+    void computeImportDeduplicatesStructuredCommentPrimarySampleWhenItMatchesTheWorksheetSample() {
+        ConfiguredLocationDashboardImportStrategy strategy = criticalPhStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": null,
+              "primarySample": {
+                "sampledOn": "2026-01-01",
+                "resultReceivedOn": null,
+                "resultRaw": "7.6",
+                "resultValue": 7.6,
+                "resultUnit": null,
+                "notes": [],
+                "correctiveActions": []
+              },
+              "followUpSamples": [],
+              "correctiveActions": [
+                {
+                  "text": "Drain tank, install new DI bottles"
+                }
+              ],
+              "notes": [
+                "First Test: 7.6",
+                "Second Test: 6.8"
+              ]
+            }
+            """;
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    39,
+                    "Newport Beach",
+                    "Hospital",
+                    "Critical",
+                    "DI Return",
+                    "Return from SPD",
+                    List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                        "pH",
+                        LocalDate.parse("2026-01-01"),
+                        "7.6",
+                        new BigDecimal("7.6"),
+                        structuredComment,
+                        "CB39"
+                    ))
+                ))
+            ),
+            List.of(measurementBound(1L, "pH", new BigDecimal("5.0"), new BigDecimal("7.5"), null, null, null, null, null, null))
+        );
+
+        assertEquals(1, result.correctiveActions().size());
+        assertEquals(1, result.observations().size());
+    }
+
+    @Test
+    void rangeProfileTreatsMaximumAsInclusive() {
         MeasurementBound measurementBound =
             measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("10"));
 
         assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("9.9"), measurementBound));
-        assertFalse(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("10"), measurementBound));
+        assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("10"), measurementBound));
     }
 
     @Test
@@ -423,20 +531,20 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportKeepsCorrectiveActionIdentityStableWhenCellReferenceChanges() {
+    void computeImportKeepsSyntheticCorrectiveActionIdentityStableWhenCommentCellReferenceChanges() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String originalTitle = strategy.computeImport(
+        List<String> originalTitles = strategy.computeImport(
             workbookWithCommentCell("Test 1;350;CA;Drain Tank, install new DI bottles", "F5"),
             measurementBounds()
-        ).correctiveActions().getFirst().title();
+        ).correctiveActions().stream().map(LocationDashboardImportStrategy.CorrectiveActionDraft::title).toList();
 
-        String shiftedTitle = strategy.computeImport(
+        List<String> shiftedTitles = strategy.computeImport(
             workbookWithCommentCell("Test 1;350;CA;Drain Tank, install new DI bottles", "F6"),
             measurementBounds()
-        ).correctiveActions().getFirst().title();
+        ).correctiveActions().stream().map(LocationDashboardImportStrategy.CorrectiveActionDraft::title).toList();
 
-        assertEquals(originalTitle, shiftedTitle);
+        assertEquals(originalTitles, shiftedTitles);
     }
 
     @Test
@@ -1070,6 +1178,42 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(),
                 List.of()
+            )
+        );
+    }
+
+    private ConfiguredLocationDashboardImportStrategy criticalPhStrategy() {
+        return new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Newport Beach",
+                List.of(new LocationDashboardImportStrategyConfig.SublocationConfig(
+                    "newport-beach",
+                    "Newport Beach",
+                    List.of("Newport Beach"),
+                    List.of(),
+                    true
+                )),
+                List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                    "critical-spd",
+                    "Critical SPD",
+                    LocationDashboardImportStrategyConfig.RangeProfile.CRITICAL,
+                    List.of()
+                )),
+                List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
+                    "water-quality",
+                    "Water Quality Compliance",
+                    "Newport Beach",
+                    LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                    "newport-beach",
+                    List.of("pH"),
+                    Map.of("pH", "#ff7f0e"),
+                    "scatter"
+                )),
+                List.of(),
+                List.of(new LocationDashboardImportStrategyConfig.SystemTypeAliasConfig(
+                    "Critical SPD",
+                    List.of("Critical")
+                ))
             )
         );
     }

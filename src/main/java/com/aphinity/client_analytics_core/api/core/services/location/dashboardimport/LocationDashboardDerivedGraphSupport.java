@@ -45,14 +45,22 @@ final class LocationDashboardDerivedGraphSupport {
         HistoricalDerivedData historicalData
     ) {
         LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType = derivedGraphDefinition.derivedType();
-        List<HistoricalSamplePoint> samplePoints = historicalData.allSamplePoints();
+        List<HistoricalSamplePoint> waterQualitySamplePoints = historicalData.allSamplePoints().stream()
+            .filter(samplePoint -> samplePoint.measurementName() != null)
+            .toList();
+        List<HistoricalSamplePoint> systemTypeSamplePoints = historicalData.allSamplePoints().stream()
+            .filter(samplePoint -> samplePoint.systemTypeName() != null)
+            .toList();
         List<HistoricalCorrectiveAction> correctiveActions = historicalData.correctiveActions();
 
-        long totalSamples = samplePoints.stream().mapToLong(HistoricalSamplePoint::sampleCount).sum();
-        long compliantSamples = samplePoints.stream().mapToLong(HistoricalSamplePoint::compliantCount).sum();
-        long totalNonConformances = correctiveActions.size();
+        long totalSamples = waterQualitySamplePoints.stream().mapToLong(HistoricalSamplePoint::sampleCount).sum();
+        long compliantSamples = waterQualitySamplePoints.stream().mapToLong(HistoricalSamplePoint::compliantCount).sum();
+        long totalSampleNonConformances = waterQualitySamplePoints.stream()
+            .mapToLong(HistoricalSamplePoint::nonConformingCount)
+            .sum();
+        long totalIncidentNonConformances = correctiveActions.size();
         long resolvedNonConformances = correctiveActions.stream().filter(HistoricalCorrectiveAction::resolved).count();
-        long activeNonConformances = totalNonConformances - resolvedNonConformances;
+        long activeNonConformances = totalIncidentNonConformances - resolvedNonConformances;
 
         return switch (derivedGraphType) {
             case TOTAL_SAMPLES -> List.of(buildPieTrace(
@@ -66,11 +74,11 @@ final class LocationDashboardDerivedGraphSupport {
                 graph,
                 "Non-Conformances",
                 List.of("Total Non-Conformances"),
-                List.of(totalNonConformances),
+                List.of(totalSampleNonConformances),
                 List.of(ACTIVE_GRAPH_COLOR)
             ));
             case ACTIVE_NON_CONFORMANCE_PERCENT -> {
-                long activePercent = calculateRoundedPercent(activeNonConformances, totalNonConformances);
+                long activePercent = calculateRoundedPercent(activeNonConformances, totalIncidentNonConformances);
                 yield List.of(buildPieTrace(
                     graph,
                     "Active Non-Conformances",
@@ -84,27 +92,27 @@ final class LocationDashboardDerivedGraphSupport {
                 yield buildPercentPayload(graph, "Conformance", percentConformance, DEFAULT_GRAPH_COLOR);
             }
             case PERCENT_RESOLVED -> {
-                long percentResolved = calculateRoundedPercent(resolvedNonConformances, totalNonConformances);
+                long percentResolved = calculateRoundedPercent(resolvedNonConformances, totalIncidentNonConformances);
                 yield buildPercentPayload(graph, "Resolved", percentResolved, RESOLVED_GRAPH_COLOR);
             }
             case NON_CONFORMANCES_BY_FACILITY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActions, HistoricalCorrectiveAction::facilityName, UNKNOWN_FACILITY_LABEL),
+                countSampleLabels(waterQualitySamplePoints, HistoricalSamplePoint::facilityName, UNKNOWN_FACILITY_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_SYSTEM_TYPE -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActions, HistoricalCorrectiveAction::systemTypeName, UNKNOWN_SYSTEM_TYPE_LABEL),
+                countSampleLabels(systemTypeSamplePoints, HistoricalSamplePoint::systemTypeName, UNKNOWN_SYSTEM_TYPE_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_CATEGORY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countLabels(correctiveActions, HistoricalCorrectiveAction::measurementName, UNKNOWN_CATEGORY_LABEL),
+                countSampleLabels(waterQualitySamplePoints, HistoricalSamplePoint::measurementName, UNKNOWN_CATEGORY_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
@@ -185,6 +193,32 @@ final class LocationDashboardDerivedGraphSupport {
                 Collectors.counting()
             ))
             .entrySet().stream()
+            .sorted(Comparator
+                .<Map.Entry<String, Long>>comparingLong(entry -> -entry.getValue())
+                .thenComparing(Map.Entry::getKey))
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+    }
+
+    private static Map<String, Long> countSampleLabels(
+        List<HistoricalSamplePoint> samplePoints,
+        Function<HistoricalSamplePoint, String> labelExtractor,
+        String fallbackLabel
+    ) {
+        Map<String, Long> countsByLabel = new LinkedHashMap<>();
+        for (HistoricalSamplePoint samplePoint : samplePoints) {
+            if (samplePoint == null || samplePoint.nonConformingCount() <= 0L) {
+                continue;
+            }
+            String label = labelOrFallback(labelExtractor.apply(samplePoint), fallbackLabel);
+            countsByLabel.merge(label, samplePoint.nonConformingCount(), Long::sum);
+        }
+
+        return countsByLabel.entrySet().stream()
             .sorted(Comparator
                 .<Map.Entry<String, Long>>comparingLong(entry -> -entry.getValue())
                 .thenComparing(Map.Entry::getKey))
@@ -457,6 +491,7 @@ final class LocationDashboardDerivedGraphSupport {
         LocalDate observedDate,
         String facilityName,
         String measurementName,
+        String systemTypeName,
         long sampleCount,
         long compliantCount
     ) {

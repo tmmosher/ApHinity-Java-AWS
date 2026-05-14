@@ -272,7 +272,7 @@ public class LocationDashboardImportService {
                 matchedImportGraphsByDefinitionId,
                 assignedGraphsById,
                 updatedPreviewGraphsById,
-                computation.observations(),
+                computation.analyzedSamples(),
                 previewCorrectiveActions
             );
 

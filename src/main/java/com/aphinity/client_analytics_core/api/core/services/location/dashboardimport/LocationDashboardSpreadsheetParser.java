@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 @Service
 public class LocationDashboardSpreadsheetParser {
     private static final int MIN_DATE_ROW_SCORE = 1;
+    private static final String VALIDATION_SHEET_NAME = "validation";
     private static final String HEADER_FACILITY = "facility";
     private static final String HEADER_BUILDING = "bldg (collated if unrecognized)";
     private static final String HEADER_SYSTEM = "system (collated if unrecognized)";
@@ -80,9 +81,9 @@ public class LocationDashboardSpreadsheetParser {
         requireSpreadsheet(file);
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getNumberOfSheets() > 0 ? workbook.getSheetAt(0) : null;
+            Sheet sheet = resolveValidationSheet(workbook);
             if (sheet == null) {
-                throw invalidSpreadsheet("Spreadsheet does not contain any worksheets.");
+                throw invalidSpreadsheet("Spreadsheet must contain a 'Validation' worksheet.");
             }
 
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
@@ -99,6 +100,19 @@ public class LocationDashboardSpreadsheetParser {
         } catch (IOException | RuntimeException ex) {
             throw invalidSpreadsheet("Spreadsheet could not be read.");
         }
+    }
+
+    private Sheet resolveValidationSheet(Workbook workbook) {
+        if (workbook == null || workbook.getNumberOfSheets() == 0) {
+            return null;
+        }
+        for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex += 1) {
+            Sheet sheet = workbook.getSheetAt(sheetIndex);
+            if (sheet != null && VALIDATION_SHEET_NAME.equals(normalizeKey(sheet.getSheetName()))) {
+                return sheet;
+            }
+        }
+        return null;
     }
 
     private void requireSpreadsheet(MultipartFile file) {
@@ -637,6 +651,10 @@ public class LocationDashboardSpreadsheetParser {
         }
         String normalized = value.strip();
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizeKey(String value) {
+        return LocationDashboardGraphMetadataSupport.normalizeKey(value);
     }
 
     private ApiClientException invalidSpreadsheet(String message) {

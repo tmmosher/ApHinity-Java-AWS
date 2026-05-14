@@ -24,6 +24,9 @@ final class LocationDashboardCommentParser {
     private static final Pattern DATE_TOKEN_PATTERN = Pattern.compile("\\b(\\d{1,2}/\\d{1,2}/\\d{2,4})\\b");
     private static final Pattern BARE_DATE_LINE_PATTERN = Pattern.compile("(?i)^\\d{1,2}/\\d{1,2}/\\d{2,4}[\\p{Punct}]?$");
     private static final Pattern YEAR_TOKEN_PATTERN = Pattern.compile("^(\\d{1,2}/\\d{1,2}/)(\\d{3,4})$");
+    private static final Pattern LABELED_TEST_NOTE_PATTERN = Pattern.compile(
+        "(?i)^(first|second|third|fourth|fifth)\\s+test\\s*:\\s*(.+)$"
+    );
     private static final Pattern MEASUREMENT_VALUE_PATTERN = Pattern.compile(
         "^[<>]=?\\s*([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(?:\\s+(.+))?$",
         Pattern.CASE_INSENSITIVE
@@ -504,6 +507,86 @@ final class LocationDashboardCommentParser {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private static List<BigDecimal> parseLabeledTestResults(List<String> notes) {
+        if (notes == null || notes.isEmpty()) {
+            return List.of();
+        }
+        List<BigDecimal> results = new ArrayList<>();
+        for (String note : notes) {
+            if (note == null || note.isBlank()) {
+                continue;
+            }
+            Matcher matcher = LABELED_TEST_NOTE_PATTERN.matcher(note.strip());
+            if (!matcher.matches()) {
+                continue;
+            }
+            ParsedMeasurement measurement = parseStaticMeasurementValue(matcher.group(2));
+            if (measurement != null && measurement.value() != null) {
+                results.add(measurement.value());
+            }
+        }
+        return List.copyOf(results);
+    }
+
+    private static ParsedMeasurement parseStaticMeasurementValue(String rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+        String cleanedValue = rawValue.replace(",", "").strip();
+        if (cleanedValue.isBlank()) {
+            return null;
+        }
+        if (cleanedValue.equalsIgnoreCase("nd")
+            || cleanedValue.equalsIgnoreCase("n.d.")
+            || cleanedValue.equalsIgnoreCase("not detected")) {
+            return new ParsedMeasurement(BigDecimal.ZERO, null, "ND");
+        }
+        if (cleanedValue.equalsIgnoreCase("nt")
+            || cleanedValue.equalsIgnoreCase("n.t.")
+            || cleanedValue.equalsIgnoreCase("not tested")) {
+            return null;
+        }
+
+        Matcher matcher = MEASUREMENT_VALUE_PATTERN.matcher(cleanedValue);
+        if (!matcher.matches()) {
+            return null;
+        }
+
+        String numericPortion = matcher.group(1);
+        if (numericPortion == null) {
+            return null;
+        }
+        try {
+            BigDecimal numericValue = new BigDecimal(normalizeStaticNumericPortion(numericPortion));
+            String unit = normalizeStaticUnit(matcher.group(2));
+            String normalizedRaw = numericValue.toPlainString() + (unit == null ? "" : " " + unit);
+            return new ParsedMeasurement(numericValue, unit, normalizedRaw);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static String normalizeStaticUnit(String rawUnit) {
+        if (rawUnit == null) {
+            return null;
+        }
+        String normalized = rawUnit.strip().replaceAll("[\\s\\p{Punct}]+$", "");
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private static String normalizeStaticNumericPortion(String numericPortion) {
+        if (numericPortion.startsWith("+.")) {
+            return "+0" + numericPortion.substring(1);
+        }
+        if (numericPortion.startsWith("-.")) {
+            return "-0" + numericPortion.substring(1);
+        }
+        if (numericPortion.startsWith(".")) {
+            return "0" + numericPortion;
+        }
+        return numericPortion;
     }
 
     private String normalizeUnit(String rawUnit) {
@@ -990,6 +1073,63 @@ final class LocationDashboardCommentParser {
                 || !followUpSamples.isEmpty()
                 || !correctiveActions.isEmpty()
                 || !notes.isEmpty();
+        }
+
+        private List<String> migratedCompatibilityNotes() {
+            List<String> compatibilityNotes = new ArrayList<>(notes);
+            if (primarySample != null && primarySample.notes() != null && !primarySample.notes().isEmpty()) {
+                compatibilityNotes.addAll(primarySample.notes());
+            }
+            return List.copyOf(compatibilityNotes);
+        }
+
+        List<BigDecimal> labeledTestResults() {
+            return LocationDashboardCommentParser.parseLabeledTestResults(migratedCompatibilityNotes());
+        }
+
+        BigDecimal worksheetCompatibilityResultValue() {
+            List<BigDecimal> labeledResults = labeledTestResults();
+            if (!labeledResults.isEmpty()) {
+                return labeledResults.getFirst();
+            }
+            return primarySample == null ? null : primarySample.resultValue();
+        }
+
+        BigDecimal effectiveAnchoredResultValue() {
+            List<BigDecimal> labeledResults = labeledTestResults();
+            if (labeledResults.size() >= 2) {
+                return labeledResults.getLast();
+            }
+            if (primarySample != null && primarySample.resultValue() != null) {
+                if (labeledResults.size() == 1
+                    && labeledResults.getFirst().compareTo(primarySample.resultValue()) != 0) {
+                    return primarySample.resultValue();
+                }
+                return primarySample.resultValue();
+            }
+            return labeledResults.isEmpty() ? null : labeledResults.getLast();
+        }
+
+        boolean matchesWorksheetCompatibilityValue(BigDecimal worksheetValue) {
+            if (worksheetValue == null) {
+                return false;
+            }
+            BigDecimal compatibilityValue = worksheetCompatibilityResultValue();
+            if (compatibilityValue != null && worksheetValue.compareTo(compatibilityValue) == 0) {
+                return true;
+            }
+            return primarySample != null
+                && primarySample.resultValue() != null
+                && worksheetValue.compareTo(primarySample.resultValue()) == 0;
+        }
+
+        boolean hasMigratedLabeledTestNotes() {
+            for (String note : migratedCompatibilityNotes()) {
+                if (note != null && LABELED_TEST_NOTE_PATTERN.matcher(note.strip()).matches()) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

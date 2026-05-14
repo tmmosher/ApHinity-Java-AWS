@@ -34,12 +34,13 @@ final class LocationDashboardHistoricalDataAssembler {
         Map<String, Graph> matchedImportGraphsByDefinitionId,
         Map<Long, Graph> assignedGraphsById,
         Map<Long, Graph> previewGraphsById,
-        List<LocationDashboardImportStrategy.ImportedObservation> importedObservations,
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples,
         List<ServiceEvent> effectiveCorrectiveActions
     ) {
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity = new LinkedHashMap<>();
         for (GraphConfig graphDefinition : graphDefinitions) {
-            if (graphDefinition.importType() != ImportType.WATER_QUALITY_COMPLIANCE) {
+            if (graphDefinition.importType() != ImportType.WATER_QUALITY_COMPLIANCE
+                && graphDefinition.importType() != ImportType.SYSTEM_TYPE_COMPLIANCE) {
                 continue;
             }
 
@@ -62,10 +63,10 @@ final class LocationDashboardHistoricalDataAssembler {
                 graphDefinition.title(),
                 LocationDashboardGraphMetadataSupport.readGraphLayoutTitleText(effectiveGraph)
             );
-            collectPersistedSamplePoints(samplePointsByIdentity, effectiveGraph, facilityName);
+            collectPersistedSamplePoints(samplePointsByIdentity, effectiveGraph, facilityName, graphDefinition.importType());
         }
 
-        mergeImportedObservationSamplePoints(samplePointsByIdentity, importedObservations);
+        mergeImportedSamplePoints(samplePointsByIdentity, analyzedSamples);
 
         Map<LocalDate, List<LocationDashboardDerivedGraphSupport.HistoricalSamplePoint>> samplesByDate = new LinkedHashMap<>();
         samplePointsByIdentity.values().stream()
@@ -88,7 +89,8 @@ final class LocationDashboardHistoricalDataAssembler {
     private void collectPersistedSamplePoints(
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity,
         Graph effectiveGraph,
-        String facilityName
+        String facilityName,
+        ImportType importType
     ) {
         if (effectiveGraph == null || effectiveGraph.getGraphTraces() == null) {
             return;
@@ -118,15 +120,14 @@ final class LocationDashboardHistoricalDataAssembler {
                     continue;
                 }
 
-                String sampleIdentity = observedDate
-                    + "|"
-                    + LocationDashboardGraphMetadataSupport.nullSafeNormalized(facilityName)
-                    + "|"
-                    + LocationDashboardGraphMetadataSupport.nullSafeNormalized(measurementName);
+                String measurementLabel = importType == ImportType.WATER_QUALITY_COMPLIANCE ? measurementName : null;
+                String systemTypeLabel = importType == ImportType.SYSTEM_TYPE_COMPLIANCE ? measurementName : null;
+                String sampleIdentity = sampleIdentity(observedDate, facilityName, measurementLabel, systemTypeLabel);
                 samplePointsByIdentity.put(sampleIdentity, new LocationDashboardDerivedGraphSupport.HistoricalSamplePoint(
                     observedDate,
                     facilityName,
-                    measurementName,
+                    measurementLabel,
+                    systemTypeLabel,
                     sampleCount,
                     Math.max(0L, Math.min(compliantCount, sampleCount))
                 ));
@@ -185,52 +186,96 @@ final class LocationDashboardHistoricalDataAssembler {
         return customDataValues.size() == expectedPointCount ? customDataValues : List.of();
     }
 
-    private void mergeImportedObservationSamplePoints(
+    private void mergeImportedSamplePoints(
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity,
-        List<LocationDashboardImportStrategy.ImportedObservation> importedObservations
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples
     ) {
-        Map<String, ImportedObservationAggregate> importedObservationsByIdentity = new LinkedHashMap<>();
-        for (LocationDashboardImportStrategy.ImportedObservation observation : importedObservations) {
-            if (observation == null
-                || observation.observedDate() == null
-                || observation.facilityName() == null
-                || observation.measurementName() == null) {
+        Map<String, ImportedSampleAggregate> importedSamplesByIdentity = new LinkedHashMap<>();
+        for (LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample : analyzedSamples) {
+            if (analyzedSample == null
+                || analyzedSample.observedDate() == null
+                || analyzedSample.facilityName() == null
+                || analyzedSample.measurementName() == null) {
                 continue;
             }
 
-            String sampleIdentity = observation.observedDate()
-                + "|"
-                + LocationDashboardGraphMetadataSupport.nullSafeNormalized(observation.facilityName())
-                + "|"
-                + LocationDashboardGraphMetadataSupport.nullSafeNormalized(observation.measurementName());
-            importedObservationsByIdentity
+            String measurementSampleIdentity = sampleIdentity(
+                analyzedSample.observedDate(),
+                analyzedSample.facilityName(),
+                analyzedSample.measurementName(),
+                null
+            );
+            importedSamplesByIdentity
                 .computeIfAbsent(
-                    sampleIdentity,
-                    ignored -> new ImportedObservationAggregate(
-                        observation.observedDate(),
-                        observation.facilityName(),
-                        observation.measurementName()
+                    measurementSampleIdentity,
+                    ignored -> new ImportedSampleAggregate(
+                        analyzedSample.observedDate(),
+                        analyzedSample.facilityName(),
+                        analyzedSample.measurementName(),
+                        null
                     )
                 )
-                .record(observation.compliant());
+                .record(analyzedSample.compliant());
+
+            if (analyzedSample.systemTypeName() != null && !analyzedSample.systemTypeName().isBlank()) {
+                String systemTypeSampleIdentity = sampleIdentity(
+                    analyzedSample.observedDate(),
+                    analyzedSample.facilityName(),
+                    null,
+                    analyzedSample.systemTypeName()
+                );
+                importedSamplesByIdentity
+                    .computeIfAbsent(
+                        systemTypeSampleIdentity,
+                        ignored -> new ImportedSampleAggregate(
+                            analyzedSample.observedDate(),
+                            analyzedSample.facilityName(),
+                            null,
+                            analyzedSample.systemTypeName()
+                        )
+                    )
+                    .record(analyzedSample.compliant());
+            }
         }
 
-        importedObservationsByIdentity.forEach((sampleIdentity, aggregate) ->
+        importedSamplesByIdentity.forEach((sampleIdentity, aggregate) ->
             samplePointsByIdentity.put(sampleIdentity, aggregate.toHistoricalSamplePoint())
         );
     }
 
-    private static final class ImportedObservationAggregate {
+    private String sampleIdentity(
+        LocalDate observedDate,
+        String facilityName,
+        String measurementName,
+        String systemTypeName
+    ) {
+        return observedDate
+            + "|"
+            + LocationDashboardGraphMetadataSupport.nullSafeNormalized(facilityName)
+            + "|"
+            + LocationDashboardGraphMetadataSupport.nullSafeNormalized(measurementName)
+            + "|"
+            + LocationDashboardGraphMetadataSupport.nullSafeNormalized(systemTypeName);
+    }
+
+    private static final class ImportedSampleAggregate {
         private final LocalDate observedDate;
         private final String facilityName;
         private final String measurementName;
+        private final String systemTypeName;
         private long sampleCount;
         private long compliantCount;
 
-        private ImportedObservationAggregate(LocalDate observedDate, String facilityName, String measurementName) {
+        private ImportedSampleAggregate(
+            LocalDate observedDate,
+            String facilityName,
+            String measurementName,
+            String systemTypeName
+        ) {
             this.observedDate = observedDate;
             this.facilityName = facilityName;
             this.measurementName = measurementName;
+            this.systemTypeName = systemTypeName;
         }
 
         void record(boolean compliant) {
@@ -245,6 +290,7 @@ final class LocationDashboardHistoricalDataAssembler {
                 observedDate,
                 facilityName,
                 measurementName,
+                systemTypeName,
                 sampleCount,
                 compliantCount
             );

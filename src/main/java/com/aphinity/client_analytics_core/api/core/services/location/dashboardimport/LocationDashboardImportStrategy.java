@@ -21,7 +21,8 @@ public interface LocationDashboardImportStrategy {
     record LocationDashboardImportComputation(
         List<ComputedGraphPayload> graphs,
         List<ImportedObservation> observations,
-        List<CorrectiveActionDraft> correctiveActions
+        List<CorrectiveActionDraft> correctiveActions,
+        List<AnalyzedSamplePoint> analyzedSamples
     ) {
     }
 
@@ -48,5 +49,24 @@ public interface LocationDashboardImportStrategy {
         String systemTypeName,
         String measurementName
     ) {
+    }
+
+    enum SampleOrigin {
+        WORKSHEET,
+        COMMENT_PRIMARY,
+        COMMENT_SUPPLEMENTAL
+    }
+
+    record AnalyzedSamplePoint(
+        LocalDate observedDate,
+        String facilityName,
+        String systemTypeName,
+        String measurementName,
+        boolean compliant,
+        SampleOrigin origin
+    ) {
+        boolean nonConforming() {
+            return !compliant;
+        }
     }
 }
