@@ -175,7 +175,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportTreatsPrimaryStructuredCommentSamplesAsDistinctDataWhenTheyCarryActualSampleDates() {
+    void computeImportDoesNotDuplicatePrimaryStructuredCommentSamplesWhenTheyUseActualSampleDatesInsideTheWorksheetMonth() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String structuredComment = """
@@ -197,14 +197,108 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertTrue(result.observations().stream().anyMatch(observation ->
+        assertEquals(4, result.observations().size());
+        assertEquals(3, result.correctiveActions().size());
+        assertFalse(result.observations().stream().anyMatch(observation ->
             LocalDate.parse("2025-08-15").equals(observation.observedDate())
                 && "HPC".equals(observation.measurementName())
-                && !observation.compliant()
         ));
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-01").equals(draft.observedDate())
+                && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Primary Sample: sampled on 2025-08-15")
+        ));
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-15").equals(draft.observedDate())
+                && "HPC".equals(draft.measurementName())
+        ));
+    }
+
+    @Test
+    void computeImportCreatesCorrectiveActionForFailedFollowUpSamplesWhenTheWorksheetSampleWasCompliant() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": "Cooling Tower Sample Port",
+              "primarySample": {
+                "sampledOn": "2025-08-01",
+                "resultReceivedOn": "2025-08-05",
+                "resultRaw": "5 CFU.mL",
+                "resultValue": 5,
+                "resultUnit": "CFU.mL"
+              },
+              "followUpSamples": [
+                {
+                  "sampledOn": "2025-08-15",
+                  "resultReceivedOn": "2025-08-20",
+                  "resultRaw": "15 CFU.mL",
+                  "resultValue": 15,
+                  "resultUnit": "CFU.mL",
+                  "correctiveActions": [
+                    {
+                      "text": "Disinfect and retest"
+                    }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbookWithStructuredCommentAndPrimaryValue(structuredComment, new BigDecimal("5"), "5", "F5"),
+            measurementBounds()
+        );
+
         assertTrue(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-08-15").equals(draft.observedDate())
                 && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Supplemental Sample 1: sampled on 2025-08-15")
+        ));
+    }
+
+    @Test
+    void computeImportCreatesSeparateCorrectiveActionForLaterMonthFailedFollowUps() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String structuredComment = """
+            {
+              "schema": "aphinity.location-dashboard.comment.v1",
+              "sampleLocation": "Cooling Tower Sample Port",
+              "primarySample": {
+                "sampledOn": "2025-08-01",
+                "resultReceivedOn": "2025-08-05",
+                "resultRaw": "10 CFU.mL",
+                "resultValue": 10,
+                "resultUnit": "CFU.mL"
+              },
+              "followUpSamples": [
+                {
+                  "sampledOn": "2025-09-15",
+                  "resultReceivedOn": "2025-09-20",
+                  "resultRaw": "15 CFU.mL",
+                  "resultValue": 15,
+                  "resultUnit": "CFU.mL",
+                  "correctiveActions": [
+                    {
+                      "text": "Disinfect and retest"
+                    }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbookWithCommentCell(structuredComment, "F5"),
+            measurementBounds()
+        );
+
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-09-15").equals(draft.observedDate())
+                && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Supplemental Sample 1: sampled on 2025-09-15")
         ));
     }
 
@@ -1004,6 +1098,15 @@ class ConfiguredLocationDashboardImportStrategyTest {
         String commentText,
         String firstCellReference
     ) {
+        return workbookWithStructuredCommentAndPrimaryValue(commentText, new BigDecimal("10"), "10", firstCellReference);
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbookWithStructuredCommentAndPrimaryValue(
+        String commentText,
+        BigDecimal primaryNumericValue,
+        String primaryRawValue,
+        String firstCellReference
+    ) {
         // Keep the workbook comment text verbatim so the tests can cover both
         // the legacy semicolon-delimited format and the new structured JSON payload.
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
@@ -1020,8 +1123,8 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
                             "HPC",
                             LocalDate.parse("2025-08-01"),
-                            "10",
-                            new BigDecimal("10"),
+                            primaryRawValue,
+                            primaryNumericValue,
                             commentText,
                             firstCellReference
                         ),

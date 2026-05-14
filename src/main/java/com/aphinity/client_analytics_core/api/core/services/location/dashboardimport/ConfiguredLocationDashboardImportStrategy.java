@@ -728,7 +728,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         List<CorrectiveActionDraft> drafts = new ArrayList<>();
 
         LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
-        if (shouldCreateCommentSampleCorrectiveAction(primarySample, cell, systemType, measurementBound)) {
+        if (shouldCreatePrimaryCommentSampleCorrectiveAction(primarySample, cell, systemType, measurementBound)) {
             drafts.add(buildCommentSampleCorrectiveActionDraft(
                 cell,
                 row,
@@ -976,7 +976,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         if (primarySample != null
             && primarySample.sampledOn() != null
             && primarySample.resultValue() != null
-            && !matchesPrimaryCellSample(primaryCell, primarySample)) {
+            && !matchesWorksheetPrimarySample(primaryCell, primarySample)) {
             boolean compliant = activeSystemType.rangeProfile().isCompliant(primarySample.resultValue(), measurementBound);
             recordObservation(
                 primarySample.sampledOn(),
@@ -1012,6 +1012,18 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
     }
 
+    private boolean shouldCreatePrimaryCommentSampleCorrectiveAction(
+        LocationDashboardCommentParser.ParsedCommentSample primarySample,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
+        SystemTypeConfig systemType,
+        MeasurementBound measurementBound
+    ) {
+        if (matchesWorksheetPrimarySample(primaryCell, primarySample)) {
+            return false;
+        }
+        return shouldCreateCommentSampleCorrectiveAction(primarySample, primaryCell, systemType, measurementBound);
+    }
+
     private boolean shouldCreateCommentSampleCorrectiveAction(
         LocationDashboardCommentParser.ParsedCommentSample sample,
         LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
@@ -1031,6 +1043,27 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             return false;
         }
         return !systemType.rangeProfile().isCompliant(sample.resultValue(), measurementBound);
+    }
+
+    private boolean matchesWorksheetPrimarySample(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
+        LocationDashboardCommentParser.ParsedCommentSample candidateSample
+    ) {
+        if (primaryCell == null || candidateSample == null) {
+            return false;
+        }
+        if (primaryCell.observedDate() == null || candidateSample.sampledOn() == null) {
+            return false;
+        }
+        // Primary structured samples often preserve the actual sample day while the worksheet cell
+        // represents the reporting month bucket for that same sample.
+        if (!sameObservationMonth(primaryCell.observedDate(), candidateSample.sampledOn())) {
+            return false;
+        }
+        if (primaryCell.numericValue() == null || candidateSample.resultValue() == null) {
+            return false;
+        }
+        return primaryCell.numericValue().compareTo(candidateSample.resultValue()) == 0;
     }
 
     private boolean matchesPrimaryCellSample(
