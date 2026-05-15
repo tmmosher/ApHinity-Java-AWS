@@ -75,12 +75,17 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
             strategy.computeImport(augmentedWorkbook, hoagMeasurementBounds());
 
         assertEquals(
-            baseline.correctiveActions().size() + EXPECTED_ADDED_NON_CONFORMANCES,
+            baseline.correctiveActions().size(),
             augmented.correctiveActions().size()
         );
         assertEquals(
             baseline.observations().size() + EXPECTED_ADDED_NON_CONFORMANCES,
             augmented.observations().size()
+        );
+        assertEquals(
+            baseline.analyzedSamples().stream().filter(LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming).count()
+                + EXPECTED_ADDED_NON_CONFORMANCES,
+            augmented.analyzedSamples().stream().filter(LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming).count()
         );
 
         for (InjectedCommentPlan plan : INJECTED_COMMENT_PLANS) {
@@ -89,12 +94,6 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
                 augmentedCellsByReference.get(plan.cellReference());
             assertTrue(augmentedCell != null && augmentedCell.commentText() != null);
             assertTrue(augmentedCell.commentText().contains(marker));
-            assertEquals(
-                plan.addedNonConformances(),
-                augmented.correctiveActions().stream()
-                    .filter(draft -> draft.description().contains(marker))
-                    .count()
-            );
         }
     }
 

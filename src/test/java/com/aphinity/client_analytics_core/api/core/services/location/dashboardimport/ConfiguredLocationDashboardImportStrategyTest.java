@@ -30,14 +30,14 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityHpcTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityHpcTrace.get("x"));
-        assertEquals(List.of(0.0d), waterQualityHpcTrace.get("y"));
+        assertEquals(List.of(50.0d), waterQualityHpcTrace.get("y"));
 
         Map<String, Object> systemTypeTrace = result.graphs().get(1).data().getFirst();
         assertEquals("Cooling Towers", systemTypeTrace.get("name"));
-        assertEquals(List.of(25.0d), systemTypeTrace.get("y"));
+        assertEquals(List.of(50.0d), systemTypeTrace.get("y"));
 
         assertEquals(4, result.observations().size());
-        assertEquals(1, result.observations().stream().filter(observation -> observation.compliant()).count());
+        assertEquals(2, result.observations().stream().filter(observation -> observation.compliant()).count());
         assertEquals(2, result.correctiveActions().size());
         assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             draft.description().contains("Drain Tank, install new DI bottles")
@@ -388,7 +388,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityHpcTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityHpcTrace.get("x"));
-        assertEquals(List.of(0.0d), waterQualityHpcTrace.get("y"));
+        assertEquals(List.of(50.0d), waterQualityHpcTrace.get("y"));
         assertTrue(result.observations().stream().anyMatch(observation -> "HPC".equals(observation.measurementName())));
     }
 
@@ -690,6 +690,93 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals("16405 Irvine", result.observations().get(1).facilityName());
         assertEquals("Utility Domestic Hot", result.observations().get(1).systemTypeName());
         assertEquals("Steam", result.observations().get(2).systemTypeName());
+        assertEquals(0, result.correctiveActions().size());
+    }
+
+    @Test
+    void computeImportResolvesHoagSublocationWhenBuildingAliasAppearsInFacilityColumn() {
+        ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "irvine",
+                        "Irvine",
+                        List.of("Irvine"),
+                        List.of(),
+                        true
+                    ),
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "16405-irvine",
+                        "16405 Irvine",
+                        List.of("Irvine"),
+                        List.of("16405", "16105", "SPD-16405"),
+                        false
+                    )
+                ),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                        "utility-spd",
+                        "Utility SPD",
+                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        List.of()
+                    )
+                ),
+                List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
+                    "16405-irvine-water-quality",
+                    "Water Quality Compliance",
+                    "16405 Irvine",
+                    LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                    "16405-irvine",
+                    List.of("HPC"),
+                    Map.of("HPC", "#1f77b4"),
+                    "scatter"
+                )),
+                List.of(),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SystemTypeAliasConfig(
+                        "Utility SPD",
+                        List.of("Utility HLD", "Utility Water")
+                    )
+                )
+            )
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Hoag Hospital",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        68,
+                        "SPD-16405",
+                        null,
+                        "Utility- HLD",
+                        "DI Source",
+                        "Source to SPD",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "4",
+                                new BigDecimal("4"),
+                                null,
+                                "K68"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            List.of(measurementBound(1L, "HPC", null, null, null, new BigDecimal("500"), null, null, null, null))
+        );
+
+        assertEquals(1, result.graphs().size());
+        assertEquals("16405-irvine-water-quality", result.graphs().getFirst().graphId());
+        assertEquals(1, result.observations().size());
+        assertEquals("16405 Irvine", result.observations().getFirst().facilityName());
+        assertEquals("Utility SPD", result.observations().getFirst().systemTypeName());
         assertEquals(0, result.correctiveActions().size());
     }
 

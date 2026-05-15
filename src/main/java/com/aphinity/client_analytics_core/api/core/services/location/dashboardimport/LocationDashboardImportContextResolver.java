@@ -145,6 +145,16 @@ final class LocationDashboardImportContextResolver {
             }
         }
 
+        // Some newer ST-108 exports place building/site identifiers like "SPD-16405"
+        // into the facility column. When that happens, allow the facility token to
+        // resolve through configured building aliases so sample facility names still
+        // collapse to the canonical sublocation display name.
+        for (SublocationConfig sublocation : config.sublocations()) {
+            if (matchesAny(normalizedFacility, sublocation.buildingAliases())) {
+                return sublocation;
+            }
+        }
+
         if (building == null && belongsToFacility(previousSublocation, normalizedFacility)) {
             return previousSublocation;
         }

@@ -151,7 +151,7 @@ class LocationDashboardImportServiceTest {
 
         assertEquals(11, responses.size());
         assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("x"));
-        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 0.0d);
+        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 50.0d);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> hpcCustomData = (List<Map<String, Object>>) findResponseByName(responses, "Water Quality Compliance")
             .data()
@@ -169,8 +169,8 @@ class LocationDashboardImportServiceTest {
             "#0f766e",
             totalSamplesMarker.get("color")
         );
-        assertEquals(List.of(4L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
-        assertEquals(25L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
+        assertEquals(List.of(2L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentGauge = (Map<String, Object>) findResponseByName(
             responses,
@@ -179,14 +179,14 @@ class LocationDashboardImportServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentBar = (Map<String, Object>) resolutionPercentGauge.get("bar");
         assertEquals("#9333ea", resolutionPercentBar.get("color"));
-        assertEquals(57L, ((Number) findResponseByName(responses, "Percent Conformance").data().getFirst().get("value")).longValue());
-        assertEquals(List.of(3L, 1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("x"));
-        assertEquals(List.of("HPC", "Endotoxin"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("y"));
-        assertEquals(List.of(4L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("x"));
+        assertEquals(71L, ((Number) findResponseByName(responses, "Percent Conformance").data().getFirst().get("value")).longValue());
+        assertEquals(List.of(1L, 1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("x"));
+        assertEquals(List.of("Endotoxin", "HPC"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("y"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("x"));
         assertEquals(List.of("Cooling Towers"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("y"));
-        assertEquals(List.of(4L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
-        assertEquals(List.of(3L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
         assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
@@ -283,7 +283,7 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("x"));
-        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 0.0d);
+        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 50.0d);
         assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
     }
 
@@ -360,12 +360,12 @@ class LocationDashboardImportServiceTest {
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        assertEquals(List.of(4L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
-        assertEquals(List.of(3L, 1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("x"));
+        assertEquals(List.of(3L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        assertEquals(List.of(2L, 1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("x"));
         assertEquals(List.of("HPC", "Endotoxin"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("y"));
-        assertEquals(List.of(4L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("x"));
+        assertEquals(List.of(3L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("x"));
         assertEquals(List.of("Cooling Towers"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("y"));
-        assertEquals(List.of(4L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(3L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
     }
 
@@ -524,7 +524,7 @@ class LocationDashboardImportServiceTest {
         assertEquals(2, waterQualityResponse.data().size());
         assertEquals("HPC", waterQualityResponse.data().getFirst().get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityResponse.data().getFirst().get("x"));
-        assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 0.0d);
+        assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 50.0d);
         assertEquals(Map.of("color", "#123456", "width", 4L), waterQualityResponse.data().getFirst().get("line"));
         assertEquals(Map.of("size", 9L), waterQualityResponse.data().getFirst().get("marker"));
     }
@@ -605,7 +605,7 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(5, responses.size());
-        assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
+        assertEquals(50L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
         assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
 
@@ -615,7 +615,7 @@ class LocationDashboardImportServiceTest {
         assertEquals("v", resolvedByFacility.get("orientation"));
         assertEquals(List.of("Newport Beach"), activeByFacility.get("x"));
         assertEquals(List.of("Newport Beach"), resolvedByFacility.get("x"));
-        assertEquals(List.of(2L), activeByFacility.get("y"));
+        assertEquals(List.of(1L), activeByFacility.get("y"));
         assertEquals(List.of(1L), resolvedByFacility.get("y"));
         assertEquals(Map.of("color", "#b91c1c"), activeByFacility.get("marker"));
         assertEquals(Map.of("color", "#15803d"), resolvedByFacility.get("marker"));
@@ -694,15 +694,15 @@ class LocationDashboardImportServiceTest {
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        assertEquals(List.of(3L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
-        assertEquals(List.of(3L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
+        assertEquals(List.of(2L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
 
         Map<String, Object> activeByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst();
         Map<String, Object> resolvedByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1);
         assertEquals(List.of("Newport Beach"), activeByFacility.get("x"));
         assertEquals(List.of("Newport Beach"), resolvedByFacility.get("x"));
-        assertEquals(List.of(3L), activeByFacility.get("y"));
+        assertEquals(List.of(2L), activeByFacility.get("y"));
         assertEquals(List.of(0L), resolvedByFacility.get("y"));
     }
 

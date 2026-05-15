@@ -61,29 +61,29 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$.length()").value(17))
             .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].y[0]").value(0))
+            .andExpect(jsonPath("$[0].data[0].y[0]").value(100))
             .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
             .andExpect(jsonPath("$[0].data[1].y[0]").value(33.333333333333336d))
             .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
             .andExpect(jsonPath("$[1].data.length()").value(1))
             .andExpect(jsonPath("$[1].data[0].name").value("Cooling Tower"))
-            .andExpect(jsonPath("$[1].data[0].y[0]").value(16.666666666666668d))
+            .andExpect(jsonPath("$[1].data[0].y[0]").value(66.66666666666667d))
             .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
             .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
-            .andExpect(jsonPath("$[3].data[0].values[0]").value(1))
+            .andExpect(jsonPath("$[3].data[0].values[0]").value(2))
             .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
             .andExpect(jsonPath("$[4].data[0].value").value(0))
             .andExpect(jsonPath("$[5].name").value("Percent Conformance"))
-            .andExpect(jsonPath("$[5].data[0].value").value(17))
+            .andExpect(jsonPath("$[5].data[0].value").value(67))
             .andExpect(jsonPath("$[6].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[6].data[0].x[0]").value(1))
-            .andExpect(jsonPath("$[6].data[0].y[0]").value("HPC"))
+            .andExpect(jsonPath("$[6].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$[6].data[0].y[0]").value("Endotoxin"))
             .andExpect(jsonPath("$[7].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[7].data[0].x[0]").value(1))
+            .andExpect(jsonPath("$[7].data[0].x[0]").value(2))
             .andExpect(jsonPath("$[7].data[0].y[0]").value("Cooling Tower"))
             .andExpect(jsonPath("$[8].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[8].data[0].x[0]").value(1))
+            .andExpect(jsonPath("$[8].data[0].x[0]").value(2))
             .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
 
         Graph persistedWaterQualityGraph = reloadGraph(graphs.waterQualityGraph().getId());
@@ -163,15 +163,17 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
-            .andExpect(jsonPath("$[3].data[0].values[0]").value(2))
+            .andExpect(jsonPath("$[3].data[0].values[0]").value(3))
             .andExpect(jsonPath("$[6].name").value("Non-Conformances"))
             .andExpect(jsonPath("$[6].data[0].x[0]").value(2))
-            .andExpect(jsonPath("$[6].data[0].y[0]").value("HPC"))
+            .andExpect(jsonPath("$[6].data[0].y[0]").value("Endotoxin"))
+            .andExpect(jsonPath("$[6].data[0].x[1]").value(1))
+            .andExpect(jsonPath("$[6].data[0].y[1]").value("HPC"))
             .andExpect(jsonPath("$[7].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[7].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$[7].data[0].x[0]").value(3))
             .andExpect(jsonPath("$[7].data[0].y[0]").value("Cooling Tower"))
             .andExpect(jsonPath("$[8].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[8].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$[8].data[0].x[0]").value(3))
             .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
@@ -580,7 +582,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     ) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Dashboard");
+            Sheet sheet = workbook.createSheet("Validation");
 
             Row metricRow = sheet.createRow(0);
             metricRow.createCell(5).setCellValue("HPC");
@@ -643,7 +645,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     ) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Dashboard");
+            Sheet sheet = workbook.createSheet("Validation");
 
             Row metricRow = sheet.createRow(4);
             metricRow.createCell(5).setCellValue("HPC");

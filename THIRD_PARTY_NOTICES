@@ -1,2 +1,51 @@
-To all third-parties explicitly licensed in writing as a contractor or other service, this software contains the 
-following packages as a dependency as per their relevant Apache, MIT, or BSD licenses:
+THIRD-PARTY NOTICES
+
+This product includes third-party software components. The components listed below
+are used by this repository and are provided under their respective open-source
+licenses (including Apache-2.0, MIT, BSD-family, and other permissive licenses).
+
+Backend (Java / Gradle)
+- org.springframework.boot:spring-boot-starter-web
+- org.springframework.boot:spring-boot-starter-security
+- org.springframework.boot:spring-boot-starter-oauth2-resource-server
+- org.springframework.boot:spring-boot-starter-validation
+- org.springframework.boot:spring-boot-starter-actuator
+- org.springframework.boot:spring-boot-starter-mail
+- org.springframework.boot:spring-boot-starter-data-jpa
+- io.awspring.cloud:spring-cloud-aws-starter
+- io.awspring.cloud:spring-cloud-aws-starter-ses
+- com.digitalsanctuary:ds-spring-cf-turnstile
+- com.github.ben-manes.caffeine:caffeine
+- com.fasterxml.jackson.core:jackson-databind
+- org.apache.poi:poi-ooxml
+- dev.matrixlab.webp4j:webp4j-core
+- org.postgresql:postgresql
+- org.springframework.security:spring-security-test
+- org.springframework.boot:spring-boot-starter-test
+
+Frontend (Node / npm workspaces)
+- @nerimity/solid-turnstile
+- @solidjs/router
+- corvu
+- frappe-gantt
+- plotly.js-dist-min
+- solid-js
+- solid-motionone
+- solid-toast
+- solid-turnstile
+- theme-change
+- xlsx
+- zod
+- vite
+- vite-plugin-solid
+- vitest
+- typescript
+- tailwindcss
+- postcss
+- autoprefixer
+- daisyui
+
+License and Copyright
+Each third-party component is licensed and copyrighted by its respective
+authors and contributors. Full license texts and any required notices should be
+obtained from the corresponding package distribution and/or upstream repository.

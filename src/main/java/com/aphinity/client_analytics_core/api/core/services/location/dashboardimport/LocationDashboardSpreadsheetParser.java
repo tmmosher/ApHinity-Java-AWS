@@ -3,7 +3,6 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.CellValue;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
@@ -508,18 +507,13 @@ public class LocationDashboardSpreadsheetParser {
             throw invalidSpreadsheet("Row " + rowNumber + ": Date column is blank.");
         }
 
-        CellType effectiveType = cell.getCellType() == CellType.FORMULA
-            ? evaluator.evaluateFormulaCell(cell)
-            : cell.getCellType();
+        CellType effectiveType = effectiveCellType(cell);
         if (effectiveType == CellType.NUMERIC) {
-            CellValue evaluatedCell = cell.getCellType() == CellType.FORMULA ? evaluator.evaluate(cell) : null;
-            double numericDate = evaluatedCell == null ? cell.getNumericCellValue() : evaluatedCell.getNumberValue();
+            double numericDate = cell.getNumericCellValue();
             return DateUtil.getLocalDateTime(numericDate).toLocalDate();
         }
 
-        String rawValue = cell.getCellType() == CellType.FORMULA
-            ? evaluator.evaluate(cell).formatAsString()
-            : cell.toString();
+        String rawValue = normalizeCellText(cell, new DataFormatter(Locale.US), evaluator);
         String normalizedText = blankToNull(rawValue == null ? null : rawValue.strip());
         if (normalizedText == null) {
             throw invalidSpreadsheet("Row " + rowNumber + ": Date column is blank.");
@@ -537,12 +531,9 @@ public class LocationDashboardSpreadsheetParser {
         if (cell == null || rawValue == null) {
             return null;
         }
-        CellType effectiveType = cell.getCellType() == CellType.FORMULA
-            ? evaluator.evaluateFormulaCell(cell)
-            : cell.getCellType();
+        CellType effectiveType = effectiveCellType(cell);
         if (effectiveType == CellType.NUMERIC && !DateUtil.isCellDateFormatted(cell)) {
-            CellValue evaluatedCell = cell.getCellType() == CellType.FORMULA ? evaluator.evaluate(cell) : null;
-            double numericValue = evaluatedCell == null ? cell.getNumericCellValue() : evaluatedCell.getNumberValue();
+            double numericValue = cell.getNumericCellValue();
             return BigDecimal.valueOf(numericValue);
         }
 
@@ -630,8 +621,38 @@ public class LocationDashboardSpreadsheetParser {
         if (cell == null) {
             return "";
         }
+        if (cell.getCellType() == CellType.FORMULA) {
+            return formatFormulaCellFromCache(cell, formatter);
+        }
         String value = formatter.formatCellValue(cell, evaluator);
         return value == null ? "" : value.strip();
+    }
+
+    private CellType effectiveCellType(Cell cell) {
+        if (cell == null) {
+            return CellType.BLANK;
+        }
+        return cell.getCellType() == CellType.FORMULA
+            ? cell.getCachedFormulaResultType()
+            : cell.getCellType();
+    }
+
+    private String formatFormulaCellFromCache(Cell cell, DataFormatter formatter) {
+        CellType cachedType = effectiveCellType(cell);
+        return switch (cachedType) {
+            case NUMERIC -> formatter.formatRawCellContents(
+                cell.getNumericCellValue(),
+                cell.getCellStyle() == null ? -1 : cell.getCellStyle().getDataFormat(),
+                cell.getCellStyle() == null ? null : cell.getCellStyle().getDataFormatString()
+            ).strip();
+            case STRING -> {
+                String value = cell.getStringCellValue();
+                yield value == null ? "" : value.strip();
+            }
+            case BOOLEAN -> Boolean.toString(cell.getBooleanCellValue());
+            case BLANK, ERROR, _NONE -> "";
+            default -> "";
+        };
     }
 
     private String normalizeHeader(String header) {
