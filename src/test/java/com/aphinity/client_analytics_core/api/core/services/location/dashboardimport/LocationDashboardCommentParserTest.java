@@ -4,7 +4,11 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.structuredComment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,46 +17,31 @@ class LocationDashboardCommentParserTest {
     void parseStructuredCommentPreservesPrimaryAndSupplementalSamples() {
         LocationDashboardCommentParser parser = new LocationDashboardCommentParser();
 
-        LocationDashboardCommentParser.ParsedComment parsed = parser.parse("""
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Cooling Tower Sample Port",
-              "primarySample": {
-                "sampledOn": "2025-08-01",
-                "resultReceivedOn": "2025-08-05",
-                "resultRaw": "10 CFU.mL",
-                "resultValue": 10,
-                "resultUnit": "CFU.mL",
-                "notes": ["Primary sample note"],
-                "correctiveActions": [
-                  {
-                    "text": "Primary sample action"
-                  }
-                ]
-              },
-              "followUpSamples": [
-                {
-                  "sampledOn": "2025-08-15",
-                  "resultReceivedOn": "2025-08-20",
-                  "resultRaw": "5 CFU.mL",
-                  "resultValue": 5,
-                  "resultUnit": "CFU.mL",
-                  "notes": ["Follow-up sample note"],
-                  "correctiveActions": [
-                    {
-                      "text": "Follow-up sample action"
-                    }
-                  ]
-                }
-              ],
-              "correctiveActions": [
-                "Root corrective action"
-              ],
-              "notes": [
-                "General note"
-              ]
-            }
-            """);
+        LocationDashboardCommentParser.ParsedComment parsed = parser.parse(structuredComment(
+            new LocationDashboardCommentFixtures.StructuredCommentSpec(
+                "Cooling Tower Sample Port",
+                sample(
+                    LocalDate.parse("2025-08-01"),
+                    LocalDate.parse("2025-08-05"),
+                    "10 CFU.mL",
+                    new BigDecimal("10"),
+                    "CFU.mL",
+                    List.of("Primary sample note"),
+                    List.of(correctiveAction("Primary sample action"))
+                ),
+                List.of(sample(
+                    LocalDate.parse("2025-08-15"),
+                    LocalDate.parse("2025-08-20"),
+                    "5 CFU.mL",
+                    new BigDecimal("5"),
+                    "CFU.mL",
+                    List.of("Follow-up sample note"),
+                    List.of(correctiveAction("Follow-up sample action"))
+                )),
+                List.of(correctiveAction("Root corrective action")),
+                List.of("General note")
+            )
+        ));
 
         assertTrue(parsed.structured());
         assertEquals("Cooling Tower Sample Port", parsed.sampleLocation());

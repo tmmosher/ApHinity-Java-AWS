@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -33,8 +34,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -242,7 +247,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         createUser("admin-locations@example.com", PASSWORD, true, "admin");
         AuthCookies authCookies = loginAndCaptureCookies("admin-locations@example.com", PASSWORD);
 
-        mockMvc.perform(
+        MvcResult result = mockMvc.perform(
                 post("/api/core/locations")
                     .cookie(authCookies(authCookies))
                     .with(csrfDoubleSubmit())
@@ -252,9 +257,18 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
                         """)
             )
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.name").value("Phoenix"));
+            .andExpect(jsonPath("$.name").value("Phoenix"))
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
 
+        String createdUpdatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
         assertTrue(locationRepository.findByName("Phoenix").isPresent());
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}", locationRepository.findByName("Phoenix").orElseThrow().getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updatedAt").value(createdUpdatedAt));
     }
 
     @Test
@@ -322,6 +336,16 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         Location updatedLocation = locationRepository.findById(location.getId()).orElseThrow();
         assertTrue(updatedLocation.getUpdatedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
         assertThat(result.getResponse().getContentAsString()).contains("Pump station visit");
+
+        String createdUpdatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .accept(APPLICATION_JSON)
+                    .param("month", "2026-04")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].updatedAt").value(createdUpdatedAt));
     }
 
     @Test
@@ -494,6 +518,60 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.code").value("forbidden"));
 
         assertEquals(1L, serviceEventRepository.count());
+    }
+
+    @Test
+    void createCorrectiveActionReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-corrective-action-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Palm Springs");
+        location.setWorkOrderEmail("workorders@example.com");
+        locationRepository.saveAndFlush(location);
+        ServiceEvent sourceEvent = createServiceEvent(
+            location,
+            "Source event",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-03-14"),
+            LocalTime.parse("09:00:00"),
+            LocalDate.parse("2026-03-14"),
+            LocalTime.parse("10:00:00"),
+            "Source description",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-corrective-action-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                post("/api/core/locations/{locationId}/events/{sourceEventId}/corrective-actions", location.getId(), sourceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Corrective action",
+                          "responsibility": "partner",
+                          "date": "2026-04-15",
+                          "time": "10:15:00",
+                          "endDate": "2026-04-15",
+                          "endTime": "12:00:00",
+                          "description": "Corrective action description",
+                          "status": "upcoming"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .accept(APPLICATION_JSON)
+                    .param("month", "2026-04")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].title").value(hasItem("Corrective action")))
+            .andExpect(jsonPath("$[?(@.title == 'Corrective action')].updatedAt").value(hasItem(updatedAt)));
     }
 
     @Test
@@ -974,6 +1052,62 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void updateLocationGraphsAcceptsExpectedUpdatedAtReturnedFromRenameEndpoint() throws Exception {
+        createUser("partner-graph-rename-followup@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Prescott");
+        Graph graph = createGraph("Rename then update", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        addLocationGraph(location, graph);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graph-rename-followup@example.com", PASSWORD);
+
+        MvcResult renameResult = mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs/{graphId}/name", location.getId(), graph.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"Renamed graph"}
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.graphId").value(graph.getId()))
+            .andExpect(jsonPath("$.name").value("Renamed graph"))
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String renamedUpdatedAt = extractJsonStringField(renameResult.getResponse().getContentAsString(), "updatedAt");
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": %d,
+                              "expectedUpdatedAt": "%s",
+                              "data": [{"type": "bar", "y": [9, 8, 7]}]
+                            }
+                          ]
+                        }
+                        """.formatted(graph.getId(), renamedUpdatedAt))
+            )
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(graph.getId()))
+            .andExpect(jsonPath("$[0].name").value("Renamed graph"))
+            .andExpect(jsonPath("$[0].data[0].orientation").value("h"))
+            .andExpect(jsonPath("$[0].data[0].x[0]").value(9));
+    }
+
+    @Test
     void updateLocationGraphNameRejectsMismatchedCsrfToken() throws Exception {
         createUser("partner-graph-rename-csrf@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Surprise");
@@ -1018,6 +1152,128 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
 
         Graph persisted = graphRepository.findById(graph.getId()).orElseThrow();
         assertEquals("Client rename graph", persisted.getName());
+    }
+
+    @Test
+    void updateLocationNameReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-location-update-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Apache Junction");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-location-update-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                put("/api/core/locations/{locationId}", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"name":"Apache Junction Updated"}
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Apache Junction Updated"))
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updatedAt").value(updatedAt));
+    }
+
+    @Test
+    void updateLocationWorkOrderEmailReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-location-email-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Casa Grande");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-location-email-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                put("/api/core/locations/{locationId}/work-order-email", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"workOrderEmail":"dispatch@example.com"}
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.workOrderEmail").value("dispatch@example.com"))
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updatedAt").value(updatedAt));
+    }
+
+    @Test
+    void updateLocationThumbnailReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-location-thumbnail-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Chandler");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-location-thumbnail-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/thumbnail", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "thumbnail.png",
+                        "image/png",
+                        createPngThumbnail()
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.thumbnailAvailable").value(true))
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updatedAt").value(updatedAt))
+            .andExpect(jsonPath("$.thumbnailAvailable").value(true));
+    }
+
+    @Test
+    void createLocationGraphReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-graph-create-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Fountain Hills");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-graph-create-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                post("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "createNewSection": true,
+                          "graphType": "bar"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].updatedAt").value(updatedAt));
     }
 
     @Test
@@ -1100,6 +1356,181 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals("v", traces.getFirst().get("orientation"));
         assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("x"));
         assertEquals(List.of(6L, 8L), traces.getFirst().get("y"));
+    }
+
+    @Test
+    void updateLocationEventReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-event-update-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Monterey Park");
+        ServiceEvent serviceEvent = createServiceEvent(
+            location,
+            "Original event",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2026-04-10"),
+            LocalTime.parse("08:00:00"),
+            LocalDate.parse("2026-04-10"),
+            LocalTime.parse("09:00:00"),
+            "Original description",
+            ServiceEventStatus.UPCOMING
+        );
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-event-update-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                put("/api/core/locations/{locationId}/events/{eventId}", location.getId(), serviceEvent.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Updated event",
+                          "responsibility": "partner",
+                          "date": "2026-04-11",
+                          "time": "10:30:00",
+                          "endDate": "2026-04-11",
+                          "endTime": "11:45:00",
+                          "description": "Updated description",
+                          "status": "current"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/events", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .accept(APPLICATION_JSON)
+                    .param("month", "2026-04")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].updatedAt").value(updatedAt));
+    }
+
+    @Test
+    void createGanttTaskReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-gantt-create-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Beverly Hills");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-gantt-create-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                post("/api/core/locations/{locationId}/gantt-tasks", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Task Alpha",
+                          "startDate": "2026-05-01",
+                          "endDate": "2026-05-03",
+                          "description": "Task description",
+                          "dependencyTaskIds": []
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/gantt-tasks", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].updatedAt").value(updatedAt));
+    }
+
+    @Test
+    void createGanttTasksBulkReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-gantt-bulk-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Glendale");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-gantt-bulk-timestamp@example.com", PASSWORD);
+
+        MvcResult result = mockMvc.perform(
+                post("/api/core/locations/{locationId}/gantt-tasks/bulk", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        [
+                          {
+                            "title": "Bulk task",
+                            "startDate": "2026-05-04",
+                            "endDate": "2026-05-06",
+                            "description": "Bulk task description",
+                            "dependencyTaskIds": []
+                          }
+                        ]
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$[0].updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(result.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/gantt-tasks", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].updatedAt").value(updatedAt));
+    }
+
+    @Test
+    void updateGanttTaskReturnsPersistedUpdatedAt() throws Exception {
+        createUser("partner-gantt-update-timestamp@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Pasadena");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-gantt-update-timestamp@example.com", PASSWORD);
+
+        MvcResult createResult = mockMvc.perform(
+                post("/api/core/locations/{locationId}/gantt-tasks", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Task Beta",
+                          "startDate": "2026-05-02",
+                          "endDate": "2026-05-04",
+                          "description": "Before update",
+                          "dependencyTaskIds": []
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").isNumber())
+            .andReturn();
+
+        String taskId = extractJsonNumberField(createResult.getResponse().getContentAsString(), "id");
+        MvcResult updateResult = mockMvc.perform(
+                put("/api/core/locations/{locationId}/gantt-tasks/{taskId}", location.getId(), Long.parseLong(taskId))
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Task Beta Updated",
+                          "startDate": "2026-05-03",
+                          "endDate": "2026-05-06",
+                          "description": "After update",
+                          "dependencyTaskIds": []
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+            .andReturn();
+
+        String updatedAt = extractJsonStringField(updateResult.getResponse().getContentAsString(), "updatedAt");
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/gantt-tasks", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].updatedAt").value(updatedAt));
     }
 
     @Test
@@ -1782,6 +2213,29 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         }
         // CookieCsrfTokenRepository validates by matching header and cookie values.
         return UUID.randomUUID().toString();
+    }
+
+    private String extractJsonStringField(String json, String fieldName) {
+        Matcher matcher = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*\"([^\"]+)\"")
+            .matcher(json);
+        assertTrue(matcher.find(), () -> "Expected JSON string field \"" + fieldName + "\" in: " + json);
+        return matcher.group(1);
+    }
+
+    private String extractJsonNumberField(String json, String fieldName) {
+        Matcher matcher = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*(\\d+)")
+            .matcher(json);
+        assertTrue(matcher.find(), () -> "Expected JSON numeric field \"" + fieldName + "\" in: " + json);
+        return matcher.group(1);
+    }
+
+    private byte[] createPngThumbnail() throws IOException {
+        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, 0x336699);
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "png", outputStream);
+            return outputStream.toByteArray();
+        }
     }
 
     private byte[] createServiceCalendarSpreadsheet(List<String> headerRow, List<String> dataRow) throws IOException {

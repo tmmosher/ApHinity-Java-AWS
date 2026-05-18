@@ -8,6 +8,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.structuredComment;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookStyleComment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -52,47 +56,29 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportReadsStructuredCommentSamplesAsSupplementalObservations() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Cooling Tower Sample Port",
-              "primarySample": {
-                "sampledOn": "2025-08-01",
-                "resultReceivedOn": "2025-08-05",
-                "resultRaw": "10 CFU.mL",
-                "resultValue": 10,
-                "resultUnit": "CFU.mL",
-                "notes": ["30 sec. flush with sample port wipe down."],
-                "correctiveActions": [
-                  {
-                    "text": "New sample port installed"
-                  }
-                ]
-              },
-              "followUpSamples": [
-                {
-                  "sampledOn": "2025-08-15",
-                  "resultReceivedOn": "2025-08-20",
-                  "resultRaw": "5 CFU.mL",
-                  "resultValue": 5,
-                  "resultUnit": "CFU.mL",
-                  "correctiveActions": [
-                    {
-                      "text": "Flush and retest"
-                    }
-                  ]
-                }
-              ],
-              "correctiveActions": [
-                {
-                  "text": "External note"
-                }
-              ],
-              "notes": [
-                "General comment note"
-              ]
-            }
-            """;
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-08-05"),
+                "10 CFU.mL",
+                new BigDecimal("10"),
+                "CFU.mL",
+                List.of("30 sec. flush with sample port wipe down."),
+                List.of(correctiveAction("New sample port installed"))
+            ),
+            List.of(sample(
+                LocalDate.parse("2025-08-15"),
+                LocalDate.parse("2025-08-20"),
+                "5 CFU.mL",
+                new BigDecimal("5"),
+                "CFU.mL",
+                List.of(),
+                List.of(correctiveAction("Flush and retest"))
+            )),
+            List.of(correctiveAction("External note")),
+            List.of("General comment note")
+        ));
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbookWithCommentCell(structuredComment, "F5");
@@ -125,33 +111,27 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDoesNotCreateCorrectiveActionsForOutOfSpecStructuredCommentSamplesWhileCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Cooling Tower Sample Port",
-              "primarySample": {
-                "sampledOn": "2025-08-01",
-                "resultReceivedOn": "2025-08-05",
-                "resultRaw": "10 CFU.mL",
-                "resultValue": 10,
-                "resultUnit": "CFU.mL"
-              },
-              "followUpSamples": [
-                {
-                  "sampledOn": "2025-08-15",
-                  "resultReceivedOn": "2025-08-20",
-                  "resultRaw": "15 CFU.mL",
-                  "resultValue": 15,
-                  "resultUnit": "CFU.mL",
-                  "correctiveActions": [
-                    {
-                      "text": "Disinfect and retest"
-                    }
-                  ]
-                }
-              ]
-            }
-            """;
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-08-05"),
+                "10 CFU.mL",
+                new BigDecimal("10"),
+                "CFU.mL"
+            ),
+            List.of(sample(
+                LocalDate.parse("2025-08-15"),
+                LocalDate.parse("2025-08-20"),
+                "15 CFU.mL",
+                new BigDecimal("15"),
+                "CFU.mL",
+                List.of(),
+                List.of(correctiveAction("Disinfect and retest"))
+            )),
+            List.of(),
+            List.of()
+        ));
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbookWithCommentCell(structuredComment, "F5");
@@ -172,19 +152,19 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDoesNotDuplicatePrimaryStructuredCommentSamplesWhenTheyUseActualSampleDatesInsideTheWorksheetMonth() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Cooling Tower Sample Port",
-              "primarySample": {
-                "sampledOn": "2025-08-15",
-                "resultReceivedOn": "2025-08-20",
-                "resultRaw": "10 CFU.mL",
-                "resultValue": 10,
-                "resultUnit": "CFU.mL"
-              }
-            }
-            """;
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-15"),
+                LocalDate.parse("2025-08-20"),
+                "10 CFU.mL",
+                new BigDecimal("10"),
+                "CFU.mL"
+            ),
+            List.of(),
+            List.of(),
+            List.of()
+        ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbookWithCommentCell(structuredComment, "F5"),
@@ -206,33 +186,27 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDoesNotCreateCorrectiveActionForFailedFollowUpSamplesWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Cooling Tower Sample Port",
-              "primarySample": {
-                "sampledOn": "2025-08-01",
-                "resultReceivedOn": "2025-08-05",
-                "resultRaw": "5 CFU.mL",
-                "resultValue": 5,
-                "resultUnit": "CFU.mL"
-              },
-              "followUpSamples": [
-                {
-                  "sampledOn": "2025-08-15",
-                  "resultReceivedOn": "2025-08-20",
-                  "resultRaw": "15 CFU.mL",
-                  "resultValue": 15,
-                  "resultUnit": "CFU.mL",
-                  "correctiveActions": [
-                    {
-                      "text": "Disinfect and retest"
-                    }
-                  ]
-                }
-              ]
-            }
-            """;
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-08-05"),
+                "5 CFU.mL",
+                new BigDecimal("5"),
+                "CFU.mL"
+            ),
+            List.of(sample(
+                LocalDate.parse("2025-08-15"),
+                LocalDate.parse("2025-08-20"),
+                "15 CFU.mL",
+                new BigDecimal("15"),
+                "CFU.mL",
+                List.of(),
+                List.of(correctiveAction("Disinfect and retest"))
+            )),
+            List.of(),
+            List.of()
+        ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbookWithStructuredCommentAndPrimaryValue(structuredComment, new BigDecimal("5"), "5", "F5"),
@@ -250,33 +224,27 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDoesNotCreateSeparateCorrectiveActionForLaterMonthFailedFollowUpsWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Cooling Tower Sample Port",
-              "primarySample": {
-                "sampledOn": "2025-08-01",
-                "resultReceivedOn": "2025-08-05",
-                "resultRaw": "10 CFU.mL",
-                "resultValue": 10,
-                "resultUnit": "CFU.mL"
-              },
-              "followUpSamples": [
-                {
-                  "sampledOn": "2025-09-15",
-                  "resultReceivedOn": "2025-09-20",
-                  "resultRaw": "15 CFU.mL",
-                  "resultValue": 15,
-                  "resultUnit": "CFU.mL",
-                  "correctiveActions": [
-                    {
-                      "text": "Disinfect and retest"
-                    }
-                  ]
-                }
-              ]
-            }
-            """;
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-08-05"),
+                "10 CFU.mL",
+                new BigDecimal("10"),
+                "CFU.mL"
+            ),
+            List.of(sample(
+                LocalDate.parse("2025-09-15"),
+                LocalDate.parse("2025-09-20"),
+                "15 CFU.mL",
+                new BigDecimal("15"),
+                "CFU.mL",
+                List.of(),
+                List.of(correctiveAction("Disinfect and retest"))
+            )),
+            List.of(),
+            List.of()
+        ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbookWithCommentCell(structuredComment, "F5"),
@@ -393,33 +361,16 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportAcceptsMigratedStructuredCommentWhenWorksheetMatchesLabeledTestNote() {
+    void computeImportAcceptsWorkbookStyleRetestCommentWhenWorksheetCarriesOriginalFailedResult() {
         ConfiguredLocationDashboardImportStrategy strategy = criticalPhStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": null,
-              "primarySample": {
-                "sampledOn": "2025-09-03",
-                "resultReceivedOn": null,
-                "resultRaw": "6.8",
-                "resultValue": 6.8,
-                "resultUnit": null,
-                "notes": [],
-                "correctiveActions": []
-              },
-              "followUpSamples": [],
-              "correctiveActions": [
-                {
-                  "text": "Drain tank, install new DI bottles"
-                }
-              ],
-              "notes": [
-                "First Test: 7.6"
-              ]
-            }
-            """;
+        String commentText = workbookStyleComment(
+            "First Test: 7.6",
+            "Corrective Action: Drain tank, install new DI bottles",
+            "Sample Date: 8/3/25",
+            "Result Date: 8/5/25",
+            "Result: 6.8"
+        );
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
@@ -436,7 +387,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         LocalDate.parse("2025-08-01"),
                         "7.6",
                         new BigDecimal("7.6"),
-                        structuredComment,
+                        commentText,
                         "CB38"
                     ))
                 ))
@@ -447,7 +398,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals(1, result.correctiveActions().size());
         assertEquals(2, result.observations().size());
         assertTrue(result.observations().stream().anyMatch(observation ->
-            LocalDate.parse("2025-09-03").equals(observation.observedDate()) && observation.compliant()
+            LocalDate.parse("2025-08-03").equals(observation.observedDate()) && observation.compliant()
         ));
         assertTrue(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-08-01").equals(draft.observedDate())
@@ -459,31 +410,19 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDeduplicatesStructuredCommentPrimarySampleWhenItMatchesTheWorksheetSample() {
         ConfiguredLocationDashboardImportStrategy strategy = criticalPhStrategy();
 
-        String structuredComment = """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": null,
-              "primarySample": {
-                "sampledOn": "2026-01-01",
-                "resultReceivedOn": null,
-                "resultRaw": "7.6",
-                "resultValue": 7.6,
-                "resultUnit": null,
-                "notes": [],
-                "correctiveActions": []
-              },
-              "followUpSamples": [],
-              "correctiveActions": [
-                {
-                  "text": "Drain tank, install new DI bottles"
-                }
-              ],
-              "notes": [
-                "First Test: 7.6",
-                "Second Test: 6.8"
-              ]
-            }
-            """;
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            null,
+            sample(
+                LocalDate.parse("2026-01-01"),
+                null,
+                "7.6",
+                new BigDecimal("7.6"),
+                null
+            ),
+            List.of(),
+            List.of(correctiveAction("Drain tank, install new DI bottles")),
+            List.of("First Test: 7.6", "Second Test: 6.8")
+        ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(

@@ -257,171 +257,42 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         InjectedCommentPlan plan
     ) {
         LocalDate primarySampledOn = withDayOfMonth(cell.observedDate(), 15);
-        StringBuilder followUpSamples = new StringBuilder();
-        for (int index = 0; index < plan.followUpSamples().size(); index += 1) {
-            SupplementalFailurePlan supplementalPlan = plan.followUpSamples().get(index);
-            LocalDate sampledOn = primarySampledOn.plusDays(supplementalPlan.dayOffset());
-            if (index > 0) {
-                followUpSamples.append(",\n");
-            }
-            followUpSamples.append("""
-                {
-                  "sampledOn": "%s",
-                  "resultReceivedOn": "%s",
-                  "resultRaw": "%s",
-                  "resultValue": %s,
-                  "resultUnit": "CFU.mL",
-                  "notes": [],
-                  "correctiveActions": [],
-                  "sampleLocation": null
-                }""".formatted(
-                sampledOn,
-                sampledOn.plusDays(4),
-                supplementalPlan.resultValue().toPlainString() + " CFU.mL",
-                jsonNumber(supplementalPlan.resultValue())
-            ));
-        }
-
-        return """
-            {
-              "schema": "aphinity.location-dashboard.comment.v1",
-              "sampleLocation": "Parser Delta Control %s",
-              "primarySample": {
-                "sampledOn": "%s",
-                "resultReceivedOn": "%s",
-                "resultRaw": "%s",
-                "resultValue": %s,
-                "resultUnit": null,
-                "notes": [],
-                "correctiveActions": [],
-                "sampleLocation": null
-              },
-              "followUpSamples": [
-            %s
-              ],
-              "correctiveActions": [],
-              "notes": [
-                "%s"
-              ]
-            }
-            """.formatted(
-            plan.cellReference(),
-            primarySampledOn,
-            primarySampledOn.plusDays(4),
-            escapeJson(cell.rawValue()),
-            jsonNumber(cell.numericValue()),
-            followUpSamples,
-            markerText(plan)
+        return LocationDashboardCommentFixtures.structuredComment(
+            new LocationDashboardCommentFixtures.StructuredCommentSpec(
+                "Parser Delta Control " + plan.cellReference(),
+                new LocationDashboardCommentFixtures.StructuredSample(
+                    primarySampledOn,
+                    primarySampledOn.plusDays(4),
+                    cell.rawValue(),
+                    cell.numericValue(),
+                    null,
+                    List.of(),
+                    List.of(),
+                    null
+                ),
+                plan.followUpSamples().stream()
+                    .map(supplementalPlan -> {
+                        LocalDate sampledOn = primarySampledOn.plusDays(supplementalPlan.dayOffset());
+                        return new LocationDashboardCommentFixtures.StructuredSample(
+                            sampledOn,
+                            sampledOn.plusDays(4),
+                            supplementalPlan.resultValue().toPlainString() + " CFU.mL",
+                            supplementalPlan.resultValue(),
+                            "CFU.mL",
+                            List.of(),
+                            List.of(),
+                            null
+                        );
+                    })
+                    .toList(),
+                List.of(),
+                List.of(markerText(plan))
+            )
         );
     }
 
     private String toStructuredCommentJson(LocationDashboardCommentParser.ParsedComment parsedComment) {
-        String primarySampleJson = toSampleJson(parsedComment.primarySample(), 2);
-        String followUpSamplesJson = parsedComment.followUpSamples().stream()
-            .map(sample -> toSampleJson(sample, 2))
-            .reduce((left, right) -> left + ",\n" + right)
-            .orElse("");
-        String correctiveActionsJson = parsedComment.correctiveActions().stream()
-            .map(action -> toCorrectiveActionJson(action, 2))
-            .reduce((left, right) -> left + ",\n" + right)
-            .orElse("");
-        String notesJson = parsedComment.notes().stream()
-            .map(note -> indent(2) + jsonString(note))
-            .reduce((left, right) -> left + ",\n" + right)
-            .orElse("");
-
-        return """
-            {
-              "schema": %s,
-              "sampleLocation": %s,
-              "primarySample": %s,
-              "followUpSamples": [
-            %s
-              ],
-              "correctiveActions": [
-            %s
-              ],
-              "notes": [
-            %s
-              ]
-            }
-            """.formatted(
-            jsonString(LocationDashboardCommentParser.SCHEMA_VERSION),
-            jsonStringOrNull(parsedComment.sampleLocation()),
-            primarySampleJson,
-            followUpSamplesJson,
-            correctiveActionsJson,
-            notesJson
-        );
-    }
-
-    private String toSampleJson(LocationDashboardCommentParser.ParsedCommentSample sample, int indentLevel) {
-        if (sample == null) {
-            return "null";
-        }
-        String notesJson = sample.notes().stream()
-            .map(note -> indent(indentLevel + 2) + jsonString(note))
-            .reduce((left, right) -> left + ",\n" + right)
-            .orElse("");
-        String correctiveActionsJson = sample.correctiveActions().stream()
-            .map(action -> toCorrectiveActionJson(action, indentLevel + 2))
-            .reduce((left, right) -> left + ",\n" + right)
-            .orElse("");
-
-        return """
-            {
-            %s"sampledOn": %s,
-            %s"resultReceivedOn": %s,
-            %s"resultRaw": %s,
-            %s"resultValue": %s,
-            %s"resultUnit": %s,
-            %s"notes": [
-            %s
-            %s],
-            %s"correctiveActions": [
-            %s
-            %s]
-            %s}""".formatted(
-            indent(indentLevel + 1), jsonStringOrNull(sample.sampledOn()),
-            indent(indentLevel + 1), jsonStringOrNull(sample.resultReceivedOn()),
-            indent(indentLevel + 1), jsonStringOrNull(sample.resultRaw()),
-            indent(indentLevel + 1), jsonNumberOrNull(sample.resultValue()),
-            indent(indentLevel + 1), jsonStringOrNull(sample.resultUnit()),
-            indent(indentLevel + 1),
-            notesJson,
-            indent(indentLevel + 1),
-            indent(indentLevel + 1),
-            correctiveActionsJson,
-            indent(indentLevel + 1),
-            indent(indentLevel)
-        );
-    }
-
-    private String toCorrectiveActionJson(
-        LocationDashboardCommentParser.ParsedCommentCorrectiveAction action,
-        int indentLevel
-    ) {
-        String notesJson = action.notes().stream()
-            .map(note -> indent(indentLevel + 2) + jsonString(note))
-            .reduce((left, right) -> left + ",\n" + right)
-            .orElse("");
-        return """
-            {
-            %s"actionDate": %s,
-            %s"text": %s,
-            %s"ticket": %s,
-            %s"notes": [
-            %s
-            %s]
-            %s}""".formatted(
-            indent(indentLevel + 1), jsonStringOrNull(action.actionDate()),
-            indent(indentLevel + 1), jsonStringOrNull(action.text()),
-            indent(indentLevel + 1), jsonStringOrNull(action.ticket()),
-            indent(indentLevel + 1),
-            notesJson,
-            indent(indentLevel + 1),
-            indent(indentLevel)
-        );
+        return LocationDashboardCommentFixtures.structuredComment(parsedComment);
     }
 
     private String markerText(InjectedCommentPlan plan) {
@@ -454,34 +325,6 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         }
         return worksheetObservedDate.getYear() == commentSampleDate.getYear()
             && worksheetObservedDate.getMonth() == commentSampleDate.getMonth();
-    }
-
-    private String jsonNumber(BigDecimal value) {
-        return value.stripTrailingZeros().toPlainString();
-    }
-
-    private String jsonNumberOrNull(BigDecimal value) {
-        return value == null ? "null" : jsonNumber(value);
-    }
-
-    private String jsonStringOrNull(Object value) {
-        return value == null ? "null" : jsonString(value.toString());
-    }
-
-    private String jsonString(String value) {
-        return "\"" + escapeJson(value) + "\"";
-    }
-
-    private String indent(int level) {
-        return "  ".repeat(Math.max(0, level));
-    }
-
-    private String escapeJson(String value) {
-        return value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\r", "\\r")
-            .replace("\n", "\\n");
     }
 
     private List<MeasurementBound> hoagMeasurementBounds() {

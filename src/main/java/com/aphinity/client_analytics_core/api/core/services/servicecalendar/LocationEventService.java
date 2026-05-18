@@ -9,6 +9,8 @@ import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -25,6 +27,9 @@ import java.util.List;
 @Service
 public class LocationEventService {
     private static final Logger log = LoggerFactory.getLogger(LocationEventService.class);
+
+    @Autowired(required = false)
+    private EntityManager entityManager;
 
     private final LocationRepository locationRepository;
     private final ServiceEventRepository serviceEventRepository;
@@ -92,6 +97,7 @@ public class LocationEventService {
 
         try {
             ServiceEvent persisted = serviceEventRepository.saveAndFlush(serviceEvent);
+            persisted = refreshServiceEventFromStore(persisted.getId(), persisted);
             auditService.recordCreated(userId, persisted);
             ServiceEventResponse response = requestMapper.toResponse(persisted);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
@@ -132,6 +138,7 @@ public class LocationEventService {
 
         try {
             ServiceEvent persisted = serviceEventRepository.saveAndFlush(correctiveAction);
+            persisted = refreshServiceEventFromStore(persisted.getId(), persisted);
             auditService.recordCreated(userId, persisted);
 
             ServiceEventResponse response = requestMapper.toResponse(persisted);
@@ -183,6 +190,7 @@ public class LocationEventService {
 
         try {
             ServiceEvent persisted = serviceEventRepository.saveAndFlush(serviceEvent);
+            persisted = refreshServiceEventFromStore(persisted.getId(), persisted);
             auditService.recordUpdated(userId, persisted);
             // touchUpdatedAt() clears the persistence context, so map the response first while
             // any lazy corrective-action source proxy is still attached.
@@ -199,6 +207,21 @@ public class LocationEventService {
             );
             throw ex;
         }
+    }
+
+    private ServiceEvent refreshServiceEventFromStore(Long eventId, ServiceEvent fallbackEvent) {
+        if (entityManager != null) {
+            if (entityManager.contains(fallbackEvent)) {
+                entityManager.refresh(fallbackEvent);
+                return fallbackEvent;
+            }
+
+            ServiceEvent refreshedEvent = entityManager.find(ServiceEvent.class, eventId);
+            if (refreshedEvent != null) {
+                return refreshedEvent;
+            }
+        }
+        return serviceEventRepository.findById(eventId).orElse(fallbackEvent);
     }
 
     @Transactional

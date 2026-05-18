@@ -179,12 +179,7 @@ final class LocationDashboardImportContextResolver {
             return aliasGroup.representativeSystemType();
         }
 
-        SystemTypeConfig resolvedSystemType = systemsByAlias.get(normalizedSystem);
-        if (resolvedSystemType != null) {
-            return resolvedSystemType;
-        }
-
-        return null;
+        return systemsByAlias.get(normalizedSystem);
     }
 
     private boolean matchesAny(String candidate, List<String> rawAliases) {

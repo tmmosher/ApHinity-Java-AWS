@@ -28,6 +28,8 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
+import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -56,6 +58,9 @@ import java.util.Set;
 @Service
 public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
+
+    @Autowired(required = false)
+    private EntityManager entityManager;
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -612,6 +617,7 @@ public class LocationService {
             throw locationNameInUse();
         }
 
+        location = refreshLocationFromStore(location.getId(), location);
         return toLocationResponse(location, user);
     }
 
@@ -643,6 +649,7 @@ public class LocationService {
             throw ex;
         }
 
+        location = refreshLocationFromStore(location.getId(), location);
         return toLocationResponse(location, user);
     }
 
@@ -674,6 +681,7 @@ public class LocationService {
             throw ex;
         }
 
+        location = refreshLocationFromStore(location.getId(), location);
         return toLocationResponse(location, user);
     }
 
@@ -798,6 +806,7 @@ public class LocationService {
             throw locationNameInUse();
         }
 
+        location = refreshLocationFromStore(location.getId(), location);
         return toLocationResponse(location, user);
     }
 
@@ -1405,7 +1414,33 @@ public class LocationService {
     }
 
     private Graph refreshGraphFromStore(Long graphId, Graph fallbackGraph) {
+        if (entityManager != null) {
+            if (entityManager.contains(fallbackGraph)) {
+                entityManager.refresh(fallbackGraph);
+                return fallbackGraph;
+            }
+
+            Graph refreshedGraph = entityManager.find(Graph.class, graphId);
+            if (refreshedGraph != null) {
+                return refreshedGraph;
+            }
+        }
         return graphRepository.findById(graphId).orElse(fallbackGraph);
+    }
+
+    private Location refreshLocationFromStore(Long locationId, Location fallbackLocation) {
+        if (entityManager != null) {
+            if (entityManager.contains(fallbackLocation)) {
+                entityManager.refresh(fallbackLocation);
+                return fallbackLocation;
+            }
+
+            Location refreshedLocation = entityManager.find(Location.class, locationId);
+            if (refreshedLocation != null) {
+                return refreshedLocation;
+            }
+        }
+        return locationRepository.findById(locationId).orElse(fallbackLocation);
     }
 
     private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(

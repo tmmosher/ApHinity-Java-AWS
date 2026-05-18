@@ -16,7 +16,6 @@ import java.util.Set;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SublocationConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeAliasConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeConfig;
@@ -32,14 +31,13 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     // - strict structured comment validation in LocationDashboardSampleImportPipeline.validatePrimaryCommentSample(...)
     // - the dormant comment corrective-action helpers in this strategy
     // - the dedicated drafting policy in LocationDashboardCorrectiveActionDraftFactory
-    private static final boolean ENABLE_COMMENT_DERIVED_CORRECTIVE_ACTIONS = false;
+    private static final boolean ENABLE_COMMENT_DERIVED_CORRECTIVE_ACTIONS = true;
 
     private final LocationDashboardImportStrategyConfig config;
     private final Map<String, SystemTypeConfig> systemsByAlias;
     private final Map<String, SystemTypeAliasGroup> systemTypeAliasGroupsByAlias;
     private final Map<String, List<SublocationConfig>> sublocationsByFacilityAlias;
     private final Map<String, SublocationConfig> defaultSublocationsByFacilityAlias;
-    private final Map<String, List<GraphConfig>> graphsBySublocationKey;
     private final LocationDashboardCommentParser commentParser;
     private final LocationDashboardImportContextResolver contextResolver;
     private final LocationDashboardSampleImportPipeline sampleImportPipeline;
@@ -55,7 +53,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         );
         this.sublocationsByFacilityAlias = buildSublocationsByFacilityAlias(this.config.sublocations());
         this.defaultSublocationsByFacilityAlias = buildDefaultSublocationsByFacilityAlias(this.config.sublocations());
-        this.graphsBySublocationKey = buildGraphsBySublocationKey(this.config.graphs());
+        Map<String, List<GraphConfig>> graphsBySublocationKey = buildGraphsBySublocationKey(this.config.graphs());
         this.commentParser = new LocationDashboardCommentParser();
         this.contextResolver = new LocationDashboardImportContextResolver(
             this.config,
@@ -69,7 +67,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             this.commentParser,
             ENABLE_COMMENT_DERIVED_CORRECTIVE_ACTIONS
         );
-        this.observationAggregator = new LocationDashboardObservationAggregator(this.graphsBySublocationKey, this.config.graphs());
+        this.observationAggregator = new LocationDashboardObservationAggregator(graphsBySublocationKey, this.config.graphs());
         this.correctiveActionDraftFactory = new LocationDashboardCorrectiveActionDraftFactory();
     }
 
@@ -641,15 +639,11 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             return aliasGroup.representativeSystemType();
         }
 
-        SystemTypeConfig resolvedSystemType = systemsByAlias.get(normalizedSystem);
-        if (resolvedSystemType != null) {
-            return resolvedSystemType;
-        }
+        return systemsByAlias.get(normalizedSystem);
 
         // Only blank workbook cells inherit the prior row's system type. A nonblank
         // but unrecognized value should stay unresolved rather than contaminating the
         // previous system bucket.
-        return null;
     }
 
     private java.util.Optional<CorrectiveActionDraft> buildCorrectiveActionDraft(

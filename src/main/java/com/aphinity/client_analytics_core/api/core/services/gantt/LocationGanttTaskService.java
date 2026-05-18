@@ -7,6 +7,8 @@ import com.aphinity.client_analytics_core.api.core.repositories.gantt.GanttTaskR
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.requests.gantt.LocationGanttTaskRequest;
 import com.aphinity.client_analytics_core.api.core.response.gantt.GanttTaskResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityManager;
 import org.springframework.core.io.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,9 @@ import java.util.List;
 @Service
 public class LocationGanttTaskService {
     private static final Logger log = LoggerFactory.getLogger(LocationGanttTaskService.class);
+
+    @Autowired(required = false)
+    private EntityManager entityManager;
 
     private final LocationRepository locationRepository;
     private final GanttTaskRepository ganttTaskRepository;
@@ -92,6 +97,7 @@ public class LocationGanttTaskService {
         GanttTask task = requestMapper.createTask(location, request);
         try {
             GanttTask persisted = ganttTaskRepository.saveAndFlush(task);
+            persisted = refreshGanttTaskFromStore(persisted.getId(), persisted);
             List<Long> dependencyTaskIds = dependencyService.replaceDependencies(persisted, request.dependencyTaskIds());
             auditService.recordCreated(userId, persisted, dependencyTaskIds);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
@@ -130,7 +136,7 @@ public class LocationGanttTaskService {
             List<GanttTask> persisted = ganttTaskRepository.saveAllAndFlush(tasks);
             List<GanttTaskResponse> response = new ArrayList<>(persisted.size());
             for (int taskIndex = 0; taskIndex < persisted.size(); taskIndex += 1) {
-                GanttTask task = persisted.get(taskIndex);
+                GanttTask task = refreshGanttTaskFromStore(persisted.get(taskIndex).getId(), persisted.get(taskIndex));
                 List<Long> dependencyTaskIds = dependencyService.replaceDependencies(
                     task,
                     requests.get(taskIndex).dependencyTaskIds()
@@ -171,6 +177,7 @@ public class LocationGanttTaskService {
             List<Long> dependencyTaskIds = dependencyService.replaceDependencies(task, request.dependencyTaskIds());
             task.setUpdatedAt(Instant.now());
             GanttTask persisted = ganttTaskRepository.saveAndFlush(task);
+            persisted = refreshGanttTaskFromStore(persisted.getId(), persisted);
             auditService.recordUpdated(userId, persisted, dependencyTaskIds);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return requestMapper.toResponse(persisted, dependencyTaskIds);
@@ -184,6 +191,21 @@ public class LocationGanttTaskService {
             );
             throw ex;
         }
+    }
+
+    private GanttTask refreshGanttTaskFromStore(Long taskId, GanttTask fallbackTask) {
+        if (entityManager != null) {
+            if (entityManager.contains(fallbackTask)) {
+                entityManager.refresh(fallbackTask);
+                return fallbackTask;
+            }
+
+            GanttTask refreshedTask = entityManager.find(GanttTask.class, taskId);
+            if (refreshedTask != null) {
+                return refreshedTask;
+            }
+        }
+        return ganttTaskRepository.findById(taskId).orElse(fallbackTask);
     }
 
     @Transactional
