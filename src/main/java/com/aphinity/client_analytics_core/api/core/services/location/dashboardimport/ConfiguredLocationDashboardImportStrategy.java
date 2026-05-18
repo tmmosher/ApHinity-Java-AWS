@@ -27,7 +27,7 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
  * behavior stays centralized and testable.
  */
 public class ConfiguredLocationDashboardImportStrategy implements LocationDashboardImportStrategy {
-    // Temporary testing switch: disable all corrective-action creation from cell comments.
+    // TODO Temporary testing switch: disable all corrective-action creation from cell comments.
     // To restore comment-derived incidents, re-enable this and revisit:
     // - strict structured comment validation in LocationDashboardSampleImportPipeline.validatePrimaryCommentSample(...)
     // - the dormant comment corrective-action helpers in this strategy

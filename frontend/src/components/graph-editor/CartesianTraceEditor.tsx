@@ -12,6 +12,7 @@ type CartesianTraceEditorProps = {
   barOrientation?: "h" | "v";
   yRangeMin: unknown;
   yRangeMax: unknown;
+  yAxisTitle?: string;
   xDrafts: Record<number, string>;
   yDrafts: Record<number, string>;
   xInputMode?: "decimal";
@@ -25,6 +26,7 @@ type CartesianTraceEditorProps = {
   onUpdateY: (rowIndex: number, rawValue: string) => void;
   onUpdateYRangeMin: (rawValue: string) => void;
   onUpdateYRangeMax: (rawValue: string) => void;
+  onUpdateYAxisTitle: (rawValue: string) => void;
   onRemoveRow: (rowIndex: number) => void;
 };
 
@@ -33,7 +35,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
   const yDrafts = () => props.yDrafts ?? ({} as Record<number, string>);
   const xLabel = () => props.xLabel ?? "X";
   const yLabel = () => props.yLabel ?? "Y";
-  const rangeLabel = () => props.rangeLabel ?? "Y";
+  const rangeLabel = () => props.rangeLabel ?? "Y axis";
 
   return (
     <section class="space-y-3">
@@ -88,6 +90,17 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
             value={props.yRangeMaxDraft ?? toInputValue(props.yRangeMax)}
             disabled={props.isBusy}
             onInput={(event) => props.onUpdateYRangeMax(event.currentTarget.value)}
+          />
+        </label>
+        <label class="form-control md:col-span-full">
+          <span class="label-text">{rangeLabel()} title</span>
+          <input
+            class="input input-bordered input-sm mt-1"
+            type="text"
+            placeholder={`Optional ${rangeLabel().toLowerCase()} title`}
+            value={props.yAxisTitle ?? ""}
+            disabled={props.isBusy}
+            onInput={(event) => props.onUpdateYAxisTitle(event.currentTarget.value)}
           />
         </label>
       </div>

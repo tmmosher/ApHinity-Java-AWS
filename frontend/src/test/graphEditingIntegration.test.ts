@@ -12,6 +12,7 @@ import {
   renameTrace,
   setPieRowColor,
   setTraceColor,
+  updateTraceYAxisTitle,
   updateCartesianX,
   updateCartesianY
 } from "../util/graph/graphTraceEditor";
@@ -174,6 +175,49 @@ describe("graph editing integration", () => {
         }
       }
     ]);
+  });
+
+  it("applies value-axis title edits to the rendered layout", async () => {
+    const baseGraph: LocationGraph = {
+      id: 13,
+      name: "Compliance Trend",
+      data: [{ type: "scatter", name: "Daily", x: [1], y: [9] }],
+      layout: {
+        title: { text: "Baseline" },
+        yaxis: {
+          range: [0, 100],
+          title: { text: "% Compliance", font: { size: 14 } }
+        }
+      },
+      config: { displayModeBar: false },
+      style: { height: 280 },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(baseGraph);
+    payload.layout = updateTraceYAxisTitle(payload.layout ?? null, payload.data[0], "Monthly pass rate");
+
+    const editResult = applyGraphPayloadEdit([baseGraph], [], 13, payload);
+    expect(editResult.changed).toBe(true);
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      { react } as unknown as { react: (...args: unknown[]) => Promise<unknown> },
+      { id: "chart-root" } as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any,
+      editResult.nextGraphs[0].layout as any,
+      editResult.nextGraphs[0].config as any
+    );
+
+    const [, , renderedLayout] = react.mock.calls[0];
+    expect(renderedLayout).toEqual({
+      title: { text: "Baseline", x: 0.02, xanchor: "left" },
+      yaxis: {
+        range: [0, 100],
+        title: { text: "Monthly pass rate", font: { size: 14 } }
+      }
+    });
   });
 
   it("applies per-slice pie color edits without changing other slices", async () => {

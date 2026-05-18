@@ -25,6 +25,7 @@ import {
   getTraceArray,
   getTraceType,
   getTraceYAxisRange,
+  getTraceYAxisTitle,
   isRecord,
   removeCartesianRow,
   removePieRow,
@@ -35,6 +36,7 @@ import {
   setTraceColor,
   parseNumericInput,
   swapCartesianLayoutAxes,
+  updateTraceYAxisTitle,
   updateTraceYAxisRange,
   updateCartesianX,
   updateCartesianY,
@@ -302,6 +304,14 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     return getTraceYAxisRange(visibleEditableGraphPayloadLayout(), trace);
   });
 
+  const selectedTraceYAxisTitle = createMemo(() => {
+    const trace = selectedTrace();
+    if (!trace) {
+      return "";
+    }
+    return getTraceYAxisTitle(visibleEditableGraphPayloadLayout(), trace);
+  });
+
   const selectedBarOrientation = createMemo(() => {
     const trace = selectedTrace();
     if (!trace || getTraceType(trace) !== "bar") {
@@ -470,6 +480,20 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       });
       setOperationError("");
     });
+  };
+
+  const updateSelectedTraceYAxisTitle = (rawValue: string) => {
+    setEditablePayload((current) => {
+      const existingTrace = current.data[selectedTraceIndex()];
+      if (!isRecord(existingTrace)) {
+        return current;
+      }
+      return {
+        ...current,
+        layout: updateTraceYAxisTitle(current.layout ?? null, existingTrace, rawValue)
+      };
+    });
+    setOperationError("");
   };
 
   const applyTraceColor = (colorHex: string) => {
@@ -903,6 +927,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yInputMode={selectedBarOrientation() === "v" ? "decimal" : undefined}
                       yRangeMin={selectedTraceYAxisRange()[0]}
                       yRangeMax={selectedTraceYAxisRange()[1]}
+                      yAxisTitle={selectedTraceYAxisTitle()}
                       yRangeMinDraft={yRangeMinDraft()}
                       yRangeMaxDraft={yRangeMaxDraft()}
                       isBusy={isBusy()}
@@ -916,6 +941,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                       onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
                       onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}
+                      onUpdateYAxisTitle={updateSelectedTraceYAxisTitle}
                       onRemoveRow={(rowIndex) =>
                         batch(() => {
                           setCartesianXDrafts((current) => shiftIndexedDrafts(current, rowIndex));
@@ -937,6 +963,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yInputMode="decimal"
                       yRangeMin={selectedTraceYAxisRange()[0]}
                       yRangeMax={selectedTraceYAxisRange()[1]}
+                      yAxisTitle={selectedTraceYAxisTitle()}
                       yRangeMinDraft={yRangeMinDraft()}
                       yRangeMaxDraft={yRangeMaxDraft()}
                       isBusy={isBusy()}
@@ -949,6 +976,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                       onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
                       onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}
+                      onUpdateYAxisTitle={updateSelectedTraceYAxisTitle}
                       onRemoveRow={(rowIndex) =>
                         batch(() => {
                           setCartesianXDrafts((current) => shiftIndexedDrafts(current, rowIndex));

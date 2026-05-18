@@ -2,12 +2,11 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -20,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HoagConfiguredLocationDashboardImportStrategyTest {
-    private static final Path DATA_UPLOAD_FIXTURE = Path.of("data_upload_test.xlsx");
+    private static final String DATA_UPLOAD_FIXTURE = "data_upload_test.xlsx";
     private static final int EXPECTED_ADDED_NON_CONFORMANCES = 6;
     private static final List<InjectedCommentPlan> INJECTED_COMMENT_PLANS = List.of(
         new InjectedCommentPlan("F10", 2, List.of(
@@ -44,7 +43,7 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     void computeImportTracksOnlyTheKnownSupplementalHoagCommentNonConformanceDelta() throws IOException {
         ConfiguredLocationDashboardImportStrategy strategy = resolveHoagStrategy();
 
-        byte[] originalBytes = Files.readAllBytes(DATA_UPLOAD_FIXTURE);
+        byte[] originalBytes = readFixtureBytes(DATA_UPLOAD_FIXTURE);
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parsedWorkbook = parseWorkbook(originalBytes);
         SanitizedWorkbook sanitizedWorkbook = sanitizeInvalidFixtureComments(parsedWorkbook);
         Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> originalCellsByReference =
@@ -106,10 +105,16 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parseWorkbook(byte[] bytes) {
         return parser.parse(new MockMultipartFile(
             "file",
-            DATA_UPLOAD_FIXTURE.getFileName().toString(),
+            DATA_UPLOAD_FIXTURE,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             bytes
         ));
+    }
+
+    private byte[] readFixtureBytes(String fileName) throws IOException {
+        try (var inputStream = new ClassPathResource(fileName).getInputStream()) {
+            return inputStream.readAllBytes();
+        }
     }
 
     private Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> cellsByReference(

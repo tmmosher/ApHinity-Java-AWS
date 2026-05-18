@@ -8,6 +8,7 @@ import {
   getCartesianAxisValueMode,
   getPieRowColor,
   getTraceYAxisRange,
+  getTraceYAxisTitle,
   isAutoSizingPieTrace,
   parseNumericInput,
   removePieRow,
@@ -19,6 +20,7 @@ import {
   swapCartesianLayoutAxes,
   updateCartesianX,
   updateCartesianY,
+  updateTraceYAxisTitle,
   updateTraceYAxisRange,
   updatePieValue,
   updateIndicatorValue
@@ -257,6 +259,54 @@ describe("graphTraceEditor", () => {
       x: ["North"],
       y: [3]
     }, "y")).toBe("numeric");
+  });
+
+  it("reads and updates the selected trace value-axis title", () => {
+    const trace: Record<string, unknown> = {
+      type: "scatter",
+      x: [1],
+      y: [2]
+    };
+    const layout: Record<string, unknown> = {
+      yaxis: {
+        range: [0, 100],
+        title: {
+          text: "% Compliance",
+          font: {size: 14}
+        }
+      }
+    };
+
+    expect(getTraceYAxisTitle(layout, trace)).toBe("% Compliance");
+
+    expect(updateTraceYAxisTitle(layout, trace, "Monthly pass rate")).toEqual({
+      yaxis: {
+        range: [0, 100],
+        title: {
+          text: "Monthly pass rate",
+          font: {size: 14}
+        }
+      }
+    });
+  });
+
+  it("removes an empty value-axis title without dropping other axis settings", () => {
+    const trace: Record<string, unknown> = {
+      type: "scatter",
+      x: [1],
+      y: [2]
+    };
+
+    expect(updateTraceYAxisTitle({
+      yaxis: {
+        range: [0, 100],
+        title: "Legacy title"
+      }
+    }, trace, "   ")).toEqual({
+      yaxis: {
+        range: [0, 100]
+      }
+    });
   });
 
   it("preserves categorical bucket text and coerces numeric bar values by axis mode", () => {

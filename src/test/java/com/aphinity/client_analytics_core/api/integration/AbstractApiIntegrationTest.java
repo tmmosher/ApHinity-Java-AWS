@@ -132,12 +132,12 @@ abstract class AbstractApiIntegrationTest {
     ) {
         Set<Role> roles = Arrays.stream(roleNames)
             .map(this::requiredRole)
-            .collect(Collectors.toSet()); // TODO performance concern.
+            .collect(Collectors.toSet());
         // Profiling indicates the .collect() call takes 170ms.
         AppUser user = new AppUser();
         user.setEmail(email);
         user.setName(email);
-        user.setPasswordHash(passwordEncoder.encode(rawPassword)); //TODO performance concern.
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
         // Profiling indicates that setting password hash took 4,900ms - encode taking a long time?
         // could also be that path is being hit more often than necessary. Ensure that JWT use avoids
         // unneeded password enode/decode

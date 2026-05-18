@@ -47,6 +47,7 @@ vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
     const barOrientation = createMemo(() => props.barOrientation);
     const yRangeMin = createMemo(() => props.yRangeMin);
     const yRangeMax = createMemo(() => props.yRangeMax);
+    const yAxisTitle = createMemo(() => props.yAxisTitle);
     const xDrafts = createMemo(() => props.xDrafts);
     const yDrafts = createMemo(() => props.yDrafts);
     const xInputMode = createMemo(() => props.xInputMode);
@@ -86,6 +87,9 @@ vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
       get yRangeMax() {
         return yRangeMax();
       },
+      get yAxisTitle() {
+        return yAxisTitle();
+      },
       get xDrafts() {
         return xDrafts();
       },
@@ -119,6 +123,8 @@ vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
         (props.onUpdateYRangeMin as ((rawValue: string) => void) | undefined)?.(rawValue),
       onUpdateYRangeMax: (rawValue: string) =>
         (props.onUpdateYRangeMax as ((rawValue: string) => void) | undefined)?.(rawValue),
+      onUpdateYAxisTitle: (rawValue: string) =>
+        (props.onUpdateYAxisTitle as ((rawValue: string) => void) | undefined)?.(rawValue),
       onRemoveRow: (rowIndex: number) =>
         (props.onRemoveRow as ((rowIndex: number) => void) | undefined)?.(rowIndex)
     };
@@ -231,11 +237,13 @@ const getCartesianTraceEditorProps = () => {
     yInputMode?: "decimal";
     yRangeMinDraft?: string;
     yRangeMaxDraft?: string;
+    yAxisTitle?: string;
     onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
     onUpdateX: (rowIndex: number, rawValue: string) => void;
     onUpdateY: (rowIndex: number, rawValue: string) => void;
     onUpdateYRangeMin: (rawValue: string) => void;
     onUpdateYRangeMax: (rawValue: string) => void;
+    onUpdateYAxisTitle: (rawValue: string) => void;
   };
 };
 
@@ -456,6 +464,45 @@ describe("GraphEditorModal trace controls", () => {
       const invalidProps = getCartesianTraceEditorProps();
       expect(invalidProps.yValues).toEqual([9]);
       expect(invalidProps.yDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("passes through and updates the selected cartesian value-axis title", async () => {
+    const scatterGraph: LocationGraph = {
+      id: 23,
+      name: "Trend Title",
+      data: [{
+        type: "scatter",
+        name: "Daily",
+        x: ["2026-01-01"],
+        y: [9]
+      }],
+      layout: {
+        yaxis: {
+          range: [0, 100],
+          title: {text: "% Compliance", font: {size: 14}}
+        }
+      },
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(scatterGraph);
+    try {
+      await Promise.resolve();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      expect(cartesianProps.yAxisTitle).toBe("% Compliance");
+
+      cartesianProps.onUpdateYAxisTitle("Monthly pass rate");
+      await flushSolidUpdates();
+
+      const updatedProps = getCartesianTraceEditorProps();
+      expect(updatedProps.yAxisTitle).toBe("Monthly pass rate");
     } finally {
       dispose();
     }

@@ -13,13 +13,12 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -152,7 +151,7 @@ class LocationDashboardSpreadsheetParserTest {
             "file",
             "data_upload_test.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            Files.readAllBytes(Path.of("data_upload_test.xlsx"))
+            readFixtureBytes("data_upload_test.xlsx")
         );
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
@@ -167,6 +166,12 @@ class LocationDashboardSpreadsheetParserTest {
         assertTrue(commentCell.commentText().contains("\"schema\": \"aphinity.location-dashboard.comment.v1\""));
         assertTrue(commentCell.commentText().contains("\"followUpSamples\""));
         assertTrue(commentCell.commentText().contains("\"correctiveActions\""));
+    }
+
+    private byte[] readFixtureBytes(String fileName) throws IOException {
+        try (var inputStream = new ClassPathResource(fileName).getInputStream()) {
+            return inputStream.readAllBytes();
+        }
     }
 
     @Test

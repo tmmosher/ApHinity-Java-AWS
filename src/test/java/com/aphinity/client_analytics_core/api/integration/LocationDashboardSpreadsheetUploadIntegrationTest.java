@@ -14,14 +14,13 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -194,7 +193,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-example2@example.com", PASSWORD);
-        byte[] spreadsheet = Files.readAllBytes(Path.of("dashboard_upload_template_example_2.xlsx"));
+        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
 
         mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
@@ -252,7 +251,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         graphRepository.saveAndFlush(graphs.waterQualityGraph());
 
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-placeholders@example.com", PASSWORD);
-        byte[] spreadsheet = Files.readAllBytes(Path.of("dashboard_upload_template_example_2.xlsx"));
+        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
 
         mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
@@ -287,7 +286,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-measurement-names@example.com", PASSWORD);
-        byte[] spreadsheet = Files.readAllBytes(Path.of("dashboard_upload_template_example_2.xlsx"));
+        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
 
         mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
@@ -379,6 +378,12 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk());
+    }
+
+    private byte[] readFixtureBytes(String fileName) throws IOException {
+        try (var inputStream = new ClassPathResource(fileName).getInputStream()) {
+            return inputStream.readAllBytes();
+        }
     }
 
     private void seedMeasurement(Location location, String measurementName, BigDecimal towersRangeMax) {

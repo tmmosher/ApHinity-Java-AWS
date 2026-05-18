@@ -286,6 +286,29 @@ export const getTraceYAxisRange = (
   return [axis.range[0] ?? "", axis.range[1] ?? ""];
 };
 
+export const getTraceYAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>
+): string => {
+  if (!isRecord(layout)) {
+    return "";
+  }
+
+  const axis = layout[getTraceValueAxisLayoutKey(trace)];
+  if (!isRecord(axis)) {
+    return "";
+  }
+
+  const title = axis.title;
+  if (typeof title === "string") {
+    return title;
+  }
+  if (isRecord(title) && typeof title.text === "string") {
+    return title.text;
+  }
+  return "";
+};
+
 export const updateTraceYAxisRange = (
   layout: Record<string, unknown> | null | undefined,
   trace: Record<string, unknown>,
@@ -320,6 +343,39 @@ export const updateTraceYAxisRange = (
     } else {
       nextLayout[axisKey] = nextAxis;
     }
+  }
+
+  return Object.keys(nextLayout).length > 0 ? nextLayout : null;
+};
+
+export const updateTraceYAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>,
+  rawTitle: string
+): Record<string, unknown> | null => {
+  const axisKey = getTraceValueAxisLayoutKey(trace);
+  const nextLayout = isRecord(layout) ? {...layout} : {};
+  const nextAxis = isRecord(nextLayout[axisKey]) ? {...nextLayout[axisKey]} : {};
+  const normalizedTitle = rawTitle.trim();
+
+  if (normalizedTitle.length > 0) {
+    nextAxis.title = isRecord(nextAxis.title)
+      ? {
+          ...nextAxis.title,
+          text: normalizedTitle
+        }
+      : normalizedTitle;
+    nextLayout[axisKey] = nextAxis;
+    return nextLayout;
+  }
+
+  if ("title" in nextAxis) {
+    delete nextAxis.title;
+  }
+  if (Object.keys(nextAxis).length === 0) {
+    delete nextLayout[axisKey];
+  } else {
+    nextLayout[axisKey] = nextAxis;
   }
 
   return Object.keys(nextLayout).length > 0 ? nextLayout : null;
