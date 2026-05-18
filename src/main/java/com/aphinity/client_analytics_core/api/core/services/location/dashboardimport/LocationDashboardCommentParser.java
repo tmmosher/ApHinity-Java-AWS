@@ -122,6 +122,24 @@ final class LocationDashboardCommentParser {
                 continue;
             }
 
+            ParsedLabeledTestNote labeledTestNote = parseLabeledTestNote(line);
+            if (labeledTestNote != null) {
+                if (currentSample != null && currentSample.resultValue != null) {
+                    currentAction = finalizeAction(currentAction, currentSample, correctiveActions);
+                    currentSample = finalizeSample(currentSample, followUpSamples);
+                }
+                if (currentSample == null) {
+                    currentSample = new MutableSample();
+                }
+                if (currentSample.resultRaw == null) {
+                    currentSample.resultRaw = labeledTestNote.measurement().rawValue();
+                    currentSample.resultValue = labeledTestNote.measurement().value();
+                    currentSample.resultUnit = labeledTestNote.measurement().unit();
+                }
+                currentSample.notes.add(line);
+                continue;
+            }
+
             if (isSampleLocationLine(line)) {
                 sampleLocation = extractLocationValue(line);
                 continue;
@@ -248,6 +266,7 @@ final class LocationDashboardCommentParser {
 
         currentAction = finalizeAction(currentAction, currentSample, correctiveActions);
         currentSample = finalizeSample(currentSample, followUpSamples);
+        appendFallbackRetestSampleIfMissing(lines, followUpSamples);
 
         return new ParsedComment(
             false,
@@ -288,6 +307,79 @@ final class LocationDashboardCommentParser {
         }
         followUpSamples.add(currentSample.toRecord());
         return null;
+    }
+
+    private void appendFallbackRetestSampleIfMissing(String[] lines, List<ParsedCommentSample> followUpSamples) {
+        ParsedCommentSample fallbackSample = parseFallbackRetestSample(lines);
+        if (fallbackSample == null) {
+            return;
+        }
+        for (ParsedCommentSample existingSample : followUpSamples) {
+            if (existingSample == null) {
+                continue;
+            }
+            if (java.util.Objects.equals(existingSample.sampledOn(), fallbackSample.sampledOn())
+                && java.util.Objects.equals(existingSample.resultReceivedOn(), fallbackSample.resultReceivedOn())
+                && java.util.Objects.equals(existingSample.resultValue(), fallbackSample.resultValue())) {
+                return;
+            }
+        }
+        followUpSamples.add(fallbackSample);
+    }
+
+    private ParsedCommentSample parseFallbackRetestSample(String[] lines) {
+        if (lines == null || lines.length == 0) {
+            return null;
+        }
+
+        MutableSample currentRetest = null;
+        for (String rawLine : lines) {
+            String line = rawLine == null ? null : rawLine.strip();
+            if (line == null || line.isBlank()) {
+                continue;
+            }
+
+            if (isExplicitRetestSampleStartLine(line)) {
+                if (currentRetest != null && currentRetest.sampledOn != null && currentRetest.resultValue != null) {
+                    return currentRetest.toRecord();
+                }
+                LocalDate sampleDate = parseDateToken(line);
+                if (sampleDate == null) {
+                    currentRetest = null;
+                    continue;
+                }
+                currentRetest = new MutableSample();
+                currentRetest.sampledOn = sampleDate;
+                continue;
+            }
+
+            if (currentRetest == null) {
+                continue;
+            }
+
+            if (isResultDateLine(line)) {
+                LocalDate resultDate = parseDateFromLine(line);
+                if (resultDate != null && currentRetest.resultReceivedOn == null) {
+                    currentRetest.resultReceivedOn = resultDate;
+                }
+                continue;
+            }
+
+            if (isResultLine(line)) {
+                ParsedMeasurement measurement = parseMeasurementValue(extractLineValue(line));
+                if (measurement != null && currentRetest.resultValue == null) {
+                    currentRetest.resultRaw = measurement.rawValue();
+                    currentRetest.resultValue = measurement.value();
+                    currentRetest.resultUnit = measurement.unit();
+                }
+                continue;
+            }
+        }
+
+        if (currentRetest == null || currentRetest.sampledOn == null || currentRetest.resultValue == null) {
+            return null;
+        }
+        return currentRetest.toRecord();
     }
 
     private ParsedCommentSample parseSample(JsonNode node, boolean required, String fieldName) {
@@ -530,6 +622,21 @@ final class LocationDashboardCommentParser {
         return List.copyOf(results);
     }
 
+    private ParsedLabeledTestNote parseLabeledTestNote(String line) {
+        if (line == null || line.isBlank()) {
+            return null;
+        }
+        Matcher matcher = LABELED_TEST_NOTE_PATTERN.matcher(line.strip());
+        if (!matcher.matches()) {
+            return null;
+        }
+        ParsedMeasurement measurement = parseMeasurementValue(matcher.group(2));
+        if (measurement == null || measurement.value() == null) {
+            return null;
+        }
+        return new ParsedLabeledTestNote(matcher.group(1).toLowerCase(Locale.ROOT), measurement);
+    }
+
     private static ParsedMeasurement parseStaticMeasurementValue(String rawValue) {
         if (rawValue == null) {
             return null;
@@ -739,9 +846,26 @@ final class LocationDashboardCommentParser {
             || normalized.startsWith("sample date")
             || normalized.startsWith("date of sampling")
             || normalized.startsWith("first sample taken on")
+            || normalized.startsWith("retest sample date")
             || normalized.startsWith("retest sample taken on")
             || normalized.startsWith("retest sampled")
             || normalized.startsWith("retest date")
+            || normalized.startsWith("re-sample date")
+            || normalized.startsWith("resample date")
+            || normalized.startsWith("date of resampling")
+            || normalized.startsWith("resampled")
+            || normalized.startsWith("first retest sample taken on")
+            || normalized.startsWith("second retest sample taken on");
+    }
+
+    private boolean isExplicitRetestSampleStartLine(String line) {
+        String normalized = normalizeKey(line);
+        return normalized.startsWith("retest sample date")
+            || normalized.startsWith("retest sample taken on")
+            || normalized.startsWith("retest sampled")
+            || normalized.startsWith("retest date")
+            || normalized.startsWith("re-sample date")
+            || normalized.startsWith("resample date")
             || normalized.startsWith("date of resampling")
             || normalized.startsWith("resampled")
             || normalized.startsWith("first retest sample taken on")
@@ -751,8 +875,12 @@ final class LocationDashboardCommentParser {
     private boolean isResultDateLine(String line) {
         String normalized = normalizeKey(line);
         return normalized.startsWith("result date")
+            || normalized.startsWith("results date")
             || normalized.startsWith("results received")
             || normalized.startsWith("result received")
+            || normalized.startsWith("re-sample results date")
+            || normalized.startsWith("resample results date")
+            || normalized.startsWith("retest result date")
             || normalized.startsWith("date of results");
     }
 
@@ -991,6 +1119,12 @@ final class LocationDashboardCommentParser {
     private record ParsedAction(
         LocalDate actionDate,
         String text
+    ) {
+    }
+
+    private record ParsedLabeledTestNote(
+        String ordinal,
+        ParsedMeasurement measurement
     ) {
     }
 

@@ -365,11 +365,12 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ConfiguredLocationDashboardImportStrategy strategy = criticalPhStrategy();
 
         String commentText = workbookStyleComment(
-            "First Test: 7.6",
-            "Corrective Action: Drain tank, install new DI bottles",
-            "Sample Date: 8/3/25",
+            "First Test: 7.7",
+            "Corrective Action Taken on: 8/2/25",
+            "Drain tank, install new DI bottles",
+            "Retest Sample Date: 8/3/25",
             "Result Date: 8/5/25",
-            "Result: 6.8"
+            "Retest Result: 6.8"
         );
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
@@ -385,7 +386,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
                         "pH",
                         LocalDate.parse("2025-08-01"),
-                        "7.6",
+                        "7.7",
                         new BigDecimal("7.6"),
                         commentText,
                         "CB38"
