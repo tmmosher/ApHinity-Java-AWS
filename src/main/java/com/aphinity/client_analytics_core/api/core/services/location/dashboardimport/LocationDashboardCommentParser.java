@@ -28,7 +28,7 @@ final class LocationDashboardCommentParser {
         "(?i)^(first|second|third|fourth|fifth)\\s+test\\s*:\\s*(.+)$"
     );
     private static final Pattern MEASUREMENT_VALUE_PATTERN = Pattern.compile(
-        "^[<>]=?\\s*([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(?:\\s+(.+))?$",
+        "^(?:[<>]=?\\s*)?([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(?:\\s+(.+))?$",
         Pattern.CASE_INSENSITIVE
     );
     private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
@@ -832,6 +832,8 @@ final class LocationDashboardCommentParser {
         return payload != null && payload.contains(";") && !payload.contains("\n") && !payload.startsWith("{");
     }
 
+    // TODO Fix these line starts to properly read in structured comments
+
     private boolean isSampleLocationLine(String line) {
         String normalized = normalizeKey(line);
         return normalized.startsWith("sample location")
@@ -886,10 +888,10 @@ final class LocationDashboardCommentParser {
 
     private boolean isResultLine(String line) {
         String normalized = normalizeKey(line);
-        if (normalized.startsWith("result date")
+        if (normalized.startsWith("result date") /* this seems to hit 'date' values too? */
             || normalized.startsWith("results received")
             || normalized.startsWith("result received")
-            || normalized.startsWith("date of results")) {
+            || normalized.startsWith("date of results")) /* this seems to hit 'date' values too? */  {
             return false;
         }
         if (normalized.startsWith("result")
