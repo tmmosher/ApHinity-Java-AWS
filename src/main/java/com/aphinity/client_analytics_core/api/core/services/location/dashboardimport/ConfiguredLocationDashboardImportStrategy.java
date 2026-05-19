@@ -1030,19 +1030,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
         LocationDashboardCommentParser.ParsedCommentSample candidateSample
     ) {
-        if (primaryCell == null || candidateSample == null) {
-            return false;
-        }
-        if (primaryCell.observedDate() == null || candidateSample.sampledOn() == null) {
-            return false;
-        }
-        if (!Objects.equals(primaryCell.observedDate(), candidateSample.sampledOn())) {
-            return false;
-        }
-        if (primaryCell.numericValue() == null || candidateSample.resultValue() == null) {
-            return false;
-        }
-        return primaryCell.numericValue().compareTo(candidateSample.resultValue()) == 0;
+        return matchesWorksheetPrimarySample(primaryCell, candidateSample);
     }
 
     private boolean sameObservationMonth(LocalDate worksheetObservedDate, LocalDate commentSampleDate) {

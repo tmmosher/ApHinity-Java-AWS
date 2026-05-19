@@ -183,6 +183,176 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportDoesNotTreatCompliantLabeledTestCommentAsNonConforming() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+                new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                        "Newport Beach",
+                        List.of(
+                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                        5,
+                                        "Newport Beach",
+                                        "Hospital",
+                                        "Cooling Towers",
+                                        "Recirc Line",
+                                        "CTI/514P",
+                                        List.of(
+                                                new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                                        "HPC",
+                                                        LocalDate.parse("2025-08-01"),
+                                                        "9",
+                                                        new BigDecimal("9"),
+                                                        "First Test: 9",
+                                                        "F5"
+                                                )
+                                        )
+                                )
+                        )
+                );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+                workbook,
+                measurementBounds()
+        );
+
+        assertEquals(1, result.analyzedSamples().size());
+        assertEquals(1, result.observations().size());
+        assertEquals(0, result.correctiveActions().size());
+        assertTrue(result.analyzedSamples().getFirst().compliant());
+        assertFalse(result.analyzedSamples().getFirst().nonConforming());
+    }
+
+    @Test
+    void computeImportDoesNotTreatCompliantCommentWithCorrectiveActionTextAsNonConforming() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+                new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                        "Newport Beach",
+                        List.of(
+                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                        5,
+                                        "Newport Beach",
+                                        "Hospital",
+                                        "Cooling Towers",
+                                        "Recirc Line",
+                                        "CTI/514P",
+                                        List.of(
+                                                new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                                        "HPC",
+                                                        LocalDate.parse("2025-08-01"),
+                                                        "9",
+                                                        new BigDecimal("9"),
+                                                        "Corrective Action Taken on: 8/2/25\nRoutine flush completed",
+                                                        "F5"
+                                                )
+                                        )
+                                )
+                        )
+                );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+                workbook,
+                measurementBounds()
+        );
+
+        assertEquals(1, result.analyzedSamples().size());
+        assertEquals(1, result.observations().size());
+        assertEquals(0, result.correctiveActions().size());
+        assertTrue(result.analyzedSamples().getFirst().compliant());
+        assertFalse(result.analyzedSamples().getFirst().nonConforming());
+    }
+
+    @Test
+    void computeImportDoesNotCreateNonConformanceForCompliantRetestComment() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String commentText = workbookStyleComment(
+                "First Test: 9",
+                "Retest Sample Date: 8/3/25",
+                "Result Date: 8/5/25",
+                "Retest Result: 8"
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+                new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                        "Newport Beach",
+                        List.of(
+                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                        5,
+                                        "Newport Beach",
+                                        "Hospital",
+                                        "Cooling Towers",
+                                        "Recirc Line",
+                                        "CTI/514P",
+                                        List.of(
+                                                new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                                        "HPC",
+                                                        LocalDate.parse("2025-08-01"),
+                                                        "9",
+                                                        new BigDecimal("9"),
+                                                        commentText,
+                                                        "F5"
+                                                )
+                                        )
+                                )
+                        )
+                );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+                workbook,
+                measurementBounds()
+        );
+
+        assertEquals(2, result.analyzedSamples().size());
+        assertEquals(2, result.observations().size());
+        assertEquals(0, result.correctiveActions().size());
+        assertTrue(result.analyzedSamples().stream().allMatch(
+                LocationDashboardImportStrategy.AnalyzedSamplePoint::compliant
+        ));
+        assertFalse(result.analyzedSamples().stream().anyMatch(
+                LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming
+        ));
+    }
+
+// ... existing code ...
+
+    @Test
+    void computeImportDoesNotCreateDuplicatePrimaryCorrectiveActionsWhenPrimaryCommentSampleMatchesWorksheetMonthAndValue() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-15"),
+                LocalDate.parse("2025-08-20"),
+                "15 CFU.mL",
+                new BigDecimal("15"),
+                "CFU.mL"
+            ),
+            List.of(),
+            List.of(),
+            List.of()
+        ));
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbookWithStructuredCommentAndPrimaryValue(structuredComment, new BigDecimal("15"), "15", "F5"),
+            measurementBounds()
+        );
+
+        assertEquals(4, result.observations().size());
+        assertEquals(3, result.correctiveActions().size());
+        assertFalse(result.observations().stream().anyMatch(observation ->
+            LocalDate.parse("2025-08-15").equals(observation.observedDate())
+                && "HPC".equals(observation.measurementName())
+        ));
+        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+            draft.description().contains("Primary Sample: sampled on 2025-08-15")
+        ));
+    }
+
+    @Test
     void computeImportDoesNotCreateCorrectiveActionForFailedFollowUpSamplesWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
@@ -339,6 +509,60 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportMarksOnlyOutOfSpecCommentedCellsAsNonCompliant() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        5,
+                        "Newport Beach",
+                        "Hospital",
+                        "Cooling Towers",
+                        "Recirc Line",
+                        "CTI/514P",
+                        List.of(
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "HPC",
+                                LocalDate.parse("2025-08-01"),
+                                "9",
+                                new BigDecimal("9"),
+                                "Routine note only",
+                                "F5"
+                            ),
+                            new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                "Endotoxin",
+                                LocalDate.parse("2025-08-01"),
+                                "2",
+                                new BigDecimal("2"),
+                                "Investigating elevated reading",
+                                "I5"
+                            )
+                        )
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        assertEquals(2, result.analyzedSamples().size());
+        assertEquals(1L, result.analyzedSamples().stream().filter(
+            LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming
+        ).count());
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            "HPC".equals(sample.measurementName()) && sample.compliant()
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            "Endotoxin".equals(sample.measurementName()) && sample.nonConforming()
+        ));
+    }
+
+    @Test
     void computeImportUsesWorkbookMetricNamesWhenMeasurementBoundsUseDifferentFormatting() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
@@ -468,6 +692,21 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(BigDecimal.ZERO, measurementBound));
         assertFalse(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("0.1"), measurementBound));
+    }
+
+    @Test
+    void computeImportCountsSingleConformantCommentedLegionellaSampleAsOneObservation() {
+        ConfiguredLocationDashboardImportStrategy strategy = legionellaStrategy();
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            legionellaWorkbookWithComment("Routine note only", BigDecimal.ZERO, "0", "F5"),
+            List.of(measurementBound(1L, "Legionella", null, null, null, null, null, null, null, BigDecimal.ZERO))
+        );
+
+        assertEquals(1, result.observations().size());
+        assertEquals(1, result.analyzedSamples().size());
+        assertTrue(result.observations().getFirst().compliant());
+        assertEquals("Legionella", result.observations().getFirst().measurementName());
     }
 
     @Test
@@ -1245,6 +1484,51 @@ class ConfiguredLocationDashboardImportStrategyTest {
         );
     }
 
+    private ConfiguredLocationDashboardImportStrategy legionellaStrategy() {
+        return new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Newport Beach",
+                List.of(new LocationDashboardImportStrategyConfig.SublocationConfig(
+                    "newport-beach",
+                    "Newport Beach",
+                    List.of("Newport Beach"),
+                    List.of(),
+                    true
+                )),
+                List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                    "cooling-towers",
+                    "Cooling Towers",
+                    LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                    List.of("Cooling Towers")
+                )),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.GraphConfig(
+                        "water-quality",
+                        "Water Quality Compliance",
+                        "Newport Beach",
+                        LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
+                        "newport-beach",
+                        List.of("Legionella"),
+                        Map.of("Legionella", "#1f77b4"),
+                        "scatter"
+                    ),
+                    new LocationDashboardImportStrategyConfig.GraphConfig(
+                        "system-type",
+                        "System Type Compliance",
+                        "Newport Beach",
+                        LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
+                        "newport-beach",
+                        List.of("Cooling Towers"),
+                        Map.of("Cooling Towers", "#d62728"),
+                        "scatter"
+                    )
+                ),
+                List.of(),
+                List.of()
+            )
+        );
+    }
+
     private LocationDashboardImportStrategyConfig.GraphConfig validWaterQualityGraphConfig() {
         return new LocationDashboardImportStrategyConfig.GraphConfig(
             "water-quality",
@@ -1332,6 +1616,37 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             new BigDecimal("2"),
                             null,
                             "I6"
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook legionellaWorkbookWithComment(
+        String commentText,
+        BigDecimal numericValue,
+        String rawValue,
+        String cellReference
+    ) {
+        return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+            "Newport Beach",
+            List.of(
+                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    5,
+                    "Newport Beach",
+                    "Hospital",
+                    "Cooling Towers",
+                    "Recirc Line",
+                    "CTI/514P",
+                    List.of(
+                        new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "Legionella",
+                            LocalDate.parse("2025-08-01"),
+                            rawValue,
+                            numericValue,
+                            commentText,
+                            cellReference
                         )
                     )
                 )
