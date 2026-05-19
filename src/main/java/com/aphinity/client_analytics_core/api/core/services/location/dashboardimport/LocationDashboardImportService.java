@@ -1,14 +1,17 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
+import com.aphinity.client_analytics_core.api.core.services.location.GraphTimeRangePayloadProjector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -44,6 +48,7 @@ public class LocationDashboardImportService {
     private final LocationDashboardCorrectiveActionService correctiveActionService;
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
     private final GraphResponseMapper graphResponseMapper;
+    private final Clock clock;
 
     @Autowired
     public LocationDashboardImportService(
@@ -86,7 +91,8 @@ public class LocationDashboardImportService {
             new LocationDashboardGraphMatcher(),
             new LocationDashboardImportedGraphMerger(),
             new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry),
-            graphResponseMapper
+            graphResponseMapper,
+            clock
         );
     }
 
@@ -99,7 +105,8 @@ public class LocationDashboardImportService {
         LocationDashboardGraphMatcher graphMatcher,
         LocationDashboardImportedGraphMerger importedGraphMerger,
         LocationDashboardCorrectiveActionService correctiveActionService,
-        GraphResponseMapper graphResponseMapper
+        GraphResponseMapper graphResponseMapper,
+        Clock clock
     ) {
         this.spreadsheetParser = spreadsheetParser;
         this.strategyRegistry = strategyRegistry;
@@ -111,6 +118,7 @@ public class LocationDashboardImportService {
         this.correctiveActionService = correctiveActionService;
         this.historicalDataAssembler = new LocationDashboardHistoricalDataAssembler(correctiveActionService);
         this.graphResponseMapper = graphResponseMapper;
+        this.clock = clock;
     }
 
     @Transactional
@@ -252,6 +260,7 @@ public class LocationDashboardImportService {
             ));
             previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(graphDefinition.graphType()));
             previewGraph.setData(importedGraphMerger.mergeImportedGraphData(previewGraph, computedGraphPayload.data()));
+            materializePreviewRollingRanges(previewGraph);
             graphsToPersistById.put(previewGraph.getId(), previewGraph);
         }
         return graphsToPersistById;
@@ -304,7 +313,29 @@ public class LocationDashboardImportService {
                 previewGraph,
                 historicalDerivedData
             ));
+            for (GraphTimeRange timeRange : List.of(GraphTimeRange.ONE_MONTH, GraphTimeRange.THREE_MONTHS)) {
+                GraphRelationalPayloadMapper.syncGraphData(
+                    previewGraph,
+                    LocationDashboardDerivedGraphSupport.buildPayload(
+                        derivedGraphDefinition,
+                        previewGraph,
+                        HistoricalDerivedDataTimeRangeProjector.project(historicalDerivedData, timeRange, LocalDate.now(clock))
+                    ),
+                    timeRange
+                );
+            }
             updatedPreviewGraphsById.put(previewGraph.getId(), previewGraph);
+        }
+    }
+
+    private void materializePreviewRollingRanges(Graph graph) {
+        List<Map<String, Object>> allTimePayload = GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
+        for (GraphTimeRange timeRange : List.of(GraphTimeRange.ONE_MONTH, GraphTimeRange.THREE_MONTHS)) {
+            GraphRelationalPayloadMapper.syncGraphData(
+                graph,
+                GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, LocalDate.now(clock)),
+                timeRange
+            );
         }
     }
 

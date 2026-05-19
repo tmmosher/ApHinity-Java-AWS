@@ -10,6 +10,7 @@ import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayload
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.core.services.location.GraphTimeRangePayloadProjector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -135,7 +135,7 @@ public class LocationDashboardTimeRangeService {
         for (GraphTimeRange timeRange : rollingRanges()) {
             GraphRelationalPayloadMapper.syncGraphData(
                 graph,
-                filterTimeSeriesPayloadForRange(allTimePayload, timeRange, anchorDate),
+                GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, anchorDate),
                 timeRange
             );
         }
@@ -196,7 +196,7 @@ public class LocationDashboardTimeRangeService {
             graph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
             for (GraphTimeRange timeRange : GraphTimeRange.values()) {
                 LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
-                    filterHistoricalDataForRange(allTimeHistoricalData, timeRange, anchorDate);
+                    HistoricalDerivedDataTimeRangeProjector.project(allTimeHistoricalData, timeRange, anchorDate);
                 GraphRelationalPayloadMapper.syncGraphData(
                     graph,
                     LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, historicalData),
@@ -205,102 +205,6 @@ public class LocationDashboardTimeRangeService {
             }
             graph.setUpdatedAt(refreshedAt);
         }
-    }
-
-    private List<Map<String, Object>> filterTimeSeriesPayloadForRange(
-        List<Map<String, Object>> allTimePayload,
-        GraphTimeRange timeRange,
-        LocalDate anchorDate
-    ) {
-        if (timeRange == GraphTimeRange.ALL_TIME) {
-            return allTimePayload;
-        }
-        LocalDate windowStart = timeRange.windowStartInclusive(anchorDate);
-        if (windowStart == null) {
-            return allTimePayload;
-        }
-
-        List<Map<String, Object>> filteredPayload = new ArrayList<>(allTimePayload.size());
-        for (Map<String, Object> trace : allTimePayload) {
-            filteredPayload.add(filterTraceForRange(trace, windowStart));
-        }
-        return List.copyOf(filteredPayload);
-    }
-
-    private Map<String, Object> filterTraceForRange(Map<String, Object> trace, LocalDate windowStart) {
-        if (!isTimeSeriesTrace(trace)) {
-            return trace;
-        }
-
-        List<?> xValues = LocationDashboardGraphMetadataSupport.asList(trace.get("x"));
-        List<?> yValues = LocationDashboardGraphMetadataSupport.asList(trace.get("y"));
-        List<?> customDataValues = LocationDashboardGraphMetadataSupport.asList(trace.get("customdata"));
-        int pointCount = Math.min(xValues.size(), yValues.size());
-
-        List<Object> filteredXValues = new ArrayList<>();
-        List<Object> filteredYValues = new ArrayList<>();
-        List<Object> filteredCustomDataValues = new ArrayList<>();
-        boolean hasCustomData = false;
-
-        for (int index = 0; index < pointCount; index += 1) {
-            LocalDate observedDate = LocationDashboardGraphMetadataSupport.parseLocalDate(xValues.get(index));
-            if (observedDate == null || observedDate.isBefore(windowStart)) {
-                continue;
-            }
-            filteredXValues.add(xValues.get(index));
-            filteredYValues.add(yValues.get(index));
-            Object customDataValue = index < customDataValues.size() ? customDataValues.get(index) : null;
-            filteredCustomDataValues.add(customDataValue);
-            if (customDataValue != null) {
-                hasCustomData = true;
-            }
-        }
-
-        Map<String, Object> filteredTrace = new LinkedHashMap<>(trace);
-        filteredTrace.put("x", List.copyOf(filteredXValues));
-        filteredTrace.put("y", List.copyOf(filteredYValues));
-        if (hasCustomData) {
-            filteredTrace.put("customdata", List.copyOf(filteredCustomDataValues));
-        } else {
-            filteredTrace.remove("customdata");
-        }
-        return filteredTrace;
-    }
-
-    private LocationDashboardDerivedGraphSupport.HistoricalDerivedData filterHistoricalDataForRange(
-        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
-        GraphTimeRange timeRange,
-        LocalDate anchorDate
-    ) {
-        if (historicalData == null || timeRange == GraphTimeRange.ALL_TIME) {
-            return historicalData;
-        }
-        LocalDate windowStart = timeRange.windowStartInclusive(anchorDate);
-        if (windowStart == null) {
-            return historicalData;
-        }
-
-        Map<LocalDate, List<LocationDashboardDerivedGraphSupport.HistoricalSamplePoint>> filteredSamplesByDate =
-            historicalData.samplesByDate().entrySet().stream()
-                .filter(entry -> entry.getKey() != null && !entry.getKey().isBefore(windowStart))
-                .collect(Collectors.toMap(
-                    Map.Entry::getKey,
-                    entry -> entry.getValue() == null ? List.of() : List.copyOf(entry.getValue()),
-                    (left, right) -> left,
-                    LinkedHashMap::new
-                ));
-
-        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> filteredCorrectiveActions =
-            historicalData.correctiveActions().stream()
-                .filter(correctiveAction -> correctiveAction != null
-                    && correctiveAction.observedDate() != null
-                    && !correctiveAction.observedDate().isBefore(windowStart))
-                .toList();
-
-        return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
-            filteredSamplesByDate,
-            filteredCorrectiveActions
-        );
     }
 
     private boolean graphContainsTimeSeries(Graph graph) {
@@ -321,18 +225,6 @@ public class LocationDashboardTimeRangeService {
     private boolean isDerivedGraph(Graph graph) {
         Map<String, String> importMetadata = LocationDashboardGraphMetadataSupport.readImportMetadata(graph);
         return importMetadata.containsKey("derivedGraphType");
-    }
-
-    private boolean isTimeSeriesTrace(Map<String, Object> trace) {
-        if (!Objects.equals(
-            LocationDashboardGraphMetadataSupport.normalizeKey(String.valueOf(trace.get("type"))),
-            "scatter"
-        )) {
-            return false;
-        }
-        List<?> xValues = LocationDashboardGraphMetadataSupport.asList(trace.get("x"));
-        return !xValues.isEmpty()
-            && xValues.stream().allMatch(value -> LocationDashboardGraphMetadataSupport.parseLocalDate(value) != null);
     }
 
     private Set<GraphTimeRange> rollingRanges() {

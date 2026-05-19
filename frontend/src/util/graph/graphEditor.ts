@@ -147,6 +147,7 @@ const isGraphDirty = (
 function graphStateSignature(graph: LocationGraph): string {
   return JSON.stringify({
     name: graph.name,
+    timeRangeData: graph.timeRangeData ?? null,
     payload: normalizeGraphPayload({
       data: graph.data,
       layout: graph.layout ?? null,

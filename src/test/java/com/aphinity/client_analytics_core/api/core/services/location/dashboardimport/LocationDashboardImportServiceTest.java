@@ -154,14 +154,23 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(11, responses.size());
-        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("x"));
-        assertNumericValues(findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("y"), 100.0d, 1.0d);
+        GraphResponse waterQualityResponse = findResponseByName(responses, "Water Quality Conformance");
+        assertEquals(List.of("2025-07-01", "2025-08-01"), waterQualityResponse.data().getFirst().get("x"));
+        assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 100.0d, 1.0d);
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> hpcCustomData = (List<Map<String, Object>>) findResponseByName(responses, "Water Quality Conformance")
+        List<Map<String, Object>> hpcCustomData = (List<Map<String, Object>>) waterQualityResponse
             .data()
             .getFirst()
             .get("customdata");
         assertEquals(2L, ((Number) hpcCustomData.get(1).get("sampleCount")).longValue());
+        assertEquals(
+            List.of("2025-08-01"),
+            waterQualityResponse.timeRangeData().get("oneMonth").getFirst().get("x")
+        );
+        assertEquals(
+            List.of("2025-07-01", "2025-08-01"),
+            waterQualityResponse.timeRangeData().get("threeMonths").getFirst().get("x")
+        );
 
         assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
         @SuppressWarnings("unchecked")
@@ -173,7 +182,9 @@ class LocationDashboardImportServiceTest {
             "#0f766e",
             totalSamplesMarker.get("color")
         );
-        assertEquals(List.of(2L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
+        GraphResponse totalNonConformancesResponse = findResponseByName(responses, "Total Non-Conformances");
+        assertEquals(List.of(2L), totalNonConformancesResponse.data().getFirst().get("values"));
+        assertEquals(List.of(1L), totalNonConformancesResponse.timeRangeData().get("oneMonth").getFirst().get("values"));
         assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentGauge = (Map<String, Object>) findResponseByName(
@@ -781,6 +792,7 @@ class LocationDashboardImportServiceTest {
     }
 
     private LocationDashboardImportService buildImportService() {
+        Clock clock = Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC);
         return new LocationDashboardImportService(
             spreadsheetParser,
             strategyRegistry,
@@ -788,8 +800,8 @@ class LocationDashboardImportServiceTest {
             locationGraphRepository,
             serviceEventRepository,
             new LocationDashboardMutationLockService(),
-            new GraphResponseMapper(),
-            Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC)
+            new GraphResponseMapper(clock),
+            clock
         );
     }
 

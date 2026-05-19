@@ -2,6 +2,7 @@ import {
     ActiveInvite,
     InviteStatus,
     LocationGraph,
+    LocationGraphTimeRange,
     LocationMembership, LocationMembershipWithStatus,
     LocationSectionLayout,
     LocationSectionLayoutConfig,
@@ -170,7 +171,7 @@ const parseGraphDataEntries = (value: unknown): Record<string, unknown>[] => {
 
 const parseOptionalTimeRangeData = (
   value: unknown
-): Record<string, Record<string, unknown>[]> | undefined => {
+): Partial<Record<LocationGraphTimeRange, Record<string, unknown>[]>> | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -178,8 +179,11 @@ const parseOptionalTimeRangeData = (
     throw new Error("Invalid graph time range payload");
   }
 
-  const parsed: Record<string, Record<string, unknown>[]> = {};
+  const parsed: Partial<Record<LocationGraphTimeRange, Record<string, unknown>[]>> = {};
   for (const [key, entry] of Object.entries(value)) {
+    if (key !== "oneMonth" && key !== "threeMonths" && key !== "allTime") {
+      continue;
+    }
     parsed[key] = parseGraphDataEntries(entry);
   }
   return parsed;

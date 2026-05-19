@@ -355,4 +355,64 @@ describe("graphEditor", () => {
     expect(merged[0].updatedAt).toBe("2026-01-03T00:00:00Z");
     expect(merged[1]).toBe(baseGraphs[1]);
   });
+
+  it("replaces a graph when refreshed range payloads change even if the canonical graph data is unchanged", () => {
+    const baseGraphsWithRanges: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          oneMonth: [{type: "bar", x: ["A"], y: [1]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [3]}]
+        }
+      }
+    ];
+    const refreshedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphsWithRanges[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          oneMonth: [{type: "bar", x: ["A"], y: [2]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [4]}]
+        }
+      }
+    ];
+
+    const refreshResult = reconcileLocationGraphRefreshState(
+      baseGraphsWithRanges,
+      [],
+      buildGraphBaselineIndex(baseGraphsWithRanges),
+      refreshedGraphs
+    );
+
+    expect(refreshResult.nextGraphs[0]).toBe(refreshedGraphs[0]);
+  });
+
+  it("replaces an uploaded graph when only range payloads change", () => {
+    const baseGraphsWithRanges: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          oneMonth: [{type: "bar", x: ["A"], y: [1]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [3]}]
+        }
+      }
+    ];
+    const uploadedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphsWithRanges[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          oneMonth: [{type: "bar", x: ["A"], y: [5]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [7]}]
+        }
+      }
+    ];
+
+    const merged = reconcileLocationGraphUploadState(baseGraphsWithRanges, uploadedGraphs);
+
+    expect(merged[0]).not.toBe(baseGraphsWithRanges[0]);
+    expect(merged[0].timeRangeData?.oneMonth).toEqual([{type: "bar", x: ["A"], y: [5]}]);
+  });
 });
