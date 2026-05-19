@@ -90,13 +90,16 @@ class LocationDashboardImportedGraphMergerTest {
             "y", List.of(0.0d),
             "customdata", List.of(Map.of("sampleCount", 2, "compliantCount", 0, "nonConformingCount", 2)),
             "mode", "lines+markers",
-            "line", Map.of("color", "#abcdef", "width", 1),
+            "line", Map.of("color", "#abcdef", "width", 1, "shape", "spline", "smoothing", 0.3d),
             "marker", Map.of("size", 2)
         )));
 
         assertEquals(List.of("2025-07-01", "2025-08-01"), merged.getFirst().get("x"));
         assertNumericValues(merged.getFirst().get("y"), 100.0d, 0.0d);
-        assertEquals(Map.of("color", "#123456", "width", 4L), merged.getFirst().get("line"));
+        assertEquals(
+            Map.of("color", "#123456", "width", 4L, "shape", "spline", "smoothing", 0.3d),
+            merged.getFirst().get("line")
+        );
         assertEquals(Map.of("size", 9L), merged.getFirst().get("marker"));
     }
 
@@ -120,7 +123,7 @@ class LocationDashboardImportedGraphMergerTest {
             "y", List.of(0.0d),
             "customdata", List.of(Map.of("sampleCount", 2, "compliantCount", 0, "nonConformingCount", 2)),
             "mode", "lines+markers",
-            "line", Map.of("color", "#abcdef", "width", 1),
+            "line", Map.of("color", "#abcdef", "width", 1, "shape", "spline", "smoothing", 0.3d),
             "marker", Map.of("size", 2)
         )));
 
@@ -129,7 +132,10 @@ class LocationDashboardImportedGraphMergerTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> customData = (List<Map<String, Object>>) merged.getFirst().get("customdata");
         assertEquals(2L, ((Number) customData.getFirst().get("sampleCount")).longValue());
-        assertEquals(Map.of("color", "#123456", "width", 4L), merged.getFirst().get("line"));
+        assertEquals(
+            Map.of("color", "#123456", "width", 4L, "shape", "spline", "smoothing", 0.3d),
+            merged.getFirst().get("line")
+        );
         assertEquals(Map.of("size", 9L), merged.getFirst().get("marker"));
     }
 

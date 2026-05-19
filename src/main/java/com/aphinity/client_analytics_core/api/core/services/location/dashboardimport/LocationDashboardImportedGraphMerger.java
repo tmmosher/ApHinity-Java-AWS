@@ -25,6 +25,12 @@ final class LocationDashboardImportedGraphMerger {
         "value",
         "customdata"
     );
+    private static final Set<String> TRACE_IDENTITY_KEYS = Set.of(
+        "type",
+        "name",
+        "mode",
+        "orientation"
+    );
 
     List<Map<String, Object>> mergeImportedGraphData(Graph graph, List<Map<String, Object>> importedData) {
         List<Map<String, Object>> existingData = LocationDashboardGraphMetadataSupport.currentTraceList(graph);
@@ -87,6 +93,7 @@ final class LocationDashboardImportedGraphMerger {
         Map<String, Object> mergedTrace = new LinkedHashMap<>();
         mergedTrace.putAll(importedTrace);
         mergedTrace.putAll(existingTrace);
+        mergeNestedTracePresentationFields(mergedTrace, importedTrace, existingTrace);
         mergedTrace.put("x", orderedPoints.stream().map(Map.Entry::getKey).toList());
         mergedTrace.put("y", orderedPoints.stream().map(entry -> entry.getValue().yValue()).toList());
 
@@ -101,6 +108,29 @@ final class LocationDashboardImportedGraphMerger {
         return mergedTrace;
     }
 
+    private void mergeNestedTracePresentationFields(
+        Map<String, Object> mergedTrace,
+        Map<String, Object> importedTrace,
+        Map<String, Object> existingTrace
+    ) {
+        Set<String> candidateFieldNames = new LinkedHashSet<>();
+        candidateFieldNames.addAll(importedTrace.keySet());
+        candidateFieldNames.addAll(existingTrace.keySet());
+        for (String fieldName : candidateFieldNames) {
+            if (TRACE_DATA_KEYS.contains(fieldName) || TRACE_IDENTITY_KEYS.contains(fieldName)) {
+                continue;
+            }
+            Map<String, Object> importedField = LocationDashboardGraphMetadataSupport.asMap(importedTrace.get(fieldName));
+            Map<String, Object> existingField = LocationDashboardGraphMetadataSupport.asMap(existingTrace.get(fieldName));
+            if (importedField.isEmpty() && existingField.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> mergedField = new LinkedHashMap<>(importedField);
+            mergedField.putAll(existingField);
+            mergedTrace.put(fieldName, mergedField);
+        }
+    }
+
     private Map<String, Object> mergeTracePreservingPresentation(
         Map<String, Object> existingTrace,
         Map<String, Object> importedTrace
@@ -113,6 +143,7 @@ final class LocationDashboardImportedGraphMerger {
                 mergedTrace.put(key, value);
             }
         });
+        mergeNestedTracePresentationFields(mergedTrace, importedTrace, existingTrace);
         return mergedTrace;
     }
 

@@ -390,9 +390,32 @@ final class LocationDashboardDerivedGraphSupport {
             trace.put("y", List.copyOf(labels));
         }
         Map<String, Object> marker = copyMap(trace.get("marker"));
-        marker.putIfAbsent("color", color);
+        String preservedColor = configuredTraceColor(trace);
+        marker.put("color", preservedColor == null ? color : preservedColor);
         trace.put("marker", marker);
         return trace;
+    }
+
+    private static String configuredTraceColor(Map<String, Object> trace) {
+        Map<String, Object> marker = copyMap(trace.get("marker"));
+        Object markerColor = marker.get("color");
+        if (markerColor instanceof String colorValue && !colorValue.isBlank()) {
+            return colorValue;
+        }
+        Object markerColors = marker.get("colors");
+        if (markerColors instanceof List<?> colors) {
+            for (Object colorValue : colors) {
+                if (colorValue instanceof String color && !color.isBlank()) {
+                    return color;
+                }
+            }
+        }
+        Map<String, Object> line = copyMap(trace.get("line"));
+        Object lineColor = line.get("color");
+        if (lineColor instanceof String colorValue && !colorValue.isBlank()) {
+            return colorValue;
+        }
+        return null;
     }
 
     private static Map<String, Object> piePrototype(Graph graph, String traceName) {

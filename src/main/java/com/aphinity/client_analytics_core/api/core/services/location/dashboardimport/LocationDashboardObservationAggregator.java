@@ -13,6 +13,8 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 
 final class LocationDashboardObservationAggregator {
+    private static final String TIME_SERIES_LINE_SHAPE = "spline";
+    private static final double TIME_SERIES_LINE_SMOOTHING = 0.3d;
     private static final List<String> DEFAULT_TRACE_COLORS = List.of(
         "#1f77b4",
         "#ff7f0e",
@@ -137,7 +139,9 @@ final class LocationDashboardObservationAggregator {
                 "y", List.copyOf(yValues),
                 "line", Map.of(
                     "color", traceColor,
-                    "width", 2
+                    "width", 2,
+                    "shape", TIME_SERIES_LINE_SHAPE,
+                    "smoothing", TIME_SERIES_LINE_SMOOTHING
                 ),
                 "marker", Map.of("size", 6),
                 "customdata", List.copyOf(customDataValues)

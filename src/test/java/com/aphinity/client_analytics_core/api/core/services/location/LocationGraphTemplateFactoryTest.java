@@ -100,6 +100,30 @@ class LocationGraphTemplateFactoryTest {
     }
 
     @Test
+    void createScatterTemplateUsesSplineLinesByDefault() {
+        LocationGraphTemplateFactory.GraphTemplate template = factory.create("scatter", "Phoenix");
+
+        assertEquals("New Plot Graph", template.name());
+        assertEquals(
+            List.of(Map.of(
+                "type", "scatter",
+                "name", "Trace 1",
+                "x", List.of(),
+                "y", List.of(),
+                "line", Map.of(
+                    "color", "#1f77b4",
+                    "width", 2,
+                    "shape", "spline",
+                    "smoothing", 0.3d
+                ),
+                "mode", "lines+markers",
+                "marker", Map.of("size", 6)
+            )),
+            template.data()
+        );
+    }
+
+    @Test
     void createRejectsUnsupportedGraphTypes() {
         assertThrows(IllegalArgumentException.class, () -> factory.create("donut", "Phoenix"));
         assertThrows(IllegalArgumentException.class, () -> factory.create(null, "Phoenix"));

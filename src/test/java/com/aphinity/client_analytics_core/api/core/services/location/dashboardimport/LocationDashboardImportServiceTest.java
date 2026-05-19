@@ -366,6 +366,67 @@ class LocationDashboardImportServiceTest {
         assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
     }
 
+    @Test
+    void importLocationDashboardPreservesExistingBarTraceColorsInDerivedGraphs() {
+        LocationDashboardImportService importService = buildImportService();
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
+        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
+        when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
+        when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
+
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
+        Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples", "#0f766e");
+        Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
+        Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
+        Graph percentConformanceGraph = indicatorGraph(23L, "Percent Conformance");
+        Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality Category", "#ef4444");
+        Graph bySystemTypeGraph = barGraph(25L, "Non-Conformances", "By Water System Type", "#22c55e");
+        Graph byFacilityGraph = barGraph(26L, "Non-Conformances", "By Facility", "#f59e0b");
+        Graph statusByFacilityGraph = barGraph(27L, "Non-Conformance Status", "By Facility");
+        Graph turnaroundTimeGraph = barGraph(28L, "Non-Conformance Status", "Turnaround Time");
+
+        List<Graph> graphs = List.of(
+            waterQualityGraph,
+            systemTypeGraph,
+            totalSamplesGraph,
+            totalNonConformancesGraph,
+            resolutionPercentGraph,
+            percentConformanceGraph,
+            byWaterQualityGraph,
+            bySystemTypeGraph,
+            byFacilityGraph,
+            statusByFacilityGraph,
+            turnaroundTimeGraph
+        );
+        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
+            .map(graph -> locationGraph(9L, graph))
+            .toList());
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of());
+
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+
+        assertEquals(
+            Map.of("color", "#ef4444"),
+            findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("marker")
+        );
+        assertEquals(
+            Map.of("color", "#22c55e"),
+            findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("marker")
+        );
+        assertEquals(
+            Map.of("color", "#f59e0b"),
+            findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("marker")
+        );
+    }
+
     private void assertNumericValues(Object rawValues, double... expectedValues) {
         @SuppressWarnings("unchecked")
         List<Number> values = (List<Number>) rawValues;
@@ -373,6 +434,21 @@ class LocationDashboardImportServiceTest {
         for (int index = 0; index < expectedValues.length; index += 1) {
             assertEquals(expectedValues[index], values.get(index).doubleValue());
         }
+    }
+
+    private void assertLineStyle(
+        Object rawLineStyle,
+        String expectedColor,
+        long expectedWidth,
+        String expectedShape,
+        double expectedSmoothing
+    ) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> lineStyle = (Map<String, Object>) rawLineStyle;
+        assertEquals(expectedColor, lineStyle.get("color"));
+        assertEquals(expectedWidth, ((Number) lineStyle.get("width")).longValue());
+        assertEquals(expectedShape, lineStyle.get("shape"));
+        assertEquals(expectedSmoothing, ((Number) lineStyle.get("smoothing")).doubleValue());
     }
 
     @Test
@@ -522,7 +598,7 @@ class LocationDashboardImportServiceTest {
         assertEquals("HPC", waterQualityResponse.data().getFirst().get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityResponse.data().getFirst().get("x"));
         assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 1.0d);
-        assertEquals(Map.of("color", "#123456", "width", 4L), waterQualityResponse.data().getFirst().get("line"));
+        assertLineStyle(waterQualityResponse.data().getFirst().get("line"), "#123456", 4L, "spline", 0.3d);
         assertEquals(Map.of("size", 9L), waterQualityResponse.data().getFirst().get("marker"));
     }
 
@@ -923,13 +999,20 @@ class LocationDashboardImportServiceTest {
     }
 
     private Graph barGraph(Long id, String name, String titleText) {
-        return graph(id, name, "bar", Map.of("title", Map.of("text", titleText)), List.of(Map.of(
-            "type", "bar",
-            "name", "Trace 1",
-            "x", List.of(),
-            "y", List.of(),
-            "orientation", "h"
-        )));
+        return barGraph(id, name, titleText, null);
+    }
+
+    private Graph barGraph(Long id, String name, String titleText, String color) {
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("type", "bar");
+        trace.put("name", "Trace 1");
+        trace.put("x", List.of());
+        trace.put("y", List.of());
+        trace.put("orientation", "h");
+        if (color != null) {
+            trace.put("marker", Map.of("color", color));
+        }
+        return graph(id, name, "bar", Map.of("title", Map.of("text", titleText)), List.of(trace));
     }
 
     private Graph verticalStatusByFacilityGraph(
