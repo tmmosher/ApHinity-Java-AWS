@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
@@ -137,6 +138,9 @@ final class LocationDashboardHistoricalDataAssembler {
 
     private boolean isSupportedHistoricalTrace(GraphTrace trace) {
         if (trace == null) {
+            return false;
+        }
+        if (trace.getTimeRange() != GraphTimeRange.ALL_TIME) {
             return false;
         }
         String normalizedTraceType = LocationDashboardGraphMetadataSupport.normalizeKey(trace.getTraceType());

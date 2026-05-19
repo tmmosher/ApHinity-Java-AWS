@@ -8,6 +8,7 @@ public record GraphResponse(
     Long id,
     String name,
     List<Map<String, Object>> data,
+    Map<String, List<Map<String, Object>>> timeRangeData,
     Map<String, Object> layout,
     Map<String, Object> config,
     Map<String, Object> style,

@@ -10,7 +10,6 @@ import com.aphinity.client_analytics_core.api.core.entities.location.LocationUse
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.entities.location.UserSubscriptionToLocation;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
@@ -26,6 +25,7 @@ import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory.GraphTemplate;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +74,8 @@ public class LocationService {
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
     private final LocationDashboardImportService locationDashboardImportService;
     private final LocationDashboardMutationLockService locationDashboardMutationLockService;
+    private final LocationDashboardTimeRangeService locationDashboardTimeRangeService;
+    private final GraphResponseMapper graphResponseMapper;
 
     public LocationService(
         AppUserRepository appUserRepository,
@@ -87,7 +89,9 @@ public class LocationService {
         LocationGraphTemplateFactory locationGraphTemplateFactory,
         LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory,
         LocationDashboardImportService locationDashboardImportService,
-        LocationDashboardMutationLockService locationDashboardMutationLockService
+        LocationDashboardMutationLockService locationDashboardMutationLockService,
+        LocationDashboardTimeRangeService locationDashboardTimeRangeService,
+        GraphResponseMapper graphResponseMapper
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
@@ -101,6 +105,8 @@ public class LocationService {
         this.locationGraphUpdatePayloadValidationFactory = locationGraphUpdatePayloadValidationFactory;
         this.locationDashboardImportService = locationDashboardImportService;
         this.locationDashboardMutationLockService = locationDashboardMutationLockService;
+        this.locationDashboardTimeRangeService = locationDashboardTimeRangeService;
+        this.graphResponseMapper = graphResponseMapper;
     }
 
     /**
@@ -169,7 +175,7 @@ public class LocationService {
 
         return locationGraphRepository.findByLocationIdWithGraph(locationId).stream()
             .map(LocationGraph::getGraph)
-            .map(this::toGraphResponse)
+            .map(graphResponseMapper::toResponse)
             .toList();
     }
 
@@ -269,7 +275,7 @@ public class LocationService {
             throw ex;
         }
 
-        return toGraphResponse(savedGraph);
+        return graphResponseMapper.toResponse(savedGraph);
     }
 
     /**
@@ -481,7 +487,8 @@ public class LocationService {
 
             try {
                 if (hasGraphUpdates) {
-                    graphRepository.saveAll(graphs);
+                    graphRepository.saveAllAndFlush(graphs);
+                    locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
                 }
                 if (normalizedSectionLayout != null) {
                     location.setSectionLayout(normalizedSectionLayout);
@@ -1010,28 +1017,7 @@ public class LocationService {
      * Maps graph entities into API response shape.
      */
     private GraphResponse toGraphResponse(Graph graph) {
-        GraphPayloadMapper.GraphPayload payload;
-        try {
-            payload = GraphRelationalPayloadMapper.normalize(graph);
-        } catch (IllegalArgumentException ex) {
-            log.warn(
-                "Invalid graph payload for graphId={} during location graph response mapping",
-                graph.getId(),
-                ex
-            );
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Graph payload is invalid");
-        }
-
-        return new GraphResponse(
-            graph.getId(),
-            graph.getName(),
-            payload.data(),
-            payload.layout(),
-            payload.config(),
-            payload.style(),
-            graph.getCreatedAt(),
-            graph.getUpdatedAt()
-        );
+        return graphResponseMapper.toResponse(graph);
     }
 
     private Long resolveTargetSectionId(

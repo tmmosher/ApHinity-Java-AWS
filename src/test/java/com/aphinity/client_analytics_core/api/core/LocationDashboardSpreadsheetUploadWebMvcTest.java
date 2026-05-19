@@ -62,6 +62,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
                 18L,
                 "Water Quality Compliance",
                 List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
+                Map.of(),
                 Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
                 Map.of(),
                 Map.of(),

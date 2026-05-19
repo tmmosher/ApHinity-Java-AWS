@@ -68,6 +68,7 @@ export interface LocationGraph {
     id: number;
     name: string;
     data: Record<string, unknown>[];
+    timeRangeData?: Record<string, Record<string, unknown>[]>;
     layout?: Record<string, unknown> | null;
     config?: Record<string, unknown> | null;
     style?: Record<string, unknown> | null;

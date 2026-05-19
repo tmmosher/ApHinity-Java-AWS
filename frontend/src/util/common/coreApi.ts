@@ -168,6 +168,23 @@ const parseGraphDataEntries = (value: unknown): Record<string, unknown>[] => {
   return value;
 };
 
+const parseOptionalTimeRangeData = (
+  value: unknown
+): Record<string, Record<string, unknown>[]> | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isObject(value)) {
+    throw new Error("Invalid graph time range payload");
+  }
+
+  const parsed: Record<string, Record<string, unknown>[]> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    parsed[key] = parseGraphDataEntries(entry);
+  }
+  return parsed;
+};
+
 const parseLocationGraphColumns = (value: Record<string, unknown>) => {
   const topLevelLayout = parseOptionalGraphObject(
     value.layout,
@@ -237,6 +254,7 @@ export const parseLocationGraph = (value: unknown): LocationGraph => {
     id: value.id,
     name: value.name,
     ...parseLocationGraphColumns(value),
+    timeRangeData: parseOptionalTimeRangeData(value.timeRangeData),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };

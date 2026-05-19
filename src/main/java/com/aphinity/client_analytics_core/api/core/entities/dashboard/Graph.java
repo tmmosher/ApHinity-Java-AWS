@@ -84,17 +84,29 @@ public class Graph {
         if (updatedAt == null) {
             updatedAt = now;
         }
-        if ((graphType == null || graphType.isBlank()) && graphTraces != null && !graphTraces.isEmpty()) {
-            graphType = graphTraces.getFirst().getTraceType();
-        }
+        applyDerivedGraphType();
     }
 
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();
-        if ((graphType == null || graphType.isBlank()) && graphTraces != null && !graphTraces.isEmpty()) {
-            graphType = graphTraces.getFirst().getTraceType();
+        applyDerivedGraphType();
+    }
+
+    private void applyDerivedGraphType() {
+        if (graphType != null && !graphType.isBlank()) {
+            return;
         }
+        if (graphTraces == null || graphTraces.isEmpty()) {
+            return;
+        }
+        for (GraphTrace graphTrace : graphTraces) {
+            if (graphTrace != null && graphTrace.getTimeRange() == GraphTimeRange.ALL_TIME) {
+                graphType = graphTrace.getTraceType();
+                return;
+            }
+        }
+        graphType = graphTraces.getFirst().getTraceType();
     }
 
     public Long getId() {

@@ -19,6 +19,15 @@ public interface LocationGraphRepository extends JpaRepository<LocationGraph, Lo
         """)
     List<LocationGraph> findByLocationIdWithGraph(@Param("locationId") Long locationId);
 
+    @Query("""
+        select distinct locationGraph from LocationGraph locationGraph
+        join fetch locationGraph.graph graph
+        left join fetch graph.graphTraces
+        where locationGraph.id.locationId = :locationId
+        order by locationGraph.createdAt asc
+        """)
+    List<LocationGraph> findByLocationIdWithGraphDetails(@Param("locationId") Long locationId);
+
     List<LocationGraph> findByIdGraphId(Long graphId);
 
     boolean existsByIdLocationIdAndIdGraphId(Long locationId, Long graphId);

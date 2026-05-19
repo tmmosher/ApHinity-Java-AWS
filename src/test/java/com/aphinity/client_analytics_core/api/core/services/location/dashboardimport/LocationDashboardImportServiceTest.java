@@ -15,6 +15,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.dashboard.Measur
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -787,6 +788,7 @@ class LocationDashboardImportServiceTest {
             locationGraphRepository,
             serviceEventRepository,
             new LocationDashboardMutationLockService(),
+            new GraphResponseMapper(),
             Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC)
         );
     }

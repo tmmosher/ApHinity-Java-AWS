@@ -3,13 +3,12 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
+import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +43,7 @@ public class LocationDashboardImportService {
     private final LocationDashboardImportedGraphMerger importedGraphMerger;
     private final LocationDashboardCorrectiveActionService correctiveActionService;
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
+    private final GraphResponseMapper graphResponseMapper;
 
     @Autowired
     public LocationDashboardImportService(
@@ -52,7 +52,8 @@ public class LocationDashboardImportService {
         MeasurementBoundRepository measurementBoundRepository,
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
-        LocationDashboardMutationLockService mutationLockService
+        LocationDashboardMutationLockService mutationLockService,
+        GraphResponseMapper graphResponseMapper
     ) {
         this(
             spreadsheetParser,
@@ -61,6 +62,7 @@ public class LocationDashboardImportService {
             locationGraphRepository,
             serviceEventRepository,
             mutationLockService,
+            graphResponseMapper,
             Clock.systemDefaultZone()
         );
     }
@@ -72,6 +74,7 @@ public class LocationDashboardImportService {
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
         LocationDashboardMutationLockService mutationLockService,
+        GraphResponseMapper graphResponseMapper,
         Clock clock
     ) {
         this(
@@ -82,7 +85,8 @@ public class LocationDashboardImportService {
             mutationLockService,
             new LocationDashboardGraphMatcher(),
             new LocationDashboardImportedGraphMerger(),
-            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry)
+            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry),
+            graphResponseMapper
         );
     }
 
@@ -94,7 +98,8 @@ public class LocationDashboardImportService {
         LocationDashboardMutationLockService mutationLockService,
         LocationDashboardGraphMatcher graphMatcher,
         LocationDashboardImportedGraphMerger importedGraphMerger,
-        LocationDashboardCorrectiveActionService correctiveActionService
+        LocationDashboardCorrectiveActionService correctiveActionService,
+        GraphResponseMapper graphResponseMapper
     ) {
         this.spreadsheetParser = spreadsheetParser;
         this.strategyRegistry = strategyRegistry;
@@ -105,6 +110,7 @@ public class LocationDashboardImportService {
         this.importedGraphMerger = importedGraphMerger;
         this.correctiveActionService = correctiveActionService;
         this.historicalDataAssembler = new LocationDashboardHistoricalDataAssembler(correctiveActionService);
+        this.graphResponseMapper = graphResponseMapper;
     }
 
     @Transactional
@@ -359,31 +365,6 @@ public class LocationDashboardImportService {
     }
 
     private GraphResponse toGraphResponse(Graph graph) {
-        GraphPayloadMapper.GraphPayload payload;
-        try {
-            payload = GraphRelationalPayloadMapper.normalize(graph);
-        } catch (IllegalArgumentException ex) {
-            log.warn(
-                "Invalid graph payload for graphId={} during dashboard import response mapping",
-                graph.getId(),
-                ex
-            );
-            throw new ApiClientException(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "graph_data_invalid",
-                "Graph data is invalid"
-            );
-        }
-
-        return new GraphResponse(
-            graph.getId(),
-            graph.getName(),
-            payload.data(),
-            payload.layout(),
-            payload.config(),
-            payload.style(),
-            graph.getCreatedAt(),
-            graph.getUpdatedAt()
-        );
+        return graphResponseMapper.toResponse(graph);
     }
 }

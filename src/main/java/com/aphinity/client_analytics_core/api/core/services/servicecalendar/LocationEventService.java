@@ -6,6 +6,7 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
@@ -39,6 +40,7 @@ public class LocationEventService {
     private final ServiceCalendarImportService importService;
     private final ServiceEventAuditService auditService;
     private final MailOutboxCommandService mailOutboxCommandService;
+    private final LocationDashboardTimeRangeService locationDashboardTimeRangeService;
 
     public LocationEventService(
         LocationRepository locationRepository,
@@ -48,7 +50,8 @@ public class LocationEventService {
         ServiceCalendarTemplateService templateService,
         ServiceCalendarImportService importService,
         ServiceEventAuditService auditService,
-        MailOutboxCommandService mailOutboxCommandService
+        MailOutboxCommandService mailOutboxCommandService,
+        LocationDashboardTimeRangeService locationDashboardTimeRangeService
     ) {
         this.locationRepository = locationRepository;
         this.serviceEventRepository = serviceEventRepository;
@@ -58,6 +61,7 @@ public class LocationEventService {
         this.importService = importService;
         this.auditService = auditService;
         this.mailOutboxCommandService = mailOutboxCommandService;
+        this.locationDashboardTimeRangeService = locationDashboardTimeRangeService;
     }
 
     @Transactional(readOnly = true)
@@ -83,7 +87,9 @@ public class LocationEventService {
 
     @Transactional
     public int uploadServiceCalendar(Long userId, Long locationId, MultipartFile file) {
-        return importService.uploadServiceCalendar(userId, locationId, file);
+        int importedCount = importService.uploadServiceCalendar(userId, locationId, file);
+        locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+        return importedCount;
     }
 
     @Transactional
@@ -100,6 +106,7 @@ public class LocationEventService {
             persisted = refreshServiceEventFromStore(persisted.getId(), persisted);
             auditService.recordCreated(userId, persisted);
             ServiceEventResponse response = requestMapper.toResponse(persisted);
+            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return response;
         } catch (RuntimeException ex) {
@@ -142,6 +149,7 @@ public class LocationEventService {
             auditService.recordCreated(userId, persisted);
 
             ServiceEventResponse response = requestMapper.toResponse(persisted);
+            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             mailOutboxCommandService.queueWorkOrderEmail(
                 userId,
@@ -195,6 +203,7 @@ public class LocationEventService {
             // touchUpdatedAt() clears the persistence context, so map the response first while
             // any lazy corrective-action source proxy is still attached.
             ServiceEventResponse response = requestMapper.toResponse(persisted);
+            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return response;
         } catch (RuntimeException ex) {
@@ -236,6 +245,8 @@ public class LocationEventService {
                 // Break corrective-action back-references before deleting the source event.
                 serviceEventRepository.clearCorrectiveActionSourceEvent(locationId, serviceEvent.getId());
                 serviceEventRepository.delete(serviceEvent);
+                serviceEventRepository.flush();
+                locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
                 locationRepository.touchUpdatedAt(locationId, Instant.now());
             } catch (RuntimeException ex) {
                 log.error(
