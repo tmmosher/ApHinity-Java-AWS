@@ -27,7 +27,7 @@ import java.util.Map;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.structuredComment;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookComment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.greaterThan;
@@ -115,16 +115,16 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     }
 
     @Test
-    void uploadLocationDashboardSpreadsheetCountsOutOfSpecStructuredCommentSamplesInDerivedNonConformanceGraphs() throws Exception {
-        createUser("partner-dashboard-upload-structured-comments@example.com", PASSWORD, true, "partner");
+    void uploadLocationDashboardSpreadsheetCountsOutOfSpecWorkbookCommentSamplesInDerivedNonConformanceGraphs() throws Exception {
+        createUser("partner-dashboard-upload-workbook-comments@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
         seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
 
         seedHoagStrategyGraphs(location);
-        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-structured-comments@example.com", PASSWORD);
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-workbook-comments@example.com", PASSWORD);
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-01"),
@@ -152,7 +152,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                         "file",
                         "dashboard.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        createDashboardSpreadsheetWithRawComment("Hoag Hospital", structuredComment, 4)
+                        createDashboardSpreadsheetWithRawComment("Hoag Hospital", workbookComment, 4)
                     ))
                     .contentType("multipart/form-data")
                     .cookie(authCookies(authCookies))

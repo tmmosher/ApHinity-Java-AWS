@@ -1,9 +1,5 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -18,9 +14,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class LocationDashboardCommentParser {
-    static final String SCHEMA_VERSION = "aphinity.location-dashboard.comment.v1";
-
-    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
     private static final Pattern DATE_TOKEN_PATTERN = Pattern.compile("\\b(\\d{1,2}/\\d{1,2}/\\d{2,4})\\b");
     private static final Pattern BARE_DATE_LINE_PATTERN = Pattern.compile("(?i)^\\d{1,2}/\\d{1,2}/\\d{2,4}[\\p{Punct}]?$");
     private static final Pattern YEAR_TOKEN_PATTERN = Pattern.compile("^(\\d{1,2}/\\d{1,2}/)(\\d{3,4})$");
@@ -57,57 +50,16 @@ final class LocationDashboardCommentParser {
         }
 
         String trimmed = payload.strip();
-        if (looksLikeStructuredJson(trimmed)) {
-            return parseStructuredComment(trimmed);
-        }
-        // Preserve the old free-form formats only after structured JSON has been ruled out.
         if (isCompactSemicolonComment(trimmed)) {
             return new ParsedComment(false, null, null, List.of(), List.of(), List.of());
         }
         return parseLegacyComment(payload);
     }
 
-    private ParsedComment parseStructuredComment(String jsonText) {
-        try {
-            JsonNode root = OBJECT_MAPPER.readTree(jsonText);
-            if (root == null || !root.isObject()) {
-                throw invalidComment("Structured comment must be a JSON object.");
-            }
-
-            String schema = text(root, "schema");
-            if (!SCHEMA_VERSION.equals(schema)) {
-                throw invalidComment("Unsupported comment schema: " + schema);
-            }
-
-            String sampleLocation = blankToNull(text(root, "sampleLocation"));
-            ParsedCommentSample primarySample = parseSample(
-                root.get("primarySample"),
-                true,
-                "primarySample"
-            );
-            List<ParsedCommentSample> followUpSamples = parseSampleList(root.get("followUpSamples"));
-            List<ParsedCommentCorrectiveAction> correctiveActions = parseCorrectiveActionList(root.get("correctiveActions"));
-            List<String> notes = parseStringList(root.get("notes"));
-
-            return new ParsedComment(
-                true,
-                sampleLocation,
-                primarySample,
-                followUpSamples,
-                correctiveActions,
-                notes
-            );
-        } catch (IllegalArgumentException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw invalidComment("Structured comment could not be parsed.");
-        }
-    }
-
     private ParsedComment parseLegacyComment(String payload) {
         String[] lines = payload.replace("\r\n", "\n").split("\\R");
         String sampleLocation = null;
-        List<ParsedCommentSample> followUpSamples = new ArrayList<>();
+        ParsedSampleAccumulator parsedSamples = new ParsedSampleAccumulator();
         List<ParsedCommentCorrectiveAction> correctiveActions = new ArrayList<>();
         List<String> notes = new ArrayList<>();
 
@@ -126,7 +78,7 @@ final class LocationDashboardCommentParser {
             if (labeledTestNote != null) {
                 if (currentSample != null && currentSample.resultValue != null) {
                     currentAction = finalizeAction(currentAction, currentSample, correctiveActions);
-                    currentSample = finalizeSample(currentSample, followUpSamples);
+                    currentSample = finalizeSample(currentSample, parsedSamples);
                 }
                 if (currentSample == null) {
                     currentSample = new MutableSample();
@@ -147,7 +99,7 @@ final class LocationDashboardCommentParser {
 
             if (isSampleStartLine(line)) {
                 currentAction = finalizeAction(currentAction, currentSample, correctiveActions);
-                currentSample = finalizeSample(currentSample, followUpSamples);
+                currentSample = finalizeSample(currentSample, parsedSamples);
 
                 SampleStart start = parseSampleStart(line, pendingSampleDate);
                 pendingSampleDate = null;
@@ -265,14 +217,14 @@ final class LocationDashboardCommentParser {
         }
 
         currentAction = finalizeAction(currentAction, currentSample, correctiveActions);
-        currentSample = finalizeSample(currentSample, followUpSamples);
-        appendFallbackRetestSampleIfMissing(lines, followUpSamples);
+        currentSample = finalizeSample(currentSample, parsedSamples);
+        appendFallbackRetestSampleIfMissing(lines, parsedSamples);
 
         return new ParsedComment(
             false,
             sampleLocation,
-            null,
-            followUpSamples,
+            parsedSamples.primarySample,
+            parsedSamples.followUpSamples,
             correctiveActions,
             notes
         );
@@ -298,23 +250,23 @@ final class LocationDashboardCommentParser {
         return null;
     }
 
-    private MutableSample finalizeSample(MutableSample currentSample, List<ParsedCommentSample> followUpSamples) {
+    private MutableSample finalizeSample(MutableSample currentSample, ParsedSampleAccumulator parsedSamples) {
         if (currentSample == null) {
             return null;
         }
         if (!currentSample.hasContent()) {
             return null;
         }
-        followUpSamples.add(currentSample.toRecord());
+        parsedSamples.add(currentSample.toRecord());
         return null;
     }
 
-    private void appendFallbackRetestSampleIfMissing(String[] lines, List<ParsedCommentSample> followUpSamples) {
+    private void appendFallbackRetestSampleIfMissing(String[] lines, ParsedSampleAccumulator parsedSamples) {
         ParsedCommentSample fallbackSample = parseFallbackRetestSample(lines);
         if (fallbackSample == null) {
             return;
         }
-        for (ParsedCommentSample existingSample : followUpSamples) {
+        for (ParsedCommentSample existingSample : parsedSamples.allSamples()) {
             if (existingSample == null) {
                 continue;
             }
@@ -324,7 +276,7 @@ final class LocationDashboardCommentParser {
                 return;
             }
         }
-        followUpSamples.add(fallbackSample);
+        parsedSamples.addFollowUp(fallbackSample);
     }
 
     private ParsedCommentSample parseFallbackRetestSample(String[] lines) {
@@ -380,187 +332,6 @@ final class LocationDashboardCommentParser {
             return null;
         }
         return currentRetest.toRecord();
-    }
-
-    private ParsedCommentSample parseSample(JsonNode node, boolean required, String fieldName) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            if (required) {
-                throw invalidComment("Missing structured comment field: " + fieldName);
-            }
-            return null;
-        }
-        if (!node.isObject()) {
-            throw invalidComment("Structured comment field must be an object: " + fieldName);
-        }
-
-        LocalDate sampledOn = parseRequiredDate(node, "sampledOn");
-        LocalDate resultReceivedOn = parseOptionalDate(node, "resultReceivedOn");
-        String resultRaw = blankToNull(text(node, "resultRaw"));
-        BigDecimal resultValue = parseOptionalDecimal(node.get("resultValue"));
-        String resultUnit = blankToNull(text(node, "resultUnit"));
-        List<String> notes = parseStringList(node.get("notes"));
-        List<ParsedCommentCorrectiveAction> correctiveActions = parseCorrectiveActionList(node.get("correctiveActions"));
-
-        if (resultValue == null && resultRaw != null) {
-            ParsedMeasurement measurement = parseMeasurementValue(resultRaw);
-            if (measurement != null) {
-                resultValue = measurement.value();
-                if (resultUnit == null) {
-                    resultUnit = measurement.unit();
-                }
-                resultRaw = measurement.rawValue();
-            }
-        }
-
-        if (resultValue == null && resultRaw == null) {
-            throw invalidComment("Structured comment sample is missing a result value.");
-        }
-        if (resultRaw == null && resultValue != null) {
-            resultRaw = resultValue.toPlainString() + (resultUnit == null ? "" : " " + resultUnit);
-        }
-
-        return new ParsedCommentSample(
-            sampledOn,
-            resultReceivedOn,
-            resultRaw,
-            resultValue,
-            resultUnit,
-            notes,
-            correctiveActions
-        );
-    }
-
-    private List<ParsedCommentSample> parseSampleList(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return List.of();
-        }
-        List<ParsedCommentSample> samples = new ArrayList<>();
-        if (node.isArray()) {
-            for (JsonNode sampleNode : node) {
-                samples.add(parseSample(sampleNode, true, "followUpSamples[]"));
-            }
-            return samples;
-        }
-        samples.add(parseSample(node, true, "followUpSamples"));
-        return samples;
-    }
-
-    private List<ParsedCommentCorrectiveAction> parseCorrectiveActionList(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return List.of();
-        }
-        List<ParsedCommentCorrectiveAction> actions = new ArrayList<>();
-        if (node.isArray()) {
-            for (JsonNode actionNode : node) {
-                ParsedCommentCorrectiveAction action = parseCorrectiveAction(actionNode);
-                if (action != null) {
-                    actions.add(action);
-                }
-            }
-            return actions;
-        }
-        ParsedCommentCorrectiveAction action = parseCorrectiveAction(node);
-        if (action != null) {
-            actions.add(action);
-        }
-        return actions;
-    }
-
-    private ParsedCommentCorrectiveAction parseCorrectiveAction(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        if (node.isTextual()) {
-            String text = blankToNull(node.asText());
-            if (text == null) {
-                return null;
-            }
-            return new ParsedCommentCorrectiveAction(null, text, null, List.of());
-        }
-        if (!node.isObject()) {
-            throw invalidComment("Structured corrective action must be a JSON object or string.");
-        }
-
-        LocalDate actionDate = parseOptionalDate(node, "actionDate");
-        String text = blankToNull(text(node, "text"));
-        String ticket = blankToNull(text(node, "ticket"));
-        List<String> notes = parseStringList(node.get("notes"));
-        if (text == null) {
-            if (!notes.isEmpty()) {
-                text = String.join(" ", notes);
-                notes = List.of();
-            } else {
-                throw invalidComment("Structured corrective action is missing text.");
-            }
-        }
-        return new ParsedCommentCorrectiveAction(actionDate, text, ticket, notes);
-    }
-
-    private List<String> parseStringList(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return List.of();
-        }
-        List<String> values = new ArrayList<>();
-        if (node.isArray()) {
-            for (JsonNode item : node) {
-                String value = parseStringValue(item);
-                if (value != null) {
-                    values.add(value);
-                }
-            }
-            return values;
-        }
-        String value = parseStringValue(node);
-        if (value != null) {
-            values.add(value);
-        }
-        return values;
-    }
-
-    private String parseStringValue(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        if (node.isTextual()) {
-            return blankToNull(node.asText());
-        }
-        if (node.isObject()) {
-            String text = blankToNull(text(node, "text"));
-            if (text != null) {
-                return text;
-            }
-        }
-        String value = blankToNull(node.asText());
-        return value;
-    }
-
-    private BigDecimal parseOptionalDecimal(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            return node.decimalValue();
-        }
-        if (node.isTextual()) {
-            String rawValue = blankToNull(node.asText());
-            if (rawValue == null) {
-                return null;
-            }
-            ParsedMeasurement measurement = parseMeasurementValue(rawValue);
-            if (measurement != null) {
-                return measurement.value();
-            }
-            try {
-                return new BigDecimal(rawValue);
-            } catch (NumberFormatException ex) {
-                return null;
-            }
-        }
-        try {
-            return new BigDecimal(node.asText());
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     private ParsedMeasurement parseMeasurementValue(String rawValue) {
@@ -744,25 +515,6 @@ final class LocationDashboardCommentParser {
         return new SampleStart(date, trailingText);
     }
 
-    private LocalDate parseRequiredDate(JsonNode node, String field) {
-        LocalDate date = parseOptionalDate(node, field);
-        if (date == null) {
-            throw invalidComment("Structured comment field is missing a valid date: " + field);
-        }
-        return date;
-    }
-
-    private LocalDate parseOptionalDate(JsonNode node, String field) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        return parseDate(text(node, field));
-    }
-
-    private LocalDate parseOptionalDate(JsonNode node) {
-        return node == null || node.isNull() || node.isMissingNode() ? null : parseDate(node.asText());
-    }
-
     private LocalDate parseDateToken(String rawValue) {
         if (rawValue == null) {
             return null;
@@ -824,15 +576,9 @@ final class LocationDashboardCommentParser {
         return normalized;
     }
 
-    private boolean looksLikeStructuredJson(String payload) {
-        return payload != null && payload.startsWith("{") && payload.endsWith("}");
-    }
-
     private boolean isCompactSemicolonComment(String payload) {
         return payload != null && payload.contains(";") && !payload.contains("\n") && !payload.startsWith("{");
     }
-
-    // TODO Fix these line starts to properly read in structured comments
 
     private boolean isSampleLocationLine(String line) {
         String normalized = normalizeKey(line);
@@ -1087,24 +833,6 @@ final class LocationDashboardCommentParser {
         return normalized.isBlank() ? null : normalized;
     }
 
-    private String text(JsonNode node, String field) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        JsonNode child = node.get(field);
-        if (child == null || child.isNull() || child.isMissingNode()) {
-            return null;
-        }
-        if (child.isTextual()) {
-            return child.asText();
-        }
-        return child.asText(null);
-    }
-
-    private IllegalArgumentException invalidComment(String message) {
-        return new IllegalArgumentException(message);
-    }
-
     private record ParsedMeasurement(
         BigDecimal value,
         String unit,
@@ -1177,6 +905,38 @@ final class LocationDashboardCommentParser {
                 ticket,
                 notes
             );
+        }
+    }
+
+    private static final class ParsedSampleAccumulator {
+        private ParsedCommentSample primarySample;
+        private final List<ParsedCommentSample> followUpSamples = new ArrayList<>();
+
+        private void add(ParsedCommentSample sample) {
+            if (sample == null) {
+                return;
+            }
+            if (primarySample == null) {
+                primarySample = sample;
+                return;
+            }
+            followUpSamples.add(sample);
+        }
+
+        private void addFollowUp(ParsedCommentSample sample) {
+            if (sample == null) {
+                return;
+            }
+            followUpSamples.add(sample);
+        }
+
+        private List<ParsedCommentSample> allSamples() {
+            List<ParsedCommentSample> samples = new ArrayList<>();
+            if (primarySample != null) {
+                samples.add(primarySample);
+            }
+            samples.addAll(followUpSamples);
+            return List.copyOf(samples);
         }
     }
 

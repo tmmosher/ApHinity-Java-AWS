@@ -7,18 +7,18 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookComment;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.structuredComment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class LocationDashboardCommentParserTest {
     @Test
-    void parseStructuredCommentPreservesPrimaryAndSupplementalSamples() {
+    void parseWorkbookCommentPromotesPrimarySampleAndPreservesSupplementalSamples() {
         LocationDashboardCommentParser parser = new LocationDashboardCommentParser();
 
-        LocationDashboardCommentParser.ParsedComment parsed = parser.parse(structuredComment(
-            new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        LocationDashboardCommentParser.ParsedComment parsed = parser.parse(workbookComment(
+            new LocationDashboardCommentFixtures.WorkbookCommentSpec(
                 "Cooling Tower Sample Port",
                 sample(
                     LocalDate.parse("2025-08-01"),
@@ -43,7 +43,7 @@ class LocationDashboardCommentParserTest {
             )
         ));
 
-        assertTrue(parsed.structured());
+        assertFalse(parsed.structured());
         assertEquals("Cooling Tower Sample Port", parsed.sampleLocation());
         assertEquals(LocalDate.parse("2025-08-01"), parsed.primarySample().sampledOn());
         assertEquals(LocalDate.parse("2025-08-05"), parsed.primarySample().resultReceivedOn());

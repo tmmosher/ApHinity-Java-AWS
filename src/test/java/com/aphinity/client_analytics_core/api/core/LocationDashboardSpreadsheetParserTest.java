@@ -146,26 +146,25 @@ class LocationDashboardSpreadsheetParserTest {
     }
 
     @Test
-    void parseReadsMigratedStructuredCommentsFromDataUploadWorkbook() throws IOException {
+    void parseReadsWorkbookCommentsFromExampleUploadWorkbook() throws IOException {
         MockMultipartFile file = new MockMultipartFile(
             "file",
-            "data_upload_test.xlsx",
+            "dashboard_upload_template_example_2.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            readFixtureBytes("data_upload_test.xlsx")
+            readFixtureBytes("dashboard_upload_template_example_2.xlsx")
         );
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
 
         LocationDashboardSpreadsheetParser.ParsedDashboardCell commentCell = workbook.rows().stream()
             .flatMap(row -> row.cells().stream())
-            .filter(cell -> "W39".equals(cell.cellReference()))
+            .filter(cell -> "W43".equals(cell.cellReference()))
             .findFirst()
             .orElseThrow();
 
-        assertTrue(commentCell.commentText() != null && commentCell.commentText().startsWith("{"));
-        assertTrue(commentCell.commentText().contains("\"schema\": \"aphinity.location-dashboard.comment.v1\""));
-        assertTrue(commentCell.commentText().contains("\"followUpSamples\""));
-        assertTrue(commentCell.commentText().contains("\"correctiveActions\""));
+        assertTrue(commentCell.commentText() != null && commentCell.commentText().contains("Comment:"));
+        assertTrue(commentCell.commentText().contains("Date of sampling: 1/19/26"));
+        assertTrue(commentCell.commentText().contains("Retest Result: 46 CFU.mL"));
     }
 
     private byte[] readFixtureBytes(String fileName) throws IOException {

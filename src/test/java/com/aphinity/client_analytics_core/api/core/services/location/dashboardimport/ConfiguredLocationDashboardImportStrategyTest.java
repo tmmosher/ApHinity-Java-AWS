@@ -10,7 +10,7 @@ import java.util.Map;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.structuredComment;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookComment;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookStyleComment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -53,10 +53,10 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportReadsStructuredCommentSamplesAsSupplementalObservations() {
+    void computeImportReadsWorkbookCommentSamplesAsSupplementalObservations() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-01"),
@@ -81,7 +81,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
-            workbookWithCommentCell(structuredComment, "F5");
+            workbookWithCommentCell(workbookComment, "F5");
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbook,
@@ -108,10 +108,10 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportDoesNotCreateCorrectiveActionsForOutOfSpecStructuredCommentSamplesWhileCommentParsingIsDisabled() {
+    void computeImportDoesNotCreateCorrectiveActionsForOutOfSpecWorkbookCommentSamplesWhileCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-01"),
@@ -134,7 +134,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
-            workbookWithCommentCell(structuredComment, "F5");
+            workbookWithCommentCell(workbookComment, "F5");
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbook,
@@ -149,10 +149,10 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportDoesNotDuplicatePrimaryStructuredCommentSamplesWhenTheyUseActualSampleDatesInsideTheWorksheetMonth() {
+    void computeImportDoesNotDuplicatePrimaryWorkbookCommentSamplesWhenTheyUseActualSampleDatesInsideTheWorksheetMonth() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-15"),
@@ -167,7 +167,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
-            workbookWithCommentCell(structuredComment, "F5"),
+            workbookWithCommentCell(workbookComment, "F5"),
             measurementBounds()
         );
 
@@ -224,7 +224,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportDoesNotTreatCompliantCommentWithCorrectiveActionTextAsNonConforming() {
+    void computeImportDoesNotTreatCompliantUnstructuredCommentAsNonConforming() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
@@ -244,7 +244,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                                                         LocalDate.parse("2025-08-01"),
                                                         "9",
                                                         new BigDecimal("9"),
-                                                        "Corrective Action Taken on: 8/2/25\nRoutine flush completed",
+                                                        "Routine monitoring note: visual inspection completed with no issues.",
                                                         "F5"
                                                 )
                                         )
@@ -316,13 +316,80 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
     }
 
+    @Test
+    void computeImportDoesNotInheritWorksheetNonConformanceForCompliantFollowUpCommentSample() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String commentText = workbookStyleComment(
+                "First Test: 15",
+                "Corrective Action Taken on: 8/2/25",
+                "Routine flush completed",
+                "Retest Sample Date: 8/3/25",
+                "Result Date: 8/5/25",
+                "Retest Result: 8"
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+                new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                        "Newport Beach",
+                        List.of(
+                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                        5,
+                                        "Newport Beach",
+                                        "Hospital",
+                                        "Cooling Towers",
+                                        "Recirc Line",
+                                        "CTI/514P",
+                                        List.of(
+                                                new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                                                        "HPC",
+                                                        LocalDate.parse("2025-08-01"),
+                                                        "15",
+                                                        new BigDecimal("15"),
+                                                        commentText,
+                                                        "F5"
+                                                )
+                                        )
+                                )
+                        )
+                );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+                workbook,
+                measurementBounds()
+        );
+
+        assertEquals(2, result.analyzedSamples().size());
+        assertEquals(2, result.observations().size());
+        assertEquals(1, result.correctiveActions().size());
+        assertEquals(1L, result.analyzedSamples().stream().filter(
+                LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming
+        ).count());
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+                sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                        && LocalDate.parse("2025-08-01").equals(sample.observedDate())
+                        && "HPC".equals(sample.measurementName())
+                        && sample.nonConforming()
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+                sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_SUPPLEMENTAL
+                        && LocalDate.parse("2025-08-03").equals(sample.observedDate())
+                        && "HPC".equals(sample.measurementName())
+                        && sample.compliant()
+        ));
+        assertFalse(result.analyzedSamples().stream().anyMatch(sample ->
+                sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_SUPPLEMENTAL
+                        && sample.nonConforming()
+        ));
+    }
+
 // ... existing code ...
 
     @Test
     void computeImportDoesNotCreateDuplicatePrimaryCorrectiveActionsWhenPrimaryCommentSampleMatchesWorksheetMonthAndValue() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-15"),
@@ -337,7 +404,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
-            workbookWithStructuredCommentAndPrimaryValue(structuredComment, new BigDecimal("15"), "15", "F5"),
+            workbookWithCommentAndPrimaryValue(workbookComment, new BigDecimal("15"), "15", "F5"),
             measurementBounds()
         );
 
@@ -356,7 +423,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDoesNotCreateCorrectiveActionForFailedFollowUpSamplesWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-01"),
@@ -379,7 +446,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
-            workbookWithStructuredCommentAndPrimaryValue(structuredComment, new BigDecimal("5"), "5", "F5"),
+            workbookWithCommentAndPrimaryValue(workbookComment, new BigDecimal("5"), "5", "F5"),
             measurementBounds()
         );
 
@@ -394,7 +461,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
     void computeImportDoesNotCreateSeparateCorrectiveActionForLaterMonthFailedFollowUpsWhenCommentParsingIsDisabled() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-01"),
@@ -417,7 +484,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         ));
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
-            workbookWithCommentCell(structuredComment, "F5"),
+            workbookWithCommentCell(workbookComment, "F5"),
             measurementBounds()
         );
 
@@ -632,22 +699,14 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportDeduplicatesStructuredCommentPrimarySampleWhenItMatchesTheWorksheetSample() {
+    void computeImportDeduplicatesWorkbookCommentPrimarySampleWhenItMatchesTheWorksheetSample() {
         ConfiguredLocationDashboardImportStrategy strategy = criticalPhStrategy();
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
-            null,
-            sample(
-                LocalDate.parse("2026-01-01"),
-                null,
-                "7.6",
-                new BigDecimal("7.6"),
-                null
-            ),
-            List.of(),
-            List.of(correctiveAction("Drain tank, install new DI bottles")),
-            List.of("First Test: 7.6", "Second Test: 6.8")
-        ));
+        String workbookComment = workbookStyleComment(
+            "First Test: 7.6",
+            "Corrective Action: Drain tank, install new DI bottles",
+            "Second Test: 6.8"
+        );
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
@@ -664,7 +723,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         LocalDate.parse("2026-01-01"),
                         "7.6",
                         new BigDecimal("7.6"),
-                        structuredComment,
+                        workbookComment,
                         "CB39"
                     ))
                 ))
@@ -1553,17 +1612,17 @@ class ConfiguredLocationDashboardImportStrategyTest {
         String commentText,
         String firstCellReference
     ) {
-        return workbookWithStructuredCommentAndPrimaryValue(commentText, new BigDecimal("10"), "10", firstCellReference);
+        return workbookWithCommentAndPrimaryValue(commentText, new BigDecimal("10"), "10", firstCellReference);
     }
 
-    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbookWithStructuredCommentAndPrimaryValue(
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbookWithCommentAndPrimaryValue(
         String commentText,
         BigDecimal primaryNumericValue,
         String primaryRawValue,
         String firstCellReference
     ) {
-        // Keep the workbook comment text verbatim so the tests can cover both
-        // the legacy semicolon-delimited format and the new structured JSON payload.
+        // Keep the workbook comment text verbatim so the tests can cover the
+        // semicolon-delimited and multi-line workbook comment formats directly.
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             "Newport Beach",
             List.of(

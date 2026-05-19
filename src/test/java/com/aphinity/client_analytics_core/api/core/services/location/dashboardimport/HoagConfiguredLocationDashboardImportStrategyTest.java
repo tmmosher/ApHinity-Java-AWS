@@ -9,27 +9,23 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class HoagConfiguredLocationDashboardImportStrategyTest {
-    private static final String DATA_UPLOAD_FIXTURE = "data_upload_test.xlsx";
+    private static final String DATA_UPLOAD_FIXTURE = "dashboard_upload_template_example_2.xlsx";
     private static final int EXPECTED_ADDED_NON_CONFORMANCES = 6;
     private static final List<InjectedCommentPlan> INJECTED_COMMENT_PLANS = List.of(
-        new InjectedCommentPlan("F10", 2, List.of(
+        new InjectedCommentPlan(2, List.of(
             new SupplementalFailurePlan(5, new BigDecimal("150")),
             new SupplementalFailurePlan(26, new BigDecimal("175"))
         )),
-        new InjectedCommentPlan("G11", 1, List.of(
+        new InjectedCommentPlan(1, List.of(
             new SupplementalFailurePlan(9, new BigDecimal("160"))
         )),
-        new InjectedCommentPlan("H12", 3, List.of(
+        new InjectedCommentPlan(3, List.of(
             new SupplementalFailurePlan(6, new BigDecimal("180")),
             new SupplementalFailurePlan(19, new BigDecimal("190")),
             new SupplementalFailurePlan(37, new BigDecimal("210"))
@@ -37,7 +33,6 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     );
 
     private final LocationDashboardSpreadsheetParser parser = new LocationDashboardSpreadsheetParser();
-    private final LocationDashboardCommentParser commentParser = new LocationDashboardCommentParser();
 
     @Test
     void computeImportTracksOnlyTheKnownSupplementalHoagCommentNonConformanceDelta() throws IOException {
@@ -45,17 +40,14 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
 
         byte[] originalBytes = readFixtureBytes(DATA_UPLOAD_FIXTURE);
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parsedWorkbook = parseWorkbook(originalBytes);
-        SanitizedWorkbook sanitizedWorkbook = sanitizeInvalidFixtureComments(parsedWorkbook);
         Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> originalCellsByReference =
-            cellsByReference(sanitizedWorkbook.workbook());
+            cellsByReference(parsedWorkbook);
+        List<ResolvedInjectedCommentPlan> resolvedPlans = resolveInjectedCommentPlans(parsedWorkbook);
 
-        assertTrue(sanitizedWorkbook.normalizedCellReferences().contains("BH43"));
-        assertTrue(sanitizedWorkbook.normalizedCellReferences().contains("CB38"));
-
-        for (InjectedCommentPlan plan : INJECTED_COMMENT_PLANS) {
+        for (ResolvedInjectedCommentPlan plan : resolvedPlans) {
             LocationDashboardSpreadsheetParser.ParsedDashboardCell originalCell =
                 originalCellsByReference.get(plan.cellReference());
-            assertTrue(originalCell != null, () -> "Expected fixture cell " + plan.cellReference() + " to exist");
+            assertNotNull(originalCell, () -> "Expected fixture cell " + plan.cellReference() + " to exist");
             assertNull(
                 originalCell.commentText(),
                 () -> "Expected fixture cell " + plan.cellReference() + " to start without a comment"
@@ -63,10 +55,10 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         }
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation baseline =
-            strategy.computeImport(sanitizedWorkbook.workbook(), hoagMeasurementBounds());
+            strategy.computeImport(parsedWorkbook, hoagMeasurementBounds());
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook augmentedWorkbook =
-            injectSupplementalHoagComments(sanitizedWorkbook.workbook(), originalCellsByReference);
+            injectSupplementalHoagComments(parsedWorkbook, originalCellsByReference, resolvedPlans);
         Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> augmentedCellsByReference =
             cellsByReference(augmentedWorkbook);
 
@@ -87,7 +79,7 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
             augmented.analyzedSamples().stream().filter(LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming).count()
         );
 
-        for (InjectedCommentPlan plan : INJECTED_COMMENT_PLANS) {
+        for (ResolvedInjectedCommentPlan plan : resolvedPlans) {
             String marker = markerText(plan);
             LocationDashboardSpreadsheetParser.ParsedDashboardCell augmentedCell =
                 augmentedCellsByReference.get(plan.cellReference());
@@ -126,103 +118,45 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
             .collect(LinkedHashMap::new, (map, cell) -> map.put(cell.cellReference(), cell), Map::putAll);
     }
 
-    private SanitizedWorkbook sanitizeInvalidFixtureComments(
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook originalWorkbook
+    private List<ResolvedInjectedCommentPlan> resolveInjectedCommentPlans(
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook
     ) {
-        Set<String> normalizedCellReferences = new LinkedHashSet<>();
-        List<LocationDashboardSpreadsheetParser.ParsedDashboardRow> sanitizedRows = originalWorkbook.rows().stream()
-            .map(row -> new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
-                row.rowNumber(),
-                row.facility(),
-                row.building(),
-                row.system(),
-                row.pointOfUse(),
-                row.basis(),
-                row.cells().stream()
-                    .map(cell -> sanitizeCellComment(cell, normalizedCellReferences))
-                    .toList()
-            ))
+        List<LocationDashboardSpreadsheetParser.ParsedDashboardCell> injectableCells = workbook.rows().stream()
+            .flatMap(row -> row.cells().stream())
+            .filter(cell -> cell.cellReference() != null)
+            .filter(cell -> cell.numericValue() != null)
+            .filter(cell -> cell.commentText() == null)
+            .limit(INJECTED_COMMENT_PLANS.size())
             .toList();
 
-        return new SanitizedWorkbook(
-            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
-                originalWorkbook.locationTitle(),
-                sanitizedRows
-            ),
-            Set.copyOf(normalizedCellReferences)
+        assertEquals(
+            INJECTED_COMMENT_PLANS.size(),
+            injectableCells.size(),
+            "Expected enough comment-free numeric worksheet cells in the Hoag fixture"
         );
-    }
 
-    private LocationDashboardSpreadsheetParser.ParsedDashboardCell sanitizeCellComment(
-        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
-        Set<String> normalizedCellReferences
-    ) {
-        String commentText = cell.commentText();
-        if (commentText == null || commentText.isBlank()) {
-            return cell;
+        List<ResolvedInjectedCommentPlan> resolvedPlans = new java.util.ArrayList<>();
+        for (int index = 0; index < INJECTED_COMMENT_PLANS.size(); index += 1) {
+            InjectedCommentPlan plan = INJECTED_COMMENT_PLANS.get(index);
+            resolvedPlans.add(new ResolvedInjectedCommentPlan(
+                injectableCells.get(index).cellReference(),
+                plan.addedNonConformances(),
+                plan.followUpSamples()
+            ));
         }
-
-        LocationDashboardCommentParser.ParsedComment parsedComment;
-        try {
-            parsedComment = commentParser.parse(commentText);
-        } catch (IllegalArgumentException ex) {
-            return cell;
-        }
-        if (!parsedComment.structured() || parsedComment.primarySample() == null) {
-            return cell;
-        }
-
-        LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
-        boolean monthMismatch = cell.observedDate() != null
-            && primarySample.sampledOn() != null
-            && !sameObservationMonth(cell.observedDate(), primarySample.sampledOn());
-        boolean resultMismatch = cell.numericValue() != null
-            && primarySample.resultValue() != null
-            && cell.numericValue().compareTo(primarySample.resultValue()) != 0;
-        if (!monthMismatch && !resultMismatch) {
-            return cell;
-        }
-
-        normalizedCellReferences.add(cell.cellReference());
-        LocationDashboardCommentParser.ParsedCommentSample correctedPrimarySample =
-            new LocationDashboardCommentParser.ParsedCommentSample(
-                monthMismatch ? alignToWorksheetMonth(cell.observedDate(), primarySample.sampledOn()) : primarySample.sampledOn(),
-                primarySample.resultReceivedOn(),
-                resultMismatch ? cell.rawValue() : primarySample.resultRaw(),
-                resultMismatch ? cell.numericValue() : primarySample.resultValue(),
-                primarySample.resultUnit(),
-                primarySample.notes(),
-                primarySample.correctiveActions()
-            );
-        LocationDashboardCommentParser.ParsedComment correctedComment =
-            new LocationDashboardCommentParser.ParsedComment(
-                true,
-                parsedComment.sampleLocation(),
-                correctedPrimarySample,
-                parsedComment.followUpSamples(),
-                parsedComment.correctiveActions(),
-                parsedComment.notes()
-            );
-
-        return new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
-            cell.metricName(),
-            cell.observedDate(),
-            cell.rawValue(),
-            cell.numericValue(),
-            toStructuredCommentJson(correctedComment),
-            cell.cellReference()
-        );
+        return List.copyOf(resolvedPlans);
     }
 
     private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook injectSupplementalHoagComments(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook originalWorkbook,
-        Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> originalCellsByReference
+        Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> originalCellsByReference,
+        List<ResolvedInjectedCommentPlan> resolvedPlans
     ) {
         Map<String, String> commentOverridesByReference = new LinkedHashMap<>();
-        for (InjectedCommentPlan plan : INJECTED_COMMENT_PLANS) {
+        for (ResolvedInjectedCommentPlan plan : resolvedPlans) {
             LocationDashboardSpreadsheetParser.ParsedDashboardCell cell =
                 originalCellsByReference.get(plan.cellReference());
-            commentOverridesByReference.put(plan.cellReference(), buildStructuredComment(cell, plan));
+            commentOverridesByReference.put(plan.cellReference(), buildWorkbookComment(cell, plan));
         }
 
         List<LocationDashboardSpreadsheetParser.ParsedDashboardRow> augmentedRows = originalWorkbook.rows().stream()
@@ -252,15 +186,15 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         );
     }
 
-    private String buildStructuredComment(
+    private String buildWorkbookComment(
         LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
-        InjectedCommentPlan plan
+        ResolvedInjectedCommentPlan plan
     ) {
         LocalDate primarySampledOn = withDayOfMonth(cell.observedDate(), 15);
-        return LocationDashboardCommentFixtures.structuredComment(
-            new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        return LocationDashboardCommentFixtures.workbookComment(
+            new LocationDashboardCommentFixtures.WorkbookCommentSpec(
                 "Parser Delta Control " + plan.cellReference(),
-                new LocationDashboardCommentFixtures.StructuredSample(
+                new LocationDashboardCommentFixtures.WorkbookSample(
                     primarySampledOn,
                     primarySampledOn.plusDays(4),
                     cell.rawValue(),
@@ -273,7 +207,7 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
                 plan.followUpSamples().stream()
                     .map(supplementalPlan -> {
                         LocalDate sampledOn = primarySampledOn.plusDays(supplementalPlan.dayOffset());
-                        return new LocationDashboardCommentFixtures.StructuredSample(
+                        return new LocationDashboardCommentFixtures.WorkbookSample(
                             sampledOn,
                             sampledOn.plusDays(4),
                             supplementalPlan.resultValue().toPlainString() + " CFU.mL",
@@ -291,11 +225,7 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         );
     }
 
-    private String toStructuredCommentJson(LocationDashboardCommentParser.ParsedComment parsedComment) {
-        return LocationDashboardCommentFixtures.structuredComment(parsedComment);
-    }
-
-    private String markerText(InjectedCommentPlan plan) {
+    private String markerText(ResolvedInjectedCommentPlan plan) {
         return "Parser delta control " + plan.cellReference()
             + ": this comment adds exactly " + plan.addedNonConformances() + " non-conformance"
             + (plan.addedNonConformances() == 1 ? "" : "s") + ".";
@@ -303,28 +233,6 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
 
     private LocalDate withDayOfMonth(LocalDate date, int dayOfMonth) {
         return date.withDayOfMonth(Math.min(dayOfMonth, date.lengthOfMonth()));
-    }
-
-    private LocalDate alignToWorksheetMonth(LocalDate worksheetObservedDate, LocalDate primarySampleDate) {
-        if (worksheetObservedDate == null) {
-            return primarySampleDate;
-        }
-        if (primarySampleDate == null) {
-            return worksheetObservedDate;
-        }
-        return LocalDate.of(
-            worksheetObservedDate.getYear(),
-            worksheetObservedDate.getMonth(),
-            Math.min(primarySampleDate.getDayOfMonth(), worksheetObservedDate.lengthOfMonth())
-        );
-    }
-
-    private boolean sameObservationMonth(LocalDate worksheetObservedDate, LocalDate commentSampleDate) {
-        if (worksheetObservedDate == null || commentSampleDate == null) {
-            return false;
-        }
-        return worksheetObservedDate.getYear() == commentSampleDate.getYear()
-            && worksheetObservedDate.getMonth() == commentSampleDate.getMonth();
     }
 
     private List<MeasurementBound> hoagMeasurementBounds() {
@@ -351,6 +259,12 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     }
 
     private record InjectedCommentPlan(
+        int addedNonConformances,
+        List<SupplementalFailurePlan> followUpSamples
+    ) {
+    }
+
+    private record ResolvedInjectedCommentPlan(
         String cellReference,
         int addedNonConformances,
         List<SupplementalFailurePlan> followUpSamples
@@ -358,11 +272,5 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     }
 
     private record SupplementalFailurePlan(int dayOffset, BigDecimal resultValue) {
-    }
-
-    private record SanitizedWorkbook(
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
-        Set<String> normalizedCellReferences
-    ) {
     }
 }

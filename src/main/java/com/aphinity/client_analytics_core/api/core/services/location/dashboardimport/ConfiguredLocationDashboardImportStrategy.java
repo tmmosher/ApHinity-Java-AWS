@@ -28,7 +28,7 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 public class ConfiguredLocationDashboardImportStrategy implements LocationDashboardImportStrategy {
     // TODO Temporary testing switch: disable all corrective-action creation from cell comments.
     // To restore comment-derived incidents, re-enable this and revisit:
-    // - strict structured comment validation in LocationDashboardSampleImportPipeline.validatePrimaryCommentSample(...)
+    // - strict primary comment sample validation in LocationDashboardSampleImportPipeline.validatePrimaryCommentSample(...)
     // - the dormant comment corrective-action helpers in this strategy
     // - the dedicated drafting policy in LocationDashboardCorrectiveActionDraftFactory
     private static final boolean ENABLE_COMMENT_DERIVED_CORRECTIVE_ACTIONS = true;
@@ -238,7 +238,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
 
         LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
-        // The worksheet buckets samples by month, while structured comments can carry the
+        // The worksheet buckets samples by month, while workbook comments can carry the
         // actual sample day inside that month. Keep the anchor loose enough for the workbook
         // we receive, but still reject comments that drift into a different reporting bucket.
         if (cell.observedDate() != null
@@ -246,7 +246,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             && !sameObservationMonth(cell.observedDate(), primarySample.sampledOn())) {
             throw invalidSpreadsheet(
                 "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
-                    + ": structured comment primary sample date must stay within the worksheet month bucket."
+                    + ": comment primary sample date must stay within the worksheet month bucket."
             );
         }
         if (cell.numericValue() != null
@@ -254,7 +254,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             && cell.numericValue().compareTo(primarySample.resultValue()) != 0) {
             throw invalidSpreadsheet(
                 "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
-                    + ": structured comment primary sample result does not match the worksheet cell."
+                    + ": comment primary sample result does not match the worksheet cell."
             );
         }
     }

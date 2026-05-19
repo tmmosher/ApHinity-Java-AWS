@@ -206,7 +206,7 @@ final class LocationDashboardSampleImportPipeline {
             && !sameObservationMonth(cell.observedDate(), primarySample.sampledOn())) {
             throw invalidSpreadsheet(
                 "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
-                    + ": structured comment primary sample date must stay within the worksheet month bucket."
+                    + ": comment primary sample date must stay within the worksheet month bucket."
             );
         }
         if (cell.numericValue() != null
@@ -214,7 +214,7 @@ final class LocationDashboardSampleImportPipeline {
             && cell.numericValue().compareTo(primarySample.resultValue()) != 0) {
             throw invalidSpreadsheet(
                 "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
-                    + ": structured comment primary sample result does not match the worksheet cell."
+                    + ": comment primary sample result does not match the worksheet cell."
             );
         }
     }

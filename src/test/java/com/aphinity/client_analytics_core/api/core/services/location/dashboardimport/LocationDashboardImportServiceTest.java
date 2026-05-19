@@ -31,7 +31,7 @@ import java.util.Optional;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.structuredComment;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookComment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -291,12 +291,12 @@ class LocationDashboardImportServiceTest {
     }
 
     @Test
-    void importLocationDashboardCountsOutOfSpecStructuredCommentSamplesAsNonConformances() {
+    void importLocationDashboardCountsOutOfSpecWorkbookCommentSamplesAsNonConformances() {
         LocationDashboardImportService importService = buildImportService();
         MockMultipartFile file = dashboardFile();
         Location location = location(9L, "Newport Beach");
 
-        String structuredComment = structuredComment(new LocationDashboardCommentFixtures.StructuredCommentSpec(
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
             "Cooling Tower Sample Port",
             sample(
                 LocalDate.parse("2025-08-01"),
@@ -318,7 +318,7 @@ class LocationDashboardImportServiceTest {
             List.of()
         ));
 
-        when(spreadsheetParser.parse(file)).thenReturn(workbookWithRawComment("Newport Beach", structuredComment, "F5"));
+        when(spreadsheetParser.parse(file)).thenReturn(workbookWithRawComment("Newport Beach", workbookComment, "F5"));
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
