@@ -79,8 +79,8 @@
   ],
   "graphs": [
     {
-      "id": "newport-beach-water-quality-compliance",
-      "name": "Water Quality Compliance",
+      "id": "newport-beach-water-quality-conformance",
+      "name": "Water Quality Conformance",
       "title": "Newport Beach",
       "importType": "water_quality_compliance",
       "sublocationKey": "newport-beach",
@@ -105,8 +105,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "newport-beach-system-type-compliance",
-      "name": "System Type Compliance",
+      "id": "newport-beach-system-type-conformance",
+      "name": "System Type Conformance",
       "title": "Newport Beach",
       "importType": "system_type_compliance",
       "sublocationKey": "newport-beach",
@@ -127,8 +127,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "irvine-water-quality-compliance",
-      "name": "Water Quality Compliance",
+      "id": "irvine-water-quality-conformance",
+      "name": "Water Quality Conformance",
       "title": "Irvine",
       "importType": "water_quality_compliance",
       "sublocationKey": "irvine",
@@ -153,8 +153,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "irvine-system-type-compliance",
-      "name": "System Type Compliance",
+      "id": "irvine-system-type-conformance",
+      "name": "System Type Conformance",
       "title": "Irvine",
       "importType": "system_type_compliance",
       "sublocationKey": "irvine",
@@ -175,8 +175,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "16405-irvine-water-quality-compliance",
-      "name": "Water Quality Compliance",
+      "id": "16405-irvine-water-quality-conformance",
+      "name": "Water Quality Conformance",
       "title": "16405 Irvine",
       "importType": "water_quality_compliance",
       "sublocationKey": "16405-irvine",
@@ -201,8 +201,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "16405-irvine-system-type-compliance",
-      "name": "System Type Compliance",
+      "id": "16405-irvine-system-type-conformance",
+      "name": "System Type Conformance",
       "title": "16405 Irvine",
       "importType": "system_type_compliance",
       "sublocationKey": "16405-irvine",
@@ -223,8 +223,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "surgical-pavilion-water-quality-compliance",
-      "name": "Water Quality Compliance",
+      "id": "surgical-pavilion-water-quality-conformance",
+      "name": "Water Quality Conformance",
       "title": "Surgical Pavilion",
       "importType": "water_quality_compliance",
       "sublocationKey": "surgical-pavilion",
@@ -249,8 +249,8 @@
       "graphType": "scatter"
     },
     {
-      "id": "surgical-pavilion-system-type-compliance",
-      "name": "System Type Compliance",
+      "id": "surgical-pavilion-system-type-conformance",
+      "name": "System Type Conformance",
       "title": "Surgical Pavilion",
       "importType": "system_type_compliance",
       "sublocationKey": "surgical-pavilion",

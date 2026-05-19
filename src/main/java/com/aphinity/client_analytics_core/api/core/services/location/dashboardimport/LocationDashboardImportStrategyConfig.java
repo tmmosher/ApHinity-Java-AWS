@@ -176,6 +176,7 @@ public record LocationDashboardImportStrategyConfig(
         TOTAL_NON_CONFORMANCES("total_non_conformances"),
         ACTIVE_NON_CONFORMANCE_PERCENT("active_non_conformance_percent"),
         PERCENT_CONFORMANCE("percent_conformance"),
+        NON_CONFORMANCE_COUNT("non_conformance_count"),
         PERCENT_RESOLVED("percent_resolved"),
         NON_CONFORMANCES_BY_FACILITY("non_conformances_by_facility"),
         NON_CONFORMANCES_BY_SYSTEM_TYPE("non_conformances_by_system_type"),

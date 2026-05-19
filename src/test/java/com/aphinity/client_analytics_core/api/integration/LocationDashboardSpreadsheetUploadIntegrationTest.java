@@ -62,15 +62,15 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(17))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].y[0]").value(100))
+            .andExpect(jsonPath("$[0].data[0].y[0]").value(0))
             .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
-            .andExpect(jsonPath("$[0].data[1].y[0]").value(33.333333333333336d))
-            .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
+            .andExpect(jsonPath("$[0].data[1].y[0]").value(2))
+            .andExpect(jsonPath("$[1].name").value("System Type Conformance"))
             .andExpect(jsonPath("$[1].data.length()").value(1))
             .andExpect(jsonPath("$[1].data[0].name").value("Cooling Tower"))
-            .andExpect(jsonPath("$[1].data[0].y[0]").value(66.66666666666667d))
+            .andExpect(jsonPath("$[1].data[0].y[0]").value(2))
             .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
             .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
@@ -207,11 +207,11 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(17))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$[0].data.length()").value(7))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
             .andExpect(jsonPath("$[0].data[0].x[0]").exists())
-            .andExpect(jsonPath("$[1].name").value("System Type Compliance"))
+            .andExpect(jsonPath("$[1].name").value("System Type Conformance"))
             .andExpect(jsonPath("$[1].data.length()").value(4))
             .andExpect(jsonPath("$[1].data[0].name").value("Utility SPD"))
             .andExpect(jsonPath("$[1].data[3].name").value("Cooling Tower"))
@@ -264,7 +264,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
             .andExpect(jsonPath("$[0].data[0].x[0]").exists())
             .andExpect(jsonPath("$[0].data[0].y[0]").isNumber());
@@ -299,7 +299,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
             .andExpect(jsonPath("$[0].data[0].x[0]").exists())
             .andExpect(jsonPath("$[0].data[0].y[0]").isNumber());
@@ -329,7 +329,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(17))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6));
 
@@ -505,8 +505,8 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     }
 
     private HoagGraphFixture seedHoagStrategyGraphs(Location location) {
-        Graph waterQualityGraph = createGraphWithTitle("Water Quality Compliance", "Newport Beach", blankScatterData());
-        Graph systemTypeGraph = createGraphWithTitle("System Type Compliance", "Newport Beach", blankScatterData());
+        Graph waterQualityGraph = createGraphWithTitle("Water Quality Conformance", "Newport Beach", blankScatterData());
+        Graph systemTypeGraph = createGraphWithTitle("System Type Conformance", "Newport Beach", blankScatterData());
         Graph totalSamplesGraph = createGraph("Total Number of Samples", blankPieData());
         Graph totalNonConformancesGraph = createGraph("Total Non-Conformances", blankPieData());
         Graph resolutionPercentGraph = createGraph("Percent Resolved", blankIndicatorData());
@@ -548,12 +548,12 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         addLocationGraph(location, byFacilityGraph);
         addLocationGraph(location, turnaroundTimeGraph);
         addLocationGraph(location, statusByFacilityGraph);
-        addLocationGraph(location, createGraphWithTitle("Water Quality Compliance", "Irvine", blankScatterData()));
-        addLocationGraph(location, createGraphWithTitle("System Type Compliance", "Irvine", blankScatterData()));
-        addLocationGraph(location, createGraphWithTitle("Water Quality Compliance", "16405 Irvine", blankScatterData()));
-        addLocationGraph(location, createGraphWithTitle("System Type Compliance", "16405 Irvine", blankScatterData()));
-        addLocationGraph(location, createGraphWithTitle("Water Quality Compliance", "Surgical Pavilion", blankScatterData()));
-        addLocationGraph(location, createGraphWithTitle("System Type Compliance", "Surgical Pavilion", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("Water Quality Conformance", "Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("System Type Conformance", "Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("Water Quality Conformance", "16405 Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("System Type Conformance", "16405 Irvine", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("Water Quality Conformance", "Surgical Pavilion", blankScatterData()));
+        addLocationGraph(location, createGraphWithTitle("System Type Conformance", "Surgical Pavilion", blankScatterData()));
 
         return new HoagGraphFixture(
             waterQualityGraph,

@@ -61,7 +61,9 @@ final class LocationDashboardGraphMetadataSupport {
         importMeta.put("graphName", graphDefinition.name());
         importMeta.put("graphTitle", graphDefinition.title());
         importMeta.put("importType", graphDefinition.importType().value());
+        importMeta.put("metricKey", "non_conformance_count");
         importMeta.put("sublocationKey", graphDefinition.sublocationKey());
+        importMeta.put("unit", "count");
         importMeta.put("locationName", strategyLocationName);
 
         Map<String, Object> meta = copyMutableMap(asMap(layout.get("meta")));
@@ -74,9 +76,10 @@ final class LocationDashboardGraphMetadataSupport {
         layout.put("xaxis", xAxis);
 
         Map<String, Object> yAxis = copyMutableMap(asMap(layout.get("yaxis")));
-        yAxis.put("range", List.of(0, 100));
-        yAxis.put("title", "% Compliance");
-        yAxis.put("ticksuffix", "%");
+        yAxis.remove("range");
+        yAxis.put("rangemode", "tozero");
+        yAxis.put("title", "# Non-Conformances");
+        yAxis.remove("ticksuffix");
         layout.put("yaxis", yAxis);
 
         return layout;
@@ -104,10 +107,26 @@ final class LocationDashboardGraphMetadataSupport {
             "derivedGraphType",
             LocationDashboardDerivedGraphSupport.metadataValue(derivedGraphDefinition.derivedType())
         );
+        importMeta.put("metricKey", derivedMetricKey(derivedGraphDefinition.derivedType()));
+        importMeta.put("unit", derivedGraphUnit(derivedGraphDefinition.derivedType()));
         importMeta.put("locationName", strategyLocationName);
         meta.put(IMPORT_LAYOUT_META_KEY, importMeta);
         layout.put("meta", meta);
         return layout;
+    }
+
+    private static String derivedMetricKey(LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType) {
+        return derivedGraphType == null ? null : derivedGraphType.value();
+    }
+
+    private static String derivedGraphUnit(LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType) {
+        if (derivedGraphType == null) {
+            return null;
+        }
+        return switch (derivedGraphType) {
+            case ACTIVE_NON_CONFORMANCE_PERCENT, PERCENT_CONFORMANCE, PERCENT_RESOLVED -> "percent";
+            default -> "count";
+        };
     }
 
     static String readGraphLayoutTitleText(Graph graph) {

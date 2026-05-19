@@ -31,14 +31,19 @@ class ConfiguredLocationDashboardImportStrategyTest {
         );
 
         assertEquals(2, result.graphs().size());
+        assertEquals(2, result.graphs().getFirst().data().size());
         Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityHpcTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityHpcTrace.get("x"));
-        assertEquals(List.of(50.0d), waterQualityHpcTrace.get("y"));
+        assertEquals(List.of(1L), waterQualityHpcTrace.get("y"));
+        Map<String, Object> waterQualityEndotoxinTrace = result.graphs().getFirst().data().get(1);
+        assertEquals("Endotoxin", waterQualityEndotoxinTrace.get("name"));
+        assertEquals(List.of("2025-08-01"), waterQualityEndotoxinTrace.get("x"));
+        assertEquals(List.of(1L), waterQualityEndotoxinTrace.get("y"));
 
         Map<String, Object> systemTypeTrace = result.graphs().get(1).data().getFirst();
         assertEquals("Cooling Towers", systemTypeTrace.get("name"));
-        assertEquals(List.of(50.0d), systemTypeTrace.get("y"));
+        assertEquals(List.of(2L), systemTypeTrace.get("y"));
 
         assertEquals(4, result.observations().size());
         assertEquals(2, result.observations().stream().filter(observation -> observation.compliant()).count());
@@ -647,7 +652,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityHpcTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityHpcTrace.get("x"));
-        assertEquals(List.of(50.0d), waterQualityHpcTrace.get("y"));
+        assertEquals(List.of(1L), waterQualityHpcTrace.get("y"));
         assertTrue(result.observations().stream().anyMatch(observation -> "HPC".equals(observation.measurementName())));
     }
 
@@ -828,7 +833,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                     "16405-irvine-water-quality",
-                    "Water Quality Compliance",
+                    "Water Quality Conformance",
                     "16405 Irvine",
                     LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                     "16405-irvine",
@@ -918,7 +923,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertEquals(1, result.graphs().size());
         assertEquals("16405-irvine-water-quality", result.graphs().getFirst().graphId());
-        assertEquals(List.of(100.0d), result.graphs().getFirst().data().getFirst().get("y"));
+        assertEquals(List.of(0L), result.graphs().getFirst().data().getFirst().get("y"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> customData = (List<Map<String, Object>>) result.graphs().getFirst().data().getFirst().get("customdata");
         assertEquals(3L, ((Number) customData.getFirst().get("sampleCount")).longValue());
@@ -962,7 +967,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                     "16405-irvine-water-quality",
-                    "Water Quality Compliance",
+                    "Water Quality Conformance",
                     "16405 Irvine",
                     LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                     "16405-irvine",
@@ -1042,7 +1047,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                     "newport-beach-system-type",
-                    "System Type Compliance",
+                    "System Type Conformance",
                     "Newport Beach",
                     LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                     "newport-beach",
@@ -1134,7 +1139,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "16405-irvine-water-quality",
-                        "Water Quality Compliance",
+                        "Water Quality Conformance",
                         "16405 Irvine",
                         LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                         "16405-irvine",
@@ -1144,7 +1149,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     ),
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "16405-irvine-system-type",
-                        "System Type Compliance",
+                        "System Type Conformance",
                         "16405 Irvine",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "16405-irvine",
@@ -1240,7 +1245,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> waterQualityTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityTrace.get("x"));
-        assertEquals(List.of(100.0d), waterQualityTrace.get("y"));
+        assertEquals(List.of(0L), waterQualityTrace.get("y"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> customData = (List<Map<String, Object>>) waterQualityTrace.get("customdata");
         assertEquals(3L, ((Number) customData.getFirst().get("sampleCount")).longValue());
@@ -1248,7 +1253,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> systemTypeTrace = result.graphs().get(1).data().getFirst();
         assertEquals("Utility SPD", systemTypeTrace.get("name"));
         assertEquals(List.of("2025-08-01"), systemTypeTrace.get("x"));
-        assertEquals(List.of(100.0d), systemTypeTrace.get("y"));
+        assertEquals(List.of(0L), systemTypeTrace.get("y"));
     }
 
     @Test
@@ -1275,7 +1280,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 ),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                     "surgical-pavilion-water-quality",
-                    "Water Quality Compliance",
+                    "Water Quality Conformance",
                     "Surgical Pavilion",
                     LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                     "surgical-pavilion",
@@ -1376,7 +1381,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     )),
                     List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                         "water-quality",
-                        "Water Quality Compliance",
+                        "Water Quality Conformance",
                         "Newport Beach",
                         null,
                         "newport-beach",
@@ -1417,7 +1422,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         validWaterQualityGraphConfig(),
                         new LocationDashboardImportStrategyConfig.GraphConfig(
                             "water-quality-duplicate",
-                            "Water Quality Compliance",
+                            "Water Quality Conformance",
                             "Newport Beach",
                             LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                             "newport-beach",
@@ -1458,7 +1463,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     List.of(validWaterQualityGraphConfig()),
                     List.of(new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
                         "water-quality-summary",
-                        "Water Quality Compliance",
+                        "Water Quality Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_SAMPLES,
                         "pie"
@@ -1492,7 +1497,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     validWaterQualityGraphConfig(),
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "system-type",
-                        "System Type Compliance",
+                        "System Type Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "newport-beach",
@@ -1526,7 +1531,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 )),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
                     "water-quality",
-                    "Water Quality Compliance",
+                    "Water Quality Conformance",
                     "Newport Beach",
                     LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                     "newport-beach",
@@ -1563,7 +1568,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "water-quality",
-                        "Water Quality Compliance",
+                        "Water Quality Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                         "newport-beach",
@@ -1573,7 +1578,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     ),
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "system-type",
-                        "System Type Compliance",
+                        "System Type Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "newport-beach",
@@ -1591,7 +1596,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
     private LocationDashboardImportStrategyConfig.GraphConfig validWaterQualityGraphConfig() {
         return new LocationDashboardImportStrategyConfig.GraphConfig(
             "water-quality",
-            "Water Quality Compliance",
+            "Water Quality Conformance",
             "Newport Beach",
             LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
             "newport-beach",

@@ -79,7 +79,7 @@ class LocationDashboardImportServiceTest {
 
         Graph waterQualityGraph = graph(
             18L,
-            "Water Quality Compliance",
+            "Water Quality Conformance",
             "scatter",
             Map.of("title", Map.of("text", "Newport Beach")),
             List.of(
@@ -95,7 +95,7 @@ class LocationDashboardImportServiceTest {
                 scatterTrace("Endotoxin", List.of(), List.of(), List.of())
             )
         );
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
         Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples", "#0f766e");
         Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
         Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
@@ -153,10 +153,10 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(11, responses.size());
-        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("x"));
-        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 50.0d);
+        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("x"));
+        assertNumericValues(findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("y"), 100.0d, 1.0d);
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> hpcCustomData = (List<Map<String, Object>>) findResponseByName(responses, "Water Quality Compliance")
+        List<Map<String, Object>> hpcCustomData = (List<Map<String, Object>>) findResponseByName(responses, "Water Quality Conformance")
             .data()
             .getFirst()
             .get("customdata");
@@ -218,7 +218,7 @@ class LocationDashboardImportServiceTest {
 
         Graph waterQualityGraph = legacyWaterQualityGraph(
             18L,
-            "Water Quality Compliance",
+            "Water Quality Conformance",
             "Newport Beach",
             "HPC",
             List.of("2025-07-01", "2025-08-01"),
@@ -228,7 +228,7 @@ class LocationDashboardImportServiceTest {
                 Map.of("sampleCount", 9, "compliantCount", 9, "nonConformingCount", 0)
             )
         );
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
         Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples", "#0f766e");
         Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
         Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
@@ -285,8 +285,8 @@ class LocationDashboardImportServiceTest {
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("x"));
-        assertNumericValues(findResponseByName(responses, "Water Quality Compliance").data().getFirst().get("y"), 100.0d, 50.0d);
+        assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("x"));
+        assertNumericValues(findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("y"), 100.0d, 1.0d);
         assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
     }
 
@@ -324,8 +324,8 @@ class LocationDashboardImportServiceTest {
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
         Graph totalSamplesGraph = pieGraph(20L, "Total Number of Samples", "#0f766e");
         Graph totalNonConformancesGraph = pieGraph(21L, "Total Non-Conformances");
         Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
@@ -412,8 +412,8 @@ class LocationDashboardImportServiceTest {
                 )),
                 List.of(
                     new LocationDashboardImportStrategyConfig.GraphConfig(
-                        "newport-beach-water-quality-compliance",
-                        "Water Quality Compliance",
+                        "newport-beach-water-quality-conformance",
+                        "Water Quality Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                         "newport-beach",
@@ -422,8 +422,8 @@ class LocationDashboardImportServiceTest {
                         "scatter"
                     ),
                     new LocationDashboardImportStrategyConfig.GraphConfig(
-                        "irvine-water-quality-compliance",
-                        "Water Quality Compliance",
+                        "irvine-water-quality-conformance",
+                        "Water Quality Conformance",
                         "Irvine",
                         LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                         "irvine",
@@ -440,8 +440,8 @@ class LocationDashboardImportServiceTest {
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph newportQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
-        Graph irvineQualityGraph = scatterGraph(19L, "Water Quality Compliance", "Irvine");
+        Graph newportQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
+        Graph irvineQualityGraph = scatterGraph(19L, "Water Quality Conformance", "Irvine");
         List<Graph> graphs = List.of(newportQualityGraph, irvineQualityGraph);
         when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(graphs.stream()
             .map(graph -> locationGraph(9L, graph))
@@ -454,7 +454,7 @@ class LocationDashboardImportServiceTest {
         assertEquals(2, responses.size());
         @SuppressWarnings("unchecked")
         Map<String, Object> importMeta = (Map<String, Object>) ((Map<String, Object>) responses.getFirst().layout().get("meta")).get("aphinityImport");
-        assertEquals("Water Quality Compliance", importMeta.get("graphName"));
+        assertEquals("Water Quality Conformance", importMeta.get("graphName"));
         assertEquals("Newport Beach", importMeta.get("graphTitle"));
         assertEquals(
             List.of("Newport Beach", "Irvine"),
@@ -484,7 +484,7 @@ class LocationDashboardImportServiceTest {
 
         Graph waterQualityGraph = graph(
             18L,
-            "Water Quality Compliance",
+            "Water Quality Conformance",
             "scatter",
             Map.of("title", Map.of("text", "Newport Beach")),
             List.of(
@@ -508,7 +508,7 @@ class LocationDashboardImportServiceTest {
                 )
             )
         );
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
         when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(List.of(waterQualityGraph, systemTypeGraph).stream()
             .map(graph -> locationGraph(9L, graph))
             .toList());
@@ -517,11 +517,11 @@ class LocationDashboardImportServiceTest {
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
-        GraphResponse waterQualityResponse = findResponseByName(responses, "Water Quality Compliance");
+        GraphResponse waterQualityResponse = findResponseByName(responses, "Water Quality Conformance");
         assertEquals(2, waterQualityResponse.data().size());
         assertEquals("HPC", waterQualityResponse.data().getFirst().get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityResponse.data().getFirst().get("x"));
-        assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 50.0d);
+        assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 1.0d);
         assertEquals(Map.of("color", "#123456", "width", 4L), waterQualityResponse.data().getFirst().get("line"));
         assertEquals(Map.of("size", 9L), waterQualityResponse.data().getFirst().get("marker"));
     }
@@ -559,8 +559,8 @@ class LocationDashboardImportServiceTest {
         when(spreadsheetParser.parse(file)).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
         Graph resolutionPercentGraph = indicatorGraph(20L, "Percent Resolved");
         Graph turnaroundTimeGraph = barGraph(21L, "Non-Conformance Status", "Turnaround Time");
         Graph statusByFacilityGraph = verticalStatusByFacilityGraph(
@@ -638,8 +638,8 @@ class LocationDashboardImportServiceTest {
         when(spreadsheetParser.parse(file)).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
-        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Compliance", "Newport Beach");
-        Graph systemTypeGraph = scatterGraph(19L, "System Type Compliance", "Newport Beach");
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
         Graph totalNonConformancesGraph = pieGraph(20L, "Total Non-Conformances");
         Graph byFacilityGraph = barGraph(21L, "Non-Conformances", "By Facility");
         Graph turnaroundTimeGraph = barGraph(22L, "Non-Conformance Status", "Turnaround Time");
@@ -737,7 +737,7 @@ class LocationDashboardImportServiceTest {
                 List.of(
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "water-quality",
-                        "Water Quality Compliance",
+                        "Water Quality Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE,
                         "newport-beach",
@@ -747,7 +747,7 @@ class LocationDashboardImportServiceTest {
                     ),
                     new LocationDashboardImportStrategyConfig.GraphConfig(
                         "system-type",
-                        "System Type Compliance",
+                        "System Type Conformance",
                         "Newport Beach",
                         LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
                         "newport-beach",

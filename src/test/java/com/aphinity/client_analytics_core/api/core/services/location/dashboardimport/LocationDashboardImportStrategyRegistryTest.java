@@ -17,8 +17,8 @@ class LocationDashboardImportStrategyRegistryTest {
 
         assertEquals("Hoag Hospital", strategy.locationName());
         assertEquals(8, strategy.graphDefinitions().size());
-        assertEquals("newport-beach-water-quality-compliance", strategy.graphDefinitions().getFirst().id());
-        assertEquals("Water Quality Compliance", strategy.graphDefinitions().getFirst().name());
+        assertEquals("newport-beach-water-quality-conformance", strategy.graphDefinitions().getFirst().id());
+        assertEquals("Water Quality Conformance", strategy.graphDefinitions().getFirst().name());
         assertEquals("Newport Beach", strategy.graphDefinitions().getFirst().title());
         assertEquals(
             List.of("HPC", "Endotoxin", "Legionella", "pH", "Conductivity", "Alkalinity", "Hardness"),
@@ -28,9 +28,9 @@ class LocationDashboardImportStrategyRegistryTest {
             List.of("Utility SPD", "Steam", "Critical SPD", "Utility Domestic Hot", "Cooling Tower"),
             strategy.graphDefinitions().get(1).traceOrder()
         );
-        assertEquals("irvine-water-quality-compliance", strategy.graphDefinitions().get(2).id());
+        assertEquals("irvine-water-quality-conformance", strategy.graphDefinitions().get(2).id());
         assertEquals("Irvine", strategy.graphDefinitions().get(2).title());
-        assertEquals("surgical-pavilion-system-type-compliance", strategy.graphDefinitions().get(7).id());
+        assertEquals("surgical-pavilion-system-type-conformance", strategy.graphDefinitions().get(7).id());
         assertEquals(9, strategy.derivedGraphDefinitions().size());
         assertEquals("total-samples", strategy.derivedGraphDefinitions().getFirst().id());
         assertEquals("Total Number of Samples", strategy.derivedGraphDefinitions().getFirst().name());

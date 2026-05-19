@@ -116,11 +116,11 @@ final class LocationDashboardObservationAggregator {
             observedDates.sort(LocalDate::compareTo);
 
             List<String> xValues = new ArrayList<>();
-            List<Double> yValues = new ArrayList<>();
+            List<Long> yValues = new ArrayList<>();
             List<Map<String, Object>> customDataValues = new ArrayList<>();
             for (LocalDate observedDate : observedDates) {
                 xValues.add(observedDate.toString());
-                yValues.add(graphAggregation.percentage(traceName, observedDate));
+                yValues.add((long) graphAggregation.nonConforming(traceName, observedDate));
                 customDataValues.add(Map.of(
                     "sampleCount", graphAggregation.total(traceName, observedDate),
                     "compliantCount", graphAggregation.compliant(traceName, observedDate),
@@ -209,14 +209,6 @@ final class LocationDashboardObservationAggregator {
         Set<LocalDate> observedDatesForTrace(String traceName) {
             TraceCounterBucket bucket = countersByTrace.get(normalizeKey(traceName));
             return bucket == null ? Set.of() : bucket.countersByDate().keySet();
-        }
-
-        double percentage(String traceName, LocalDate observedDate) {
-            ComplianceCounter counter = counter(traceName, observedDate);
-            if (counter == null || counter.total == 0) {
-                return 0.0d;
-            }
-            return (counter.compliant * 100.0d) / counter.total;
         }
 
         int total(String traceName, LocalDate observedDate) {

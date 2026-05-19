@@ -91,6 +91,12 @@ final class LocationDashboardDerivedGraphSupport {
                 long percentConformance = calculateRoundedPercent(compliantSamples, totalSamples);
                 yield buildPercentPayload(graph, "Conformance", percentConformance, DEFAULT_GRAPH_COLOR);
             }
+            case NON_CONFORMANCE_COUNT -> buildCountPayload(
+                graph,
+                "Non-Conformances",
+                totalSampleNonConformances,
+                ACTIVE_GRAPH_COLOR
+            );
             case PERCENT_RESOLVED -> {
                 long percentResolved = calculateRoundedPercent(resolvedNonConformances, totalIncidentNonConformances);
                 yield buildPercentPayload(graph, "Resolved", percentResolved, RESOLVED_GRAPH_COLOR);
@@ -143,6 +149,25 @@ final class LocationDashboardDerivedGraphSupport {
             List.of(traceName, "Remaining"),
             List.of(percent, Math.max(0L, 100L - percent)),
             List.of(color, KPI_REMAINDER_COLOR)
+        ));
+    }
+
+    private static List<Map<String, Object>> buildCountPayload(
+        Graph graph,
+        String traceName,
+        long count,
+        String color
+    ) {
+        String normalizedGraphType = normalizeKey(resolveGraphType(graph));
+        if (Objects.equals(normalizedGraphType, "indicator")) {
+            return List.of(buildCountIndicatorTrace(graph, traceName, count, color));
+        }
+        return List.of(buildPieTrace(
+            graph,
+            traceName,
+            List.of(traceName),
+            List.of(count),
+            List.of(color)
         ));
     }
 
@@ -306,6 +331,30 @@ final class LocationDashboardDerivedGraphSupport {
         bar.putIfAbsent("color", color);
         gauge.put("bar", bar);
         trace.put("gauge", gauge);
+        return trace;
+    }
+
+    private static Map<String, Object> buildCountIndicatorTrace(
+        Graph graph,
+        String traceName,
+        long value,
+        String color
+    ) {
+        Map<String, Object> trace = indicatorPrototype(graph, traceName);
+        trace.put("mode", "number");
+        trace.put("value", value);
+        Map<String, Object> number = copyMap(trace.get("number"));
+        number.remove("suffix");
+        number.putIfAbsent("font", Map.of("size", 22));
+        trace.put("number", number);
+        trace.remove("gauge");
+        Map<String, Object> domain = copyMap(trace.get("domain"));
+        domain.putIfAbsent("x", List.of(0, 1));
+        domain.putIfAbsent("y", List.of(0, 1));
+        trace.put("domain", domain);
+        Map<String, Object> title = copyMap(trace.get("title"));
+        title.putIfAbsent("font", Map.of("size", 14, "color", color));
+        trace.put("title", title);
         return trace;
     }
 
