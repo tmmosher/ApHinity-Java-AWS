@@ -180,11 +180,23 @@ const parseOptionalTimeRangeData = (
   }
 
   const parsed: Partial<Record<LocationGraphTimeRange, Record<string, unknown>[]>> = {};
+  const rawEntries = Object.entries(value);
+  const hasLegacyKeys = rawEntries.some(([key]) => key === "oneMonth");
   for (const [key, entry] of Object.entries(value)) {
-    if (key !== "oneMonth" && key !== "threeMonths" && key !== "allTime") {
+    let normalizedKey: LocationGraphTimeRange | null = null;
+    if (key === "allTime") {
+      normalizedKey = "allTime";
+    } else if (key === "twelveMonths") {
+      normalizedKey = "twelveMonths";
+    } else if (key === "threeMonths") {
+      normalizedKey = hasLegacyKeys ? "twelveMonths" : "threeMonths";
+    } else if (key === "oneMonth") {
+      normalizedKey = "threeMonths";
+    }
+    if (normalizedKey === null) {
       continue;
     }
-    parsed[key] = parseGraphDataEntries(entry);
+    parsed[normalizedKey] = parseGraphDataEntries(entry);
   }
   return parsed;
 };

@@ -95,6 +95,10 @@ describe("graphTheme", () => {
     });
     expect(themedLayout.legend).toMatchObject({
       orientation: "h",
+      x: 0,
+      xanchor: "left",
+      y: -0.16,
+      yanchor: "top",
       font: {color: "#eceff4"}
     });
     expect(themedLayout.xaxis).toMatchObject({
@@ -114,6 +118,12 @@ describe("graphTheme", () => {
     ]);
     expect(themedLayout.paper_bgcolor).toBe("#111827");
     expect(themedLayout.plot_bgcolor).toBe("#0f172a");
+    expect(themedLayout.margin).toMatchObject({
+      l: 10,
+      r: 10,
+      t: 10,
+      b: 96
+    });
   });
 
   it("forces top-level layout titles to the left even when a custom x was stored", () => {
@@ -160,5 +170,77 @@ describe("graphTheme", () => {
         font: {size: 22, color: "#e5e7eb"}
       }
     ]);
+  });
+
+  it("reserves roughly the bottom third of cartesian graphs for the legend based on graph height", () => {
+    const themedLayout = resolveThemedGraphLayout({
+      legend: {
+        orientation: "v",
+        x: 0.8
+      },
+      margin: {
+        b: 24
+      },
+      xaxis: {
+        title: "Observed At"
+      },
+      yaxis: {
+        title: "Value"
+      }
+    }, {height: 360}, "light", [
+      {
+        type: "scatter",
+        x: ["2026-01-01"],
+        y: [4]
+      }
+    ]);
+
+    expect(themedLayout.legend).toMatchObject({
+      orientation: "h",
+      x: 0,
+      xanchor: "left",
+      y: -0.16,
+      yanchor: "top"
+    });
+    expect(themedLayout.margin).toMatchObject({
+      b: 120
+    });
+  });
+
+  it("does not force legend geometry for bar charts", () => {
+    const themedLayout = resolveThemedGraphLayout({
+      legend: {
+        orientation: "v",
+        x: 0.8
+      },
+      margin: {
+        b: 24
+      },
+      xaxis: {
+        title: "Count"
+      },
+      yaxis: {
+        title: "Facility"
+      }
+    }, {height: 360}, "light", [
+      {
+        type: "bar",
+        x: [3, 7],
+        y: ["North", "South"]
+      }
+    ]);
+
+    expect(themedLayout.legend).toMatchObject({
+      orientation: "v",
+      x: 0.8
+    });
+    expect(themedLayout.legend).not.toMatchObject({
+      xanchor: "left",
+      y: -0.16,
+      yanchor: "top"
+    });
+    expect(themedLayout.margin).toMatchObject({
+      b: 24
+    });
   });
 });

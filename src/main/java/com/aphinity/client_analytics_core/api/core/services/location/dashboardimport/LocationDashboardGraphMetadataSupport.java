@@ -79,6 +79,7 @@ final class LocationDashboardGraphMetadataSupport {
         yAxis.remove("range");
         yAxis.put("rangemode", "tozero");
         yAxis.put("title", "# Non-Conformances");
+        yAxis.put("dtick", 1);
         yAxis.remove("ticksuffix");
         layout.put("yaxis", yAxis);
 

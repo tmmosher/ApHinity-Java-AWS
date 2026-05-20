@@ -430,7 +430,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         void renderVersion;
         const activeTheme = themePreference();
         const data = props.data;
-        const layout = resolveThemedGraphLayout(props.layout, props.style, activeTheme);
+        const layout = resolveThemedGraphLayout(props.layout, props.style, activeTheme, data);
         const config = props.config;
 
         renderQueue = renderQueue

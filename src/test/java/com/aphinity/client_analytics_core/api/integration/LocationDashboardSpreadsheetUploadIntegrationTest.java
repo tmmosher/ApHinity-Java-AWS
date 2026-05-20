@@ -457,7 +457,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                 "x", List.of(),
                 "y", List.of(),
                 "mode", "lines+markers",
-                "line", Map.of("color", "#1f77b4", "width", 2, "shape", "spline", "smoothing", 0.3d),
+                "line", Map.of("color", "#1f77b4", "width", 2, "shape", "hv", "smoothing", 0.3d),
                 "marker", Map.of("size", 6)
             ))
             .toList();

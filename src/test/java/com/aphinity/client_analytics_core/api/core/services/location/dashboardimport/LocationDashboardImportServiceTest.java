@@ -164,12 +164,12 @@ class LocationDashboardImportServiceTest {
             .get("customdata");
         assertEquals(2L, ((Number) hpcCustomData.get(1).get("sampleCount")).longValue());
         assertEquals(
-            List.of("2025-08-01"),
-            waterQualityResponse.timeRangeData().get("oneMonth").getFirst().get("x")
+            List.of("2025-07-01", "2025-08-01"),
+            waterQualityResponse.timeRangeData().get("threeMonths").getFirst().get("x")
         );
         assertEquals(
             List.of("2025-07-01", "2025-08-01"),
-            waterQualityResponse.timeRangeData().get("threeMonths").getFirst().get("x")
+            waterQualityResponse.timeRangeData().get("twelveMonths").getFirst().get("x")
         );
 
         assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
@@ -184,7 +184,7 @@ class LocationDashboardImportServiceTest {
         );
         GraphResponse totalNonConformancesResponse = findResponseByName(responses, "Total Non-Conformances");
         assertEquals(List.of(2L), totalNonConformancesResponse.data().getFirst().get("values"));
-        assertEquals(List.of(2L), totalNonConformancesResponse.timeRangeData().get("oneMonth").getFirst().get("values"));
+        assertEquals(List.of(2L), totalNonConformancesResponse.timeRangeData().get("threeMonths").getFirst().get("values"));
         assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentGauge = (Map<String, Object>) findResponseByName(
@@ -610,7 +610,7 @@ class LocationDashboardImportServiceTest {
         assertEquals("HPC", waterQualityResponse.data().getFirst().get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityResponse.data().getFirst().get("x"));
         assertNumericValues(waterQualityResponse.data().getFirst().get("y"), 1.0d);
-        assertLineStyle(waterQualityResponse.data().getFirst().get("line"), "#123456", 4L, "spline", 0.3d);
+        assertLineStyle(waterQualityResponse.data().getFirst().get("line"), "#123456", 4L, "hv", 0.3d);
         assertEquals(Map.of("size", 9L), waterQualityResponse.data().getFirst().get("marker"));
     }
 

@@ -55,7 +55,7 @@ vi.mock("corvu/popover", () => {
 
   Popover.Trigger = (props: Record<string, unknown>) => {
     const {children, ...rest} = props;
-    return <button {...rest}>{children as unknown}</button>;
+    return <button {...rest}>{children as Element}</button>;
   };
   Popover.Portal = (props: Record<string, unknown>) => {
     const {children} = props;
@@ -63,19 +63,19 @@ vi.mock("corvu/popover", () => {
   };
   Popover.Content = (props: Record<string, unknown>) => {
     const {children, ...rest} = props;
-    return <div {...rest}>{children as unknown}</div>;
+    return <div {...rest}>{children as Element}</div>;
   };
   Popover.Close = (props: Record<string, unknown>) => {
     const {children, ...rest} = props;
-    return <button {...rest}>{children as unknown}</button>;
+    return <button {...rest}>{children as Element}</button>;
   };
   Popover.Label = (props: Record<string, unknown>) => {
     const {children, ...rest} = props;
-    return <div {...rest}>{children as unknown}</div>;
+    return <div {...rest}>{children as Element}</div>;
   };
   Popover.Description = (props: Record<string, unknown>) => {
     const {children, ...rest} = props;
-    return <div {...rest}>{children as unknown}</div>;
+    return <div {...rest}>{children as Element}</div>;
   };
 
   return {
@@ -98,10 +98,12 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Undo");
     expect(html).toContain("Last updated");
     expect(html).toContain("Date Range");
-    expect(html).toContain("Choose which history window to apply across dashboard graphs.");
-    expect(html).toContain("1 Month");
     expect(html).toContain("3 Months");
+    expect(html).toContain("Recent quarter");
+    expect(html).toContain("12 Months");
+    expect(html).toContain("Rolling year");
     expect(html).toContain("All Data");
+    expect(html).toContain("Full history");
     expect(html).toContain("btn h-11 min-h-11 rounded-2xl");
     expect(html).toContain("aria-label=\"More actions\"");
     expect(html).toContain("aria-label=\"Dashboard date range selector\"");

@@ -5,8 +5,8 @@ import java.util.Arrays;
 import java.util.Locale;
 
 public enum GraphTimeRange {
-    ONE_MONTH("one_month", "oneMonth", 1),
     THREE_MONTHS("three_months", "threeMonths", 3),
+    TWELVE_MONTHS("twelve_months", "twelveMonths", 12),
     ALL_TIME("all_time", "allTime", null);
 
     private final String databaseValue;
@@ -39,7 +39,11 @@ public enum GraphTimeRange {
         if (!isRollingWindow() || anchorDate == null) {
             return null;
         }
-        return anchorDate.minusMonths(lookbackMonths);
+        LocalDate rollingStart = anchorDate.minusMonths(lookbackMonths);
+        if (this == THREE_MONTHS) {
+            return rollingStart.withDayOfMonth(1);
+        }
+        return rollingStart;
     }
 
     public static GraphTimeRange fromDatabaseValue(String rawValue) {

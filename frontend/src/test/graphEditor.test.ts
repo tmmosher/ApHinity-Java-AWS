@@ -362,8 +362,8 @@ describe("graphEditor", () => {
         ...baseGraphs[0],
         timeRangeData: {
           allTime: [{type: "bar", x: ["A"], y: [9]}],
-          oneMonth: [{type: "bar", x: ["A"], y: [1]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [3]}]
+          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
         }
       }
     ];
@@ -372,8 +372,8 @@ describe("graphEditor", () => {
         ...baseGraphsWithRanges[0],
         timeRangeData: {
           allTime: [{type: "bar", x: ["A"], y: [9]}],
-          oneMonth: [{type: "bar", x: ["A"], y: [2]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [4]}]
+          threeMonths: [{type: "bar", x: ["A"], y: [2]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [4]}]
         }
       }
     ];
@@ -394,8 +394,8 @@ describe("graphEditor", () => {
         ...baseGraphs[0],
         timeRangeData: {
           allTime: [{type: "bar", x: ["A"], y: [9]}],
-          oneMonth: [{type: "bar", x: ["A"], y: [1]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [3]}]
+          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
         }
       }
     ];
@@ -404,8 +404,8 @@ describe("graphEditor", () => {
         ...baseGraphsWithRanges[0],
         timeRangeData: {
           allTime: [{type: "bar", x: ["A"], y: [9]}],
-          oneMonth: [{type: "bar", x: ["A"], y: [5]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [7]}]
+          threeMonths: [{type: "bar", x: ["A"], y: [5]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [7]}]
         }
       }
     ];
@@ -413,6 +413,6 @@ describe("graphEditor", () => {
     const merged = reconcileLocationGraphUploadState(baseGraphsWithRanges, uploadedGraphs);
 
     expect(merged[0]).not.toBe(baseGraphsWithRanges[0]);
-    expect(merged[0].timeRangeData?.oneMonth).toEqual([{type: "bar", x: ["A"], y: [5]}]);
+    expect(merged[0].timeRangeData?.threeMonths).toEqual([{type: "bar", x: ["A"], y: [5]}]);
   });
 });

@@ -237,7 +237,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(pieGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
       const pieProps = getPieTraceEditorProps();
 
       expect(latestTraceControlsProps).toBeNull();
@@ -270,7 +270,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(pieGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const pieProps = getPieTraceEditorProps();
       pieProps.onUpdateValue(0, "abc");
@@ -331,7 +331,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(indicatorGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const indicatorProps = getIndicatorTraceEditorProps();
 
@@ -383,7 +383,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(scatterGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
       cartesianProps.onUpdateY(0, "abc");
@@ -421,7 +421,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(scatterGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
       expect(cartesianProps.yAxisTitle).toBe("% Compliance");
@@ -455,7 +455,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(scatterGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
       cartesianProps.onUpdateX(0, "abc");
@@ -492,7 +492,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(barGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
       expect(cartesianProps.barOrientation).toBe("h");
@@ -536,7 +536,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(barGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
       cartesianProps.onUpdateY(0, "Irvine");
@@ -569,7 +569,7 @@ describe("GraphEditorModal trace controls", () => {
 
     const dispose = renderModal(barGraph);
     try {
-      await Promise.resolve();
+      await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
       cartesianProps.onUpdateX(0, "Irvine");

@@ -10,7 +10,7 @@ import java.util.Map;
 @Component
 public class LocationGraphTemplateFactory {
     private static final String DEFAULT_GRAPH_COLOR = "#1f77b4";
-    private static final String DEFAULT_TIME_SERIES_LINE_SHAPE = "spline";
+    private static final String DEFAULT_TIME_SERIES_LINE_SHAPE = "hv";
     private static final double DEFAULT_TIME_SERIES_LINE_SMOOTHING = 1.0d;
     private static final String INDICATOR_GAUGE_BACKGROUND_COLOR = "#6b728040";
     private static final String INDICATOR_THRESHOLD_COLOR = "red";
@@ -213,6 +213,7 @@ public class LocationGraphTemplateFactory {
         layout.put("yaxis", Map.of(
             "range", List.of(0, 100),
             "title", "% Compliance",
+            "dtick", 1,
             "ticksuffix", "%"
         ));
         layout.put("legend", Map.of(

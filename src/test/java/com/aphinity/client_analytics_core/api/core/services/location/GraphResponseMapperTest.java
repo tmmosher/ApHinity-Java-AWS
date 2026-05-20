@@ -25,10 +25,11 @@ class GraphResponseMapperTest {
         graph.setData(List.of(Map.of(
             "type", "scatter",
             "name", "HPC",
-            "x", List.of("2025-11-01", "2026-01-15", "2026-03-10"),
-            "y", List.of(4, 7, 9),
+            "x", List.of("2025-11-01", "2025-12-05", "2026-01-15", "2026-03-10"),
+            "y", List.of(4, 5, 7, 9),
             "customdata", List.of(
                 Map.of("sampleCount", 1),
+                Map.of("sampleCount", 4),
                 Map.of("sampleCount", 2),
                 Map.of("sampleCount", 3)
             )
@@ -41,16 +42,16 @@ class GraphResponseMapperTest {
         GraphResponse response = mapper.toResponse(graph);
 
         assertProjectedTrace(
-            response.timeRangeData().get("oneMonth").getFirst(),
-            List.of("2026-03-10"),
-            List.of(9L),
-            List.of(3L)
+            response.timeRangeData().get("threeMonths").getFirst(),
+            List.of("2025-12-05", "2026-01-15", "2026-03-10"),
+            List.of(5L, 7L, 9L),
+            List.of(4L, 2L, 3L)
         );
         assertProjectedTrace(
-            response.timeRangeData().get("threeMonths").getFirst(),
-            List.of("2026-01-15", "2026-03-10"),
-            List.of(7L, 9L),
-            List.of(2L, 3L)
+            response.timeRangeData().get("twelveMonths").getFirst(),
+            List.of("2025-11-01", "2025-12-05", "2026-01-15", "2026-03-10"),
+            List.of(4L, 5L, 7L, 9L),
+            List.of(1L, 4L, 2L, 3L)
         );
     }
 
@@ -73,9 +74,9 @@ class GraphResponseMapperTest {
                 "type", "bar",
                 "name", "Non-Conformances",
                 "x", List.of(2),
-                "y", List.of("Materialized 1M")
+                "y", List.of("Materialized 3M")
             )),
-            GraphTimeRange.ONE_MONTH
+            GraphTimeRange.THREE_MONTHS
         );
 
         GraphResponseMapper mapper = new GraphResponseMapper(
@@ -90,9 +91,9 @@ class GraphResponseMapperTest {
                 "name", "Non-Conformances",
                 "orientation", "h",
                 "x", List.of(2L),
-                "y", List.of("Materialized 1M")
+                "y", List.of("Materialized 3M")
             )),
-            response.timeRangeData().get("oneMonth")
+            response.timeRangeData().get("threeMonths")
         );
         assertEquals(
             List.of(Map.of(
@@ -102,7 +103,7 @@ class GraphResponseMapperTest {
                 "x", List.of(9L),
                 "y", List.of("All Data")
             )),
-            response.timeRangeData().get("threeMonths")
+            response.timeRangeData().get("twelveMonths")
         );
     }
 

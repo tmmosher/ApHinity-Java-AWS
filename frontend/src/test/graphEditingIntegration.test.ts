@@ -211,13 +211,20 @@ describe("graph editing integration", () => {
     );
 
     const [, , renderedLayout] = react.mock.calls[0];
-    expect(renderedLayout).toEqual(expect.objectContaining({
-      title: { text: "Baseline" },
-      yaxis: {
+    expect(renderedLayout).toMatchObject({
+      title: expect.objectContaining({
+        text: "Baseline",
+        x: 0.02,
+        xanchor: "left"
+      }),
+      yaxis: expect.objectContaining({
         range: [0, 100],
-        title: { text: "Monthly pass rate", font: { size: 14 } }
-      }
-    }));
+        title: expect.objectContaining({
+          text: "Monthly pass rate",
+          font: { size: 14 }
+        })
+      })
+    });
   });
 
   it("applies per-slice pie color edits without changing other slices", async () => {

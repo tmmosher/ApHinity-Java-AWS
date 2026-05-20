@@ -100,7 +100,7 @@ class LocationGraphTemplateFactoryTest {
     }
 
     @Test
-    void createScatterTemplateUsesSplineLinesByDefault() {
+    void createScatterTemplateUsesHvhLinesByDefault() {
         LocationGraphTemplateFactory.GraphTemplate template = factory.create("scatter", "Phoenix");
 
         assertEquals("New Plot Graph", template.name());
@@ -113,13 +113,23 @@ class LocationGraphTemplateFactoryTest {
                 "line", Map.of(
                     "color", "#1f77b4",
                     "width", 2,
-                    "shape", "spline",
+                    "shape", "hv",
                     "smoothing", 1.0d
                 ),
                 "mode", "lines+markers",
                 "marker", Map.of("size", 6)
             )),
             template.data()
+        );
+        assertEquals(
+            Map.of(
+                "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
+                "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
+                "yaxis", Map.of("range", List.of(0, 100), "title", "% Compliance", "dtick", 1, "ticksuffix", "%"),
+                "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
+                "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+            ),
+            template.layout()
         );
     }
 

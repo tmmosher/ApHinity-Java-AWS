@@ -313,7 +313,7 @@ public class LocationDashboardImportService {
                 previewGraph,
                 historicalDerivedData
             ));
-            for (GraphTimeRange timeRange : List.of(GraphTimeRange.ONE_MONTH, GraphTimeRange.THREE_MONTHS)) {
+            for (GraphTimeRange timeRange : List.of(GraphTimeRange.THREE_MONTHS, GraphTimeRange.TWELVE_MONTHS)) {
                 GraphRelationalPayloadMapper.syncGraphData(
                     previewGraph,
                     LocationDashboardDerivedGraphSupport.buildPayload(
@@ -330,7 +330,7 @@ public class LocationDashboardImportService {
 
     private void materializePreviewRollingRanges(Graph graph) {
         List<Map<String, Object>> allTimePayload = GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
-        for (GraphTimeRange timeRange : List.of(GraphTimeRange.ONE_MONTH, GraphTimeRange.THREE_MONTHS)) {
+        for (GraphTimeRange timeRange : List.of(GraphTimeRange.THREE_MONTHS, GraphTimeRange.TWELVE_MONTHS)) {
             GraphRelationalPayloadMapper.syncGraphData(
                 graph,
                 GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, LocalDate.now(clock)),

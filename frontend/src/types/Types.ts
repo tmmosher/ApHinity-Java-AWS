@@ -76,7 +76,7 @@ export interface LocationGraph {
     updatedAt: string;
 }
 
-export type LocationGraphTimeRange = "oneMonth" | "threeMonths" | "allTime";
+export type LocationGraphTimeRange = "threeMonths" | "twelveMonths" | "allTime";
 
 export interface LocationGraphUpdate {
     graphId: number;

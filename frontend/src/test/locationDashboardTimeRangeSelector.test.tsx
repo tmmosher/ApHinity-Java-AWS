@@ -13,7 +13,8 @@ describe("LocationDashboardTimeRangeSelector", () => {
 
     expect(html).toContain("aria-label=\"Dashboard date range selector\"");
     expect(html).toContain("inline-grid grid-cols-3 divide-x divide-base-300");
-    expect(html).toContain("Rolling quarter");
+    expect(html).toContain("Recent quarter");
+    expect(html).toContain("Rolling year");
     expect(html).toContain("aria-pressed=\"true\"");
     expect(html).toContain("cursor-default");
   });

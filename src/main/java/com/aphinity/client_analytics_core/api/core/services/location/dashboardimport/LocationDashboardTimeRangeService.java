@@ -122,8 +122,8 @@ public class LocationDashboardTimeRangeService {
     private void materializeRollingTimeRanges(Graph graph, LocalDate anchorDate) {
         List<Map<String, Object>> allTimePayload = GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
         if (allTimePayload.isEmpty()) {
-            GraphRelationalPayloadMapper.syncGraphData(graph, List.of(), GraphTimeRange.ONE_MONTH);
             GraphRelationalPayloadMapper.syncGraphData(graph, List.of(), GraphTimeRange.THREE_MONTHS);
+            GraphRelationalPayloadMapper.syncGraphData(graph, List.of(), GraphTimeRange.TWELVE_MONTHS);
             return;
         }
 
@@ -231,8 +231,8 @@ public class LocationDashboardTimeRangeService {
 
     private Set<GraphTimeRange> rollingRanges() {
         Set<GraphTimeRange> rollingRanges = new LinkedHashSet<>();
-        rollingRanges.add(GraphTimeRange.ONE_MONTH);
         rollingRanges.add(GraphTimeRange.THREE_MONTHS);
+        rollingRanges.add(GraphTimeRange.TWELVE_MONTHS);
         return rollingRanges;
     }
 }

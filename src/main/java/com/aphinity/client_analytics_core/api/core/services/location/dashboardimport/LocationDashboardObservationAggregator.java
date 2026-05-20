@@ -13,7 +13,7 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 
 final class LocationDashboardObservationAggregator {
-    private static final String TIME_SERIES_LINE_SHAPE = "spline";
+    private static final String TIME_SERIES_LINE_SHAPE = "hv";
     private static final double TIME_SERIES_LINE_SMOOTHING = 0.3d;
     private static final List<String> DEFAULT_TRACE_COLORS = List.of(
         "#1f77b4",

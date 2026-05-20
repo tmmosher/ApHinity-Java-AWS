@@ -1,4 +1,4 @@
-import type { PlotlyLayout } from "../components/Chart";
+import type { PlotlyData, PlotlyLayout } from "../components/Chart";
 import type { ThemePreference } from "./themePreference";
 import {normalizePlotlyLayoutTitle} from "./graphLayoutTitle";
 
@@ -21,9 +21,14 @@ const DEFAULT_GRAPH_THEME_STYLE: Record<ThemePreference, GraphThemeStyle> = {
 };
 
 const FALLBACK_GRAPH_HEIGHT = "18rem";
+const FALLBACK_GRAPH_HEIGHT_PX = 288;
+const CARTESIAN_LEGEND_HEIGHT_RATIO = 1 / 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
+
+const toFiniteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 
 const omitUndefinedEntries = <T extends Record<string, unknown>>(value: T): T => {
   const normalized = {...value};
@@ -155,12 +160,58 @@ export const resolveGraphHeight = (graphStyle: unknown): string => {
   return `${graphStyle.height}px`;
 };
 
+const resolveGraphHeightPixels = (graphStyle: unknown): number => {
+  if (!isRecord(graphStyle) || typeof graphStyle.height !== "number" || graphStyle.height <= 0) {
+    return FALLBACK_GRAPH_HEIGHT_PX;
+  }
+  return graphStyle.height;
+};
+
+const hasCartesianAxes = (layout: Record<string, unknown>): boolean =>
+  Object.keys(layout).some((key) => /^xaxis\d*$/.test(key) || /^yaxis\d*$/.test(key));
+
+const hasBarTrace = (data: readonly PlotlyData[] | undefined): boolean =>
+  Array.isArray(data) && data.some((trace) => trace?.type === "bar");
+
+const applyCartesianLegendGeometry = (
+  layout: Record<string, unknown>,
+  graphStyle: unknown,
+  data: readonly PlotlyData[] | undefined
+): Record<string, unknown> => {
+  if (layout.showlegend === false || !hasCartesianAxes(layout) || hasBarTrace(data)) {
+    return layout;
+  }
+
+  const legend = isRecord(layout.legend) ? layout.legend : {};
+  const margin = isRecord(layout.margin) ? layout.margin : {};
+  const graphHeight = resolveGraphHeightPixels(graphStyle);
+  const reservedLegendBand = Math.round(graphHeight * CARTESIAN_LEGEND_HEIGHT_RATIO);
+  const nextBottomMargin = Math.max(toFiniteNumber(margin.b) ?? 0, reservedLegendBand);
+
+  return {
+    ...layout,
+    legend: {
+      ...legend,
+      orientation: "h",
+      x: 0,
+      xanchor: "left",
+      y: -0.16,
+      yanchor: "top"
+    },
+    margin: {
+      ...margin,
+      b: nextBottomMargin
+    }
+  };
+};
+
 export const resolveThemedGraphLayout = (
   layoutValue: unknown,
   graphStyle: unknown,
-  theme: ThemePreference
+  theme: ThemePreference,
+  data?: readonly PlotlyData[]
 ): PlotlyLayout => {
-  const layout = isRecord(layoutValue) ? layoutValue : {};
+  const layout = isRecord(layoutValue) ? applyCartesianLegendGeometry(layoutValue, graphStyle, data) : {};
   const themeStyle = resolveGraphThemeStyle(graphStyle, theme);
 
   return omitUndefinedEntries({

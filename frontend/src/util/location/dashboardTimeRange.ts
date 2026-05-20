@@ -8,14 +8,14 @@ export const dashboardTimeRangeOptions: Array<{
   description: string;
 }> = [
   {
-    value: "oneMonth",
-    label: "1 Month",
-    description: "Recent month"
-  },
-  {
     value: "threeMonths",
     label: "3 Months",
-    description: "Rolling quarter"
+    description: "Recent quarter"
+  },
+  {
+    value: "twelveMonths",
+    label: "12 Months",
+    description: "Rolling year"
   },
   {
     value: "allTime",
@@ -76,10 +76,7 @@ const addUtcDays = (isoDate: string, days: number): string => {
   ].join("-");
 };
 
-const resolveAllTimeGraphData = (graph: LocationGraph): Record<string, unknown>[] => {
-  const allTimeData = graph.timeRangeData?.allTime;
-  return isGraphDataList(allTimeData) ? allTimeData : graph.data;
-};
+const resolveAllTimeGraphData = (graph: LocationGraph): Record<string, unknown>[] => graph.data;
 
 const findMatchingSourceTrace = (
   sourceData: Record<string, unknown>[],
@@ -247,6 +244,10 @@ export const resolveLocationGraphDataForTimeRange = (
   graph: LocationGraph,
   timeRange: DashboardTimeRange
 ): Record<string, unknown>[] => {
+  if (timeRange === "allTime") {
+    return graph.data;
+  }
+
   const rangedData = graph.timeRangeData?.[timeRange];
   if (isGraphDataList(rangedData)) {
     return rangedData;
