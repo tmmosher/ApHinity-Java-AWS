@@ -40,28 +40,17 @@ class GraphResponseMapperTest {
 
         GraphResponse response = mapper.toResponse(graph);
 
-        assertEquals(
-            List.of(Map.of(
-                "type", "scatter",
-                "name", "HPC",
-                "x", List.of("2026-03-10"),
-                "y", List.of(9),
-                "customdata", List.of(Map.of("sampleCount", 3L))
-            )),
-            response.timeRangeData().get("oneMonth")
+        assertProjectedTrace(
+            response.timeRangeData().get("oneMonth").getFirst(),
+            List.of("2026-03-10"),
+            List.of(9L),
+            List.of(3L)
         );
-        assertEquals(
-            List.of(Map.of(
-                "type", "scatter",
-                "name", "HPC",
-                "x", List.of("2026-01-15", "2026-03-10"),
-                "y", List.of(7, 9),
-                "customdata", List.of(
-                    Map.of("sampleCount", 2L),
-                    Map.of("sampleCount", 3L)
-                )
-            )),
-            response.timeRangeData().get("threeMonths")
+        assertProjectedTrace(
+            response.timeRangeData().get("threeMonths").getFirst(),
+            List.of("2026-01-15", "2026-03-10"),
+            List.of(7L, 9L),
+            List.of(2L, 3L)
         );
     }
 
@@ -114,6 +103,31 @@ class GraphResponseMapperTest {
                 "y", List.of("All Data")
             )),
             response.timeRangeData().get("threeMonths")
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertProjectedTrace(
+        Map<String, Object> trace,
+        List<String> expectedX,
+        List<Long> expectedY,
+        List<Long> expectedSampleCounts
+    ) {
+        assertEquals("scatter", trace.get("type"));
+        assertEquals("HPC", trace.get("name"));
+        assertEquals(expectedX, trace.get("x"));
+        assertEquals(
+            expectedY,
+            ((List<Number>) trace.get("y")).stream()
+                .map(Number::longValue)
+                .toList()
+        );
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) trace.get("customdata");
+        assertEquals(
+            expectedSampleCounts,
+            customData.stream()
+                .map(entry -> ((Number) entry.get("sampleCount")).longValue())
+                .toList()
         );
     }
 }

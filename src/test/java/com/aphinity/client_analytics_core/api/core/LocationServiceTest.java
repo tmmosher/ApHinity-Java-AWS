@@ -21,10 +21,12 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphRespo
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
+import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -85,6 +87,9 @@ class LocationServiceTest {
     @Mock
     private LocationDashboardImportService locationDashboardImportService;
 
+    @Mock
+    private LocationDashboardTimeRangeService locationDashboardTimeRangeService;
+
     @Spy
     private LocationGraphTemplateFactory locationGraphTemplateFactory = new LocationGraphTemplateFactory();
 
@@ -95,6 +100,9 @@ class LocationServiceTest {
     @Spy
     private LocationDashboardMutationLockService locationDashboardMutationLockService =
         new LocationDashboardMutationLockService();
+
+    @Spy
+    private GraphResponseMapper graphResponseMapper = new GraphResponseMapper();
 
     @InjectMocks
     private LocationService locationService;
@@ -977,7 +985,7 @@ class LocationServiceTest {
             ))
         );
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
@@ -1183,7 +1191,7 @@ class LocationServiceTest {
             ))
         );
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
@@ -1223,7 +1231,7 @@ class LocationServiceTest {
             ))
         );
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(2, traces.size());
         assertEquals("Actual", traces.get(0).get("name"));

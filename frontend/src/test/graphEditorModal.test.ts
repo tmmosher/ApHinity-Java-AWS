@@ -1,4 +1,4 @@
-import { createMemo, createRoot } from "solid-js";
+import { createRoot } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
@@ -37,80 +37,8 @@ vi.mock("../components/Chart", () => ({
 
 vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
-    const heading = createMemo(() => props.heading);
-    const rowIndexes = createMemo(() => props.rowIndexes);
-    const xValues = createMemo(() => props.xValues);
-    const yValues = createMemo(() => props.yValues);
-    const xLabel = createMemo(() => props.xLabel);
-    const yLabel = createMemo(() => props.yLabel);
-    const rangeLabel = createMemo(() => props.rangeLabel);
-    const barOrientation = createMemo(() => props.barOrientation);
-    const yRangeMin = createMemo(() => props.yRangeMin);
-    const yRangeMax = createMemo(() => props.yRangeMax);
-    const yAxisTitle = createMemo(() => props.yAxisTitle);
-    const xDrafts = createMemo(() => props.xDrafts);
-    const yDrafts = createMemo(() => props.yDrafts);
-    const xInputMode = createMemo(() => props.xInputMode);
-    const yInputMode = createMemo(() => props.yInputMode);
-    const yRangeMinDraft = createMemo(() => props.yRangeMinDraft);
-    const yRangeMaxDraft = createMemo(() => props.yRangeMaxDraft);
-    const isBusy = createMemo(() => props.isBusy);
-
     latestCartesianTraceEditorProps = {
-      get heading() {
-        return heading();
-      },
-      get rowIndexes() {
-        return rowIndexes();
-      },
-      get xValues() {
-        return xValues();
-      },
-      get yValues() {
-        return yValues();
-      },
-      get xLabel() {
-        return xLabel();
-      },
-      get yLabel() {
-        return yLabel();
-      },
-      get rangeLabel() {
-        return rangeLabel();
-      },
-      get barOrientation() {
-        return barOrientation();
-      },
-      get yRangeMin() {
-        return yRangeMin();
-      },
-      get yRangeMax() {
-        return yRangeMax();
-      },
-      get yAxisTitle() {
-        return yAxisTitle();
-      },
-      get xDrafts() {
-        return xDrafts();
-      },
-      get yDrafts() {
-        return yDrafts();
-      },
-      get xInputMode() {
-        return xInputMode();
-      },
-      get yInputMode() {
-        return yInputMode();
-      },
-      get yRangeMinDraft() {
-        return yRangeMinDraft();
-      },
-      get yRangeMaxDraft() {
-        return yRangeMaxDraft();
-      },
-      get isBusy() {
-        return isBusy();
-      },
+      ...props,
       onUpdateBarOrientation: (nextOrientation: "h" | "v") =>
         (props.onUpdateBarOrientation as ((nextOrientation: "h" | "v") => void) | undefined)?.(nextOrientation),
       onAddRow: () =>

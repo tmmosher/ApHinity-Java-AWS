@@ -48,6 +48,10 @@ describe("dashboardTimeRange helpers", () => {
 
   it("reuses the original graph when the resolved payload already matches the canonical data", () => {
     const graph = buildGraph();
+    graph.timeRangeData = {
+      ...graph.timeRangeData,
+      allTime: graph.data
+    };
 
     expect(materializeLocationGraphForTimeRange(graph, "allTime")).toBe(graph);
 

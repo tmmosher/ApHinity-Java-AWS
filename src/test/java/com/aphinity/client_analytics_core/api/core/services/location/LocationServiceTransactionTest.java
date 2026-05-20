@@ -129,7 +129,7 @@ class LocationServiceTransactionTest {
             null
         );
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         verify(locationRepository).touchUpdatedAt(eq(1L), org.mockito.ArgumentMatchers.any(Instant.class));
     }
 

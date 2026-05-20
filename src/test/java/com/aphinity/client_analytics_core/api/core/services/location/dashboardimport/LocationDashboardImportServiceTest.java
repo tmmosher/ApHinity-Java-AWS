@@ -184,7 +184,7 @@ class LocationDashboardImportServiceTest {
         );
         GraphResponse totalNonConformancesResponse = findResponseByName(responses, "Total Non-Conformances");
         assertEquals(List.of(2L), totalNonConformancesResponse.data().getFirst().get("values"));
-        assertEquals(List.of(1L), totalNonConformancesResponse.timeRangeData().get("oneMonth").getFirst().get("values"));
+        assertEquals(List.of(2L), totalNonConformancesResponse.timeRangeData().get("oneMonth").getFirst().get("values"));
         assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentGauge = (Map<String, Object>) findResponseByName(

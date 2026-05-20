@@ -14,11 +14,13 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.Locatio
 import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
+import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
@@ -71,6 +73,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     LocationGraphTemplateFactory.class,
     LocationGraphUpdatePayloadValidationFactory.class,
     LocationDashboardMutationLockService.class,
+    GraphResponseMapper.class,
     LocationService.class,
     LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class
 })
@@ -105,6 +108,9 @@ class LocationGraphPipelineWebMvcTest {
 
     @MockitoBean
     private LocationDashboardImportService locationDashboardImportService;
+
+    @MockitoBean
+    private LocationDashboardTimeRangeService locationDashboardTimeRangeService;
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
@@ -363,7 +369,7 @@ class LocationGraphPipelineWebMvcTest {
             )
             .andExpect(status().isNoContent());
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
@@ -409,7 +415,7 @@ class LocationGraphPipelineWebMvcTest {
             )
             .andExpect(status().isNoContent());
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
@@ -455,7 +461,7 @@ class LocationGraphPipelineWebMvcTest {
             )
             .andExpect(status().isNoContent());
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
@@ -511,7 +517,7 @@ class LocationGraphPipelineWebMvcTest {
             )
             .andExpect(status().isNoContent());
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(1, traces.size());
         assertEquals("scatter", traces.getFirst().get("type"));
@@ -558,7 +564,7 @@ class LocationGraphPipelineWebMvcTest {
             )
             .andExpect(status().isNoContent());
 
-        verify(graphRepository).saveAll(List.of(graph));
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(2, traces.size());
         assertEquals("Actual", traces.get(0).get("name"));
