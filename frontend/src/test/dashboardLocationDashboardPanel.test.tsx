@@ -97,6 +97,8 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Apply");
     expect(html).toContain("Undo");
     expect(html).toContain("Last updated");
+    expect(html).toContain("Date Range");
+    expect(html).toContain("Choose which history window to apply across dashboard graphs.");
     expect(html).toContain("1 Month");
     expect(html).toContain("3 Months");
     expect(html).toContain("All Data");

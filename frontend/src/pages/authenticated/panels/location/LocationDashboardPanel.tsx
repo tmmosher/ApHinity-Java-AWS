@@ -96,12 +96,22 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
         onUndo={dashboard.undoLastDashboardEdit}
       />
 
-      <div class="flex justify-center">
-        <LocationDashboardTimeRangeSelector
-          selectedRange={selectedTimeRange}
-          onSelectRange={setSelectedTimeRange}
-        />
-      </div>
+      <section class="rounded-2xl border border-base-300 bg-base-100/70 p-4 shadow-sm md:p-5">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div class="space-y-1">
+            <h3 class="text-sm flex items-start font-semibold uppercase tracking-tight text-base-content/70">
+              Date Range
+            </h3>
+          </div>
+
+          <div class="flex justify-center md:justify-end">
+            <LocationDashboardTimeRangeSelector
+              selectedRange={selectedTimeRange}
+              onSelectRange={setSelectedTimeRange}
+            />
+          </div>
+        </div>
+      </section>
 
       <Show
         when={!graphsError()}

@@ -114,7 +114,7 @@ class LocationGraphTemplateFactoryTest {
                     "color", "#1f77b4",
                     "width", 2,
                     "shape", "spline",
-                    "smoothing", 0.3d
+                    "smoothing", 1.0d
                 ),
                 "mode", "lines+markers",
                 "marker", Map.of("size", 6)

@@ -8,11 +8,11 @@ import type {LocationGraph} from "../types/Types";
 const buildGraph = (): LocationGraph => ({
   id: 11,
   name: "Water Quality Compliance",
-  data: [{type: "scatter", name: "All", x: ["2026-01-01"], y: [5]}],
+  data: [{type: "scatter", name: "All", x: ["2025-01-01", "2026-01-01", "2026-02-01", "2026-03-01"], y: [4, 5, 5.5, 6]}],
   timeRangeData: {
     oneMonth: [{type: "scatter", name: "1M", x: ["2026-03-01"], y: [1]}],
     threeMonths: [{type: "scatter", name: "3M", x: ["2026-01-01", "2026-02-01"], y: [2, 3]}],
-    allTime: [{type: "scatter", name: "All", x: ["2025-01-01", "2026-03-01"], y: [4, 5]}]
+    allTime: [{type: "scatter", name: "All", x: ["2025-01-01", "2026-01-01", "2026-02-01", "2026-03-01"], y: [4, 5, 5.5, 6]}]
   },
   layout: null,
   config: null,
@@ -42,8 +42,19 @@ describe("dashboardTimeRange helpers", () => {
     const displayGraph = materializeLocationGraphForTimeRange(graph, "threeMonths");
 
     expect(displayGraph).not.toBe(graph);
-    expect(displayGraph.data).toEqual(graph.timeRangeData?.threeMonths);
-    expect(graph.data).toEqual([{type: "scatter", name: "All", x: ["2026-01-01"], y: [5]}]);
+    expect(displayGraph.data).toEqual([{
+      type: "scatter",
+      name: "3M",
+      x: ["2025-01-01", "2026-01-01", "2026-02-01"],
+      y: [4, 2, 3]
+    }]);
+    expect(displayGraph.layout).toMatchObject({
+      xaxis: {
+        range: ["2026-01-01", "2026-02-01"],
+        autorange: false
+      }
+    });
+    expect(graph.data).toEqual([{type: "scatter", name: "All", x: ["2025-01-01", "2026-01-01", "2026-02-01", "2026-03-01"], y: [4, 5, 5.5, 6]}]);
   });
 
   it("reuses the original graph when the resolved payload already matches the canonical data", () => {
@@ -57,5 +68,23 @@ describe("dashboardTimeRange helpers", () => {
 
     delete graph.timeRangeData?.oneMonth;
     expect(materializeLocationGraphForTimeRange(graph, "oneMonth")).toBe(graph);
+  });
+
+  it("prepends the prior all-time datapoint for one-month views and keeps it outside the visible range", () => {
+    const graph = buildGraph();
+    const displayGraph = materializeLocationGraphForTimeRange(graph, "oneMonth");
+
+    expect(displayGraph.data).toEqual([{
+      type: "scatter",
+      name: "1M",
+      x: ["2026-02-01", "2026-03-01"],
+      y: [5.5, 1]
+    }]);
+    expect(displayGraph.layout).toMatchObject({
+      xaxis: {
+        range: ["2026-03-01", "2026-03-02"],
+        autorange: false
+      }
+    });
   });
 });
