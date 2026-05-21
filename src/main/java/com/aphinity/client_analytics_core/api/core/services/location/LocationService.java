@@ -488,7 +488,14 @@ public class LocationService {
             try {
                 if (hasGraphUpdates) {
                     graphRepository.saveAllAndFlush(graphs);
-                    locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+                    // Spreadsheet preview applies already carry fully-computed derived graphs.
+                    // Rebuilding them here from persisted corrective actions would wipe
+                    // non-conformance resolution state that only exists in the preview batch.
+                    if (containsDerivedDashboardGraphs(graphs)) {
+                        locationDashboardTimeRangeService.refreshLocationImportedGraphDateGroups(locationId);
+                    } else {
+                        locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+                    }
                 }
                 if (normalizedSectionLayout != null) {
                     location.setSectionLayout(normalizedSectionLayout);
@@ -537,6 +544,35 @@ public class LocationService {
             );
             return null;
         });
+    }
+
+    private boolean containsDerivedDashboardGraphs(List<Graph> graphs) {
+        if (graphs == null || graphs.isEmpty()) {
+            return false;
+        }
+
+        for (Graph graph : graphs) {
+            if (graph != null && graphHasDerivedDashboardMetadata(graph.getLayout())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean graphHasDerivedDashboardMetadata(Map<String, Object> layout) {
+        if (layout == null) {
+            return false;
+        }
+        Object metaValue = layout.get("meta");
+        if (!(metaValue instanceof Map<?, ?> meta)) {
+            return false;
+        }
+        Object importMetaValue = meta.get("aphinityImport");
+        if (!(importMetaValue instanceof Map<?, ?> importMeta)) {
+            return false;
+        }
+        Object derivedGraphType = importMeta.get("derivedGraphType");
+        return derivedGraphType instanceof String value && !value.isBlank();
     }
 
     /**

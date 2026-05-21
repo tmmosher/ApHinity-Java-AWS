@@ -471,6 +471,65 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void updateLocationGraphDataPreservesPerBarMarkerColorsThroughPipeline() throws Exception {
+        Long userId = 42L;
+        Long locationId = 78L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(locationId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(310L);
+        graph.setName("Editable graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        mockMvc.perform(
+                put("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "graphs": [
+                            {
+                              "graphId": 310,
+                              "data": [
+                                {
+                                  "type": "bar",
+                                  "orientation": "v",
+                                  "x": ["Jan", "Feb"],
+                                  "y": [9, 8],
+                                  "marker": {
+                                    "color": "#1f77b4",
+                                    "colors": ["#1f77b4", "#d62728"]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                        """)
+            )
+            .andExpect(status().isNoContent());
+
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals("v", traces.getFirst().get("orientation"));
+        assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("x"));
+        assertEquals(List.of(9L, 8L), traces.getFirst().get("y"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> marker = (Map<String, Object>) traces.getFirst().get("marker");
+        assertEquals("#1f77b4", marker.get("color"));
+        assertEquals(List.of("#1f77b4", "#d62728"), marker.get("colors"));
+    }
+
+    @Test
     void updateLocationGraphDataPreservesScatterDateStringsWithFlexibleLocalDateFormatting() throws Exception {
         Long userId = 42L;
         Long locationId = 78L;

@@ -1,4 +1,4 @@
-import { createRoot } from "solid-js";
+import { createRenderEffect, createRoot } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
@@ -37,25 +37,51 @@ vi.mock("../components/Chart", () => ({
 
 vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
-    latestCartesianTraceEditorProps = {
-      ...props,
-      onUpdateBarOrientation: (nextOrientation: "h" | "v") =>
-        (props.onUpdateBarOrientation as ((nextOrientation: "h" | "v") => void) | undefined)?.(nextOrientation),
-      onAddRow: () =>
-        (props.onAddRow as (() => void) | undefined)?.(),
-      onUpdateX: (rowIndex: number, rawValue: string) =>
-        (props.onUpdateX as ((rowIndex: number, rawValue: string) => void) | undefined)?.(rowIndex, rawValue),
-      onUpdateY: (rowIndex: number, rawValue: string) =>
-        (props.onUpdateY as ((rowIndex: number, rawValue: string) => void) | undefined)?.(rowIndex, rawValue),
-      onUpdateYRangeMin: (rawValue: string) =>
-        (props.onUpdateYRangeMin as ((rawValue: string) => void) | undefined)?.(rawValue),
-      onUpdateYRangeMax: (rawValue: string) =>
-        (props.onUpdateYRangeMax as ((rawValue: string) => void) | undefined)?.(rawValue),
-      onUpdateYAxisTitle: (rawValue: string) =>
-        (props.onUpdateYAxisTitle as ((rawValue: string) => void) | undefined)?.(rawValue),
-      onRemoveRow: (rowIndex: number) =>
-        (props.onRemoveRow as ((rowIndex: number) => void) | undefined)?.(rowIndex)
-    };
+    createRenderEffect(() => {
+      latestCartesianTraceEditorProps = {
+        ...props,
+        onUpdateBarOrientation:
+          typeof props["onUpdateBarOrientation"] === "function"
+            ? (nextOrientation: "h" | "v") =>
+                (props["onUpdateBarOrientation"] as (nextOrientation: "h" | "v") => void)(nextOrientation)
+            : undefined,
+        onAddRow:
+          typeof props["onAddRow"] === "function"
+            ? () => (props["onAddRow"] as () => void)()
+            : undefined,
+        onUpdateX:
+          typeof props["onUpdateX"] === "function"
+            ? (rowIndex: number, rawValue: string) =>
+                (props["onUpdateX"] as (rowIndex: number, rawValue: string) => void)(rowIndex, rawValue)
+            : undefined,
+        onUpdateY:
+          typeof props["onUpdateY"] === "function"
+            ? (rowIndex: number, rawValue: string) =>
+                (props["onUpdateY"] as (rowIndex: number, rawValue: string) => void)(rowIndex, rawValue)
+            : undefined,
+        onUpdateColor:
+          typeof props["onUpdateColor"] === "function"
+            ? (rowIndex: number, colorHex: string) =>
+                (props["onUpdateColor"] as (rowIndex: number, colorHex: string) => void)(rowIndex, colorHex)
+            : undefined,
+        onUpdateYRangeMin:
+          typeof props["onUpdateYRangeMin"] === "function"
+            ? (rawValue: string) => (props["onUpdateYRangeMin"] as (rawValue: string) => void)(rawValue)
+            : undefined,
+        onUpdateYRangeMax:
+          typeof props["onUpdateYRangeMax"] === "function"
+            ? (rawValue: string) => (props["onUpdateYRangeMax"] as (rawValue: string) => void)(rawValue)
+            : undefined,
+        onUpdateYAxisTitle:
+          typeof props["onUpdateYAxisTitle"] === "function"
+            ? (rawValue: string) => (props["onUpdateYAxisTitle"] as (rawValue: string) => void)(rawValue)
+            : undefined,
+        onRemoveRow:
+          typeof props["onRemoveRow"] === "function"
+            ? (rowIndex: number) => (props["onRemoveRow"] as (rowIndex: number) => void)(rowIndex)
+            : undefined
+      };
+    });
     return null;
   }
 }));
@@ -155,6 +181,8 @@ const getCartesianTraceEditorProps = () => {
   return latestCartesianTraceEditorProps as {
     xValues: unknown[];
     yValues: unknown[];
+    rowColors?: string[];
+    colorOptions?: Record<string, string>;
     xLabel?: string;
     yLabel?: string;
     rangeLabel?: string;
@@ -169,6 +197,7 @@ const getCartesianTraceEditorProps = () => {
     onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
     onUpdateX: (rowIndex: number, rawValue: string) => void;
     onUpdateY: (rowIndex: number, rawValue: string) => void;
+    onUpdateColor?: (rowIndex: number, colorHex: string) => void;
     onUpdateYRangeMin: (rawValue: string) => void;
     onUpdateYRangeMax: (rawValue: string) => void;
     onUpdateYAxisTitle: (rawValue: string) => void;
@@ -436,6 +465,35 @@ describe("GraphEditorModal trace controls", () => {
     }
   });
 
+  it("does not expose row color editing props for scatter traces", async () => {
+    const scatterGraph: LocationGraph = {
+      id: 30,
+      name: "Trend",
+      data: [{
+        type: "scatter",
+        name: "Daily",
+        x: ["2026-01-01"],
+        y: [9]
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(scatterGraph);
+    try {
+      await flushSolidUpdates();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      expect(cartesianProps.rowColors).toBeUndefined();
+      expect(cartesianProps.onUpdateColor).toBeUndefined();
+    } finally {
+      dispose();
+    }
+  });
+
   it("stages invalid cartesian x values while the modal is open", async () => {
     const scatterGraph: LocationGraph = {
       id: 20,
@@ -517,6 +575,46 @@ describe("GraphEditorModal trace controls", () => {
     }
   });
 
+  it("passes bar row color editing props and updates the selected bar row color", async () => {
+    const barGraph: LocationGraph = {
+      id: 29,
+      name: "Buckets",
+      data: [{
+        type: "bar",
+        name: "Trace 1",
+        orientation: "h",
+        x: [9, 6],
+        y: ["North", "South"],
+        marker: {
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
+        }
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(barGraph);
+    try {
+      await flushSolidUpdates();
+
+      const cartesianProps = getCartesianTraceEditorProps();
+      expect(cartesianProps.rowColors).toEqual(["#1f77b4", "#2ca02c"]);
+      expect(cartesianProps.colorOptions).toBeTruthy();
+
+      cartesianProps.onUpdateColor?.(1, "#d62728");
+      await flushSolidUpdates();
+
+      const updatedProps = getCartesianTraceEditorProps();
+      expect(updatedProps.rowColors).toEqual(["#1f77b4", "#d62728"]);
+    } finally {
+      dispose();
+    }
+  });
+
   it("accepts string bucket values on the y-axis for horizontal bars", async () => {
     const barGraph: LocationGraph = {
       id: 21,
@@ -557,7 +655,7 @@ describe("GraphEditorModal trace controls", () => {
       data: [{
         type: "bar",
         orientation: "v",
-        x: ["North"],
+        x: ["Irvine"],
         y: [3]
       }],
       layout: null,

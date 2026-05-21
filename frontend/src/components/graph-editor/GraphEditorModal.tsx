@@ -20,6 +20,7 @@ import {
   createTrace,
   getCartesianAxisValueMode,
   getBarOrientation,
+  getBarRowColor,
   getPieRowColor,
   getTraceColor,
   getTraceArray,
@@ -32,6 +33,7 @@ import {
   removeTraceWithPlotly,
   renameTrace,
   setBarOrientation,
+  setBarRowColor,
   setPieRowColor,
   setTraceColor,
   parseNumericInput,
@@ -293,6 +295,14 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const cartesianRowIndexes = createMemo(() =>
     Array.from({length: Math.max(cartesianXValues().length, cartesianYValues().length)}, (_, index) => index)
   );
+
+  const barRowColors = createMemo(() => {
+    const trace = selectedTrace();
+    if (!trace || getTraceType(trace) !== "bar") {
+      return [] as string[];
+    }
+    return cartesianRowIndexes().map((rowIndex) => getBarRowColor(trace, rowIndex));
+  });
 
   const visibleEditableGraphPayloadLayout = () => visibleEditablePayload().layout ?? null;
 
@@ -917,6 +927,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       rowIndexes={cartesianRowIndexes()}
                       xValues={cartesianXValues()}
                       yValues={cartesianYValues()}
+                      rowColors={barRowColors()}
+                      colorOptions={TRACE_COLOR_OPTIONS}
                       xLabel={selectedBarOrientation() === "h" ? "Value" : "Category"}
                       yLabel={selectedBarOrientation() === "h" ? "Category" : "Value"}
                       rangeLabel={selectedBarOrientation() === "h" ? "Value axis" : "Y axis"}
@@ -938,6 +950,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                       onUpdateY={(rowIndex, rawValue) =>
                         updateCartesianYValue(rowIndex, rawValue)
+                      }
+                      onUpdateColor={(rowIndex, colorHex) =>
+                        updateSelectedTrace((trace) => setBarRowColor(trace, rowIndex, colorHex))
                       }
                       onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
                       onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}

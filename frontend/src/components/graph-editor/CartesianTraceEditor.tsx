@@ -6,6 +6,8 @@ type CartesianTraceEditorProps = {
   rowIndexes: number[];
   xValues: unknown[];
   yValues: unknown[];
+  rowColors?: string[];
+  colorOptions?: Record<string, string>;
   xLabel?: string;
   yLabel?: string;
   rangeLabel?: string;
@@ -24,6 +26,7 @@ type CartesianTraceEditorProps = {
   onAddRow: () => void;
   onUpdateX: (rowIndex: number, rawValue: string) => void;
   onUpdateY: (rowIndex: number, rawValue: string) => void;
+  onUpdateColor?: (rowIndex: number, colorHex: string) => void;
   onUpdateYRangeMin: (rawValue: string) => void;
   onUpdateYRangeMax: (rawValue: string) => void;
   onUpdateYAxisTitle: (rawValue: string) => void;
@@ -109,7 +112,34 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
         <ul class="space-y-2">
           <Index each={props.rowIndexes}>
             {(_, rowIndex) => (
-              <li class="grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <li
+                class={
+                  "grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 " +
+                  (props.onUpdateColor && props.colorOptions
+                    ? "md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+                    : "md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]")
+                }
+              >
+                <Show when={props.onUpdateColor && props.colorOptions}>
+                  <select
+                    class="select select-bordered select-sm"
+                    value={props.rowColors?.[rowIndex] ?? ""}
+                    disabled={props.isBusy}
+                    onChange={(event) => {
+                      const nextColor = event.currentTarget.value;
+                      if (nextColor.length > 0) {
+                        props.onUpdateColor?.(rowIndex, nextColor);
+                      }
+                    }}
+                  >
+                    <option value="">Choose a color</option>
+                    <Index each={Object.entries(props.colorOptions ?? {})}>
+                      {(entry) => (
+                        <option value={entry()[1]}>{entry()[0]}</option>
+                      )}
+                    </Index>
+                  </select>
+                </Show>
                 <input
                   class={"input input-bordered input-sm" + (xDrafts()[rowIndex] !== undefined ? " input-error" : "")}
                   aria-invalid={xDrafts()[rowIndex] !== undefined}

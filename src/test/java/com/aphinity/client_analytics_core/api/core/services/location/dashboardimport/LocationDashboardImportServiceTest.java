@@ -426,15 +426,15 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
         assertEquals(
-            Map.of("color", "#ef4444"),
+            Map.of("color", "#ef4444", "colors", List.of("#ef4444", "#ef4444")),
             findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("marker")
         );
         assertEquals(
-            Map.of("color", "#22c55e"),
+            Map.of("color", "#22c55e", "colors", List.of("#22c55e")),
             findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("marker")
         );
         assertEquals(
-            Map.of("color", "#f59e0b"),
+            Map.of("color", "#f59e0b", "colors", List.of("#f59e0b")),
             findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("marker")
         );
     }
@@ -702,8 +702,8 @@ class LocationDashboardImportServiceTest {
         assertEquals(List.of("Newport Beach"), resolvedByFacility.get("x"));
         assertEquals(List.of(1L), activeByFacility.get("y"));
         assertEquals(List.of(1L), resolvedByFacility.get("y"));
-        assertEquals(Map.of("color", "#b91c1c"), activeByFacility.get("marker"));
-        assertEquals(Map.of("color", "#15803d"), resolvedByFacility.get("marker"));
+        assertEquals(Map.of("color", "#b91c1c", "colors", List.of("#b91c1c")), activeByFacility.get("marker"));
+        assertEquals(Map.of("color", "#15803d", "colors", List.of("#15803d")), resolvedByFacility.get("marker"));
 
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
         verifyNoInteractions(graphRepository, locationRepository);

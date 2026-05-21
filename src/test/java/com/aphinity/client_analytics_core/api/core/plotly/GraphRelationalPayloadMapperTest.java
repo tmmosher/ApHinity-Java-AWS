@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -210,5 +211,48 @@ class GraphRelationalPayloadMapperTest {
         assertEquals("v", traces.getFirst().get("orientation"));
         assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("x"));
         assertEquals(List.of(5L, 7L), traces.getFirst().get("y"));
+    }
+
+    @Test
+    void setDataDoesNotInventBarMarkerColorsWhenNoneAreProvided() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "name", "Sessions",
+            "orientation", "v",
+            "x", List.of("Jan", "Feb"),
+            "y", List.of(5, 7)
+        )));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertFalse(traces.getFirst().containsKey("marker"));
+    }
+
+    @Test
+    void setDataRoundTripsPerBarMarkerColors() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "name", "Sessions",
+            "orientation", "v",
+            "x", List.of("Jan", "Feb"),
+            "y", List.of(5, 7),
+            "marker", Map.of(
+                "color", "#1f77b4",
+                "colors", List.of("#1f77b4", "#d62728")
+            )
+        )));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("bar", traces.getFirst().get("type"));
+        assertEquals("v", traces.getFirst().get("orientation"));
+        assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("x"));
+        assertEquals(List.of(5L, 7L), traces.getFirst().get("y"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> marker = (Map<String, Object>) traces.getFirst().get("marker");
+        assertEquals("#1f77b4", marker.get("color"));
+        assertEquals(List.of("#1f77b4", "#d62728"), marker.get("colors"));
     }
 }

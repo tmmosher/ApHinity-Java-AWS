@@ -10,6 +10,7 @@ import {
   createTrace,
   removeTraceWithPlotly,
   renameTrace,
+  setBarRowColor,
   setPieRowColor,
   setTraceColor,
   updateTraceYAxisTitle,
@@ -172,6 +173,61 @@ describe("graph editing integration", () => {
         marker: {
           color: "#d62728",
           colors: ["#d62728", "#d62728"]
+        }
+      }
+    ]);
+  });
+
+  it("applies per-row bar color edits to the rendered marker colors", async () => {
+    const baseGraph: LocationGraph = {
+      id: 12,
+      name: "Regional Counts",
+      data: [{
+        type: "bar",
+        name: "Distribution",
+        orientation: "v",
+        x: ["North", "South"],
+        y: [3, 7],
+        marker: {
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
+        }
+      }],
+      layout: { title: { text: "Breakdown" } },
+      config: { displayModeBar: false },
+      style: { height: 280 },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(baseGraph);
+    payload.data = [
+      setBarRowColor(payload.data[0], 1, "#d62728")
+    ];
+
+    const editResult = applyGraphPayloadEdit([baseGraph], [], 12, payload);
+    expect(editResult.changed).toBe(true);
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      { react } as unknown as { react: (...args: unknown[]) => Promise<unknown> },
+      { id: "chart-root" } as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any,
+      editResult.nextGraphs[0].layout as any,
+      editResult.nextGraphs[0].config as any
+    );
+
+    const [, renderedData] = react.mock.calls[0];
+    expect(renderedData).toEqual([
+      {
+        type: "bar",
+        name: "Distribution",
+        orientation: "v",
+        x: ["North", "South"],
+        y: [3, 7],
+        marker: {
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#d62728"]
         }
       }
     ]);

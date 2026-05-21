@@ -189,6 +189,29 @@ export const getPieRowColor = (
   return getDefaultTraceColor();
 };
 
+export const getBarRowColor = (
+  trace: Record<string, unknown>,
+  rowIndex: number
+): string => {
+  const marker = isRecord(trace.marker) ? trace.marker : null;
+  if (marker && Array.isArray(marker.colors)) {
+    const rowColor = marker.colors[rowIndex];
+    if (typeof rowColor === "string") {
+      return rowColor;
+    }
+    const firstColor = marker.colors.find((entry) => typeof entry === "string");
+    if (typeof firstColor === "string") {
+      return firstColor;
+    }
+  }
+
+  if (marker && typeof marker.color === "string") {
+    return marker.color;
+  }
+
+  return getDefaultTraceColor();
+};
+
 export const buildTraceLabel = (trace: Record<string, unknown>, index: number): string => {
   const traceName = typeof trace.name === "string" ? trace.name.trim() : "";
   const traceType = typeof trace.type === "string" ? trace.type : "trace";
@@ -494,6 +517,32 @@ export const setPieRowColor = (
   };
 };
 
+export const setBarRowColor = (
+  trace: Record<string, unknown>,
+  rowIndex: number,
+  colorHex: string
+): Record<string, unknown> => {
+  if (getTraceType(trace) !== "bar" || !Number.isInteger(rowIndex) || rowIndex < 0) {
+    return trace;
+  }
+
+  const rowCount = Math.max(getTraceArray(trace, "x").length, getTraceArray(trace, "y").length);
+  if (rowIndex >= rowCount) {
+    return trace;
+  }
+
+  const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+  const colors = Array.from({length: rowCount}, (_, index) => getBarRowColor(trace, index));
+  colors[rowIndex] = colorHex;
+  marker.color = colors[0] ?? colorHex;
+  marker.colors = colors;
+
+  return {
+    ...trace,
+    marker
+  };
+};
+
 export const setTraceColor = (
   trace: Record<string, unknown>,
   traceType: TraceType,
@@ -501,6 +550,19 @@ export const setTraceColor = (
 ): Record<string, unknown> => {
   if (traceType === "pie") {
     return syncPieMarkerColors(trace, colorHex);
+  }
+
+  if (traceType === "bar") {
+    const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+    const rowCount = Math.max(getTraceArray(trace, "x").length, getTraceArray(trace, "y").length);
+    marker.color = colorHex;
+    if (rowCount > 0) {
+      marker.colors = Array.from({length: rowCount}, () => colorHex);
+    }
+    return {
+      ...trace,
+      marker
+    };
   }
 
   if (traceType === "indicator") {
@@ -638,16 +700,34 @@ export const removePieRow = (
 export const addCartesianRow = (trace: Record<string, unknown>): Record<string, unknown> => {
   const xValues = getTraceArray(trace, "x");
   const yValues = getTraceArray(trace, "y");
+  const previousRowCount = Math.max(xValues.length, yValues.length);
   const firstXValue = xValues.find((value) => value !== undefined && value !== null);
   const nextX = typeof firstXValue === "number" ? xValues.length + 1 : "";
   const firstYValue = yValues.find((value) => value !== undefined && value !== null);
   const nextY = typeof firstYValue === "number" ? 0 : "";
   xValues.push(nextX);
   yValues.push(nextY);
-  return {
+  const nextTrace: Record<string, unknown> = {
     ...trace,
     x: xValues,
     y: yValues
+  };
+  if (getTraceType(trace) !== "bar") {
+    return nextTrace;
+  }
+
+  const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+  const inheritedColor = previousRowCount > 0
+    ? getBarRowColor(trace, 0)
+    : getDefaultTraceColor();
+  const colors = Array.from({length: Math.max(xValues.length, yValues.length)}, (_, index) =>
+    index < previousRowCount ? getBarRowColor(trace, index) : inheritedColor
+  );
+  marker.color = colors[0] ?? getDefaultTraceColor();
+  marker.colors = colors;
+  return {
+    ...nextTrace,
+    marker
   };
 };
 
@@ -697,6 +777,7 @@ export const removeCartesianRow = (
   trace: Record<string, unknown>,
   rowIndex: number
 ): Record<string, unknown> => {
+  const previousRowCount = Math.max(getTraceArray(trace, "x").length, getTraceArray(trace, "y").length);
   const xValues = getTraceArray(trace, "x");
   const yValues = getTraceArray(trace, "y");
   if (rowIndex >= 0 && rowIndex < xValues.length) {
@@ -705,10 +786,32 @@ export const removeCartesianRow = (
   if (rowIndex >= 0 && rowIndex < yValues.length) {
     yValues.splice(rowIndex, 1);
   }
-  return {
+  const nextTrace: Record<string, unknown> = {
     ...trace,
     x: xValues,
     y: yValues
+  };
+  if (getTraceType(trace) !== "bar") {
+    return nextTrace;
+  }
+
+  const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+  const originalColors = Array.from({length: previousRowCount}, (_, index) =>
+    getBarRowColor(trace, index)
+  );
+  if (rowIndex >= 0 && rowIndex < originalColors.length) {
+    originalColors.splice(rowIndex, 1);
+  }
+  if (originalColors.length > 0) {
+    marker.color = originalColors[0];
+    marker.colors = originalColors;
+  } else {
+    delete marker.colors;
+    marker.color = getDefaultTraceColor();
+  }
+  return {
+    ...nextTrace,
+    marker
   };
 };
 

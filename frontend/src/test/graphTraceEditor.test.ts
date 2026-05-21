@@ -1,19 +1,23 @@
 import {describe, expect, it} from "vitest";
 import {
   AUTO_SIZE_TRACE_FLAG,
+  addCartesianRow,
   addPieRow,
   coerceInputValue,
   createTrace,
   getBarOrientation,
+  getBarRowColor,
   getCartesianAxisValueMode,
   getPieRowColor,
   getTraceYAxisRange,
   getTraceYAxisTitle,
   isAutoSizingPieTrace,
   parseNumericInput,
+  removeCartesianRow,
   removePieRow,
   renameTrace,
   setBarOrientation,
+  setBarRowColor,
   setPieRowColor,
   getTraceColor,
   setTraceColor,
@@ -84,6 +88,46 @@ describe("graphTraceEditor", () => {
     expect(getPieRowColor(nextTrace, 1)).toBe("#d62728");
     expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#d62728"]);
     expect((nextTrace.marker as {color: string}).color).toBe("#1f77b4");
+  });
+
+  it("updates only the selected bar row color", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      orientation: "h",
+      x: [2, 5],
+      y: ["North", "South"],
+      marker: {
+        color: "#1f77b4",
+        colors: ["#1f77b4", "#2ca02c"]
+      }
+    };
+
+    const nextTrace = setBarRowColor(trace, 1, "#d62728");
+
+    expect(getBarRowColor(nextTrace, 0)).toBe("#1f77b4");
+    expect(getBarRowColor(nextTrace, 1)).toBe("#d62728");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#d62728"]);
+    expect((nextTrace.marker as {color: string}).color).toBe("#1f77b4");
+  });
+
+  it("applies a trace-level bar color to every row", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      orientation: "v",
+      x: ["North", "South"],
+      y: [2, 5],
+      marker: {
+        color: "#1f77b4",
+        colors: ["#1f77b4", "#2ca02c"]
+      }
+    };
+
+    const nextTrace = setTraceColor(trace, "bar", "#d62728");
+
+    expect((nextTrace.marker as {color: string}).color).toBe("#d62728");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#d62728", "#d62728"]);
+    expect(getBarRowColor(nextTrace, 0)).toBe("#d62728");
+    expect(getBarRowColor(nextTrace, 1)).toBe("#d62728");
   });
 
   it("applies scatter color to marker and line", () => {
@@ -290,6 +334,46 @@ describe("graphTraceEditor", () => {
     });
   });
 
+  it("reads and updates the horizontal bar value-axis title from xaxis", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      orientation: "h",
+      x: [3, 7],
+      y: ["North", "South"]
+    };
+    const layout: Record<string, unknown> = {
+      xaxis: {
+        range: [0, 10],
+        title: {
+          text: "Count",
+          font: {size: 14}
+        }
+      },
+      yaxis: {
+        title: {
+          text: "Facility"
+        }
+      }
+    };
+
+    expect(getTraceYAxisTitle(layout, trace)).toBe("Count");
+
+    expect(updateTraceYAxisTitle(layout, trace, "Sample count")).toEqual({
+      xaxis: {
+        range: [0, 10],
+        title: {
+          text: "Sample count",
+          font: {size: 14}
+        }
+      },
+      yaxis: {
+        title: {
+          text: "Facility"
+        }
+      }
+    });
+  });
+
   it("removes an empty value-axis title without dropping other axis settings", () => {
     const trace: Record<string, unknown> = {
       type: "scatter",
@@ -335,6 +419,27 @@ describe("graphTraceEditor", () => {
       "numeric"
     );
     expect(vertical.x).toEqual([5]);
+  });
+
+  it("keeps bar row colors aligned when rows are added and removed", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      orientation: "h",
+      x: [2],
+      y: ["North"],
+      marker: {
+        color: "#1f77b4",
+        colors: ["#1f77b4"]
+      }
+    };
+
+    const withAddedRow = addCartesianRow(trace);
+    expect((withAddedRow.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#1f77b4"]);
+
+    const recolored = setBarRowColor(withAddedRow, 1, "#d62728");
+    const withRemovedRow = removeCartesianRow(recolored, 0);
+    expect((withRemovedRow.marker as {colors: string[]}).colors).toEqual(["#d62728"]);
+    expect((withRemovedRow.marker as {color: string}).color).toBe("#d62728");
   });
 
   it("creates pie traces with donut defaults", () => {

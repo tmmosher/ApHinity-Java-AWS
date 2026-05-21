@@ -48,6 +48,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1201,6 +1202,65 @@ class LocationServiceTest {
         assertEquals(Map.of("title", "Updated layout"), graph.getLayout());
         assertEquals(Map.of("displayModeBar", false), graph.getConfig());
         assertEquals(Map.of("height", 240), graph.getStyle());
+        verify(locationDashboardTimeRangeService).refreshLocationDateGroups(99L);
+        verify(locationDashboardTimeRangeService, never()).refreshLocationImportedGraphDateGroups(anyLong());
+    }
+
+    @Test
+    void updateLocationGraphDataPreservesSubmittedDerivedGraphsByRefreshingImportedRangesOnly() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Percent Resolved");
+        graph.setData(List.of(Map.of(
+            "type", "indicator",
+            "mode", "gauge+number",
+            "value", 0,
+            "gauge", Map.of(
+                "axis", Map.of("range", List.of(0, 100)),
+                "bar", Map.of("color", LEGACY_GRAPH_COLOR)
+            )
+        )));
+        graph.setLayout(new LinkedHashMap<>(Map.of(
+            "meta", Map.of(
+                "aphinityImport", Map.of(
+                    "derivedGraphId", "resolution-percent",
+                    "derivedGraphType", "percent_resolved"
+                )
+            )
+        )));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                31L,
+                List.of(Map.of(
+                    "type", "indicator",
+                    "mode", "gauge+number",
+                    "value", 68,
+                    "gauge", Map.of(
+                        "axis", Map.of("range", List.of(0, 100)),
+                        "bar", Map.of("color", LEGACY_GRAPH_COLOR)
+                    )
+                ))
+            ))
+        );
+
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
+        verify(locationDashboardTimeRangeService).refreshLocationImportedGraphDateGroups(99L);
+        verify(locationDashboardTimeRangeService, never()).refreshLocationDateGroups(anyLong());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("indicator", traces.getFirst().get("type"));
+        assertEquals(68L, ((Number) traces.getFirst().get("value")).longValue());
     }
 
     @Test

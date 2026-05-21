@@ -30,6 +30,7 @@ public final class GraphRelationalPayloadMapper {
     private static final String INTERNAL_X_FIELD = "x";
     private static final String INTERNAL_LABEL_FIELD = "label";
     private static final String INTERNAL_CUSTOMDATA_FIELD = "customdata";
+    private static final String INTERNAL_COLOR_FIELD = "color";
     private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
         .appendValue(ChronoField.YEAR, 4)
         .appendLiteral('-')
@@ -227,6 +228,7 @@ public final class GraphRelationalPayloadMapper {
             case "bar" -> {
                 List<Object> xValues = new ArrayList<>();
                 List<Object> yValues = new ArrayList<>();
+                List<String> barColors = new ArrayList<>();
                 String orientation = resolveStoredBarOrientation(trace);
 
                 for (GraphCategoryPoint point : filteredCategoryPoints(trace)) {
@@ -237,6 +239,7 @@ public final class GraphRelationalPayloadMapper {
                         xValues.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
                         yValues.add(resolveLabelValue(point));
                     }
+                    barColors.add(resolveBarPointColor(point, trace));
                 }
 
                 result.putAll(Map.of(
@@ -244,6 +247,13 @@ public final class GraphRelationalPayloadMapper {
                     "x", List.copyOf(xValues),
                     "y", List.copyOf(yValues)
                 ));
+                List<String> normalizedBarColors = normalizeBarColors(barColors);
+                if (!normalizedBarColors.isEmpty()) {
+                    Map<String, Object> marker = extractTraceMarker(result);
+                    marker.put("color", normalizedBarColors.getFirst());
+                    marker.put("colors", List.copyOf(normalizedBarColors));
+                    result.put("marker", marker);
+                }
             }
             case "scatter" -> {
                 List<Object> xValues = new ArrayList<>();
@@ -349,6 +359,8 @@ public final class GraphRelationalPayloadMapper {
         boolean scatterTrace = "scatter".equals(canonicalType);
         String explicitBarOrientation = barTrace ? resolveExplicitBarOrientation(trace) : null;
         boolean horizontalBarTrace = barTrace && isHorizontalBarInput(xValues, yValues, explicitBarOrientation);
+        List<?> barColors = barTrace ? optionalMarkerColors(trace) : null;
+        String fallbackBarColor = barTrace ? optionalMarkerColor(trace) : null;
 
         if (!horizontalBarTrace && hasExplicitX && yValues.isEmpty()) {
             throw new IllegalArgumentException("Graph data is invalid");
@@ -382,7 +394,10 @@ public final class GraphRelationalPayloadMapper {
                 point.setCategoryKey(String.valueOf(rawLabel));
                 point.setCategoryLabel(rawLabel instanceof String ? (String) rawLabel : String.valueOf(rawLabel));
                 point.setValueNumeric(toBigDecimal(number));
-                point.setPointMeta(Map.of(INTERNAL_LABEL_FIELD, point.getCategoryLabel()));
+                Map<String, Object> pointMeta = new LinkedHashMap<>();
+                pointMeta.put(INTERNAL_LABEL_FIELD, point.getCategoryLabel());
+                addBarPointColor(pointMeta, barColors, fallbackBarColor, index);
+                point.setPointMeta(pointMeta);
                 continue;
             }
 
@@ -397,6 +412,9 @@ public final class GraphRelationalPayloadMapper {
             pointMeta.put(INTERNAL_LABEL_FIELD, point.getCategoryLabel());
             if (scatterTrace) {
                 pointMeta.put(INTERNAL_X_FIELD, rawX);
+            }
+            if (barTrace) {
+                addBarPointColor(pointMeta, barColors, fallbackBarColor, index);
             }
             point.setPointMeta(pointMeta);
         }
@@ -582,6 +600,98 @@ public final class GraphRelationalPayloadMapper {
         return config;
     }
 
+    private static List<?> optionalMarkerColors(Map<String, Object> trace) {
+        if (trace == null) {
+            return null;
+        }
+        Object markerValue = trace.get("marker");
+        if (!(markerValue instanceof Map<?, ?> marker)) {
+            return null;
+        }
+        Object colorsValue = marker.get("colors");
+        if (colorsValue == null) {
+            return null;
+        }
+        if (!(colorsValue instanceof List<?> colors)) {
+            throw new IllegalArgumentException("Graph data is invalid");
+        }
+        return colors;
+    }
+
+    private static String optionalMarkerColor(Map<String, Object> trace) {
+        if (trace == null) {
+            return null;
+        }
+        Object markerValue = trace.get("marker");
+        if (!(markerValue instanceof Map<?, ?> marker)) {
+            return null;
+        }
+        Object colorValue = marker.get("color");
+        return colorValue instanceof String color && !color.isBlank() ? color : null;
+    }
+
+    private static void addBarPointColor(
+        Map<String, Object> pointMeta,
+        List<?> barColors,
+        String fallbackBarColor,
+        int index
+    ) {
+        if (pointMeta == null) {
+            return;
+        }
+        if (barColors != null && index >= 0 && index < barColors.size()) {
+            Object rawColor = barColors.get(index);
+            if (rawColor instanceof String color && !color.isBlank()) {
+                pointMeta.put(INTERNAL_COLOR_FIELD, color);
+                return;
+            }
+        }
+        if (fallbackBarColor != null && !fallbackBarColor.isBlank()) {
+            pointMeta.put(INTERNAL_COLOR_FIELD, fallbackBarColor);
+        }
+    }
+
+    private static Map<String, Object> extractTraceMarker(Map<String, Object> trace) {
+        Object markerValue = trace.get("marker");
+        if (!(markerValue instanceof Map<?, ?> markerMap)) {
+            return new LinkedHashMap<>();
+        }
+        return copyStringKeyedMap(markerMap);
+    }
+
+    private static Map<String, Object> copyStringKeyedMap(Map<?, ?> source) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null) {
+                copy.put(String.valueOf(key), value);
+            }
+        });
+        return copy;
+    }
+
+    private static List<String> normalizeBarColors(List<String> barColors) {
+        if (barColors == null || barColors.isEmpty()) {
+            return List.of();
+        }
+
+        String fallbackColor = null;
+        for (String color : barColors) {
+            if (hasText(color)) {
+                fallbackColor = color;
+                break;
+            }
+        }
+        if (!hasText(fallbackColor)) {
+            return List.of();
+        }
+
+        List<String> normalized = new ArrayList<>(barColors.size());
+        for (String color : barColors) {
+            normalized.add(hasText(color) ? color : fallbackColor);
+        }
+        return List.copyOf(normalized);
+    }
+
     private static void ensureCategoryPoints(GraphTrace graphTrace) {
         if (graphTrace.getCategoryPoints() == null) {
             graphTrace.setCategoryPoints(new ArrayList<>());
@@ -748,6 +858,31 @@ public final class GraphRelationalPayloadMapper {
             return point.getCategoryLabel();
         }
         return point.getCategoryKey();
+    }
+
+    private static String resolveBarPointColor(GraphCategoryPoint point, GraphTrace trace) {
+        if (point != null && point.getPointMeta() != null) {
+            Object pointColor = point.getPointMeta().get(INTERNAL_COLOR_FIELD);
+            if (pointColor instanceof String color && hasText(color)) {
+                return color;
+            }
+        }
+
+        Map<String, Object> traceConfig = trace == null ? null : trace.getTraceConfig();
+        if (traceConfig != null) {
+            Object markerValue = traceConfig.get("marker");
+            if (markerValue instanceof Map<?, ?> marker) {
+                Object markerColor = marker.get("color");
+                if (markerColor instanceof String color && hasText(color)) {
+                    return color;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static Instant parseObservedAt(Object rawX) {

@@ -1,5 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
+import org.jspecify.annotations.Nullable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -335,13 +337,8 @@ final class LocationDashboardCommentParser {
     }
 
     private ParsedMeasurement parseMeasurementValue(String rawValue) {
-        if (rawValue == null) {
-            return null;
-        }
-        String cleanedValue = rawValue.replace(",", "").strip();
-        if (cleanedValue.isBlank()) {
-            return null;
-        }
+        String cleanedValue = getCleanedValue(rawValue);
+        if (cleanedValue == null) return null;
 
         if (cleanedValue.equalsIgnoreCase("nd")
             || cleanedValue.equalsIgnoreCase("n.d.")
@@ -370,6 +367,17 @@ final class LocationDashboardCommentParser {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private static @Nullable String getCleanedValue(String rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+        String cleanedValue = rawValue.replace(",", "").strip();
+        if (cleanedValue.isBlank()) {
+            return null;
+        }
+        return cleanedValue;
     }
 
     private static List<BigDecimal> parseLabeledTestResults(List<String> notes) {
@@ -409,13 +417,8 @@ final class LocationDashboardCommentParser {
     }
 
     private static ParsedMeasurement parseStaticMeasurementValue(String rawValue) {
-        if (rawValue == null) {
-            return null;
-        }
-        String cleanedValue = rawValue.replace(",", "").strip();
-        if (cleanedValue.isBlank()) {
-            return null;
-        }
+        String cleanedValue = getCleanedValue(rawValue);
+        if (cleanedValue == null) return null;
         if (cleanedValue.equalsIgnoreCase("nd")
             || cleanedValue.equalsIgnoreCase("n.d.")
             || cleanedValue.equalsIgnoreCase("not detected")) {

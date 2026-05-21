@@ -79,25 +79,91 @@ public class LocationDashboardTimeRangeService {
 
     @Transactional
     public void refreshLocationDateGroups(Long locationId) {
-        if (locationId == null) {
+        RefreshContext refreshContext = loadRefreshContext(locationId);
+        if (refreshContext == null) {
             return;
+        }
+
+        materializeImportedGraphTimeRanges(
+            refreshContext.assignedGraphs(),
+            refreshContext.anchorDate(),
+            refreshContext.refreshedAt()
+        );
+
+        strategyRegistry.resolve(refreshContext.location().getName()).ifPresent(strategy ->
+            refreshDerivedGraphs(
+                locationId,
+                refreshContext.location(),
+                refreshContext.assignedGraphs(),
+                strategy,
+                refreshContext.anchorDate(),
+                refreshContext.refreshedAt()
+            )
+        );
+
+        log.info(
+            "Refreshed location dashboard time ranges locationId={} graphCount={} anchorDate={}",
+            locationId,
+            refreshContext.assignedGraphs().size(),
+            refreshContext.anchorDate()
+        );
+    }
+
+    @Transactional
+    public void refreshLocationImportedGraphDateGroups(Long locationId) {
+        RefreshContext refreshContext = loadRefreshContext(locationId);
+        if (refreshContext == null) {
+            return;
+        }
+
+        materializeImportedGraphTimeRanges(
+            refreshContext.assignedGraphs(),
+            refreshContext.anchorDate(),
+            refreshContext.refreshedAt()
+        );
+
+        log.info(
+            "Refreshed location dashboard imported graph time ranges locationId={} graphCount={} anchorDate={}",
+            locationId,
+            refreshContext.assignedGraphs().size(),
+            refreshContext.anchorDate()
+        );
+    }
+
+    private RefreshContext loadRefreshContext(Long locationId) {
+        if (locationId == null) {
+            return null;
         }
         Location location = locationRepository.findById(locationId).orElse(null);
         if (location == null) {
-            return;
+            return null;
         }
 
         List<LocationGraph> locationGraphs = locationGraphRepository.findByLocationIdWithGraphDetails(locationId);
         if (locationGraphs.isEmpty()) {
-            return;
+            return null;
         }
 
         List<Graph> assignedGraphs = locationGraphs.stream()
             .map(LocationGraph::getGraph)
             .filter(Objects::nonNull)
             .toList();
-        LocalDate anchorDate = LocalDate.now(clock);
-        Instant refreshedAt = Instant.now(clock);
+        return new RefreshContext(
+            location,
+            assignedGraphs,
+            LocalDate.now(clock),
+            Instant.now(clock)
+        );
+    }
+
+    private void materializeImportedGraphTimeRanges(
+        List<Graph> assignedGraphs,
+        LocalDate anchorDate,
+        Instant refreshedAt
+    ) {
+        if (assignedGraphs == null || assignedGraphs.isEmpty()) {
+            return;
+        }
 
         for (Graph graph : assignedGraphs) {
             if (graph == null || graph.getId() == null || isDerivedGraph(graph)) {
@@ -106,17 +172,6 @@ public class LocationDashboardTimeRangeService {
             materializeRollingTimeRanges(graph, anchorDate);
             graph.setUpdatedAt(refreshedAt);
         }
-
-        strategyRegistry.resolve(location.getName()).ifPresent(strategy ->
-            refreshDerivedGraphs(locationId, location, assignedGraphs, strategy, anchorDate, refreshedAt)
-        );
-
-        log.info(
-            "Refreshed location dashboard time ranges locationId={} graphCount={} anchorDate={}",
-            locationId,
-            assignedGraphs.size(),
-            anchorDate
-        );
     }
 
     private void materializeRollingTimeRanges(Graph graph, LocalDate anchorDate) {
@@ -234,5 +289,13 @@ public class LocationDashboardTimeRangeService {
         rollingRanges.add(GraphTimeRange.THREE_MONTHS);
         rollingRanges.add(GraphTimeRange.TWELVE_MONTHS);
         return rollingRanges;
+    }
+
+    private record RefreshContext(
+        Location location,
+        List<Graph> assignedGraphs,
+        LocalDate anchorDate,
+        Instant refreshedAt
+    ) {
     }
 }
