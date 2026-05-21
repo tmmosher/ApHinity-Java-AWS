@@ -245,6 +245,9 @@ public class LocationDashboardTimeRangeService {
             if (graph == null) {
                 continue;
             }
+            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition, correctiveActions)) {
+                continue;
+            }
             graph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
                 graph.getLayout(),
                 derivedGraphDefinition,
@@ -262,6 +265,22 @@ public class LocationDashboardTimeRangeService {
             }
             graph.setUpdatedAt(refreshedAt);
         }
+    }
+
+    private boolean shouldPreserveExistingResolutionGraph(
+        DerivedGraphConfig derivedGraphDefinition,
+        List<ServiceEvent> correctiveActions
+    ) {
+        if (derivedGraphDefinition == null || derivedGraphDefinition.derivedType() == null) {
+            return false;
+        }
+        if (!derivedGraphDefinition.derivedType().requiresResolvedNonConformanceState()) {
+            return false;
+        }
+        // Generic dashboard refreshes do not have spreadsheet analyzed-sample context.
+        // When there are also no persisted corrective actions, recomputing these
+        // resolution-driven derived graphs would destructively collapse them to empty.
+        return correctiveActions == null || correctiveActions.isEmpty();
     }
 
     private boolean graphContainsTimeSeries(Graph graph) {

@@ -141,6 +141,8 @@ const getTraceControlsProps = () => {
     traceOptions: Array<{label: string}>;
     selectedTraceIndex: number;
     traceNameDraft: string;
+    showColorSelect: boolean;
+    disableColorSelect: boolean;
     disableRenameTrace: boolean;
     onAddTrace: () => void;
     onChangeTraceName: (nextName: string) => void;
@@ -610,6 +612,36 @@ describe("GraphEditorModal trace controls", () => {
 
       const updatedProps = getCartesianTraceEditorProps();
       expect(updatedProps.rowColors).toEqual(["#1f77b4", "#d62728"]);
+    } finally {
+      dispose();
+    }
+  });
+
+  it("hides the trace-level color control for bar traces", () => {
+    const dispose = renderModal({
+      id: 26,
+      name: "Bucket colors",
+      data: [{
+        type: "bar",
+        orientation: "h",
+        x: [3, 7],
+        y: ["North", "South"],
+        marker: {
+          color: "#1f77b4",
+          colors: ["#1f77b4", "#2ca02c"]
+        }
+      }],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    });
+    try {
+      const traceControlsProps = getTraceControlsProps();
+
+      expect(traceControlsProps.showColorSelect).toBe(false);
+      expect(traceControlsProps.disableColorSelect).toBe(true);
     } finally {
       dispose();
     }

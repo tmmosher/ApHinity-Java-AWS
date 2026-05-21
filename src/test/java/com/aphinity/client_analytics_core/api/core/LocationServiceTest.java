@@ -3,12 +3,14 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.location.UserSubscriptionToLocation;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
@@ -1245,6 +1247,71 @@ class LocationServiceTest {
         assertEquals(1, traces.size());
         assertEquals("indicator", traces.getFirst().get("type"));
         assertEquals(68L, ((Number) traces.getFirst().get("value")).longValue());
+    }
+
+    @Test
+    void updateLocationGraphDataPersistsRollingTimeRangePayloadsForDerivedGraphs() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Percent Resolved");
+        graph.setData(List.of(indicatorTrace(68)));
+        graph.setLayout(new LinkedHashMap<>(Map.of(
+            "meta", Map.of(
+                "aphinityImport", Map.of(
+                    "derivedGraphId", "resolution-percent",
+                    "derivedGraphType", "percent_resolved"
+                )
+            )
+        )));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                31L,
+                List.of(indicatorTrace(68)),
+                Map.of(
+                    "threeMonths", List.of(indicatorTrace(40)),
+                    "twelveMonths", List.of(indicatorTrace(55)),
+                    "allTime", List.of(indicatorTrace(999))
+                ),
+                null,
+                null
+            ))
+        );
+
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
+        verify(locationDashboardTimeRangeService).refreshLocationImportedGraphDateGroups(99L);
+        verify(locationDashboardTimeRangeService, never()).refreshLocationDateGroups(anyLong());
+        assertEquals(
+            40L,
+            ((Number) GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.THREE_MONTHS)
+                .data()
+                .getFirst()
+                .get("value")).longValue()
+        );
+        assertEquals(
+            55L,
+            ((Number) GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.TWELVE_MONTHS)
+                .data()
+                .getFirst()
+                .get("value")).longValue()
+        );
+        assertEquals(
+            68L,
+            ((Number) GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME)
+                .data()
+                .getFirst()
+                .get("value")).longValue()
+        );
     }
 
     @Test

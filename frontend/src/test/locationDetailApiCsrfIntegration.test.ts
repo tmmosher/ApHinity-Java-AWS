@@ -49,7 +49,10 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
       saveLocationGraphsById("https://example.test", "42", [
         {
           graphId: 7,
-          data: [{type: "bar", y: [1, 2, 3]}]
+          data: [{type: "bar", y: [1, 2, 3]}],
+          timeRangeData: {
+            threeMonths: [{type: "bar", y: [3, 2, 1]}]
+          }
         }
       ])
     ).resolves.toBeUndefined();
@@ -58,8 +61,12 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/core/profile");
     const firstMutationHeaders = fetchMock.mock.calls[0][1]?.headers as Headers;
     const retryMutationHeaders = fetchMock.mock.calls[2][1]?.headers as Headers;
+    const firstMutationBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(firstMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-stale");
     expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-fresh");
+    expect(firstMutationBody.graphs[0].timeRangeData).toEqual({
+      threeMonths: [{type: "bar", y: [3, 2, 1]}]
+    });
   });
 
   it("surfaces a CSRF error when stale-token retry still fails", async () => {

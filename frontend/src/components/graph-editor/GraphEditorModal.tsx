@@ -851,9 +851,10 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                 traceNameDraft={traceNameDraft()}
                 selectedTraceColor={selectedTraceColorValue()}
                 colorOptions={TRACE_COLOR_OPTIONS}
+                showColorSelect={selectedTraceType() !== "bar"}
                 disableAddTrace={isBusy()}
                 disableTraceSelect={isBusy() || traceOptions().length === 0}
-                disableColorSelect={isBusy() || !selectedTraceType()}
+                disableColorSelect={isBusy() || !selectedTraceType() || selectedTraceType() === "bar"}
                 disableTraceNameInput={isBusy() || !selectedTrace()}
                 disableRenameTrace={isBusy() || !selectedTrace()}
                 disableRemoveTrace={isBusy() || !selectedTrace()}

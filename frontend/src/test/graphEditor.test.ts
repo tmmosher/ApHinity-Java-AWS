@@ -99,10 +99,24 @@ describe("graphEditor", () => {
   });
 
   it("builds save payloads for the graph update API", () => {
-    expect(buildLocationGraphUpdates(baseGraphs)).toEqual([
+    expect(buildLocationGraphUpdates([
+      {
+        ...baseGraphs[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [2]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [4]}]
+        }
+      },
+      baseGraphs[1]
+    ])).toEqual([
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [9]}],
+        timeRangeData: {
+          threeMonths: [{type: "bar", x: ["A"], y: [2]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [4]}]
+        },
         layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 320}
@@ -118,17 +132,40 @@ describe("graphEditor", () => {
   });
 
   it("builds save payloads only for changed graphs with expectedUpdatedAt values", () => {
-    const editedGraphs = applyGraphPayloadEdit(baseGraphs, [], 10, {
+    const baseGraphsWithRanges: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
+        }
+      },
+      baseGraphs[1]
+    ];
+    const editedGraphs = applyGraphPayloadEdit(baseGraphsWithRanges, [], 10, {
       data: [{type: "bar", x: ["A"], y: [15]}],
       layout: {title: {text: "Updated"}},
       config: {displayModeBar: false},
       style: {height: 360}
     }).nextGraphs;
+    editedGraphs[0] = {
+      ...editedGraphs[0],
+      timeRangeData: {
+        allTime: [{type: "bar", x: ["A"], y: [15]}],
+        threeMonths: [{type: "bar", x: ["A"], y: [5]}],
+        twelveMonths: [{type: "bar", x: ["A"], y: [7]}]
+      }
+    };
 
-    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphs)).toEqual([
+    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphsWithRanges)).toEqual([
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [15]}],
+        timeRangeData: {
+          threeMonths: [{type: "bar", x: ["A"], y: [5]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [7]}]
+        },
         layout: {title: {text: "Updated", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 360},
@@ -139,6 +176,44 @@ describe("graphEditor", () => {
 
   it("returns no save payloads when there are no graph changes", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
+  });
+
+  it("treats rolling time-range payload changes as graph changes even when all-time data is unchanged", () => {
+    const baseGraphsWithRanges: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
+        }
+      }
+    ];
+    const editedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphsWithRanges[0],
+        timeRangeData: {
+          allTime: [{type: "bar", x: ["A"], y: [9]}],
+          threeMonths: [{type: "bar", x: ["A"], y: [6]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [8]}]
+        }
+      }
+    ];
+
+    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphsWithRanges)).toEqual([
+      {
+        graphId: 10,
+        data: [{type: "bar", x: ["A"], y: [9]}],
+        timeRangeData: {
+          threeMonths: [{type: "bar", x: ["A"], y: [6]}],
+          twelveMonths: [{type: "bar", x: ["A"], y: [8]}]
+        },
+        layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
+        config: {displayModeBar: false},
+        style: {height: 320},
+        expectedUpdatedAt: "2026-01-02T00:00:00Z"
+      }
+    ]);
   });
 
   it("prunes deleted graphs from the local dashboard caches", () => {

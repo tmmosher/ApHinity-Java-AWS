@@ -267,3 +267,46 @@ export const materializeLocationGraphForTimeRange = (
     layout: nextLayout
   };
 };
+
+export const reconcileLocationGraphUploadState = (
+  currentGraphs: LocationGraph[],
+  uploadedGraphs: LocationGraph[]
+): LocationGraph[] => {
+  if (uploadedGraphs.length === 0) {
+    return currentGraphs;
+  }
+
+  const uploadedGraphById = new Map(uploadedGraphs.map((graph) => [graph.id, graph]));
+  let changed = false;
+
+  const nextGraphs = currentGraphs.map((currentGraph) => {
+    const uploadedGraph = uploadedGraphById.get(currentGraph.id);
+    if (!uploadedGraph) {
+      return currentGraph;
+    }
+
+    changed = true;
+    return {
+      ...currentGraph,
+      ...uploadedGraph,
+      data: uploadedGraph.data,
+      timeRangeData: uploadedGraph.timeRangeData,
+      layout: uploadedGraph.layout,
+      config: uploadedGraph.config,
+      style: uploadedGraph.style,
+      updatedAt: uploadedGraph.updatedAt
+    };
+  });
+
+  return changed ? nextGraphs : currentGraphs;
+};
+
+export const cloneLocationGraphs = (graphs: LocationGraph[]): LocationGraph[] =>
+  graphs.map((graph) => ({
+    ...graph,
+    data: structuredClone(graph.data),
+    timeRangeData: structuredClone(graph.timeRangeData),
+    layout: structuredClone(graph.layout),
+    config: structuredClone(graph.config),
+    style: structuredClone(graph.style)
+  }));

@@ -1,4 +1,4 @@
-import { For, Index } from "solid-js";
+import { For, Index, Show } from "solid-js";
 
 export type TraceOption = {
   index: number;
@@ -11,6 +11,7 @@ type TraceControlsProps = {
   traceNameDraft: string;
   selectedTraceColor: string;
   colorOptions: Record<string, string>;
+  showColorSelect: boolean;
   disableAddTrace: boolean;
   disableTraceSelect: boolean;
   disableColorSelect: boolean;
@@ -27,7 +28,7 @@ type TraceControlsProps = {
 
 const TraceControls = (props: TraceControlsProps) => (
   <div class="space-y-2">
-    <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+    <div class={`grid grid-cols-1 gap-2 ${props.showColorSelect ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
       <label class="form-control">
         <span class="label-text">Trace</span>
           <select
@@ -60,27 +61,29 @@ const TraceControls = (props: TraceControlsProps) => (
         />
       </label>
 
-      <label class="form-control">
-        <span class="label-text">Trace color</span>
-        <select
-          class="select select-bordered select-sm mt-1"
-          value={props.selectedTraceColor}
-          disabled={props.disableColorSelect}
-          onChange={(event) => {
-            const nextColor = event.currentTarget.value;
-            if (nextColor.length > 0) {
-              props.onApplyColor(nextColor);
-            }
-          }}
-        >
-          <option value="">Choose a color</option>
-          <For each={Object.entries(props.colorOptions)}>
-            {([label, hex]) => (
-              <option value={hex}>{label}</option>
-            )}
-          </For>
-        </select>
-      </label>
+      <Show when={props.showColorSelect}>
+        <label class="form-control">
+          <span class="label-text">Trace color</span>
+          <select
+            class="select select-bordered select-sm mt-1"
+            value={props.selectedTraceColor}
+            disabled={props.disableColorSelect}
+            onChange={(event) => {
+              const nextColor = event.currentTarget.value;
+              if (nextColor.length > 0) {
+                props.onApplyColor(nextColor);
+              }
+            }}
+          >
+            <option value="">Choose a color</option>
+            <For each={Object.entries(props.colorOptions)}>
+              {([label, hex]) => (
+                <option value={hex}>{label}</option>
+              )}
+            </For>
+          </select>
+        </label>
+      </Show>
     </div>
 
     <div class="flex flex-wrap items-center gap-2">

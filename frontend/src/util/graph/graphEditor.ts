@@ -134,20 +134,55 @@ const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayl
 const graphPayloadSignature = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload));
 
+const normalizeGraphTimeRangeData = (
+  timeRangeData: LocationGraph["timeRangeData"]
+): LocationGraphUpdate["timeRangeData"] => {
+  if (!timeRangeData) {
+    return undefined;
+  }
+
+  const nextTimeRangeData: NonNullable<LocationGraphUpdate["timeRangeData"]> = {};
+  if (timeRangeData.threeMonths) {
+    nextTimeRangeData.threeMonths = cloneJson(timeRangeData.threeMonths);
+  }
+  if (timeRangeData.twelveMonths) {
+    nextTimeRangeData.twelveMonths = cloneJson(timeRangeData.twelveMonths);
+  }
+
+  return Object.keys(nextTimeRangeData).length > 0 ? nextTimeRangeData : undefined;
+};
+
+const buildGraphUpdatePayload = (graph: LocationGraph): LocationGraphUpdate => ({
+  graphId: graph.id,
+  ...createEditableGraphPayload(graph),
+  timeRangeData: normalizeGraphTimeRangeData(graph.timeRangeData)
+});
+
+const graphPersistenceSignature = (graph: LocationGraph): string =>
+  JSON.stringify({
+    payload: normalizeGraphPayload({
+      data: graph.data,
+      layout: graph.layout ?? null,
+      config: graph.config ?? null,
+      style: graph.style ?? null
+    }),
+    timeRangeData: normalizeGraphTimeRangeData(graph.timeRangeData) ?? null
+  });
+
 const buildGraphBaselineEntry = (graph: LocationGraph): GraphBaselineEntry => ({
-  payloadSignature: graphPayloadSignature(createEditableGraphPayload(graph)),
+  payloadSignature: graphPersistenceSignature(graph),
   expectedUpdatedAt: graph.updatedAt ?? null
 });
 
 const isGraphDirty = (
   graph: LocationGraph,
   baseline: GraphBaselineEntry | undefined
-): boolean => baseline !== undefined && graphPayloadSignature(createEditableGraphPayload(graph)) !== baseline.payloadSignature;
+): boolean => baseline !== undefined && graphPersistenceSignature(graph) !== baseline.payloadSignature;
 
 function graphStateSignature(graph: LocationGraph): string {
   return JSON.stringify({
     name: graph.name,
-    timeRangeData: graph.timeRangeData ?? null,
+    timeRangeData: normalizeGraphTimeRangeData(graph.timeRangeData) ?? null,
     payload: normalizeGraphPayload({
       data: graph.data,
       layout: graph.layout ?? null,
@@ -228,10 +263,7 @@ export const reconcileLocationGraphs = (
 };
 
 export const buildLocationGraphUpdates = (graphs: LocationGraph[]): LocationGraphUpdate[] =>
-  graphs.map((graph) => ({
-    graphId: graph.id,
-    ...createEditableGraphPayload(graph)
-  }));
+  graphs.map(buildGraphUpdatePayload);
 
 export const buildGraphBaselineIndex = (graphs: LocationGraph[]): Map<number, GraphBaselineEntry> => {
   const baselineById = new Map<number, GraphBaselineEntry>();
@@ -282,14 +314,13 @@ export const buildChangedLocationGraphUpdates = (
   const changedUpdates: LocationGraphUpdate[] = [];
   for (const currentGraph of currentGraphs) {
     const baseline = baselineById.get(currentGraph.id);
-    const currentSignature = graphPayloadSignature(createEditableGraphPayload(currentGraph));
+    const currentSignature = graphPersistenceSignature(currentGraph);
     if (baseline && baseline.payloadSignature === currentSignature) {
       continue;
     }
 
     changedUpdates.push({
-      graphId: currentGraph.id,
-      ...createEditableGraphPayload(currentGraph),
+      ...buildGraphUpdatePayload(currentGraph),
       expectedUpdatedAt: baseline?.expectedUpdatedAt ?? null
     });
   }

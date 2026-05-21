@@ -195,6 +195,16 @@ public record LocationDashboardImportStrategyConfig(
             return value;
         }
 
+        public boolean requiresResolvedNonConformanceState() {
+            return switch (this) {
+                case ACTIVE_NON_CONFORMANCE_PERCENT,
+                     PERCENT_RESOLVED,
+                     NON_CONFORMANCE_STATUS_BY_FACILITY,
+                     NON_CONFORMANCE_TURNAROUND_TIME -> true;
+                default -> false;
+            };
+        }
+
         @JsonCreator
         public static DerivedGraphType fromValue(String rawValue) {
             if (rawValue == null || rawValue.isBlank()) {
