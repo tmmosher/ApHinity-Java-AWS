@@ -34,7 +34,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
             sample.sublocation(),
             sample.facilityName(),
             sample.resolvedBuilding(),
-            sample.systemTypeName(),
+            sample.resolvedSystem(),
             sample.pointOfUse(),
             sample.basis(),
             null
@@ -58,7 +58,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
         LocationDashboardImportStrategyConfig.SublocationConfig sublocation,
         String facilityName,
         String resolvedBuilding,
-        String systemTypeName,
+        String systemName,
         String pointOfUse,
         String basis,
         String sampleIdentity
@@ -89,10 +89,10 @@ final class LocationDashboardCorrectiveActionDraftFactory {
                 LocationDashboardCorrectiveActionMetadataSupport.buildingLine(resolvedBuilding)
             );
         }
-        if (systemTypeName != null) {
+        if (systemName != null) {
             addDescriptionLine(
                 descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemTypeName)
+                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemName)
             );
         }
         if (pointOfUse != null) {

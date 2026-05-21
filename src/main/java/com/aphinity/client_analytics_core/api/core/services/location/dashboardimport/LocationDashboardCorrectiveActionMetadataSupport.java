@@ -96,29 +96,51 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
 
     static String identityKey(String title, String description) {
         Map<String, String> metadata = parseStructuredMetadata(description);
-        String measurement = LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("measurement"));
-        String observedAt = LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("observed at"));
-        String facility = LocationDashboardGraphMetadataSupport.normalizeKey(
+        String identity = identityKey(
+            metadata.get("measurement"),
+            LocationDashboardGraphMetadataSupport.parseLocalDate(metadata.get("observed at")),
             LocationDashboardGraphMetadataSupport.firstNonBlank(
                 metadata.get("sublocation"),
                 metadata.get("facility")
-            )
+            ),
+            metadata.get("building"),
+            metadata.get("system"),
+            metadata.get("point of use"),
+            metadata.get("basis"),
+            metadata.get("sample identity")
         );
-        String building = nullSafeNormalized(metadata.get("building"));
-        String system = LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("system"));
-        if (measurement != null && observedAt != null && facility != null && system != null) {
+        return identity != null ? identity : LocationDashboardGraphMetadataSupport.normalizeKey(title);
+    }
+
+    static String identityKey(
+        String measurementName,
+        LocalDate observedAt,
+        String facilityName,
+        String buildingName,
+        String systemName,
+        String pointOfUse,
+        String basis,
+        String sampleIdentity
+    ) {
+        String measurement = LocationDashboardGraphMetadataSupport.normalizeKey(measurementName);
+        String observedAtValue = observedAt == null ? null : observedAt.toString();
+        String observedAtNormalized = LocationDashboardGraphMetadataSupport.normalizeKey(observedAtValue);
+        String facility = LocationDashboardGraphMetadataSupport.normalizeKey(facilityName);
+        String building = nullSafeNormalized(buildingName);
+        String system = LocationDashboardGraphMetadataSupport.normalizeKey(systemName);
+        if (measurement != null && observedAtNormalized != null && facility != null && system != null) {
             return String.join("|", List.of(
                 measurement,
-                observedAt,
+                observedAtNormalized,
                 facility,
                 building,
                 system,
-                nullSafeNormalized(metadata.get("point of use")),
-                nullSafeNormalized(metadata.get("basis")),
-                nullSafeNormalized(metadata.get("sample identity"))
+                nullSafeNormalized(pointOfUse),
+                nullSafeNormalized(basis),
+                nullSafeNormalized(sampleIdentity)
             ));
         }
-        return LocationDashboardGraphMetadataSupport.normalizeKey(title);
+        return null;
     }
 
     private static String metadataLine(String label, String value) {

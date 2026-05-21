@@ -60,9 +60,16 @@ public interface LocationDashboardImportStrategy {
     record AnalyzedSamplePoint(
         LocalDate observedDate,
         String facilityName,
+        String buildingName,
+        String systemName,
         String systemTypeName,
         String measurementName,
+        String pointOfUse,
+        String basis,
+        String sampleIdentity,
         boolean compliant,
+        boolean resolved,
+        Long turnaroundDays,
         SampleOrigin origin
     ) {
         boolean nonConforming() {

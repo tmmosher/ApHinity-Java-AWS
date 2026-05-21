@@ -33,6 +33,10 @@ interface LocationDashboardImportedSample {
 
     String basis();
 
+    default String sampleIdentity() {
+        return null;
+    }
+
     String cellReference();
 
     default String systemTypeName() {
@@ -83,8 +87,18 @@ record LocationDashboardCommentSample(
 
 record LocationDashboardAnalyzedSample(
     LocationDashboardImportedSample sample,
-    boolean compliant
+    boolean compliant,
+    boolean resolved,
+    Long turnaroundDays
 ) {
+    LocationDashboardAnalyzedSample(LocationDashboardImportedSample sample, boolean compliant) {
+        this(sample, compliant, false, null);
+    }
+
+    LocationDashboardAnalyzedSample withResolution(boolean resolved, Long turnaroundDays) {
+        return new LocationDashboardAnalyzedSample(sample, compliant, resolved, turnaroundDays);
+    }
+
     LocationDashboardImportStrategy.ImportedObservation toObservation() {
         return new LocationDashboardImportStrategy.ImportedObservation(
             sample.observedDate(),
@@ -99,9 +113,16 @@ record LocationDashboardAnalyzedSample(
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             sample.observedDate(),
             sample.facilityName(),
+            sample.resolvedBuilding(),
+            sample.resolvedSystem(),
             sample.systemTypeName(),
             sample.measurementName(),
+            sample.pointOfUse(),
+            sample.basis(),
+            sample.sampleIdentity(),
             compliant,
+            resolved,
+            turnaroundDays,
             sample.origin()
         );
     }

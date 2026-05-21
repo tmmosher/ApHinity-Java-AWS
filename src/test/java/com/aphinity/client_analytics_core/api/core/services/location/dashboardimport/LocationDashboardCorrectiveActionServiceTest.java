@@ -47,7 +47,7 @@ class LocationDashboardCorrectiveActionServiceTest {
 
         LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction historical = service.toHistoricalCorrectiveAction(serviceEvent);
 
-        assertEquals("Cooling Towers", historical.systemTypeName());
+        assertEquals("Cooling Towers", historical.systemName());
         assertEquals("HPC", historical.measurementName());
         assertEquals("Newport Beach", historical.facilityName());
     }

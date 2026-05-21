@@ -718,7 +718,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 sublocation,
                 facilityName,
                 resolvedBuilding,
-                systemType,
+                resolvedSystem,
                 systemTypeName,
                 measurementName,
                 parsedComment,
@@ -740,7 +740,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 sublocation,
                 facilityName,
                 resolvedBuilding,
-                systemType,
+                resolvedSystem,
                 systemTypeName,
                 measurementName,
                 parsedComment,
@@ -767,7 +767,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             sample.sublocation(),
             sample.facilityName(),
             sample.resolvedBuilding(),
-            sample.systemTypeName(),
+            sample.resolvedSystem(),
             sample.pointOfUse(),
             sample.basis(),
             null
@@ -810,7 +810,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             sublocation,
             facilityName,
             resolvedBuilding,
-            systemTypeName,
+            resolvedSystem,
             row.pointOfUse(),
             row.basis(),
             null
@@ -1058,7 +1058,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         SublocationConfig sublocation,
         String facilityName,
         String resolvedBuilding,
-        SystemTypeConfig systemType,
+        String resolvedSystem,
         String systemTypeName,
         String measurementName,
         LocationDashboardCommentParser.ParsedComment parsedComment,
@@ -1072,7 +1072,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             sublocation,
             facilityName,
             resolvedBuilding,
-            systemTypeName,
+            resolvedSystem,
             row.pointOfUse(),
             row.basis(),
             sampleIdentity
@@ -1103,7 +1103,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         SublocationConfig sublocation,
         String facilityName,
         String resolvedBuilding,
-        String systemTypeName,
+        String systemName,
         String pointOfUse,
         String basis,
         String sampleIdentity
@@ -1134,10 +1134,10 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                 LocationDashboardCorrectiveActionMetadataSupport.buildingLine(resolvedBuilding)
             );
         }
-        if (systemTypeName != null) {
+        if (systemName != null) {
             addDescriptionLine(
                 descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemTypeName)
+                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemName)
             );
         }
         if (pointOfUse != null) {

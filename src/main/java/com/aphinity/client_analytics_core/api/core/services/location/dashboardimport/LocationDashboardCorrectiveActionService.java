@@ -91,27 +91,33 @@ final class LocationDashboardCorrectiveActionService {
             descriptionFields.get("facility")
         );
         String buildingName = descriptionFields.get("building");
-        String systemTypeName = descriptionFields.get("system");
+        String systemName = descriptionFields.get("system");
         String measurementName = descriptionFields.get("measurement");
+        String pointOfUse = descriptionFields.get("point of use");
+        String basis = descriptionFields.get("basis");
+        String sampleIdentity = descriptionFields.get("sample identity");
 
         LocationDashboardImportStrategy strategy = strategyRegistry == null || serviceEvent.getLocation() == null
             ? null
             : strategyRegistry.resolve(serviceEvent.getLocation().getName()).orElse(null);
         if (strategy instanceof ConfiguredLocationDashboardImportStrategy configuredStrategy) {
             facilityName = configuredStrategy.canonicalFacilityName(facilityName, buildingName);
-            systemTypeName = configuredStrategy.canonicalSystemTypeName(systemTypeName);
         }
 
         if (facilityName == null || facilityName.isBlank()
-            || systemTypeName == null || systemTypeName.isBlank()
+            || systemName == null || systemName.isBlank()
             || measurementName == null || measurementName.isBlank()) {
             return null;
         }
         return new LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction(
             observedDate,
             facilityName,
-            systemTypeName,
+            buildingName,
+            systemName,
             measurementName,
+            pointOfUse,
+            basis,
+            sampleIdentity,
             serviceEvent
         );
     }

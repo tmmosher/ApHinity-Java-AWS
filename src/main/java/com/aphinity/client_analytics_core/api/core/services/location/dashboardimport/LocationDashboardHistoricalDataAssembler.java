@@ -84,7 +84,10 @@ final class LocationDashboardHistoricalDataAssembler {
             .filter(Objects::nonNull)
             .toList();
 
-        return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(samplesByDate, correctiveActions);
+        return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+            samplesByDate,
+            mergeHistoricalNonConformances(analyzedSamples, correctiveActions)
+        );
     }
 
     private void collectPersistedSamplePoints(
@@ -260,6 +263,64 @@ final class LocationDashboardHistoricalDataAssembler {
             + LocationDashboardGraphMetadataSupport.nullSafeNormalized(measurementName)
             + "|"
             + LocationDashboardGraphMetadataSupport.nullSafeNormalized(systemTypeName);
+    }
+
+    private List<LocationDashboardDerivedGraphSupport.HistoricalNonConformance> mergeHistoricalNonConformances(
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples,
+        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> correctiveActions
+    ) {
+        Map<String, LocationDashboardDerivedGraphSupport.HistoricalNonConformance> nonConformancesByIdentity =
+            new LinkedHashMap<>();
+
+        for (LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction correctiveAction : correctiveActions) {
+            if (correctiveAction == null) {
+                continue;
+            }
+            String identity = correctiveAction.identityKey();
+            if (identity == null) {
+                continue;
+            }
+            nonConformancesByIdentity.put(identity, correctiveAction.toHistoricalNonConformance());
+        }
+
+        for (LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample : analyzedSamples) {
+            if (analyzedSample == null || !analyzedSample.nonConforming()) {
+                continue;
+            }
+            String identity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+                analyzedSample.measurementName(),
+                analyzedSample.observedDate(),
+                analyzedSample.facilityName(),
+                analyzedSample.buildingName(),
+                analyzedSample.systemName(),
+                analyzedSample.pointOfUse(),
+                analyzedSample.basis(),
+                analyzedSample.sampleIdentity()
+            );
+            if (identity == null) {
+                continue;
+            }
+            LocationDashboardDerivedGraphSupport.HistoricalNonConformance analyzedNonConformance =
+                new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                    analyzedSample.observedDate(),
+                    analyzedSample.facilityName(),
+                    analyzedSample.buildingName(),
+                    analyzedSample.systemName(),
+                    analyzedSample.measurementName(),
+                    analyzedSample.pointOfUse(),
+                    analyzedSample.basis(),
+                    analyzedSample.sampleIdentity(),
+                    analyzedSample.resolved(),
+                    analyzedSample.turnaroundDays()
+                );
+            nonConformancesByIdentity.merge(
+                identity,
+                analyzedNonConformance,
+                LocationDashboardDerivedGraphSupport.HistoricalNonConformance::merge
+            );
+        }
+
+        return List.copyOf(nonConformancesByIdentity.values());
     }
 
     private static final class ImportedSampleAggregate {

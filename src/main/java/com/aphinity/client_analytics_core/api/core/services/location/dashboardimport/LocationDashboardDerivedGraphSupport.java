@@ -51,15 +51,15 @@ final class LocationDashboardDerivedGraphSupport {
         List<HistoricalSamplePoint> systemTypeSamplePoints = historicalData.allSamplePoints().stream()
             .filter(samplePoint -> samplePoint.systemTypeName() != null)
             .toList();
-        List<HistoricalCorrectiveAction> correctiveActions = historicalData.correctiveActions();
+        List<HistoricalNonConformance> nonConformances = historicalData.nonConformances();
 
         long totalSamples = waterQualitySamplePoints.stream().mapToLong(HistoricalSamplePoint::sampleCount).sum();
         long compliantSamples = waterQualitySamplePoints.stream().mapToLong(HistoricalSamplePoint::compliantCount).sum();
         long totalSampleNonConformances = waterQualitySamplePoints.stream()
             .mapToLong(HistoricalSamplePoint::nonConformingCount)
             .sum();
-        long totalIncidentNonConformances = correctiveActions.size();
-        long resolvedNonConformances = correctiveActions.stream().filter(HistoricalCorrectiveAction::resolved).count();
+        long totalIncidentNonConformances = nonConformances.size();
+        long resolvedNonConformances = nonConformances.stream().filter(HistoricalNonConformance::resolved).count();
         long activeNonConformances = totalIncidentNonConformances - resolvedNonConformances;
 
         return switch (derivedGraphType) {
@@ -122,11 +122,11 @@ final class LocationDashboardDerivedGraphSupport {
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
-            case NON_CONFORMANCE_STATUS_BY_FACILITY -> buildStatusByFacilityPayload(graph, correctiveActions);
+            case NON_CONFORMANCE_STATUS_BY_FACILITY -> buildStatusByFacilityPayload(graph, nonConformances);
             case NON_CONFORMANCE_TURNAROUND_TIME -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Resolved",
-                countLabelsByTurnaround(correctiveActions),
+                countLabelsByTurnaround(nonConformances),
                 RESOLVED_GRAPH_COLOR,
                 0
             ));
@@ -173,15 +173,13 @@ final class LocationDashboardDerivedGraphSupport {
 
     private static List<Map<String, Object>> buildStatusByFacilityPayload(
         Graph graph,
-        List<HistoricalCorrectiveAction> correctiveActions
+        List<HistoricalNonConformance> nonConformances
     ) {
         Map<String, long[]> countsByFacility = new LinkedHashMap<>();
-        for (HistoricalCorrectiveAction correctiveAction : correctiveActions) {
-            // Historical corrective actions can predate structured import metadata. Keep
-            // those incidents visible instead of silently dropping them from grouped totals.
-            String facilityName = labelOrFallback(correctiveAction.facilityName(), UNKNOWN_FACILITY_LABEL);
+        for (HistoricalNonConformance nonConformance : nonConformances) {
+            String facilityName = labelOrFallback(nonConformance.facilityName(), UNKNOWN_FACILITY_LABEL);
             long[] counts = countsByFacility.computeIfAbsent(facilityName, ignored -> new long[2]);
-            if (correctiveAction.resolved()) {
+            if (nonConformance.resolved()) {
                 counts[1] += 1;
             } else {
                 counts[0] += 1;
@@ -202,31 +200,6 @@ final class LocationDashboardDerivedGraphSupport {
             buildHorizontalBarTrace(graph, "Active", facilityLabels, activeCounts, ACTIVE_GRAPH_COLOR, 0),
             buildHorizontalBarTrace(graph, "Resolved", facilityLabels, resolvedCounts, RESOLVED_GRAPH_COLOR, 1)
         );
-    }
-
-    private static Map<String, Long> countLabels(
-        List<HistoricalCorrectiveAction> correctiveActions,
-        Function<HistoricalCorrectiveAction, String> labelExtractor,
-        String fallbackLabel
-    ) {
-        return correctiveActions.stream()
-            .map(labelExtractor)
-            .map(label -> labelOrFallback(label, fallbackLabel))
-            .collect(Collectors.groupingBy(
-                Function.identity(),
-                LinkedHashMap::new,
-                Collectors.counting()
-            ))
-            .entrySet().stream()
-            .sorted(Comparator
-                .<Map.Entry<String, Long>>comparingLong(entry -> -entry.getValue())
-                .thenComparing(Map.Entry::getKey))
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                Map.Entry::getValue,
-                (left, right) -> left,
-                LinkedHashMap::new
-            ));
     }
 
     private static Map<String, Long> countSampleLabels(
@@ -255,11 +228,11 @@ final class LocationDashboardDerivedGraphSupport {
             ));
     }
 
-    private static Map<String, Long> countLabelsByTurnaround(List<HistoricalCorrectiveAction> correctiveActions) {
+    private static Map<String, Long> countLabelsByTurnaround(List<HistoricalNonConformance> nonConformances) {
         Map<String, Long> countsByTurnaround = new LinkedHashMap<>();
         TURNAROUND_BUCKETS.forEach(label -> countsByTurnaround.put(label, 0L));
-        correctiveActions.stream()
-            .filter(HistoricalCorrectiveAction::resolved)
+        nonConformances.stream()
+            .filter(HistoricalNonConformance::resolved)
             .map(LocationDashboardDerivedGraphSupport::turnaroundLabel)
             .filter(Objects::nonNull)
             .forEach(label -> countsByTurnaround.merge(label, 1L, Long::sum));
@@ -274,18 +247,11 @@ final class LocationDashboardDerivedGraphSupport {
             ));
     }
 
-    private static String turnaroundLabel(HistoricalCorrectiveAction correctiveAction) {
-        LocalDate observedDate = correctiveAction.observedDate();
-        ServiceEvent serviceEvent = correctiveAction.serviceEvent();
-        if (observedDate == null || serviceEvent == null || serviceEvent.getEndEventDate() == null) {
+    private static String turnaroundLabel(HistoricalNonConformance nonConformance) {
+        if (nonConformance == null || !nonConformance.resolved() || nonConformance.turnaroundDays() == null) {
             return null;
         }
-        LocalDateTime observedAt = LocalDateTime.of(observedDate, LocalTime.MIDNIGHT);
-        LocalDateTime resolvedAt = LocalDateTime.of(
-            serviceEvent.getEndEventDate(),
-            serviceEvent.getEndEventTime() == null ? LocalTime.MIDNIGHT : serviceEvent.getEndEventTime()
-        );
-        long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(observedAt, resolvedAt));
+        long turnaroundDays = Math.max(0L, nonConformance.turnaroundDays());
         if (turnaroundDays < 3L) {
             return "< 3 days";
         }
@@ -575,18 +541,103 @@ final class LocationDashboardDerivedGraphSupport {
     record HistoricalCorrectiveAction(
         LocalDate observedDate,
         String facilityName,
-        String systemTypeName,
+        String buildingName,
+        String systemName,
         String measurementName,
+        String pointOfUse,
+        String basis,
+        String sampleIdentity,
         ServiceEvent serviceEvent
     ) {
         boolean resolved() {
             return serviceEvent != null && serviceEvent.getStatus() == ServiceEventStatus.COMPLETED;
         }
+
+        Long turnaroundDays() {
+            if (!resolved() || observedDate == null || serviceEvent == null || serviceEvent.getEndEventDate() == null) {
+                return null;
+            }
+            LocalDateTime observedAt = LocalDateTime.of(observedDate, LocalTime.MIDNIGHT);
+            LocalDateTime resolvedAt = LocalDateTime.of(
+                serviceEvent.getEndEventDate(),
+                serviceEvent.getEndEventTime() == null ? LocalTime.MIDNIGHT : serviceEvent.getEndEventTime()
+            );
+            return Math.max(0L, ChronoUnit.DAYS.between(observedAt, resolvedAt));
+        }
+
+        String identityKey() {
+            return LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+                measurementName,
+                observedDate,
+                facilityName,
+                buildingName,
+                systemName,
+                pointOfUse,
+                basis,
+                sampleIdentity
+            );
+        }
+
+        HistoricalNonConformance toHistoricalNonConformance() {
+            return new HistoricalNonConformance(
+                observedDate,
+                facilityName,
+                buildingName,
+                systemName,
+                measurementName,
+                pointOfUse,
+                basis,
+                sampleIdentity,
+                resolved(),
+                turnaroundDays()
+            );
+        }
+    }
+
+    record HistoricalNonConformance(
+        LocalDate observedDate,
+        String facilityName,
+        String buildingName,
+        String systemName,
+        String measurementName,
+        String pointOfUse,
+        String basis,
+        String sampleIdentity,
+        boolean resolved,
+        Long turnaroundDays
+    ) {
+        static HistoricalNonConformance merge(
+            HistoricalNonConformance persisted,
+            HistoricalNonConformance analyzed
+        ) {
+            if (persisted == null) {
+                return analyzed;
+            }
+            if (analyzed == null) {
+                return persisted;
+            }
+            boolean resolved = persisted.resolved || analyzed.resolved;
+            Long turnaroundDays = analyzed.turnaroundDays != null
+                ? analyzed.turnaroundDays
+                : persisted.turnaroundDays;
+            return new HistoricalNonConformance(
+                analyzed.observedDate != null ? analyzed.observedDate : persisted.observedDate,
+                analyzed.facilityName != null ? analyzed.facilityName : persisted.facilityName,
+                analyzed.buildingName != null ? analyzed.buildingName : persisted.buildingName,
+                analyzed.systemName != null ? analyzed.systemName : persisted.systemName,
+                analyzed.measurementName != null ? analyzed.measurementName : persisted.measurementName,
+                analyzed.pointOfUse != null ? analyzed.pointOfUse : persisted.pointOfUse,
+                analyzed.basis != null ? analyzed.basis : persisted.basis,
+                analyzed.sampleIdentity != null ? analyzed.sampleIdentity : persisted.sampleIdentity,
+                resolved,
+                turnaroundDays
+            );
+        }
     }
 
     record HistoricalDerivedData(
         Map<LocalDate, List<HistoricalSamplePoint>> samplesByDate,
-        List<HistoricalCorrectiveAction> correctiveActions
+        List<HistoricalNonConformance> nonConformances
     ) {
         HistoricalDerivedData {
             Map<LocalDate, List<HistoricalSamplePoint>> normalizedSamplesByDate = new LinkedHashMap<>();
@@ -599,7 +650,7 @@ final class LocationDashboardDerivedGraphSupport {
                     ));
             }
             samplesByDate = Map.copyOf(normalizedSamplesByDate);
-            correctiveActions = correctiveActions == null ? List.of() : List.copyOf(correctiveActions);
+            nonConformances = nonConformances == null ? List.of() : List.copyOf(nonConformances);
         }
 
         List<HistoricalSamplePoint> allSamplePoints() {

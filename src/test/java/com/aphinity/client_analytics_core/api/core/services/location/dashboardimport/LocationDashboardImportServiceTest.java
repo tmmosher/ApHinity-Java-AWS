@@ -711,6 +711,90 @@ class LocationDashboardImportServiceTest {
     }
 
     @Test
+    void importLocationDashboardMarksImportedNonConformanceResolvedFromFutureCompliantSampleInSameBucket() {
+        LocationDashboardImportService importService = buildImportService();
+        MockMultipartFile file = dashboardFile();
+        Location location = location(9L, "Newport Beach");
+
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(List.of(
+            derivedGraphDefinition("resolution-percent", "Percent Resolved", null, LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED, "indicator"),
+            derivedGraphDefinition("non-conformance-status-by-turnaround-time", "Non-Conformance Status", "Turnaround Time", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME, "bar"),
+            derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")
+        ));
+        when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
+
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-08-02"),
+                "11 CFU.mL",
+                new BigDecimal("11"),
+                "CFU.mL"
+            ),
+            List.of(sample(
+                LocalDate.parse("2025-08-03"),
+                LocalDate.parse("2025-08-04"),
+                "5 CFU.mL",
+                new BigDecimal("5"),
+                "CFU.mL"
+            )),
+            List.of(),
+            List.of()
+        ));
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            singleSampleWorkbook("Newport Beach", workbookComment, "F5", new BigDecimal("11"));
+        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
+
+        Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
+        Graph systemTypeGraph = scatterGraph(19L, "System Type Conformance", "Newport Beach");
+        Graph resolutionPercentGraph = indicatorGraph(20L, "Percent Resolved");
+        Graph turnaroundTimeGraph = barGraph(21L, "Non-Conformance Status", "Turnaround Time");
+        Graph statusByFacilityGraph = verticalStatusByFacilityGraph(
+            22L,
+            "Non-Conformance Status",
+            "By Facility",
+            "#b91c1c",
+            "#15803d"
+        );
+        when(locationGraphRepository.findByLocationIdWithGraph(9L)).thenReturn(List.of(
+            locationGraph(9L, waterQualityGraph),
+            locationGraph(9L, systemTypeGraph),
+            locationGraph(9L, resolutionPercentGraph),
+            locationGraph(9L, turnaroundTimeGraph),
+            locationGraph(9L, statusByFacilityGraph)
+        ));
+
+        LocationDashboardImportStrategy.CorrectiveActionDraft importedDraft = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        ).correctiveActions().getFirst();
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(correctiveActionEvent(
+                location,
+                501L,
+                importedDraft.title(),
+                importedDraft.description(),
+                LocalDate.parse("2025-08-01"),
+                LocalDate.parse("2025-08-01"),
+                LocalTime.of(23, 59, 59),
+                ServiceEventStatus.OVERDUE
+            )));
+
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+
+        assertEquals(100L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
+        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
+        assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+
+        Map<String, Object> activeByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst();
+        Map<String, Object> resolvedByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1);
+        assertEquals(List.of(0L), activeByFacility.get("y"));
+        assertEquals(List.of(1L), resolvedByFacility.get("y"));
+    }
+
+    @Test
     void importLocationDashboardDropsMetadataLessCorrectiveActionsFromFacilityBreakdowns() {
         LocationDashboardImportService importService = buildImportService();
         MockMultipartFile file = dashboardFile();
@@ -968,6 +1052,37 @@ class LocationDashboardImportServiceTest {
                             new BigDecimal("2"),
                             null,
                             "I6"
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook singleSampleWorkbook(
+        String locationTitle,
+        String commentText,
+        String cellReference,
+        BigDecimal hpcValue
+    ) {
+        return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+            locationTitle,
+            List.of(
+                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    5,
+                    "Newport Beach",
+                    "Hospital",
+                    "Cooling Towers",
+                    "Recirc Line",
+                    "CTI/514P",
+                    List.of(
+                        new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "HPC",
+                            LocalDate.parse("2025-08-01"),
+                            hpcValue.toPlainString(),
+                            hpcValue,
+                            commentText,
+                            cellReference
                         )
                     )
                 )

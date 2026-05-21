@@ -35,16 +35,16 @@ final class HistoricalDerivedDataTimeRangeProjector {
                     LinkedHashMap::new
                 ));
 
-        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> filteredCorrectiveActions =
-            historicalData.correctiveActions().stream()
-                .filter(correctiveAction -> correctiveAction != null
-                    && correctiveAction.observedDate() != null
-                    && !correctiveAction.observedDate().isBefore(windowStart))
+        List<LocationDashboardDerivedGraphSupport.HistoricalNonConformance> filteredNonConformances =
+            historicalData.nonConformances().stream()
+                .filter(nonConformance -> nonConformance != null
+                    && nonConformance.observedDate() != null
+                    && !nonConformance.observedDate().isBefore(windowStart))
                 .toList();
 
         return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
             filteredSamplesByDate,
-            filteredCorrectiveActions
+            filteredNonConformances
         );
     }
 }
