@@ -85,10 +85,7 @@ final class LocationDashboardImportContextResolver {
                     || matchesAny(row.facility(), rowContext.sublocation().facilityAliases()))) {
                 activeFacility = rowContext.resolvedFacility();
             }
-            if (row != null
-                && row.building() != null
-                && (Objects.equals(normalizeKey(row.building()), normalizeKey(rowContext.sublocation().displayName()))
-                    || matchesAny(row.building(), rowContext.sublocation().buildingAliases()))) {
+            if (row != null && row.building() != null) {
                 activeBuilding = row.building();
             }
             activeSublocation = rowContext.sublocation();

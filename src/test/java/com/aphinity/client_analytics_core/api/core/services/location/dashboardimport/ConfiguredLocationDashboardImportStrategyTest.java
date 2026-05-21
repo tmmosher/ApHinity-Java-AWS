@@ -178,10 +178,28 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertEquals(4, result.observations().size());
         assertEquals(2, result.correctiveActions().size());
-        assertFalse(result.observations().stream().anyMatch(observation ->
+        assertTrue(result.observations().stream().anyMatch(observation ->
             LocalDate.parse("2025-08-15").equals(observation.observedDate())
                 && "HPC".equals(observation.measurementName())
         ));
+        assertEquals(
+            0L,
+            result.analyzedSamples().stream()
+                .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY)
+                .count()
+        );
+        assertEquals(
+            1L,
+            result.analyzedSamples().stream()
+                .filter(sample ->
+                    sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                        && LocalDate.parse("2025-08-15").equals(sample.observedDate())
+                        && "HPC".equals(sample.measurementName())
+                )
+                .count()
+        );
+        Map<String, Object> waterQualityHpcTrace = result.graphs().getFirst().data().getFirst();
+        assertEquals(List.of("2025-08-01", "2025-08-15"), waterQualityHpcTrace.get("x"));
         assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             draft.description().contains("Primary Sample: sampled on 2025-08-15")
         ));
@@ -415,9 +433,35 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         assertEquals(4, result.observations().size());
         assertEquals(3, result.correctiveActions().size());
-        assertFalse(result.observations().stream().anyMatch(observation ->
+        assertTrue(result.observations().stream().anyMatch(observation ->
             LocalDate.parse("2025-08-15").equals(observation.observedDate())
                 && "HPC".equals(observation.measurementName())
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                && LocalDate.parse("2025-08-15").equals(sample.observedDate())
+                && "HPC".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
+        assertEquals(
+            0L,
+            result.analyzedSamples().stream()
+                .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY)
+                .count()
+        );
+        assertEquals(
+            2L,
+            result.correctiveActions().stream()
+                .filter(draft -> "HPC".equals(draft.measurementName()))
+                .count()
+        );
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-15").equals(draft.observedDate())
+                && "HPC".equals(draft.measurementName())
+        ));
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            LocalDate.parse("2025-08-01").equals(draft.observedDate())
+                && "HPC".equals(draft.measurementName())
         ));
         assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             draft.description().contains("Primary Sample: sampled on 2025-08-15")
@@ -771,6 +815,203 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals(1, result.analyzedSamples().size());
         assertTrue(result.observations().getFirst().compliant());
         assertEquals("Legionella", result.observations().getFirst().measurementName());
+    }
+
+    @Test
+    void computeImportDeduplicatesCommentFollowUpWhenNextWorksheetMonthRepeatsTheSameSample() {
+        ConfiguredLocationDashboardImportStrategy strategy = legionellaStrategy();
+
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
+            "Rm. 6127 POD DHW",
+            sample(
+                LocalDate.parse("2025-04-14"),
+                LocalDate.parse("2025-04-22"),
+                "1.6 CFU.mL",
+                new BigDecimal("1.6"),
+                "CFU.mL"
+            ),
+            List.of(
+                sample(
+                    LocalDate.parse("2025-04-23"),
+                    LocalDate.parse("2025-05-01"),
+                    "13 CFU.mL",
+                    new BigDecimal("13"),
+                    "CFU.mL"
+                ),
+                sample(
+                    LocalDate.parse("2025-05-06"),
+                    LocalDate.parse("2025-05-16"),
+                    "ND",
+                    BigDecimal.ZERO,
+                    null
+                )
+            ),
+            List.of(),
+            List.of()
+        ));
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            legionellaWorkbookWithFutureWorksheetValue(
+                workbookComment,
+                new BigDecimal("1.6"),
+                "1.6",
+                LocalDate.parse("2025-04-01"),
+                "F5",
+                new BigDecimal("13"),
+                "13",
+                LocalDate.parse("2025-05-01"),
+                "G5"
+            ),
+            List.of(measurementBound(1L, "Legionella", null, null, null, null, null, null, null, BigDecimal.ZERO))
+        );
+
+        assertEquals(3, result.observations().size());
+        assertEquals(3, result.analyzedSamples().size());
+        assertEquals(1, result.correctiveActions().size());
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                && LocalDate.parse("2025-04-14").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_SUPPLEMENTAL
+                && LocalDate.parse("2025-04-23").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_SUPPLEMENTAL
+                && LocalDate.parse("2025-05-06").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.compliant()
+        ));
+        assertFalse(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                && LocalDate.parse("2025-05-01").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+        ));
+    }
+
+    @Test
+    void computeImportKeepsCommentFollowUpWhenLaterWorksheetMonthFallsOutsideDuplicateMargin() {
+        ConfiguredLocationDashboardImportStrategy strategy = legionellaStrategy();
+
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
+            "Rm. 6127 POD DHW",
+            sample(
+                LocalDate.parse("2025-04-14"),
+                LocalDate.parse("2025-04-22"),
+                "1.6 CFU.mL",
+                new BigDecimal("1.6"),
+                "CFU.mL"
+            ),
+            List.of(
+                sample(
+                    LocalDate.parse("2025-04-23"),
+                    LocalDate.parse("2025-05-01"),
+                    "13 CFU.mL",
+                    new BigDecimal("13"),
+                    "CFU.mL"
+                ),
+                sample(
+                    LocalDate.parse("2025-05-06"),
+                    LocalDate.parse("2025-05-16"),
+                    "ND",
+                    BigDecimal.ZERO,
+                    null
+                )
+            ),
+            List.of(),
+            List.of()
+        ));
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            legionellaWorkbookWithFutureWorksheetValue(
+                workbookComment,
+                new BigDecimal("1.6"),
+                "1.6",
+                LocalDate.parse("2025-04-01"),
+                "F5",
+                new BigDecimal("13"),
+                "13",
+                LocalDate.parse("2025-06-01"),
+                "G5"
+            ),
+            List.of(measurementBound(1L, "Legionella", null, null, null, null, null, null, null, BigDecimal.ZERO))
+        );
+
+        assertEquals(4, result.observations().size());
+        assertEquals(4, result.analyzedSamples().size());
+        assertEquals(2, result.correctiveActions().size());
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_SUPPLEMENTAL
+                && LocalDate.parse("2025-04-23").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                && LocalDate.parse("2025-06-01").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
+    }
+
+    @Test
+    void computeImportDoesNotDeduplicateFollowUpFromSampledDateAloneWhenResultReceivedDateFallsOutsideMargin() {
+        ConfiguredLocationDashboardImportStrategy strategy = legionellaStrategy();
+
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
+            "Rm. 6127 POD DHW",
+            sample(
+                LocalDate.parse("2025-04-14"),
+                LocalDate.parse("2025-04-22"),
+                "1.6 CFU.mL",
+                new BigDecimal("1.6"),
+                "CFU.mL"
+            ),
+            List.of(sample(
+                LocalDate.parse("2025-04-23"),
+                LocalDate.parse("2025-05-20"),
+                "13 CFU.mL",
+                new BigDecimal("13"),
+                "CFU.mL"
+            )),
+            List.of(),
+            List.of()
+        ));
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            legionellaWorkbookWithFutureWorksheetValue(
+                workbookComment,
+                new BigDecimal("1.6"),
+                "1.6",
+                LocalDate.parse("2025-04-01"),
+                "F5",
+                new BigDecimal("13"),
+                "13",
+                LocalDate.parse("2025-05-01"),
+                "G5"
+            ),
+            List.of(measurementBound(1L, "Legionella", null, null, null, null, null, null, null, BigDecimal.ZERO))
+        );
+
+        assertEquals(3, result.observations().size());
+        assertEquals(3, result.analyzedSamples().size());
+        assertEquals(2, result.correctiveActions().size());
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_SUPPLEMENTAL
+                && LocalDate.parse("2025-04-23").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
+        assertTrue(result.analyzedSamples().stream().anyMatch(sample ->
+            sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+                && LocalDate.parse("2025-05-01").equals(sample.observedDate())
+                && "Legionella".equals(sample.measurementName())
+                && sample.nonConforming()
+        ));
     }
 
     @Test
@@ -1330,6 +1571,63 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportCarriesForwardBuildingAcrossContinuationRowsForResolutionAnalysis() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        5,
+                        "Newport Beach",
+                        "Hospital",
+                        "Cooling Towers",
+                        "Recirc Line",
+                        "CTI/514P",
+                        List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "HPC",
+                            LocalDate.parse("2025-08-01"),
+                            "15",
+                            new BigDecimal("15"),
+                            null,
+                            "F5"
+                        ))
+                    ),
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        6,
+                        null,
+                        null,
+                        "Cooling Towers",
+                        "Recirc Line",
+                        "CTI/514P",
+                        List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "HPC",
+                            LocalDate.parse("2025-08-05"),
+                            "5",
+                            new BigDecimal("5"),
+                            null,
+                            "G5"
+                        ))
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> nonConformingSamples = result.analyzedSamples().stream()
+            .filter(LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming)
+            .toList();
+
+        assertEquals(1, nonConformingSamples.size());
+        assertTrue(nonConformingSamples.getFirst().resolved());
+        assertEquals(4L, nonConformingSamples.getFirst().turnaroundDays());
+    }
+
+    @Test
     void constructorRejectsMissingSystemRangeProfile() {
         IllegalStateException error = assertThrows(
             IllegalStateException.class,
@@ -1711,6 +2009,50 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             numericValue,
                             commentText,
                             cellReference
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook legionellaWorkbookWithFutureWorksheetValue(
+        String commentText,
+        BigDecimal primaryNumericValue,
+        String primaryRawValue,
+        LocalDate primaryObservedDate,
+        String primaryCellReference,
+        BigDecimal futureNumericValue,
+        String futureRawValue,
+        LocalDate futureObservedDate,
+        String futureCellReference
+    ) {
+        return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+            "Newport Beach",
+            List.of(
+                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    5,
+                    "Newport Beach",
+                    "Hospital",
+                    "Cooling Towers",
+                    "Rm. 6127 POD DHW",
+                    "Fixture sample",
+                    List.of(
+                        new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "Legionella",
+                            primaryObservedDate,
+                            primaryRawValue,
+                            primaryNumericValue,
+                            commentText,
+                            primaryCellReference
+                        ),
+                        new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "Legionella",
+                            futureObservedDate,
+                            futureRawValue,
+                            futureNumericValue,
+                            null,
+                            futureCellReference
                         )
                     )
                 )

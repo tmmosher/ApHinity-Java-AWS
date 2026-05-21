@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Measuremen
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Objects;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SublocationConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeConfig;
@@ -12,6 +13,33 @@ interface LocationDashboardImportedSample {
     LocationDashboardImportStrategy.SampleOrigin origin();
 
     LocalDate observedDate();
+
+    default LocalDate resolutionAnchorDate() {
+        return observedDate();
+    }
+
+    default String resolutionBuildingName() {
+        String resolvedBuilding = resolvedBuilding();
+        SublocationConfig sublocation = sublocation();
+        if (resolvedBuilding == null || sublocation == null || sublocation.displayName() == null) {
+            return resolvedBuilding;
+        }
+        String normalizedBuilding = normalizeKey(resolvedBuilding);
+        String normalizedDisplayName = normalizeKey(sublocation.displayName());
+        if (Objects.equals(normalizedBuilding, normalizedDisplayName)
+            || matchesAlias(normalizedBuilding, sublocation.buildingAliases())) {
+            return sublocation.displayName();
+        }
+        return resolvedBuilding;
+    }
+
+    default String resolutionSystemName() {
+        SystemTypeConfig systemType = systemType();
+        if (systemType != null && systemType.displayName() != null && !systemType.displayName().isBlank()) {
+            return systemType.displayName();
+        }
+        return resolvedSystem();
+    }
 
     BigDecimal numericValue();
 
@@ -41,6 +69,22 @@ interface LocationDashboardImportedSample {
 
     default String systemTypeName() {
         return systemType() == null ? null : systemType().displayName();
+    }
+
+    private static boolean matchesAlias(String normalizedCandidate, java.util.List<String> aliases) {
+        if (normalizedCandidate == null || aliases == null || aliases.isEmpty()) {
+            return false;
+        }
+        for (String alias : aliases) {
+            if (Objects.equals(normalizedCandidate, normalizeKey(alias))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeKey(String value) {
+        return LocationDashboardGraphMetadataSupport.normalizeKey(value);
     }
 }
 
@@ -83,6 +127,13 @@ record LocationDashboardCommentSample(
     String sampleLabel,
     String sampleIdentity
 ) implements LocationDashboardImportedSample {
+    @Override
+    public LocalDate resolutionAnchorDate() {
+        if (parsedSample != null && parsedSample.resultReceivedOn() != null) {
+            return parsedSample.resultReceivedOn();
+        }
+        return observedDate;
+    }
 }
 
 record LocationDashboardAnalyzedSample(

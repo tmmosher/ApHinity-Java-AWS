@@ -786,7 +786,7 @@ class LocationDashboardImportServiceTest {
 
         assertEquals(100L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
-        assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+        assertEquals(List.of("< 1 week"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
 
         Map<String, Object> activeByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst();
         Map<String, Object> resolvedByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1);

@@ -6,12 +6,18 @@ import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 final class LocationDashboardSampleImportPipeline {
+    private static final long FOLLOW_UP_DUPLICATE_DATE_MARGIN_DAYS = 14L;
+
     private final LocationDashboardImportContextResolver contextResolver;
     private final LocationDashboardCommentParser commentParser;
     private final boolean enableCommentDerivedCorrectiveActions;
@@ -31,7 +37,51 @@ final class LocationDashboardSampleImportPipeline {
         Map<String, MeasurementBound> measurementBoundsByName
     ) {
         LocationDashboardSampleBuckets sampleBuckets = new LocationDashboardSampleBuckets();
+        List<PreparedCellImport> preparedCells = prepareCellImports(workbook, measurementBoundsByName);
+        Set<String> deduplicatedWorksheetCells = detectFollowUpWorksheetDuplicates(preparedCells);
+
+        for (PreparedCellImport preparedCell : preparedCells) {
+            if (!deduplicatedWorksheetCells.contains(preparedCell.worksheetCellIdentity())) {
+                LocationDashboardWorksheetSample worksheetSample = buildWorksheetSample(
+                    preparedCell.cell(),
+                    preparedCell.row(),
+                    preparedCell.rowContext(),
+                    preparedCell.measurementBound(),
+                    preparedCell.parsedComment()
+                );
+                if (worksheetSample != null) {
+                    sampleBuckets.add(worksheetSample);
+                }
+            }
+
+            if (preparedCell.parsedComment() == null) {
+                continue;
+            }
+
+            if (enableCommentDerivedCorrectiveActions) {
+                validatePrimaryCommentSample(preparedCell.parsedComment(), preparedCell.cell(), preparedCell.row());
+            }
+            for (LocationDashboardImportedSample sample : extractCommentSamples(
+                preparedCell.parsedComment(),
+                preparedCell.cell(),
+                preparedCell.row(),
+                preparedCell.rowContext(),
+                preparedCell.measurementBound()
+            )) {
+                sampleBuckets.add(sample);
+            }
+        }
+
+        return new SampleImportResult(sampleBuckets);
+    }
+
+    private List<PreparedCellImport> prepareCellImports(
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
+        Map<String, MeasurementBound> measurementBoundsByName
+    ) {
+        List<PreparedCellImport> preparedCells = new ArrayList<>();
         LocationDashboardImportContextResolver.ActiveImportContext activeContext = contextResolver.emptyContext();
+        int sequenceIndex = 0;
 
         for (LocationDashboardSpreadsheetParser.ParsedDashboardRow row : workbook.rows()) {
             LocationDashboardImportContextResolver.RowImportContext rowContext =
@@ -39,42 +89,107 @@ final class LocationDashboardSampleImportPipeline {
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
                 MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
-                LocationDashboardWorksheetSample worksheetSample =
-                    buildWorksheetSample(cell, row, rowContext, measurementBound);
-                if (worksheetSample != null) {
-                    sampleBuckets.add(worksheetSample);
+                LocationDashboardCommentParser.ParsedComment parsedComment = null;
+                if (hasUsableCommentPayload(cell.commentText()) && rowContext.systemType() != null) {
+                    parsedComment = parseComment(cell, row);
                 }
-
-                if (!hasUsableCommentPayload(cell.commentText()) || rowContext.systemType() == null) {
-                    continue;
-                }
-
-                LocationDashboardCommentParser.ParsedComment parsedComment = parseComment(cell, row);
-                if (enableCommentDerivedCorrectiveActions) {
-                    validatePrimaryCommentSample(parsedComment, cell, row);
-                }
-                for (LocationDashboardImportedSample sample : extractCommentSamples(
-                    parsedComment,
-                    cell,
+                preparedCells.add(new PreparedCellImport(
                     row,
+                    cell,
                     rowContext,
-                    measurementBound
-                )) {
-                    sampleBuckets.add(sample);
-                }
+                    measurementBound,
+                    parsedComment,
+                    worksheetCellIdentity(row, cell),
+                    sequenceIndex
+                ));
+                sequenceIndex += 1;
             }
 
             activeContext = contextResolver.advance(row, rowContext, activeContext);
         }
 
-        return new SampleImportResult(sampleBuckets);
+        return List.copyOf(preparedCells);
+    }
+
+    private Set<String> detectFollowUpWorksheetDuplicates(List<PreparedCellImport> preparedCells) {
+        Set<String> deduplicatedWorksheetCells = new HashSet<>();
+        Set<String> consumedWorksheetCells = new HashSet<>();
+
+        for (PreparedCellImport sourceCell : preparedCells) {
+            LocationDashboardCommentParser.ParsedComment parsedComment = sourceCell.parsedComment();
+            if (parsedComment == null || parsedComment.followUpSamples().isEmpty()) {
+                continue;
+            }
+
+            String measurementName = resolveMeasurementName(sourceCell.cell().metricName(), sourceCell.measurementBound());
+            String streamIdentity = worksheetStreamIdentity(sourceCell.row(), sourceCell.rowContext(), measurementName);
+            if (streamIdentity == null) {
+                continue;
+            }
+
+            for (LocationDashboardCommentParser.ParsedCommentSample followUpSample : parsedComment.followUpSamples()) {
+                if (followUpSample == null
+                    || followUpSample.sampledOn() == null
+                    || followUpSample.resultValue() == null) {
+                    continue;
+                }
+
+                PreparedCellImport duplicateWorksheet = findFutureWorksheetDuplicate(
+                    sourceCell,
+                    followUpSample,
+                    streamIdentity,
+                    preparedCells,
+                    consumedWorksheetCells
+                );
+                if (duplicateWorksheet != null) {
+                    String worksheetIdentity = duplicateWorksheet.worksheetCellIdentity();
+                    deduplicatedWorksheetCells.add(worksheetIdentity);
+                    consumedWorksheetCells.add(worksheetIdentity);
+                }
+            }
+        }
+
+        return Set.copyOf(deduplicatedWorksheetCells);
+    }
+
+    private PreparedCellImport findFutureWorksheetDuplicate(
+        PreparedCellImport sourceCell,
+        LocationDashboardCommentParser.ParsedCommentSample followUpSample,
+        String sourceStreamIdentity,
+        List<PreparedCellImport> preparedCells,
+        Set<String> consumedWorksheetCells
+    ) {
+        for (PreparedCellImport candidate : preparedCells) {
+            if (candidate.sequenceIndex() <= sourceCell.sequenceIndex()) {
+                continue;
+            }
+            if (consumedWorksheetCells.contains(candidate.worksheetCellIdentity())) {
+                continue;
+            }
+            if (!Objects.equals(
+                sourceStreamIdentity,
+                worksheetStreamIdentity(
+                    candidate.row(),
+                    candidate.rowContext(),
+                    resolveMeasurementName(candidate.cell().metricName(), candidate.measurementBound())
+                )
+            )) {
+                continue;
+            }
+            if (!matchesWorksheetFollowUpSample(candidate, followUpSample)) {
+                continue;
+            }
+            return candidate;
+        }
+        return null;
     }
 
     private LocationDashboardWorksheetSample buildWorksheetSample(
         LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
         LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
         LocationDashboardImportContextResolver.RowImportContext rowContext,
-        MeasurementBound measurementBound
+        MeasurementBound measurementBound,
+        LocationDashboardCommentParser.ParsedComment parsedComment
     ) {
         if (cell == null
             || cell.numericValue() == null
@@ -84,7 +199,7 @@ final class LocationDashboardSampleImportPipeline {
             return null;
         }
         return new LocationDashboardWorksheetSample(
-            cell.observedDate(),
+            effectiveWorksheetObservedDate(cell, parsedComment),
             cell.numericValue(),
             resolveMeasurementName(cell.metricName(), measurementBound),
             rowContext.facilityName(),
@@ -97,6 +212,23 @@ final class LocationDashboardSampleImportPipeline {
             row == null ? null : row.basis(),
             cell.cellReference()
         );
+    }
+
+    private LocalDate effectiveWorksheetObservedDate(
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardCommentParser.ParsedComment parsedComment
+    ) {
+        if (cell == null) {
+            return null;
+        }
+        LocationDashboardCommentParser.ParsedCommentSample primarySample =
+            parsedComment == null ? null : parsedComment.primarySample();
+        if (primarySample != null
+            && primarySample.sampledOn() != null
+            && matchesWorksheetPrimarySample(cell, primarySample)) {
+            return primarySample.sampledOn();
+        }
+        return cell.observedDate();
     }
 
     private List<LocationDashboardImportedSample> extractCommentSamples(
@@ -250,6 +382,35 @@ final class LocationDashboardSampleImportPipeline {
         return primaryCell.numericValue().compareTo(candidateSample.resultValue()) == 0;
     }
 
+    private boolean matchesWorksheetFollowUpSample(
+        PreparedCellImport worksheetCell,
+        LocationDashboardCommentParser.ParsedCommentSample followUpSample
+    ) {
+        if (worksheetCell == null || worksheetCell.cell() == null || followUpSample == null) {
+            return false;
+        }
+        if (worksheetCell.cell().numericValue() == null || followUpSample.resultValue() == null) {
+            return false;
+        }
+        if (worksheetCell.cell().numericValue().compareTo(followUpSample.resultValue()) != 0) {
+            return false;
+        }
+        LocalDate effectiveObservedDate = effectiveWorksheetObservedDate(worksheetCell.cell(), worksheetCell.parsedComment());
+        if (effectiveObservedDate == null) {
+            return false;
+        }
+
+        return isWithinDuplicateDateMargin(effectiveObservedDate, followUpSample.resultReceivedOn());
+    }
+
+    private boolean isWithinDuplicateDateMargin(LocalDate worksheetObservedDate, LocalDate commentDate) {
+        if (worksheetObservedDate == null || commentDate == null) {
+            return false;
+        }
+        return Math.abs(ChronoUnit.DAYS.between(commentDate, worksheetObservedDate))
+            <= FOLLOW_UP_DUPLICATE_DATE_MARGIN_DAYS;
+    }
+
     private boolean sameObservationMonth(LocalDate worksheetObservedDate, LocalDate commentSampleDate) {
         if (worksheetObservedDate == null || commentSampleDate == null) {
             return false;
@@ -285,6 +446,34 @@ final class LocationDashboardSampleImportPipeline {
         return value == null ? "" : value;
     }
 
+    private String worksheetStreamIdentity(
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        LocationDashboardImportContextResolver.RowImportContext rowContext,
+        String measurementName
+    ) {
+        if (rowContext == null || rowContext.facilityName() == null || measurementName == null) {
+            return null;
+        }
+        return String.join("|", List.of(
+            nullSafe(rowContext.facilityName()),
+            nullSafe(rowContext.resolvedBuilding()),
+            nullSafe(rowContext.resolvedSystem()),
+            nullSafe(measurementName),
+            nullSafe(row == null ? null : row.pointOfUse()),
+            nullSafe(row == null ? null : row.basis())
+        ));
+    }
+
+    private String worksheetCellIdentity(
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell
+    ) {
+        return String.join("|", List.of(
+            nullSafe(String.valueOf(row == null ? null : row.rowNumber())),
+            nullSafe(cell == null ? null : cell.cellReference())
+        ));
+    }
+
     private ApiClientException invalidSpreadsheet(String message) {
         return new ApiClientException(
             HttpStatus.BAD_REQUEST,
@@ -299,6 +488,17 @@ final class LocationDashboardSampleImportPipeline {
 
     record SampleImportResult(
         LocationDashboardSampleBuckets sampleBuckets
+    ) {
+    }
+
+    private record PreparedCellImport(
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        LocationDashboardImportContextResolver.RowImportContext rowContext,
+        MeasurementBound measurementBound,
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        String worksheetCellIdentity,
+        int sequenceIndex
     ) {
     }
 }

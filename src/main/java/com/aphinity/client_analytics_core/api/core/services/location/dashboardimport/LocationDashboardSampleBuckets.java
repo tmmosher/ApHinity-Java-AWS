@@ -56,7 +56,7 @@ final class LocationDashboardSampleBuckets {
         }
 
         List<LocalDate> sortedConformingDates = leaf.conformingIndexes().stream()
-            .map(this::observedDate)
+            .map(this::resolutionAnchorDate)
             .filter(date -> date != null)
             .sorted(Comparator.naturalOrder())
             .toList();
@@ -69,16 +69,18 @@ final class LocationDashboardSampleBuckets {
                 continue;
             }
             LocationDashboardAnalyzedSample analyzedSample = analyzedSamples.get(nonConformingIndex);
-            LocalDate observedDate = analyzedSample.sample() == null ? null : analyzedSample.sample().observedDate();
-            if (observedDate == null) {
+            LocalDate resolutionAnchorDate = analyzedSample.sample() == null
+                ? null
+                : analyzedSample.sample().resolutionAnchorDate();
+            if (resolutionAnchorDate == null) {
                 continue;
             }
 
-            LocalDate resolvedAt = firstDateAfter(sortedConformingDates, observedDate);
+            LocalDate resolvedAt = firstDateAfter(sortedConformingDates, resolutionAnchorDate);
             if (resolvedAt == null) {
                 continue;
             }
-            long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(observedDate, resolvedAt));
+            long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(resolutionAnchorDate, resolvedAt));
             analyzedSamples.set(nonConformingIndex, analyzedSample.withResolution(true, turnaroundDays));
         }
     }
@@ -90,7 +92,7 @@ final class LocationDashboardSampleBuckets {
         int lowerBound = 0;
         int upperBound = sortedDates.size();
         while (lowerBound < upperBound) {
-            int midpoint = (lowerBound + upperBound) >>> 1;
+            int midpoint = (lowerBound  + upperBound) >>> 1; // random use of bitwise ops ? division would have sufficed here and probably been optimized to bitwise op by jvm anyway
             LocalDate candidateDate = sortedDates.get(midpoint);
             if (candidateDate == null || !candidateDate.isAfter(observedDate)) {
                 lowerBound = midpoint + 1;
@@ -101,12 +103,12 @@ final class LocationDashboardSampleBuckets {
         return lowerBound >= sortedDates.size() ? null : sortedDates.get(lowerBound);
     }
 
-    private LocalDate observedDate(Integer analyzedSampleIndex) {
+    private LocalDate resolutionAnchorDate(Integer analyzedSampleIndex) {
         if (analyzedSampleIndex == null || analyzedSampleIndex < 0 || analyzedSampleIndex >= analyzedSamples.size()) {
             return null;
         }
         LocationDashboardImportedSample sample = analyzedSamples.get(analyzedSampleIndex).sample();
-        return sample == null ? null : sample.observedDate();
+        return sample == null ? null : sample.resolutionAnchorDate();
     }
 
     private record ResolutionBucketKey(
@@ -119,17 +121,16 @@ final class LocationDashboardSampleBuckets {
     ) {
         private static ResolutionBucketKey maybeFrom(LocationDashboardImportedSample sample) {
             String facilityName = requiredNormalized(sample == null ? null : sample.facilityName());
-            String buildingName = requiredNormalized(sample == null ? null : sample.resolvedBuilding());
-            String systemName = requiredNormalized(sample == null ? null : sample.resolvedSystem());
+            String buildingName = optionalNormalized(sample == null ? null : sample.resolutionBuildingName());
+            String systemName = requiredNormalized(sample == null ? null : sample.resolutionSystemName());
             String measurementName = requiredNormalized(sample == null ? null : sample.measurementName());
             String pointOfUse = requiredNormalized(sample == null ? null : sample.pointOfUse());
             String basis = requiredNormalized(sample == null ? null : sample.basis());
             if (facilityName == null
-                || buildingName == null
                 || systemName == null
                 || measurementName == null
                 || pointOfUse == null
-                || basis == null) {
+                ) {
                 return null;
             }
             return new ResolutionBucketKey(
@@ -143,6 +144,10 @@ final class LocationDashboardSampleBuckets {
         }
 
         private static String requiredNormalized(String value) {
+            return LocationDashboardGraphMetadataSupport.normalizeKey(value);
+        }
+
+        private static String optionalNormalized(String value) {
             return LocationDashboardGraphMetadataSupport.normalizeKey(value);
         }
     }
