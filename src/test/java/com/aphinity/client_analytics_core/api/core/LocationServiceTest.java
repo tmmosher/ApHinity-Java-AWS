@@ -1216,15 +1216,7 @@ class LocationServiceTest {
         Graph graph = new Graph();
         graph.setId(31L);
         graph.setName("Percent Resolved");
-        graph.setData(List.of(Map.of(
-            "type", "indicator",
-            "mode", "gauge+number",
-            "value", 0,
-            "gauge", Map.of(
-                "axis", Map.of("range", List.of(0, 100)),
-                "bar", Map.of("color", LEGACY_GRAPH_COLOR)
-            )
-        )));
+        graph.setData(List.of(indicatorTrace(0)));
         graph.setLayout(new LinkedHashMap<>(Map.of(
             "meta", Map.of(
                 "aphinityImport", Map.of(
@@ -1242,15 +1234,7 @@ class LocationServiceTest {
             99L,
             List.of(new LocationGraphDataUpdateRequest(
                 31L,
-                List.of(Map.of(
-                    "type", "indicator",
-                    "mode", "gauge+number",
-                    "value", 68,
-                    "gauge", Map.of(
-                        "axis", Map.of("range", List.of(0, 100)),
-                        "bar", Map.of("color", LEGACY_GRAPH_COLOR)
-                    )
-                ))
+                List.of(indicatorTrace(68))
             ))
         );
 
