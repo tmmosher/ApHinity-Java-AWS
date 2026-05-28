@@ -232,7 +232,6 @@ final class LocationDashboardDerivedGraphSupport {
         Map<String, Long> countsByTurnaround = new LinkedHashMap<>();
         TURNAROUND_BUCKETS.forEach(label -> countsByTurnaround.put(label, 0L));
         nonConformances.stream()
-            .filter(HistoricalNonConformance::resolved)
             .map(LocationDashboardDerivedGraphSupport::turnaroundLabel)
             .filter(Objects::nonNull)
             .forEach(label -> countsByTurnaround.merge(label, 1L, Long::sum));
@@ -248,7 +247,7 @@ final class LocationDashboardDerivedGraphSupport {
     }
 
     private static String turnaroundLabel(HistoricalNonConformance nonConformance) {
-        if (nonConformance == null || !nonConformance.resolved() || nonConformance.turnaroundDays() == null) {
+        if (nonConformance == null || nonConformance.turnaroundDays() == null) {
             return null;
         }
         long turnaroundDays = Math.max(0L, nonConformance.turnaroundDays());

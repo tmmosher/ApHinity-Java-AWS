@@ -1,4 +1,4 @@
-import { createRenderEffect, createRoot } from "solid-js";
+import { createRoot } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocationGraph } from "../types/Types";
@@ -37,50 +37,20 @@ vi.mock("../components/Chart", () => ({
 
 vi.mock("../components/graph-editor/CartesianTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
-    createRenderEffect(() => {
-      latestCartesianTraceEditorProps = {
-        ...props,
-        onUpdateBarOrientation:
-          typeof props["onUpdateBarOrientation"] === "function"
-            ? (nextOrientation: "h" | "v") =>
-                (props["onUpdateBarOrientation"] as (nextOrientation: "h" | "v") => void)(nextOrientation)
-            : undefined,
-        onAddRow:
-          typeof props["onAddRow"] === "function"
-            ? () => (props["onAddRow"] as () => void)()
-            : undefined,
-        onUpdateX:
-          typeof props["onUpdateX"] === "function"
-            ? (rowIndex: number, rawValue: string) =>
-                (props["onUpdateX"] as (rowIndex: number, rawValue: string) => void)(rowIndex, rawValue)
-            : undefined,
-        onUpdateY:
-          typeof props["onUpdateY"] === "function"
-            ? (rowIndex: number, rawValue: string) =>
-                (props["onUpdateY"] as (rowIndex: number, rawValue: string) => void)(rowIndex, rawValue)
-            : undefined,
-        onUpdateColor:
-          typeof props["onUpdateColor"] === "function"
-            ? (rowIndex: number, colorHex: string) =>
-                (props["onUpdateColor"] as (rowIndex: number, colorHex: string) => void)(rowIndex, colorHex)
-            : undefined,
-        onUpdateYRangeMin:
-          typeof props["onUpdateYRangeMin"] === "function"
-            ? (rawValue: string) => (props["onUpdateYRangeMin"] as (rawValue: string) => void)(rawValue)
-            : undefined,
-        onUpdateYRangeMax:
-          typeof props["onUpdateYRangeMax"] === "function"
-            ? (rawValue: string) => (props["onUpdateYRangeMax"] as (rawValue: string) => void)(rawValue)
-            : undefined,
-        onUpdateYAxisTitle:
-          typeof props["onUpdateYAxisTitle"] === "function"
-            ? (rawValue: string) => (props["onUpdateYAxisTitle"] as (rawValue: string) => void)(rawValue)
-            : undefined,
-        onRemoveRow:
-          typeof props["onRemoveRow"] === "function"
-            ? (rowIndex: number) => (props["onRemoveRow"] as (rowIndex: number) => void)(rowIndex)
-            : undefined
-      };
+    latestCartesianTraceEditorProps = new Proxy({} as Record<string, unknown>, {
+      get: (_target, property: string | symbol) => {
+        if (typeof property !== "string") {
+          return undefined;
+        }
+        const value = props[property];
+        if (typeof value !== "function") {
+          return value;
+        }
+        return (...args: unknown[]) => {
+          const handler = props[property];
+          return typeof handler === "function" ? handler(...args) : undefined;
+        };
+      }
     });
     return null;
   }

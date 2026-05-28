@@ -83,7 +83,7 @@ class LocationDashboardSampleBucketsTest {
     }
 
     @Test
-    void analyzedSamplesUsesClosestFutureConformingSampleForTurnaround() {
+    void analyzedSamplesUsesClosestFutureSampleForTurnaroundEvenWhenStillNonConforming() {
         LocationDashboardSampleBuckets buckets = new LocationDashboardSampleBuckets();
 
         buckets.add(sample(
@@ -108,7 +108,7 @@ class LocationDashboardSampleBucketsTest {
         ));
         buckets.add(sample(
             LocalDate.parse("2025-08-03"),
-            new BigDecimal("4"),
+            new BigDecimal("12"),
             "Newport Beach",
             "Hospital",
             "Cooling Towers",
@@ -119,7 +119,39 @@ class LocationDashboardSampleBucketsTest {
 
         List<LocationDashboardAnalyzedSample> analyzedSamples = buckets.analyzedSamples();
 
+        assertFalse(analyzedSamples.get(2).compliant());
         assertTrue(analyzedSamples.getFirst().resolved());
+        assertEquals(2L, analyzedSamples.getFirst().turnaroundDays());
+    }
+
+    @Test
+    void analyzedSamplesCalculatesTurnaroundToNextSampleWithoutResolvingWhenNoFutureConformanceExists() {
+        LocationDashboardSampleBuckets buckets = new LocationDashboardSampleBuckets();
+
+        buckets.add(sample(
+            LocalDate.parse("2025-08-01"),
+            new BigDecimal("11"),
+            "Newport Beach",
+            "Hospital",
+            "Cooling Towers",
+            "HPC",
+            "Recirc Line",
+            "CTI/514P"
+        ));
+        buckets.add(sample(
+            LocalDate.parse("2025-08-03"),
+            new BigDecimal("12"),
+            "Newport Beach",
+            "Hospital",
+            "Cooling Towers",
+            "HPC",
+            "Recirc Line",
+            "CTI/514P"
+        ));
+
+        List<LocationDashboardAnalyzedSample> analyzedSamples = buckets.analyzedSamples();
+
+        assertFalse(analyzedSamples.getFirst().resolved());
         assertEquals(2L, analyzedSamples.getFirst().turnaroundDays());
     }
 

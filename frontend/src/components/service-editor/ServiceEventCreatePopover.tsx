@@ -3,6 +3,7 @@ import Popover from "corvu/popover";
 import {createEffect, createSignal, on, type JSX} from "solid-js";
 import type {AccountRole, CreateLocationServiceEventRequest} from "../../types/Types";
 import {createDefaultServiceEventDraft} from "../../util/location/serviceEventForm";
+import {formatDayOfMonth} from "../../util/location/dateUtility";
 import {
   createServiceEventEditorController,
   ServiceEventEditorBody
@@ -107,7 +108,7 @@ export const ServiceEventCreatePopover = (props: ServiceEventCreatePopoverProps)
         data-service-calendar-day-trigger=""
       >
         <span class="text-xs font-semibold tabular-nums md:text-sm">
-          {props.day.getDate()}
+          {formatDayOfMonth(props.day)}
         </span>
       </Popover.Trigger>
 

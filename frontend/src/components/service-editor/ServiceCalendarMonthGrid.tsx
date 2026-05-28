@@ -7,6 +7,7 @@ import type {
   LocationServiceEvent
 } from "../../types/Types";
 import {
+  formatDayOfMonth,
   formatDisplayDate,
   formatWeekdayLong,
   formatWeekdayShort,
@@ -321,7 +322,7 @@ const ServiceCalendarDayBackground = (props: ServiceCalendarDayBackgroundProps) 
           classList={dayCellClassList}
         >
           <span class="text-xs font-semibold tabular-nums md:text-sm">
-            {props.day.getDate()}
+            {formatDayOfMonth(props.day)}
           </span>
         </Calendar.CellTrigger>
       )}

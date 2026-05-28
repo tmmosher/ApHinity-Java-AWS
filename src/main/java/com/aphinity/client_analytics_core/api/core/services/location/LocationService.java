@@ -30,12 +30,14 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
-import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -62,7 +64,7 @@ public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
 
     @Autowired(required = false)
-    private EntityManager entityManager;
+    private EntityManagerFactory entityManagerFactory;
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -249,8 +251,6 @@ public class LocationService {
             throw new IllegalStateException("Created graph id was null");
         }
 
-        savedGraph = refreshGraphFromStore(graphId, savedGraph);
-
         location.setSectionLayout(
             appendGraphToSectionLayout(location.getSectionLayout(), targetSectionId, createNewSection, graphId)
         );
@@ -263,6 +263,7 @@ public class LocationService {
         try {
             locationGraphRepository.save(locationGraph);
             locationRepository.saveAndFlush(location);
+            savedGraph = refreshGraphFromStore(graphId, savedGraph);
         } catch (RuntimeException ex) {
             log.error(
                 "Graph assignment persistence failed actorUserId={} locationId={} graphId={} sectionId={} createNewSection={} graphType={}",
@@ -472,7 +473,7 @@ public class LocationService {
                 }
             }
 
-            if (!hasGraphUpdates && sectionLayout != null && normalizedSectionLayout == null) {
+            if (!hasGraphUpdates && normalizedSectionLayout == null) {
                 log.info(
                     "Skipped graph update because section layout snapshot was unchanged actorUserId={} locationId={}",
                     userId,
@@ -515,7 +516,7 @@ public class LocationService {
                 if (normalizedSectionLayout != null) {
                     location.setSectionLayout(normalizedSectionLayout);
                     locationRepository.saveAndFlush(location);
-                } else if (hasGraphUpdates) {
+                } else {
                     locationRepository.touchUpdatedAt(locationId, Instant.now());
                 }
             } catch (RuntimeException ex) {
@@ -605,7 +606,7 @@ public class LocationService {
         Map<GraphTimeRange, List<Map<String, Object>>> validatedPayloads = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
             GraphTimeRange timeRange = graphTimeRangeFromRequestKey(entry.getKey());
-            if (timeRange == null || timeRange == GraphTimeRange.ALL_TIME) {
+            if (timeRange == GraphTimeRange.ALL_TIME) {
                 continue;
             }
             Object rawTracePayload = entry.getValue();
@@ -1498,6 +1499,7 @@ public class LocationService {
     }
 
     private Graph refreshGraphFromStore(Long graphId, Graph fallbackGraph) {
+        EntityManager entityManager = currentEntityManager();
         if (entityManager != null) {
             if (entityManager.contains(fallbackGraph)) {
                 entityManager.refresh(fallbackGraph);
@@ -1513,6 +1515,7 @@ public class LocationService {
     }
 
     private Location refreshLocationFromStore(Long locationId, Location fallbackLocation) {
+        EntityManager entityManager = currentEntityManager();
         if (entityManager != null) {
             if (entityManager.contains(fallbackLocation)) {
                 entityManager.refresh(fallbackLocation);
@@ -1525,6 +1528,13 @@ public class LocationService {
             }
         }
         return locationRepository.findById(locationId).orElse(fallbackLocation);
+    }
+
+    private EntityManager currentEntityManager() {
+        if (entityManagerFactory == null) {
+            return null;
+        }
+        return SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory);
     }
 
     private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(

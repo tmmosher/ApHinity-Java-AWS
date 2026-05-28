@@ -4,21 +4,29 @@ const localizedDateOptions: Intl.DateTimeFormatOptions = {
   day: "numeric"
 };
 
-const monthFormatter = new Intl.DateTimeFormat("en-US", {
+const monthFormatter = new Intl.DateTimeFormat(undefined, {
   month: "long"
 });
 
-const timeFormatter = new Intl.DateTimeFormat("en-US", {
+const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit"
 });
 
-const weekdayLongFormatter = new Intl.DateTimeFormat("en-US", {
+const weekdayLongFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "long"
 });
 
-const weekdayShortFormatter = new Intl.DateTimeFormat("en-US", {
+const weekdayShortFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "short"
+});
+
+const dayOfMonthFormatter = new Intl.DateTimeFormat(undefined, {
+  day: "numeric"
+});
+
+const paddedDayOfMonthFormatter = new Intl.DateTimeFormat(undefined, {
+  day: "2-digit"
 });
 
 const yearMonthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -30,8 +38,7 @@ const normalizeTimeValue = (value: string): string => (
 );
 
 export const formatDate = (date: Date): string => {
-  const locale = Intl.NumberFormat().resolvedOptions().locale;
-  return date.toLocaleDateString(locale, localizedDateOptions);
+  return date.toLocaleDateString(undefined, localizedDateOptions);
 };
 
 export const formatCurrentDate = (): string => formatDate(new Date());
@@ -131,6 +138,10 @@ export const normalizeYearMonth = (
 };
 
 export const formatMonthLabel = (date: Date): string => monthFormatter.format(date);
+
+export const formatDayOfMonth = (date: Date): string => dayOfMonthFormatter.format(date);
+
+export const formatPaddedDayOfMonth = (date: Date): string => paddedDayOfMonthFormatter.format(date);
 
 export const formatWeekdayLong = (date: Date): string => weekdayLongFormatter.format(date);
 

@@ -5,18 +5,22 @@ export type DashboardTimeRange = LocationGraphTimeRange;
 export const dashboardTimeRangeOptions: Array<{
   value: DashboardTimeRange;
   label: string;
+  description: string;
 }> = [
   {
     value: "threeMonths",
-    label: "3 Months"
+    label: "3 Months",
+    description: "Recent quarter"
   },
   {
     value: "twelveMonths",
-    label: "12 Months"
+    label: "12 Months",
+    description: "Rolling year"
   },
   {
     value: "allTime",
-    label: "All Data"
+    label: "All Data",
+    description: "Full history"
   }
 ];
 

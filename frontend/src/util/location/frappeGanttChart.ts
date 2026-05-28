@@ -42,7 +42,7 @@ const DAY_VIEW_MODE: FrappeGanttViewModeConfig = {
   date_format: "YYYY-MM-DD",
   lower_text: (date, previousDate, lang) => (
     !previousDate || date.getDate() !== previousDate.getDate()
-      ? String(date.getDate()).padStart(2, "0")
+      ? new Intl.DateTimeFormat(lang, {day: "2-digit"}).format(date)
       : ""
   ),
   upper_text: (date, previousDate, lang) => {
@@ -50,8 +50,7 @@ const DAY_VIEW_MODE: FrappeGanttViewModeConfig = {
       return "";
     }
 
-    const monthName = new Intl.DateTimeFormat(lang, {month: "long"}).format(date);
-    return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    return new Intl.DateTimeFormat(lang, {month: "long"}).format(date);
   },
   thick_line: (date) => date.getDay() === 1
 };

@@ -51,7 +51,16 @@ final class LocationDashboardSampleBuckets {
     }
 
     private void analyzeResolutionLeaf(ResolutionBucketLeaf leaf) {
-        if (leaf == null || leaf.conformingIndexes().isEmpty() || leaf.nonConformingIndexes().isEmpty()) {
+        if (leaf == null || leaf.sampleIndexes().isEmpty() || leaf.nonConformingIndexes().isEmpty()) {
+            return;
+        }
+
+        List<LocalDate> sortedSampleDates = leaf.sampleIndexes().stream()
+            .map(this::resolutionAnchorDate)
+            .filter(date -> date != null)
+            .sorted(Comparator.naturalOrder())
+            .toList();
+        if (sortedSampleDates.isEmpty()) {
             return;
         }
 
@@ -60,9 +69,6 @@ final class LocationDashboardSampleBuckets {
             .filter(date -> date != null)
             .sorted(Comparator.naturalOrder())
             .toList();
-        if (sortedConformingDates.isEmpty()) {
-            return;
-        }
 
         for (Integer nonConformingIndex : leaf.nonConformingIndexes()) {
             if (nonConformingIndex == null || nonConformingIndex < 0 || nonConformingIndex >= analyzedSamples.size()) {
@@ -76,12 +82,13 @@ final class LocationDashboardSampleBuckets {
                 continue;
             }
 
-            LocalDate resolvedAt = firstDateAfter(sortedConformingDates, resolutionAnchorDate);
-            if (resolvedAt == null) {
+            LocalDate nextSampleAt = firstDateAfter(sortedSampleDates, resolutionAnchorDate);
+            if (nextSampleAt == null) {
                 continue;
             }
-            long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(resolutionAnchorDate, resolvedAt));
-            analyzedSamples.set(nonConformingIndex, analyzedSample.withResolution(true, turnaroundDays));
+            boolean resolved = firstDateAfter(sortedConformingDates, resolutionAnchorDate) != null;
+            long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(resolutionAnchorDate, nextSampleAt));
+            analyzedSamples.set(nonConformingIndex, analyzedSample.withResolution(resolved, turnaroundDays));
         }
     }
 
@@ -153,15 +160,21 @@ final class LocationDashboardSampleBuckets {
     }
 
     private static final class ResolutionBucketLeaf {
+        private final List<Integer> sampleIndexes = new ArrayList<>();
         private final List<Integer> conformingIndexes = new ArrayList<>();
         private final List<Integer> nonConformingIndexes = new ArrayList<>();
 
         void append(int analyzedSampleIndex, boolean compliant) {
+            sampleIndexes.add(analyzedSampleIndex);
             if (compliant) {
                 conformingIndexes.add(analyzedSampleIndex);
             } else {
                 nonConformingIndexes.add(analyzedSampleIndex);
             }
+        }
+
+        List<Integer> sampleIndexes() {
+            return sampleIndexes;
         }
 
         List<Integer> conformingIndexes() {
