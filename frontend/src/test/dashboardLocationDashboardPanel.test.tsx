@@ -99,11 +99,8 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Last updated");
     expect(html).toContain("Date Range");
     expect(html).toContain("3 Months");
-    expect(html).toContain("Recent quarter");
     expect(html).toContain("12 Months");
-    expect(html).toContain("Rolling year");
     expect(html).toContain("All Data");
-    expect(html).toContain("Full history");
     expect(html).toContain("btn h-11 min-h-11 rounded-2xl");
     expect(html).toContain("aria-label=\"More actions\"");
     expect(html).toContain("aria-label=\"Dashboard date range selector\"");

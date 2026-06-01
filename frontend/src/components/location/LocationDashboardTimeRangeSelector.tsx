@@ -34,7 +34,6 @@ export const LocationDashboardTimeRangeSelector = (props: LocationDashboardTimeR
               onClick={() => props.onSelectRange(option.value)}
             >
               <span>{option.label}</span>
-              <span class="text-[0.68rem] font-medium opacity-75 sm:text-xs">{option.description}</span>
             </button>
           );
         }}
