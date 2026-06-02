@@ -56,10 +56,7 @@ describe("GraphColorPicker", () => {
       value: "#123456",
       format: "hex",
       theme: "light",
-      colorKeywords: [
-        {"Legacy Blue": "#1f77b4"},
-        {"Legacy Green": "#2ca02c"}
-      ]
+      colorKeywords: []
     });
     expect(latestPopoverProps).toMatchObject({
       placement: "bottom-start",
@@ -67,6 +64,9 @@ describe("GraphColorPicker", () => {
       restoreFocus: false,
       closeOnOutsideFocus: false
     });
+    expect(html).toContain("aria-label=\"Preset color\"");
+    expect(html).toContain("value=\"#1f77b4\">Legacy Blue</option>");
+    expect(html).toContain("value=\"#2ca02c\">Legacy Green</option>");
   });
 
   it("forwards custom colors while suppressing disabled and unchanged updates", () => {
@@ -117,17 +117,20 @@ describe("GraphColorPicker", () => {
     });
   });
 
-  it("renders dropdowns inside a floating popover instead of expanding the modal scroll region", () => {
+  it("separates the preset dropdown from the floating picker menu", () => {
     const css = readFileSync(cssPath, "utf8");
 
     expect(css).toContain(
-      ".graph-color-picker-popover-content .graph-color-picker .color-dropdown"
+      ".graph-color-picker-popover-content .graph-color-picker .color-dropdown.picker"
     );
     expect(css).toContain("position: static;");
     expect(css).toContain(
       ".graph-color-picker-popover-content .graph-color-picker .menu-toggle"
     );
-    expect(css).toContain("height: 2rem;");
+    expect(css).toContain(
+      ".graph-color-picker-popover-content .graph-color-picker .color-dropdown.menu"
+    );
+    expect(css).toContain("display: none;");
     expect(css).not.toContain(".graph-editor-scroll-region:has");
   });
 });
