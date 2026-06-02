@@ -1,5 +1,6 @@
 import { Index, Show } from "solid-js";
 import { toInputValue } from "../../util/graph/graphTraceEditor";
+import GraphColorPicker from "./GraphColorPicker";
 
 type PieTraceEditorProps = {
   rowIndexes: number[];
@@ -60,24 +61,12 @@ const PieTraceEditor = (props: PieTraceEditorProps) => {
                   disabled={props.isBusy}
                   onInput={(event) => props.onUpdateValue(rowIndex, event.currentTarget.value)}
                 />
-                <select
-                  class="select select-bordered select-sm"
+                <GraphColorPicker
                   value={props.rowColors[rowIndex] ?? ""}
                   disabled={props.isBusy}
-                  onChange={(event) => {
-                    const nextColor = event.currentTarget.value;
-                    if (nextColor.length > 0) {
-                      props.onUpdateColor(rowIndex, nextColor);
-                    }
-                  }}
-                >
-                  <option value="">Choose a color</option>
-                  <Index each={Object.entries(props.colorOptions)}>
-                    {(entry) => (
-                      <option value={entry()[1]}>{entry()[0]}</option>
-                    )}
-                  </Index>
-                </select>
+                  colorOptions={props.colorOptions}
+                  onChange={(nextColor) => props.onUpdateColor(rowIndex, nextColor)}
+                />
                 <button
                   type="button"
                   class={"btn btn-xs " + (props.isBusy ? "btn-disabled" : "btn-ghost")}

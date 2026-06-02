@@ -1,5 +1,6 @@
 import { Index, Show } from "solid-js";
 import { toInputValue } from "../../util/graph/graphTraceEditor";
+import GraphColorPicker from "./GraphColorPicker";
 
 type CartesianTraceEditorProps = {
   heading: string;
@@ -121,24 +122,12 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                 }
               >
                 <Show when={props.onUpdateColor && props.colorOptions}>
-                  <select
-                    class="select select-bordered select-sm"
+                  <GraphColorPicker
                     value={props.rowColors?.[rowIndex] ?? ""}
                     disabled={props.isBusy}
-                    onChange={(event) => {
-                      const nextColor = event.currentTarget.value;
-                      if (nextColor.length > 0) {
-                        props.onUpdateColor?.(rowIndex, nextColor);
-                      }
-                    }}
-                  >
-                    <option value="">Choose a color</option>
-                    <Index each={Object.entries(props.colorOptions ?? {})}>
-                      {(entry) => (
-                        <option value={entry()[1]}>{entry()[0]}</option>
-                      )}
-                    </Index>
-                  </select>
+                    colorOptions={props.colorOptions ?? {}}
+                    onChange={(nextColor) => props.onUpdateColor?.(rowIndex, nextColor)}
+                  />
                 </Show>
                 <input
                   class={"input input-bordered input-sm" + (xDrafts()[rowIndex] !== undefined ? " input-error" : "")}

@@ -1,6 +1,6 @@
-import {For} from "solid-js";
 import {INDICATOR_VALUE_MAX, INDICATOR_VALUE_MIN} from "../../util/graph/graphTemplateFactory";
 import {toInputValue} from "../../util/graph/graphTraceEditor";
+import GraphColorPicker from "./GraphColorPicker";
 
 type IndicatorTraceEditorProps = {
   value: unknown;
@@ -42,24 +42,12 @@ const IndicatorTraceEditor = (props: IndicatorTraceEditorProps) => {
 
         <label class="form-control">
           <span class="label-text">Gauge color</span>
-          <select
-            class="select select-bordered select-sm mt-1"
+          <GraphColorPicker
             value={props.color}
             disabled={props.isBusy}
-            onChange={(event) => {
-              const nextColor = event.currentTarget.value;
-              if (nextColor.length > 0) {
-                props.onUpdateColor(nextColor);
-              }
-            }}
-          >
-            <option value="">Choose a color</option>
-            <For each={Object.entries(props.colorOptions)}>
-              {([label, hex]) => (
-                <option value={hex}>{label}</option>
-              )}
-            </For>
-          </select>
+            colorOptions={props.colorOptions}
+            onChange={props.onUpdateColor}
+          />
         </label>
       </div>
     </section>

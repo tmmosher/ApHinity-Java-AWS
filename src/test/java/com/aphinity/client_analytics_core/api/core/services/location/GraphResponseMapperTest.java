@@ -107,6 +107,38 @@ class GraphResponseMapperTest {
         );
     }
 
+    @Test
+    void projectsCanonicalTimeSeriesInsteadOfReturningStaleMaterializedRanges() {
+        Graph graph = new Graph();
+        graph.setId(12L);
+        graph.setName("Imported");
+        graph.setCreatedAt(Instant.parse("2026-03-20T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-03-20T00:00:00Z"));
+        graph.setData(List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of("2025-11-01", "2026-03-10"),
+            "y", List.of(4, 9)
+        )));
+        GraphRelationalPayloadMapper.syncGraphData(
+            graph,
+            List.of(Map.of(
+                "type", "scatter",
+                "name", "HPC",
+                "x", List.of("2025-11-01", "2026-03-10"),
+                "y", List.of(4, 9)
+            )),
+            GraphTimeRange.THREE_MONTHS
+        );
+
+        GraphResponse response = new GraphResponseMapper(
+            Clock.fixed(Instant.parse("2026-03-20T08:00:00Z"), ZoneOffset.UTC)
+        ).toResponse(graph);
+
+        assertEquals(List.of("2026-03-10"), response.timeRangeData().get("threeMonths").getFirst().get("x"));
+        assertEquals(List.of(9L), response.timeRangeData().get("threeMonths").getFirst().get("y"));
+    }
+
     @SuppressWarnings("unchecked")
     private void assertProjectedTrace(
         Map<String, Object> trace,

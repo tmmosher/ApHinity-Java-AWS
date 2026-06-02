@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@nerimity/solid-turnstile": "^1.1.0",
+    "@thednp/solid-color-picker": "^0.0.14",
     "@types/node": "^25.6.0",
     "corvu": "^0.7.2",
     "plotly.js-dist-min": "^3.4.0",

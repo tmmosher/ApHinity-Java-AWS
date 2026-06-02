@@ -250,7 +250,7 @@ public final class GraphRelationalPayloadMapper {
                 List<String> normalizedBarColors = normalizeBarColors(barColors);
                 if (!normalizedBarColors.isEmpty()) {
                     Map<String, Object> marker = extractTraceMarker(result);
-                    marker.put("color", normalizedBarColors.getFirst());
+                    marker.put("color", List.copyOf(normalizedBarColors));
                     marker.put("colors", List.copyOf(normalizedBarColors));
                     result.put("marker", marker);
                 }
@@ -608,7 +608,10 @@ public final class GraphRelationalPayloadMapper {
         if (!(markerValue instanceof Map<?, ?> marker)) {
             return null;
         }
-        Object colorsValue = marker.get("colors");
+        Object colorsValue = marker.get("color");
+        if (!(colorsValue instanceof List<?>)) {
+            colorsValue = marker.get("colors");
+        }
         if (colorsValue == null) {
             return null;
         }

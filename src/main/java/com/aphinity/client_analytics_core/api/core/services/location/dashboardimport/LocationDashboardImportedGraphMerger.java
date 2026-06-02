@@ -33,6 +33,14 @@ final class LocationDashboardImportedGraphMerger {
     );
 
     List<Map<String, Object>> mergeImportedGraphData(Graph graph, List<Map<String, Object>> importedData) {
+        return mergeImportedGraphData(graph, importedData, false);
+    }
+
+    List<Map<String, Object>> mergeImportedGraphData(
+        Graph graph,
+        List<Map<String, Object>> importedData,
+        boolean resetExistingPoints
+    ) {
         List<Map<String, Object>> existingData = LocationDashboardGraphMetadataSupport.currentTraceList(graph);
         if (existingData.isEmpty()) {
             return importedData;
@@ -45,6 +53,18 @@ final class LocationDashboardImportedGraphMerger {
             String traceIdentity = traceIdentity(existingTrace, index);
             existingTracesByIdentity.putIfAbsent(traceIdentity, existingTrace);
             existingTraceOrder.add(traceIdentity);
+        }
+
+        if (resetExistingPoints) {
+            List<Map<String, Object>> resetTraces = new ArrayList<>();
+            for (int index = 0; index < importedData.size(); index += 1) {
+                Map<String, Object> importedTrace = importedData.get(index);
+                resetTraces.add(mergeTracePreservingPresentation(
+                    existingTracesByIdentity.get(traceIdentity(importedTrace, index)),
+                    importedTrace
+                ));
+            }
+            return List.copyOf(resetTraces);
         }
 
         List<Map<String, Object>> mergedTraces = new ArrayList<>();
@@ -135,6 +155,9 @@ final class LocationDashboardImportedGraphMerger {
         Map<String, Object> existingTrace,
         Map<String, Object> importedTrace
     ) {
+        if (existingTrace == null) {
+            return importedTrace;
+        }
         // Persisted trace styling should win, but blank placeholder payloads must not wipe
         // out the imported workbook points for the same named trace.
         Map<String, Object> mergedTrace = new LinkedHashMap<>(importedTrace);

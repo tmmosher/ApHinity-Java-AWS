@@ -69,7 +69,6 @@ type GraphEditorModalProps = {
   onClose: () => void;
 };
 
-const TRACE_COLOR_VALUES = new Set(Object.values(TRACE_COLOR_OPTIONS));
 const EMPTY_EDITABLE_GRAPH_PAYLOAD: EditableGraphPayload = {
   data: [],
   layout: null,
@@ -245,7 +244,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     if (!traceColor) {
       return "";
     }
-    return TRACE_COLOR_VALUES.has(traceColor) ? traceColor : "";
+    return traceColor;
   });
 
   const pieLabels = createMemo(() => {

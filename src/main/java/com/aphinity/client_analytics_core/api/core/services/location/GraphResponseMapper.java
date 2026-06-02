@@ -69,10 +69,19 @@ public class GraphResponseMapper {
         if (timeRange == GraphTimeRange.ALL_TIME) {
             return allTimePayload;
         }
+        if (isCanonicalTimeSeriesPayload(allTimePayload)) {
+            return GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, anchorDate);
+        }
         if (materializedRanges.contains(timeRange)) {
             return normalize(graph, timeRange).data();
         }
         return GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, anchorDate);
+    }
+
+    private boolean isCanonicalTimeSeriesPayload(List<Map<String, Object>> payload) {
+        return payload != null
+            && !payload.isEmpty()
+            && payload.stream().allMatch(GraphTimeRangePayloadProjector::isTimeSeriesTrace);
     }
 
     private Set<GraphTimeRange> materializedRanges(Graph graph) {

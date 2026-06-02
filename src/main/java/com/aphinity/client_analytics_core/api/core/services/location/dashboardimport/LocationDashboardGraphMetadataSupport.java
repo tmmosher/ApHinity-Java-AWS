@@ -86,6 +86,17 @@ final class LocationDashboardGraphMetadataSupport {
         return layout;
     }
 
+    static boolean hasLegacyPercentAxis(Graph graph) {
+        if (graph == null || graph.getLayout() == null) {
+            return false;
+        }
+        Map<String, Object> yAxis = asMap(graph.getLayout().get("yaxis"));
+        String title = readLayoutTitleText(yAxis.get("title"));
+        Object tickSuffix = yAxis.get("ticksuffix");
+        return (title != null && title.contains("%"))
+            || (tickSuffix != null && String.valueOf(tickSuffix).contains("%"));
+    }
+
     static Map<String, Object> withDerivedImportMetadata(
         Map<String, Object> existingLayout,
         DerivedGraphConfig derivedGraphDefinition,

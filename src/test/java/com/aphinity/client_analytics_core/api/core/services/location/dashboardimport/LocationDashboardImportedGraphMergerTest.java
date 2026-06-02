@@ -139,6 +139,31 @@ class LocationDashboardImportedGraphMergerTest {
         assertEquals(Map.of("size", 9L), merged.getFirst().get("marker"));
     }
 
+    @Test
+    void mergeImportedGraphDataCanResetLegacyPercentPointsWhenImportingCounts() {
+        Graph graph = graph(List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of("2025-07-01"),
+            "y", List.of(100.0d),
+            "mode", "lines+markers",
+            "line", Map.of("color", "#123456")
+        )));
+
+        List<Map<String, Object>> merged = merger.mergeImportedGraphData(graph, List.of(Map.of(
+            "type", "scatter",
+            "name", "HPC",
+            "x", List.of("2025-08-01"),
+            "y", List.of(2.0d),
+            "mode", "lines+markers",
+            "line", Map.of("shape", "hv")
+        )), true);
+
+        assertEquals(List.of("2025-08-01"), merged.getFirst().get("x"));
+        assertNumericValues(merged.getFirst().get("y"), 2.0d);
+        assertEquals(Map.of("color", "#123456", "shape", "hv"), merged.getFirst().get("line"));
+    }
+
     private void assertNumericValues(Object rawValues, double... expectedValues) {
         @SuppressWarnings("unchecked")
         List<Number> values = (List<Number>) rawValues;

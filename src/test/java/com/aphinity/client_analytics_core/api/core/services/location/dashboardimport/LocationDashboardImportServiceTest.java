@@ -399,6 +399,14 @@ class LocationDashboardImportServiceTest {
         Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
         Graph percentConformanceGraph = indicatorGraph(23L, "Percent Conformance");
         Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality Category", "#ef4444");
+        byWaterQualityGraph.setData(List.of(Map.of(
+            "type", "bar",
+            "name", "Trace 1",
+            "orientation", "h",
+            "x", List.of(0, 0),
+            "y", List.of("Endotoxin", "HPC"),
+            "marker", Map.of("color", List.of("#0ea5e9", "#ef4444"))
+        )));
         Graph bySystemTypeGraph = barGraph(25L, "Non-Conformances", "By Water System Type", "#22c55e");
         Graph byFacilityGraph = barGraph(26L, "Non-Conformances", "By Facility", "#f59e0b");
         Graph statusByFacilityGraph = barGraph(27L, "Non-Conformance Status", "By Facility");
@@ -425,16 +433,24 @@ class LocationDashboardImportServiceTest {
 
         List<GraphResponse> responses = importService.importLocationDashboard(location, file);
 
+        Map<String, Object> waterQualityTrace =
+            findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst();
+        @SuppressWarnings("unchecked")
+        List<String> waterQualityLabels = (List<String>) waterQualityTrace.get("y");
+        @SuppressWarnings("unchecked")
+        List<String> waterQualityColors = (List<String>) ((Map<String, Object>) waterQualityTrace.get("marker")).get("color");
         assertEquals(
-            Map.of("color", "#ef4444", "colors", List.of("#ef4444", "#ef4444")),
-            findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("marker")
+            Map.of("HPC", "#ef4444", "Endotoxin", "#0ea5e9"),
+            java.util.stream.IntStream.range(0, waterQualityLabels.size())
+                .boxed()
+                .collect(java.util.stream.Collectors.toMap(waterQualityLabels::get, waterQualityColors::get))
         );
         assertEquals(
-            Map.of("color", "#22c55e", "colors", List.of("#22c55e")),
+            Map.of("color", List.of("#22c55e"), "colors", List.of("#22c55e")),
             findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("marker")
         );
         assertEquals(
-            Map.of("color", "#f59e0b", "colors", List.of("#f59e0b")),
+            Map.of("color", List.of("#f59e0b"), "colors", List.of("#f59e0b")),
             findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("marker")
         );
     }
@@ -702,8 +718,8 @@ class LocationDashboardImportServiceTest {
         assertEquals(List.of("Newport Beach"), resolvedByFacility.get("x"));
         assertEquals(List.of(1L), activeByFacility.get("y"));
         assertEquals(List.of(1L), resolvedByFacility.get("y"));
-        assertEquals(Map.of("color", "#b91c1c", "colors", List.of("#b91c1c")), activeByFacility.get("marker"));
-        assertEquals(Map.of("color", "#15803d", "colors", List.of("#15803d")), resolvedByFacility.get("marker"));
+        assertEquals(Map.of("color", List.of("#b91c1c"), "colors", List.of("#b91c1c")), activeByFacility.get("marker"));
+        assertEquals(Map.of("color", List.of("#15803d"), "colors", List.of("#15803d")), resolvedByFacility.get("marker"));
 
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
         verifyNoInteractions(graphRepository, locationRepository);

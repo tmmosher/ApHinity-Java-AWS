@@ -525,7 +525,7 @@ class LocationGraphPipelineWebMvcTest {
         assertEquals(List.of(9L, 8L), traces.getFirst().get("y"));
         @SuppressWarnings("unchecked")
         Map<String, Object> marker = (Map<String, Object>) traces.getFirst().get("marker");
-        assertEquals("#1f77b4", marker.get("color"));
+        assertEquals(List.of("#1f77b4", "#d62728"), marker.get("color"));
         assertEquals(List.of("#1f77b4", "#d62728"), marker.get("colors"));
     }
 

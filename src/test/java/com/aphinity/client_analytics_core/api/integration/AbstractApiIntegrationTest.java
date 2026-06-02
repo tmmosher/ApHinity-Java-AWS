@@ -318,7 +318,7 @@ abstract class AbstractApiIntegrationTest {
     }
 
     private void resetDatabase() {
-        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TO FALSE");
         List<String> tables = List.of(
             "location_invite",
             "service_event",
@@ -341,7 +341,7 @@ abstract class AbstractApiIntegrationTest {
         for (String table : tables) {
             jdbcTemplate.execute("TRUNCATE TABLE " + table);
         }
-        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TO TRUE");
     }
 
     private void seedRoles() {

@@ -147,6 +147,12 @@ export const getTraceColor = (trace: Record<string, unknown>): string | null => 
     if (typeof marker.color === "string") {
       return marker.color;
     }
+    if (Array.isArray(marker.color)) {
+      const firstColor = marker.color.find((entry) => typeof entry === "string");
+      if (typeof firstColor === "string") {
+        return firstColor;
+      }
+    }
     if (Array.isArray(marker.colors)) {
       const firstColor = marker.colors.find((entry) => typeof entry === "string");
       if (typeof firstColor === "string") {
@@ -194,6 +200,16 @@ export const getBarRowColor = (
   rowIndex: number
 ): string => {
   const marker = isRecord(trace.marker) ? trace.marker : null;
+  if (marker && Array.isArray(marker.color)) {
+    const rowColor = marker.color[rowIndex];
+    if (typeof rowColor === "string") {
+      return rowColor;
+    }
+    const firstColor = marker.color.find((entry) => typeof entry === "string");
+    if (typeof firstColor === "string") {
+      return firstColor;
+    }
+  }
   if (marker && Array.isArray(marker.colors)) {
     const rowColor = marker.colors[rowIndex];
     if (typeof rowColor === "string") {
@@ -534,7 +550,7 @@ export const setBarRowColor = (
   const marker = isRecord(trace.marker) ? {...trace.marker} : {};
   const colors = Array.from({length: rowCount}, (_, index) => getBarRowColor(trace, index));
   colors[rowIndex] = colorHex;
-  marker.color = colors[0] ?? colorHex;
+  marker.color = colors;
   marker.colors = colors;
 
   return {
@@ -555,9 +571,12 @@ export const setTraceColor = (
   if (traceType === "bar") {
     const marker = isRecord(trace.marker) ? {...trace.marker} : {};
     const rowCount = Math.max(getTraceArray(trace, "x").length, getTraceArray(trace, "y").length);
-    marker.color = colorHex;
     if (rowCount > 0) {
-      marker.colors = Array.from({length: rowCount}, () => colorHex);
+      const colors = Array.from({length: rowCount}, () => colorHex);
+      marker.color = colors;
+      marker.colors = colors;
+    } else {
+      marker.color = colorHex;
     }
     return {
       ...trace,
@@ -723,7 +742,7 @@ export const addCartesianRow = (trace: Record<string, unknown>): Record<string, 
   const colors = Array.from({length: Math.max(xValues.length, yValues.length)}, (_, index) =>
     index < previousRowCount ? getBarRowColor(trace, index) : inheritedColor
   );
-  marker.color = colors[0] ?? getDefaultTraceColor();
+  marker.color = colors;
   marker.colors = colors;
   return {
     ...nextTrace,
@@ -803,7 +822,7 @@ export const removeCartesianRow = (
     originalColors.splice(rowIndex, 1);
   }
   if (originalColors.length > 0) {
-    marker.color = originalColors[0];
+    marker.color = originalColors;
     marker.colors = originalColors;
   } else {
     delete marker.colors;

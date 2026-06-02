@@ -1,4 +1,5 @@
-import { For, Index, Show } from "solid-js";
+import { Index, Show } from "solid-js";
+import GraphColorPicker from "./GraphColorPicker";
 
 export type TraceOption = {
   index: number;
@@ -64,24 +65,12 @@ const TraceControls = (props: TraceControlsProps) => (
       <Show when={props.showColorSelect}>
         <label class="form-control">
           <span class="label-text">Trace color</span>
-          <select
-            class="select select-bordered select-sm mt-1"
+          <GraphColorPicker
             value={props.selectedTraceColor}
             disabled={props.disableColorSelect}
-            onChange={(event) => {
-              const nextColor = event.currentTarget.value;
-              if (nextColor.length > 0) {
-                props.onApplyColor(nextColor);
-              }
-            }}
-          >
-            <option value="">Choose a color</option>
-            <For each={Object.entries(props.colorOptions)}>
-              {([label, hex]) => (
-                <option value={hex}>{label}</option>
-              )}
-            </For>
-          </select>
+            colorOptions={props.colorOptions}
+            onChange={props.onApplyColor}
+          />
         </label>
       </Show>
     </div>

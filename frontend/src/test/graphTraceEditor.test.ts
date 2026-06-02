@@ -107,7 +107,7 @@ describe("graphTraceEditor", () => {
     expect(getBarRowColor(nextTrace, 0)).toBe("#1f77b4");
     expect(getBarRowColor(nextTrace, 1)).toBe("#d62728");
     expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#d62728"]);
-    expect((nextTrace.marker as {color: string}).color).toBe("#1f77b4");
+    expect((nextTrace.marker as {color: string[]}).color).toEqual(["#1f77b4", "#d62728"]);
   });
 
   it("applies a trace-level bar color to every row", () => {
@@ -124,7 +124,7 @@ describe("graphTraceEditor", () => {
 
     const nextTrace = setTraceColor(trace, "bar", "#d62728");
 
-    expect((nextTrace.marker as {color: string}).color).toBe("#d62728");
+    expect((nextTrace.marker as {color: string[]}).color).toEqual(["#d62728", "#d62728"]);
     expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#d62728", "#d62728"]);
     expect(getBarRowColor(nextTrace, 0)).toBe("#d62728");
     expect(getBarRowColor(nextTrace, 1)).toBe("#d62728");
@@ -434,12 +434,13 @@ describe("graphTraceEditor", () => {
     };
 
     const withAddedRow = addCartesianRow(trace);
+    expect((withAddedRow.marker as {color: string[]}).color).toEqual(["#1f77b4", "#1f77b4"]);
     expect((withAddedRow.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#1f77b4"]);
 
     const recolored = setBarRowColor(withAddedRow, 1, "#d62728");
     const withRemovedRow = removeCartesianRow(recolored, 0);
     expect((withRemovedRow.marker as {colors: string[]}).colors).toEqual(["#d62728"]);
-    expect((withRemovedRow.marker as {color: string}).color).toBe("#d62728");
+    expect((withRemovedRow.marker as {color: string[]}).color).toEqual(["#d62728"]);
   });
 
   it("creates pie traces with donut defaults", () => {

@@ -253,13 +253,18 @@ public class LocationDashboardImportService {
                 continue;
             }
 
+            boolean resetLegacyPercentHistory = LocationDashboardGraphMetadataSupport.hasLegacyPercentAxis(previewGraph);
             previewGraph.setLayout(LocationDashboardGraphMetadataSupport.withImportMetadataAndDefaults(
                 previewGraph.getLayout(),
                 graphDefinition,
                 strategy.locationName()
             ));
             previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(graphDefinition.graphType()));
-            previewGraph.setData(importedGraphMerger.mergeImportedGraphData(previewGraph, computedGraphPayload.data()));
+            previewGraph.setData(importedGraphMerger.mergeImportedGraphData(
+                previewGraph,
+                computedGraphPayload.data(),
+                resetLegacyPercentHistory
+            ));
             materializePreviewRollingRanges(previewGraph);
             graphsToPersistById.put(previewGraph.getId(), previewGraph);
         }

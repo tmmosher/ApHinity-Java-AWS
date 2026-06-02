@@ -252,7 +252,26 @@ class GraphRelationalPayloadMapperTest {
         assertEquals(List.of(5L, 7L), traces.getFirst().get("y"));
         @SuppressWarnings("unchecked")
         Map<String, Object> marker = (Map<String, Object>) traces.getFirst().get("marker");
-        assertEquals("#1f77b4", marker.get("color"));
+        assertEquals(List.of("#1f77b4", "#d62728"), marker.get("color"));
+        assertEquals(List.of("#1f77b4", "#d62728"), marker.get("colors"));
+    }
+
+    @Test
+    void setDataRoundTripsPlotlyBarMarkerColorArray() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "name", "Sessions",
+            "orientation", "v",
+            "x", List.of("Jan", "Feb"),
+            "y", List.of(5, 7),
+            "marker", Map.of("color", List.of("#1f77b4", "#d62728"))
+        )));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> marker = (Map<String, Object>) traces.getFirst().get("marker");
+        assertEquals(List.of("#1f77b4", "#d62728"), marker.get("color"));
         assertEquals(List.of("#1f77b4", "#d62728"), marker.get("colors"));
     }
 }

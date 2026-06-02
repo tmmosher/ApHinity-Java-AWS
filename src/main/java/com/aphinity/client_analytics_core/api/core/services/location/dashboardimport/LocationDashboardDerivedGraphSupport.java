@@ -347,6 +347,9 @@ final class LocationDashboardDerivedGraphSupport {
         // Preserve the configured bar direction so uploads only refresh values, not chart layout.
         String orientation = resolveBarOrientation(trace);
         trace.put("orientation", orientation);
+        Map<String, Object> marker = copyMap(trace.get("marker"));
+        String preservedColor = configuredTraceColor(trace);
+        List<String> colors = configuredBarColorsByLabel(trace, labels, orientation, preservedColor == null ? color : preservedColor);
         if ("v".equals(orientation)) {
             trace.put("x", List.copyOf(labels));
             trace.put("y", List.copyOf(values));
@@ -354,11 +357,30 @@ final class LocationDashboardDerivedGraphSupport {
             trace.put("x", List.copyOf(values));
             trace.put("y", List.copyOf(labels));
         }
-        Map<String, Object> marker = copyMap(trace.get("marker"));
-        String preservedColor = configuredTraceColor(trace);
-        marker.put("color", preservedColor == null ? color : preservedColor);
+        marker.put("color", colors);
+        marker.put("colors", colors);
         trace.put("marker", marker);
         return trace;
+    }
+
+    private static List<String> configuredBarColorsByLabel(
+        Map<String, Object> trace,
+        List<String> nextLabels,
+        String orientation,
+        String fallbackColor
+    ) {
+        List<?> existingLabels = listValue(trace.get("v".equals(orientation) ? "x" : "y"));
+        List<?> existingColors = markerColors(trace);
+        Map<String, String> colorsByLabel = new LinkedHashMap<>();
+        for (int index = 0; index < Math.min(existingLabels.size(), existingColors.size()); index += 1) {
+            Object rawColor = existingColors.get(index);
+            if (rawColor instanceof String color && !color.isBlank()) {
+                colorsByLabel.put(String.valueOf(existingLabels.get(index)), color);
+            }
+        }
+        return nextLabels.stream()
+            .map(label -> colorsByLabel.getOrDefault(label, fallbackColor))
+            .toList();
     }
 
     private static String configuredTraceColor(Map<String, Object> trace) {
@@ -367,12 +389,9 @@ final class LocationDashboardDerivedGraphSupport {
         if (markerColor instanceof String colorValue && !colorValue.isBlank()) {
             return colorValue;
         }
-        Object markerColors = marker.get("colors");
-        if (markerColors instanceof List<?> colors) {
-            for (Object colorValue : colors) {
-                if (colorValue instanceof String color && !color.isBlank()) {
-                    return color;
-                }
+        for (Object colorValue : markerColors(trace)) {
+            if (colorValue instanceof String color && !color.isBlank()) {
+                return color;
             }
         }
         Map<String, Object> line = copyMap(trace.get("line"));
@@ -381,6 +400,20 @@ final class LocationDashboardDerivedGraphSupport {
             return colorValue;
         }
         return null;
+    }
+
+    private static List<?> markerColors(Map<String, Object> trace) {
+        Map<String, Object> marker = copyMap(trace.get("marker"));
+        Object markerColor = marker.get("color");
+        if (markerColor instanceof List<?> colors) {
+            return colors;
+        }
+        Object markerColors = marker.get("colors");
+        return markerColors instanceof List<?> colors ? colors : List.of();
+    }
+
+    private static List<?> listValue(Object value) {
+        return value instanceof List<?> list ? list : List.of();
     }
 
     private static Map<String, Object> piePrototype(Graph graph, String traceName) {

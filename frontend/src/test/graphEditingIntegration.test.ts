@@ -226,7 +226,7 @@ describe("graph editing integration", () => {
         x: ["North", "South"],
         y: [3, 7],
         marker: {
-          color: "#1f77b4",
+          color: ["#1f77b4", "#d62728"],
           colors: ["#1f77b4", "#d62728"]
         }
       }
