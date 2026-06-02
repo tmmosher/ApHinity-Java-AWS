@@ -1,14 +1,31 @@
+import {readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
+import {createRoot, createSignal} from "solid-js";
 import {renderToString} from "solid-js/web";
 import {afterEach, describe, expect, it, vi} from "vitest";
 
 let latestLibraryProps: Record<string, unknown> | null = null;
+let latestPopoverProps: Record<string, unknown> | null = null;
+let libraryRenderCount = 0;
 
 vi.mock("@thednp/solid-color-picker", () => ({
   DefaultColorPicker: (props: Record<string, unknown>) => {
     latestLibraryProps = props;
+    libraryRenderCount += 1;
     return <div data-library-color-picker="" />;
   }
 }));
+
+vi.mock("corvu/popover", () => {
+  const Popover = (props: Record<string, unknown>) => {
+    latestPopoverProps = props;
+    return props.children;
+  };
+  Popover.Trigger = (props: Record<string, unknown>) => props.children;
+  Popover.Portal = (props: Record<string, unknown>) => props.children;
+  Popover.Content = (props: Record<string, unknown>) => props.children;
+  return {default: Popover};
+});
 
 import GraphColorPicker from "../components/graph-editor/GraphColorPicker";
 
@@ -16,10 +33,13 @@ const COLOR_OPTIONS = {
   "Legacy Blue": "#1f77b4",
   "Legacy Green": "#2ca02c"
 };
+const cssPath = fileURLToPath(new URL("../index.css", import.meta.url));
 
 describe("GraphColorPicker", () => {
   afterEach(() => {
     latestLibraryProps = null;
+    latestPopoverProps = null;
+    libraryRenderCount = 0;
   });
 
   it("configures the solid color picker with hex output and the existing palette defaults", () => {
@@ -40,6 +60,12 @@ describe("GraphColorPicker", () => {
         {"Legacy Blue": "#1f77b4"},
         {"Legacy Green": "#2ca02c"}
       ]
+    });
+    expect(latestPopoverProps).toMatchObject({
+      placement: "bottom-start",
+      trapFocus: false,
+      restoreFocus: false,
+      closeOnOutsideFocus: false
     });
   });
 
@@ -70,5 +96,38 @@ describe("GraphColorPicker", () => {
     ));
     (latestLibraryProps?.onChange as (colorHex: string) => void)("#fedcba");
     expect(onChange).toHaveBeenCalledOnce();
+  });
+
+  it("stays mounted when the parent accepts an interactive color update", () => {
+    createRoot((dispose) => {
+      const [value, setValue] = createSignal("#123456");
+      GraphColorPicker({
+        get value() {
+          return value();
+        },
+        colorOptions: COLOR_OPTIONS,
+        onChange: setValue
+      });
+
+      expect(libraryRenderCount).toBe(1);
+      (latestLibraryProps?.onChange as (colorHex: string) => void)("#abcdef");
+      expect(value()).toBe("#abcdef");
+      expect(libraryRenderCount).toBe(1);
+      dispose();
+    });
+  });
+
+  it("renders dropdowns inside a floating popover instead of expanding the modal scroll region", () => {
+    const css = readFileSync(cssPath, "utf8");
+
+    expect(css).toContain(
+      ".graph-color-picker-popover-content .graph-color-picker .color-dropdown"
+    );
+    expect(css).toContain("position: static;");
+    expect(css).toContain(
+      ".graph-color-picker-popover-content .graph-color-picker .menu-toggle"
+    );
+    expect(css).toContain("height: 2rem;");
+    expect(css).not.toContain(".graph-editor-scroll-region:has");
   });
 });

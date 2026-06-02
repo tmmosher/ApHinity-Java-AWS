@@ -140,3 +140,31 @@
     animation: none;
   }
 }
+
+@layer components {
+  .graph-color-picker-popover-content .graph-color-picker {
+    @apply block w-full min-w-0;
+  }
+
+  .graph-color-picker-popover-content .graph-color-picker .color-preview {
+    @apply input input-bordered input-sm w-full min-w-0 pr-12;
+  }
+
+  .graph-color-picker-popover-content .graph-color-picker .picker-toggle {
+    top: 0;
+    bottom: auto;
+    height: 2rem;
+    width: calc(100% - 3rem);
+  }
+
+  .graph-color-picker-popover-content .graph-color-picker .menu-toggle {
+    @apply rounded-r-md;
+    height: 2rem;
+  }
+
+  .graph-color-picker-popover-content .graph-color-picker .color-dropdown {
+    position: static;
+    margin-top: 0.5rem;
+    transform: none;
+  }
+}
