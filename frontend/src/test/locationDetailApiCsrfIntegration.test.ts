@@ -64,9 +64,7 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
     const firstMutationBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(firstMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-stale");
     expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-fresh");
-    expect(firstMutationBody.graphs[0].timeRangeData).toEqual({
-      threeMonths: [{type: "bar", y: [3, 2, 1]}]
-    });
+    expect(firstMutationBody.graphs[0]).not.toHaveProperty("timeRangeData");
   });
 
   it("surfaces a CSRF error when stale-token retry still fails", async () => {

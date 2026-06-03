@@ -11,88 +11,24 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Component
 public class GraphResponseMapper {
     private static final Logger log = LoggerFactory.getLogger(GraphResponseMapper.class);
-    private static final ZoneId PHOENIX_ZONE = ZoneId.of("America/Phoenix");
-    private final Clock clock;
-
-    public GraphResponseMapper() {
-        this(Clock.system(PHOENIX_ZONE));
-    }
-
-    public GraphResponseMapper(Clock clock) {
-        this.clock = clock;
-    }
 
     public GraphResponse toResponse(Graph graph) {
         GraphPayloadMapper.GraphPayload payload = normalize(graph, GraphTimeRange.ALL_TIME);
-        LocalDate anchorDate = LocalDate.now(clock);
-        Set<GraphTimeRange> materializedRanges = materializedRanges(graph);
-        Map<String, List<Map<String, Object>>> timeRangeData = new LinkedHashMap<>();
-        for (GraphTimeRange timeRange : GraphTimeRange.values()) {
-            timeRangeData.put(
-                timeRange.getResponseKey(),
-                resolveRangePayload(graph, payload.data(), timeRange, anchorDate, materializedRanges)
-            );
-        }
-
         return new GraphResponse(
             graph.getId(),
             graph.getName(),
             payload.data(),
-            Map.copyOf(timeRangeData),
             payload.layout(),
             payload.config(),
             payload.style(),
             graph.getCreatedAt(),
             graph.getUpdatedAt()
         );
-    }
-
-    private List<Map<String, Object>> resolveRangePayload(
-        Graph graph,
-        List<Map<String, Object>> allTimePayload,
-        GraphTimeRange timeRange,
-        LocalDate anchorDate,
-        Set<GraphTimeRange> materializedRanges
-    ) {
-        if (timeRange == GraphTimeRange.ALL_TIME) {
-            return allTimePayload;
-        }
-        if (isCanonicalTimeSeriesPayload(allTimePayload)) {
-            return GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, anchorDate);
-        }
-        if (materializedRanges.contains(timeRange)) {
-            return normalize(graph, timeRange).data();
-        }
-        return GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, anchorDate);
-    }
-
-    private boolean isCanonicalTimeSeriesPayload(List<Map<String, Object>> payload) {
-        return payload != null
-            && !payload.isEmpty()
-            && payload.stream().allMatch(GraphTimeRangePayloadProjector::isTimeSeriesTrace);
-    }
-
-    private Set<GraphTimeRange> materializedRanges(Graph graph) {
-        Set<GraphTimeRange> materializedRanges = EnumSet.noneOf(GraphTimeRange.class);
-        if (graph == null || graph.getGraphTraces() == null || graph.getGraphTraces().isEmpty()) {
-            return materializedRanges;
-        }
-        graph.getGraphTraces().stream()
-            .filter(trace -> trace != null && trace.getTimeRange() != null)
-            .forEach(trace -> materializedRanges.add(trace.getTimeRange()));
-        return materializedRanges;
     }
 
     private GraphPayloadMapper.GraphPayload normalize(Graph graph, GraphTimeRange timeRange) {

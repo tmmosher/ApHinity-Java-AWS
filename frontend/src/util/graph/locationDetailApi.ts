@@ -157,6 +157,7 @@ export const saveLocationGraphsById = async (
   sectionLayout?: LocationSectionLayoutConfig
 ): Promise<void> => {
   const parsedId = parseRouteLocationId(locationId);
+  const canonicalGraphUpdates = graphUpdates.map(({timeRangeData: _timeRangeData, ...graphUpdate}) => graphUpdate);
 
   const response = await apiFetch(host + "/api/core/locations/" + parsedId + "/graphs", {
     method: "PUT",
@@ -164,7 +165,7 @@ export const saveLocationGraphsById = async (
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      graphs: graphUpdates,
+      graphs: canonicalGraphUpdates,
       sectionLayout
     })
   });

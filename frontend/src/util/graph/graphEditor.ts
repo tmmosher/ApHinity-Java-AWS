@@ -134,43 +134,9 @@ const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayl
 const graphPayloadSignature = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload));
 
-const isGraphDataList = (value: unknown): value is Record<string, unknown>[] =>
-  Array.isArray(value) && value.every((entry) => isRecord(entry));
-
-const resolveEditableGraphDataForTimeRange = (
-  graph: LocationGraph,
-  timeRange: LocationGraphTimeRange
-): Record<string, unknown>[] => {
-  if (timeRange === "allTime") {
-    return graph.data;
-  }
-
-  const timeRangeData = graph.timeRangeData?.[timeRange];
-  return isGraphDataList(timeRangeData) ? timeRangeData : graph.data;
-};
-
-const normalizeGraphTimeRangeData = (
-  timeRangeData: LocationGraph["timeRangeData"]
-): LocationGraphUpdate["timeRangeData"] => {
-  if (!timeRangeData) {
-    return undefined;
-  }
-
-  const nextTimeRangeData: NonNullable<LocationGraphUpdate["timeRangeData"]> = {};
-  if (timeRangeData.threeMonths) {
-    nextTimeRangeData.threeMonths = cloneJson(timeRangeData.threeMonths);
-  }
-  if (timeRangeData.twelveMonths) {
-    nextTimeRangeData.twelveMonths = cloneJson(timeRangeData.twelveMonths);
-  }
-
-  return Object.keys(nextTimeRangeData).length > 0 ? nextTimeRangeData : undefined;
-};
-
 const buildGraphUpdatePayload = (graph: LocationGraph): LocationGraphUpdate => ({
   graphId: graph.id,
-  ...createEditableGraphPayload(graph),
-  timeRangeData: normalizeGraphTimeRangeData(graph.timeRangeData)
+  ...createEditableGraphPayload(graph)
 });
 
 const graphPersistenceSignature = (graph: LocationGraph): string =>
@@ -180,8 +146,7 @@ const graphPersistenceSignature = (graph: LocationGraph): string =>
       layout: graph.layout ?? null,
       config: graph.config ?? null,
       style: graph.style ?? null
-    }),
-    timeRangeData: normalizeGraphTimeRangeData(graph.timeRangeData) ?? null
+    })
   });
 
 const buildGraphBaselineEntry = (graph: LocationGraph): GraphBaselineEntry => ({
@@ -197,7 +162,6 @@ const isGraphDirty = (
 function graphStateSignature(graph: LocationGraph): string {
   return JSON.stringify({
     name: graph.name,
-    timeRangeData: normalizeGraphTimeRangeData(graph.timeRangeData) ?? null,
     payload: normalizeGraphPayload({
       data: graph.data,
       layout: graph.layout ?? null,
@@ -223,18 +187,8 @@ export const createEditableGraphPayload = (graph: LocationGraph): EditableGraphP
 
 export const createEditableGraphForTimeRange = (
   graph: LocationGraph,
-  timeRange: LocationGraphTimeRange
-): LocationGraph => {
-  const data = resolveEditableGraphDataForTimeRange(graph, timeRange);
-  if (data === graph.data) {
-    return graph;
-  }
-
-  return {
-    ...graph,
-    data
-  };
-};
+  _timeRange: LocationGraphTimeRange
+): LocationGraph => graph;
 
 export const serializeEditableGraphPayload = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload), null, 2);
@@ -538,24 +492,13 @@ export const applyGraphPayloadEdit = (
 
   const nextGraphs = currentGraphs.map((graph) =>
     graph.id === graphId
-      ? timeRange === "allTime"
-        ? {
-            ...graph,
-            data: cloneJson(normalizedNextPayload.data),
-            layout: cloneJson(normalizedNextPayload.layout ?? null),
-            config: cloneJson(normalizedNextPayload.config ?? null),
-            style: cloneJson(normalizedNextPayload.style ?? null)
-          }
-        : {
-            ...graph,
-            timeRangeData: {
-              ...(graph.timeRangeData ?? {}),
-              [timeRange]: cloneJson(normalizedNextPayload.data)
-            },
-            layout: cloneJson(normalizedNextPayload.layout ?? null),
-            config: cloneJson(normalizedNextPayload.config ?? null),
-            style: cloneJson(normalizedNextPayload.style ?? null)
-          }
+      ? {
+          ...graph,
+          data: cloneJson(normalizedNextPayload.data),
+          layout: cloneJson(normalizedNextPayload.layout ?? null),
+          config: cloneJson(normalizedNextPayload.config ?? null),
+          style: cloneJson(normalizedNextPayload.style ?? null)
+        }
       : graph
   );
 

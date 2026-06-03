@@ -163,15 +163,6 @@ class LocationDashboardImportServiceTest {
             .getFirst()
             .get("customdata");
         assertEquals(2L, ((Number) hpcCustomData.get(1).get("sampleCount")).longValue());
-        assertEquals(
-            List.of("2025-07-01", "2025-08-01"),
-            waterQualityResponse.timeRangeData().get("threeMonths").getFirst().get("x")
-        );
-        assertEquals(
-            List.of("2025-07-01", "2025-08-01"),
-            waterQualityResponse.timeRangeData().get("twelveMonths").getFirst().get("x")
-        );
-
         assertEquals(List.of(7L), findResponseByName(responses, "Total Number of Samples").data().getFirst().get("values"));
         @SuppressWarnings("unchecked")
         Map<String, Object> totalSamplesMarker = (Map<String, Object>) findResponseByName(
@@ -184,7 +175,6 @@ class LocationDashboardImportServiceTest {
         );
         GraphResponse totalNonConformancesResponse = findResponseByName(responses, "Total Non-Conformances");
         assertEquals(List.of(2L), totalNonConformancesResponse.data().getFirst().get("values"));
-        assertEquals(List.of(2L), totalNonConformancesResponse.timeRangeData().get("threeMonths").getFirst().get("values"));
         assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentGauge = (Map<String, Object>) findResponseByName(
@@ -900,7 +890,7 @@ class LocationDashboardImportServiceTest {
             locationGraphRepository,
             serviceEventRepository,
             new LocationDashboardMutationLockService(),
-            new GraphResponseMapper(clock),
+            new GraphResponseMapper(),
             clock
         );
     }

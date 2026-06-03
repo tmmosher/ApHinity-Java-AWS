@@ -20,10 +20,9 @@ export const dashboardTimeRangeOptions: Array<{
   }
 ];
 
-const isGraphDataList = (value: unknown): value is Record<string, unknown>[] =>
-  Array.isArray(value) && value.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry));
-
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+const RANGE_CONTEXT_MONTHS = 1;
+const DISPLAY_MARGIN_DAYS = 7;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -62,6 +61,15 @@ const normalizeIsoDateValue = (value: unknown): string | null => {
   ].join("-");
 };
 
+const getCurrentIsoDate = (): string => {
+  const currentDate = new Date();
+  return [
+    String(currentDate.getFullYear()).padStart(4, "0"),
+    String(currentDate.getMonth() + 1).padStart(2, "0"),
+    String(currentDate.getDate()).padStart(2, "0")
+  ].join("-");
+};
+
 const addUtcDays = (isoDate: string, days: number): string => {
   const [year, month, day] = isoDate.split("-").map(Number);
   const nextDate = new Date(Date.UTC(year, month - 1, day + days));
@@ -72,145 +80,122 @@ const addUtcDays = (isoDate: string, days: number): string => {
   ].join("-");
 };
 
-const resolveAllTimeGraphData = (graph: LocationGraph): Record<string, unknown>[] => graph.data;
-
-const findMatchingSourceTrace = (
-  sourceData: Record<string, unknown>[],
-  selectedTrace: Record<string, unknown>,
-  traceIndex: number
-): Record<string, unknown> | null => {
-  const sourceByIndex = sourceData[traceIndex];
-  if (
-    isRecord(sourceByIndex) &&
-    sourceByIndex.type === selectedTrace.type
-  ) {
-    return sourceByIndex;
-  }
-
-  const sourceByIdentity = sourceData.find((candidate) =>
-    isRecord(candidate) &&
-    candidate.type === selectedTrace.type &&
-    candidate.name === selectedTrace.name
-  );
-  return sourceByIdentity ?? null;
+const addUtcMonths = (isoDate: string, months: number): string => {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const monthStart = new Date(Date.UTC(year, month - 1 + months, 1));
+  const targetYear = monthStart.getUTCFullYear();
+  const targetMonth = monthStart.getUTCMonth();
+  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const nextDate = new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDayOfTargetMonth)));
+  return [
+    String(nextDate.getUTCFullYear()).padStart(4, "0"),
+    String(nextDate.getUTCMonth() + 1).padStart(2, "0"),
+    String(nextDate.getUTCDate()).padStart(2, "0")
+  ].join("-");
 };
 
-const prependContextPointToTrace = (
-  selectedTrace: Record<string, unknown>,
-  sourceTrace: Record<string, unknown>
-): {
-  trace: Record<string, unknown>;
-  selectedWindow: {start: string; end: string} | null;
-  hasContextPoint: boolean;
-} => {
-  const selectedX = Array.isArray(selectedTrace.x) ? selectedTrace.x : null;
-  if (!selectedX || selectedX.length === 0) {
-    return {trace: selectedTrace, selectedWindow: null, hasContextPoint: false};
+const firstDayOfMonth = (isoDate: string): string => {
+  const [year, month] = isoDate.split("-").map(Number);
+  return [
+    String(year).padStart(4, "0"),
+    String(month).padStart(2, "0"),
+    "01"
+  ].join("-");
+};
+
+const resolveSelectedWindow = (
+  timeRange: DashboardTimeRange,
+  anchorDate: string = getCurrentIsoDate()
+): {start: string; end: string} | null => {
+  const normalizedAnchorDate = normalizeIsoDateValue(anchorDate);
+  if (timeRange === "allTime" || normalizedAnchorDate === null) {
+    return null;
   }
 
-  const normalizedSelectedDates = selectedX
-    .map(normalizeIsoDateValue)
-    .filter((value): value is string => value !== null);
-  if (normalizedSelectedDates.length !== selectedX.length) {
-    return {trace: selectedTrace, selectedWindow: null, hasContextPoint: false};
-  }
-
-  const selectedWindow = {
-    start: normalizedSelectedDates.reduce((earliest, value) => earliest.localeCompare(value) <= 0 ? earliest : value),
-    end: normalizedSelectedDates.reduce((latest, value) => latest.localeCompare(value) >= 0 ? latest : value)
-  };
-
-  const sourceX = Array.isArray(sourceTrace.x) ? sourceTrace.x : null;
-  if (!sourceX || sourceX.length === 0) {
-    return {trace: selectedTrace, selectedWindow, hasContextPoint: false};
-  }
-
-  let previousPointIndex = -1;
-  for (let index = 0; index < sourceX.length; index += 1) {
-    const normalizedDate = normalizeIsoDateValue(sourceX[index]);
-    if (normalizedDate !== null && normalizedDate.localeCompare(selectedWindow.start) < 0) {
-      previousPointIndex = index;
-    }
-  }
-
-  if (previousPointIndex < 0) {
-    return {trace: selectedTrace, selectedWindow, hasContextPoint: false};
-  }
-
-  const nextTrace: Record<string, unknown> = {...selectedTrace};
-  let changed = false;
-  for (const [key, value] of Object.entries(selectedTrace)) {
-    if (!Array.isArray(value) || value.length !== selectedX.length) {
-      continue;
-    }
-
-    const sourceValue = Array.isArray(sourceTrace[key]) ? sourceTrace[key] as unknown[] : null;
-    nextTrace[key] = [
-      sourceValue && sourceValue.length > previousPointIndex ? sourceValue[previousPointIndex] : null,
-      ...value
-    ];
-    changed = true;
+  if (timeRange === "threeMonths") {
+    return {
+      start: firstDayOfMonth(addUtcMonths(normalizedAnchorDate, -3)),
+      end: normalizedAnchorDate
+    };
   }
 
   return {
-    trace: changed ? nextTrace : selectedTrace,
-    selectedWindow,
-    hasContextPoint: changed
+    start: addUtcMonths(normalizedAnchorDate, -12),
+    end: normalizedAnchorDate
   };
+};
+
+const isTimeSeriesTrace = (trace: Record<string, unknown>): boolean => {
+  const traceType = String(trace.type ?? "").trim().toLowerCase();
+  const xValues = Array.isArray(trace.x) ? trace.x : [];
+  return (traceType === "scatter" || traceType === "scattergl")
+    && xValues.length > 0
+    && xValues.every((value) => normalizeIsoDateValue(value) !== null);
+};
+
+const filterTraceToWindow = (
+  trace: Record<string, unknown>,
+  dataWindow: {start: string; end: string}
+): Record<string, unknown> => {
+  if (!isTimeSeriesTrace(trace)) {
+    return trace;
+  }
+
+  const xValues = Array.isArray(trace.x) ? trace.x : [];
+  const sortedIncludedIndices = xValues
+    .map((value, index) => ({
+      index,
+      date: normalizeIsoDateValue(value)
+    }))
+    .filter((entry): entry is {index: number; date: string} =>
+      entry.date !== null
+      && entry.date.localeCompare(dataWindow.start) >= 0
+      && entry.date.localeCompare(dataWindow.end) <= 0
+    )
+    .sort((left, right) => left.date.localeCompare(right.date));
+
+  const nextTrace: Record<string, unknown> = {};
+  let changed = false;
+  for (const [key, value] of Object.entries(trace)) {
+    if (!Array.isArray(value) || value.length !== xValues.length) {
+      nextTrace[key] = value;
+      continue;
+    }
+
+    const nextValues = sortedIncludedIndices.map(({index}) => value[index]);
+    nextTrace[key] = nextValues;
+    changed = changed
+      || nextValues.length !== value.length
+      || nextValues.some((nextValue, index) => nextValue !== value[index]);
+  }
+
+  return changed ? nextTrace : trace;
 };
 
 const buildTimeRangeDisplayData = (
   graph: LocationGraph,
-  timeRange: DashboardTimeRange,
-  resolvedData: Record<string, unknown>[]
+  timeRange: DashboardTimeRange
 ): {
   data: Record<string, unknown>[];
   selectedWindow: {start: string; end: string} | null;
 } => {
-  if (timeRange === "allTime" || resolvedData === graph.data) {
-    return {data: resolvedData, selectedWindow: null};
+  const selectedWindow = resolveSelectedWindow(timeRange);
+  if (selectedWindow === null) {
+    return {data: graph.data, selectedWindow: null};
   }
 
-  const allTimeData = resolveAllTimeGraphData(graph);
-  let changed = false;
-  let earliestWindowStart: string | null = null;
-  let latestWindowEnd: string | null = null;
-
-  const displayData = resolvedData.map((trace, traceIndex) => {
-    if (!isRecord(trace)) {
-      return trace;
-    }
-
-    const traceType = String(trace.type ?? "").toLowerCase();
-    if (traceType !== "scatter" && traceType !== "scattergl") {
-      return trace;
-    }
-
-    const sourceTrace = findMatchingSourceTrace(allTimeData, trace, traceIndex);
-    if (!sourceTrace) {
-      return trace;
-    }
-
-    const contextualized = prependContextPointToTrace(trace, sourceTrace);
-    if (contextualized.hasContextPoint && contextualized.selectedWindow) {
-      earliestWindowStart = earliestWindowStart === null || contextualized.selectedWindow.start.localeCompare(earliestWindowStart) < 0
-        ? contextualized.selectedWindow.start
-        : earliestWindowStart;
-      latestWindowEnd = latestWindowEnd === null || contextualized.selectedWindow.end.localeCompare(latestWindowEnd) > 0
-        ? contextualized.selectedWindow.end
-        : latestWindowEnd;
-    }
-    if (contextualized.trace !== trace) {
-      changed = true;
-    }
-    return contextualized.trace;
-  });
+  const dataWindow = {
+    start: addUtcMonths(selectedWindow.start, -RANGE_CONTEXT_MONTHS),
+    end: selectedWindow.end
+  };
+  const displayData = graph.data.map((trace) =>
+    isRecord(trace) ? filterTraceToWindow(trace, dataWindow) : trace
+  );
+  const changed = displayData.some((trace, index) => trace !== graph.data[index]);
 
   return {
-    data: changed ? displayData : resolvedData,
-    selectedWindow: earliestWindowStart && latestWindowEnd
-      ? {start: earliestWindowStart, end: latestWindowEnd}
-      : null
+    data: changed ? displayData : graph.data,
+    selectedWindow
   };
 };
 
@@ -222,12 +207,12 @@ const applySelectedDateWindowToLayout = (
     return layout;
   }
 
-  const nextEnd = selectedWindow.start === selectedWindow.end
-    ? addUtcDays(selectedWindow.end, 1)
-    : selectedWindow.end;
   const nextXAxis = {
     ...(isRecord(layout?.xaxis) ? layout.xaxis : {}),
-    range: [selectedWindow.start, nextEnd],
+    range: [
+      addUtcDays(selectedWindow.start, -DISPLAY_MARGIN_DAYS),
+      addUtcDays(selectedWindow.end, DISPLAY_MARGIN_DAYS)
+    ],
     autorange: false
   };
   return {
@@ -244,19 +229,14 @@ export const resolveLocationGraphDataForTimeRange = (
     return graph.data;
   }
 
-  const rangedData = graph.timeRangeData?.[timeRange];
-  if (isGraphDataList(rangedData)) {
-    return rangedData;
-  }
-  return graph.data;
+  return buildTimeRangeDisplayData(graph, timeRange).data;
 };
 
 export const materializeLocationGraphForTimeRange = (
   graph: LocationGraph,
   timeRange: DashboardTimeRange
 ): LocationGraph => {
-  const resolvedData = resolveLocationGraphDataForTimeRange(graph, timeRange);
-  const display = buildTimeRangeDisplayData(graph, timeRange, resolvedData);
+  const display = buildTimeRangeDisplayData(graph, timeRange);
   const nextLayout = applySelectedDateWindowToLayout(graph.layout, display.selectedWindow);
   if (display.data === graph.data && nextLayout === graph.layout) {
     return graph;
