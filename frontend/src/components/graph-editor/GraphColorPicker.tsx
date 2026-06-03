@@ -63,29 +63,27 @@ const GraphColorPicker = (props: GraphColorPickerProps) => {
               <span class="min-w-0 truncate">{pickerValue()}</span>
             </Popover.Trigger>
 
-            <Popover.Portal>
-              <Popover.Content
-                ref={popoverContent}
-                class="graph-color-picker-popover-content z-[80] w-[min(92vw,22rem)] rounded-lg border border-base-300 bg-base-100 p-2 shadow-xl"
-              >
-                <Show when={pickerValue()} keyed>
-                  {(value) => (
-                    <DefaultColorPicker
-                      value={value}
-                      format="hex"
-                      theme={pickerTheme}
-                      colorKeywords={[]}
-                      class="graph-color-picker"
-                      onChange={(colorHex) => {
-                        if (!props.disabled && colorHex !== props.value) {
-                          props.onChange(colorHex);
-                        }
-                      }}
-                    />
-                  )}
-                </Show>
-              </Popover.Content>
-            </Popover.Portal>
+            <Popover.Content
+              ref={popoverContent}
+              class="graph-color-picker-popover-content z-[80] w-[min(92vw,22rem)] rounded-lg border border-base-300 bg-base-100 p-2 shadow-xl"
+            >
+              <Show when={pickerValue()} keyed>
+                {(value) => (
+                  <DefaultColorPicker
+                    value={value}
+                    format="hex"
+                    theme={pickerTheme}
+                    colorKeywords={[]}
+                    class="graph-color-picker"
+                    onChange={(colorHex) => {
+                      if (!props.disabled && colorHex !== props.value) {
+                        props.onChange(colorHex);
+                      }
+                    }}
+                  />
+                )}
+              </Show>
+            </Popover.Content>
           </Popover>
         </div>
 

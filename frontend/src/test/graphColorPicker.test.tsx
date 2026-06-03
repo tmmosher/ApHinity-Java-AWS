@@ -7,6 +7,7 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 let latestLibraryProps: Record<string, unknown> | null = null;
 let latestPopoverProps: Record<string, unknown> | null = null;
 let libraryRenderCount = 0;
+let portalRenderCount = 0;
 
 vi.mock("@thednp/solid-color-picker", () => ({
   DefaultColorPicker: (props: Record<string, unknown>) => {
@@ -22,7 +23,10 @@ vi.mock("corvu/popover", () => {
     return props.children;
   };
   Popover.Trigger = (props: Record<string, unknown>) => props.children;
-  Popover.Portal = (props: Record<string, unknown>) => props.children;
+  Popover.Portal = (props: Record<string, unknown>) => {
+    portalRenderCount += 1;
+    return props.children;
+  };
   Popover.Content = (props: Record<string, unknown>) => props.children;
   return {default: Popover};
 });
@@ -40,6 +44,7 @@ describe("GraphColorPicker", () => {
     latestLibraryProps = null;
     latestPopoverProps = null;
     libraryRenderCount = 0;
+    portalRenderCount = 0;
   });
 
   it("configures the solid color picker with hex output and the existing palette defaults", () => {
@@ -64,6 +69,7 @@ describe("GraphColorPicker", () => {
       restoreFocus: false,
       closeOnOutsideFocus: false
     });
+    expect(portalRenderCount).toBe(0);
     expect(html).toContain("aria-label=\"Preset color\"");
     expect(html).toContain("value=\"#1f77b4\">Legacy Blue</option>");
     expect(html).toContain("value=\"#2ca02c\">Legacy Green</option>");
