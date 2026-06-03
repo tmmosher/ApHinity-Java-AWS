@@ -127,10 +127,16 @@ export const fetchLocationById = async (host: string, locationId: string): Promi
  * @returns Parsed graph payloads.
  * @throws {Error} When id is invalid or request fails.
  */
-export const fetchLocationGraphsById = async (host: string, locationId: string): Promise<LocationGraph[]> => {
+export const fetchLocationGraphsById = async (
+  host: string,
+  locationId: string,
+  monthRange = -1
+): Promise<LocationGraph[]> => {
   const parsedId = parseRouteLocationId(locationId);
+  const parsedMonthRange = Number.isInteger(monthRange) ? monthRange : -1;
+  const query = new URLSearchParams({monthRange: String(parsedMonthRange)});
 
-  const response = await apiFetch(host + "/api/core/locations/" + parsedId + "/graphs", {
+  const response = await apiFetch(host + "/api/core/locations/" + parsedId + "/graphs?" + query.toString(), {
     method: "GET"
   });
   if (!response.ok) {

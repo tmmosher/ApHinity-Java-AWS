@@ -118,7 +118,7 @@ describe("DashboardLocationDetailPanel data loaders", () => {
 
     const graphs = await fetchLocationGraphsById(host, "55");
 
-    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs?monthRange=-1", {
       method: "GET"
     });
     expect(graphs).toHaveLength(1);

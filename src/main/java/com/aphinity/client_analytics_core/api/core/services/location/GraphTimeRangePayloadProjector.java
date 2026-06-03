@@ -34,6 +34,26 @@ public final class GraphTimeRangePayloadProjector {
         return List.copyOf(projectedPayload);
     }
 
+    public static List<Map<String, Object>> project(
+        List<Map<String, Object>> allTimePayload,
+        DashboardGraphMonthRange monthRange,
+        LocalDate anchorDate
+    ) {
+        if (allTimePayload == null || allTimePayload.isEmpty() || monthRange == null || monthRange.isAllTime()) {
+            return allTimePayload == null ? List.of() : allTimePayload;
+        }
+        LocalDate windowStart = monthRange.windowStartInclusive(anchorDate);
+        if (windowStart == null) {
+            return allTimePayload;
+        }
+
+        List<Map<String, Object>> projectedPayload = new ArrayList<>(allTimePayload.size());
+        for (Map<String, Object> trace : allTimePayload) {
+            projectedPayload.add(projectTrace(trace, windowStart));
+        }
+        return List.copyOf(projectedPayload);
+    }
+
     public static boolean isTimeSeriesTrace(Map<String, Object> trace) {
         if (trace == null) {
             return false;

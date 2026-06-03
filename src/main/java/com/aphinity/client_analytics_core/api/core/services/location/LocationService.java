@@ -43,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -169,6 +170,11 @@ public class LocationService {
      */
     @Transactional(readOnly = true)
     public List<GraphResponse> getAccessibleLocationGraphs(Long userId, Long locationId) {
+        return getAccessibleLocationGraphs(userId, locationId, DashboardGraphMonthRange.ALL_TIME_REQUEST_VALUE);
+    }
+
+    @Transactional
+    public List<GraphResponse> getAccessibleLocationGraphs(Long userId, Long locationId, Integer monthRange) {
         AppUser user = requireUser(userId);
         if (!locationRepository.existsById(locationId)) {
             throw locationNotFound();
@@ -177,9 +183,12 @@ public class LocationService {
             throw forbidden();
         }
 
-        return locationGraphRepository.findByLocationIdWithGraph(locationId).stream()
+        DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
+        Map<Long, List<Map<String, Object>>> rangePayloadsByGraphId =
+            locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(locationId, resolvedMonthRange);
+        return locationGraphRepository.findByLocationIdWithGraphDetails(locationId).stream()
             .map(LocationGraph::getGraph)
-            .map(graphResponseMapper::toResponse)
+            .map(graph -> graphResponseMapper.toResponse(graph, rangePayloadsByGraphId.get(graph.getId())))
             .toList();
     }
 
@@ -1620,7 +1629,7 @@ public class LocationService {
         }
 
         Instant actualTimestamp = graph.getUpdatedAt();
-        if (!Objects.equals(actualTimestamp, expectedTimestamp)) {
+        if (!graphTimestampsEqual(actualTimestamp, expectedTimestamp)) {
             log.warn(
                 "Rejected graph update due to stale graph version actorUserId={} locationId={} graphId={} expectedUpdatedAt={} actualUpdatedAt={}",
                 actorUserId,
@@ -1631,6 +1640,15 @@ public class LocationService {
             );
             throw graphUpdateConflict();
         }
+    }
+
+    private boolean graphTimestampsEqual(Instant actualTimestamp, Instant expectedTimestamp) {
+        if (actualTimestamp == null || expectedTimestamp == null) {
+            return Objects.equals(actualTimestamp, expectedTimestamp);
+        }
+        return Duration.between(actualTimestamp, expectedTimestamp)
+            .abs()
+            .compareTo(Duration.ofNanos(1_000L)) < 0;
     }
 
 }

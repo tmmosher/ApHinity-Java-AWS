@@ -95,9 +95,13 @@ public class LocationController {
      * @return assigned graph payloads
      */
     @GetMapping("/locations/{locationId}/graphs")
-    public List<GraphResponse> locationGraphs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId) {
+    public List<GraphResponse> locationGraphs(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @RequestParam(required = false) Integer monthRange
+    ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
-        return locationService.getAccessibleLocationGraphs(userId, locationId);
+        return locationService.getAccessibleLocationGraphs(userId, locationId, monthRange);
     }
 
     /**

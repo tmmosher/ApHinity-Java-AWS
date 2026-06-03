@@ -2,8 +2,9 @@ import {A} from "@solidjs/router";
 import {For, Show, createEffect, createMemo, createResource, createSignal, on, type ParentProps} from "solid-js";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {LocationDetailProvider} from "../../../../context/LocationDetailContext";
-import type {LocationGraph, LocationSummary} from "../../../../types/Types";
+import type {LocationGraph, LocationGraphTimeRange, LocationSummary} from "../../../../types/Types";
 import {fetchLocationById, fetchLocationGraphsById} from "../../../../util/graph/locationDetailApi";
+import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
 import {
   createLocationViewActive,
   dashboardLocationViews,
@@ -32,13 +33,41 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
   );
 
   const [requestedGraphLocationId, setRequestedGraphLocationId] = createSignal<string | undefined>();
+  const [graphTimeRange, setGraphTimeRange] = createSignal<LocationGraphTimeRange>("allTime");
+  const [graphCacheVersion, setGraphCacheVersion] = createSignal(0);
+  const graphCache = new Map<string, LocationScopedResource<LocationGraph[]>>();
+
+  const graphCacheKey = (locationId: string, monthRange: number): string => `${locationId}:${monthRange}`;
+  const clearGraphCache = () => {
+    graphCache.clear();
+    setGraphCacheVersion((version) => version + 1);
+  };
 
   const [graphResource, {refetch: refetchGraphResource}] = createResource(
-    requestedGraphLocationId,
-    async (locationId): Promise<LocationScopedResource<LocationGraph[]>> => ({
-      locationId,
-      value: await fetchLocationGraphsById(host, locationId)
-    })
+    () => {
+      const locationId = requestedGraphLocationId();
+      if (!locationId) {
+        return undefined;
+      }
+      return {
+        locationId,
+        monthRange: monthRangeForDashboardTimeRange(graphTimeRange()),
+        cacheVersion: graphCacheVersion()
+      };
+    },
+    async ({locationId, monthRange}): Promise<LocationScopedResource<LocationGraph[]>> => {
+      const cacheKey = graphCacheKey(locationId, monthRange);
+      const cachedGraphs = graphCache.get(cacheKey);
+      if (cachedGraphs) {
+        return cachedGraphs;
+      }
+      const nextGraphs = {
+        locationId,
+        value: await fetchLocationGraphsById(host, locationId, monthRange)
+      };
+      graphCache.set(cacheKey, nextGraphs);
+      return nextGraphs;
+    }
   );
 
   const location = createMemo(() => getFreshLocationScopedValue(props.locationId, locationResource()));
@@ -57,6 +86,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
     if (requestedGraphLocationId() !== props.locationId) {
       return;
     }
+    clearGraphCache();
     await refetchGraphResource();
   };
 
@@ -76,6 +106,9 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
       setRequestedGraphLocationId((currentRequestedLocationId) =>
         getNextLocationGraphRequestId(currentRequestedLocationId, locationId, view)
       );
+      if (view !== "dashboard") {
+        setGraphTimeRange("allTime");
+      }
     }
   ));
 
@@ -107,6 +140,8 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
               graphs={graphs}
               graphsLoading={() => requestedGraphLocationId() === props.locationId && graphResource.loading}
               graphsError={graphsError}
+              graphTimeRange={graphTimeRange}
+              setGraphTimeRange={setGraphTimeRange}
               refetchLocation={refetchLocationDetail}
               refetchGraphs={refetchLocationGraphs}
             >

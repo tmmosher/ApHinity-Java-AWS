@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -19,10 +20,23 @@ public class GraphResponseMapper {
 
     public GraphResponse toResponse(Graph graph) {
         GraphPayloadMapper.GraphPayload payload = normalize(graph, GraphTimeRange.ALL_TIME);
+        return toResponse(graph, payload, payload.data());
+    }
+
+    public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data) {
+        GraphPayloadMapper.GraphPayload payload = normalize(graph, GraphTimeRange.ALL_TIME);
+        return toResponse(graph, payload, data == null ? payload.data() : data);
+    }
+
+    private GraphResponse toResponse(
+        Graph graph,
+        GraphPayloadMapper.GraphPayload payload,
+        List<Map<String, Object>> data
+    ) {
         return new GraphResponse(
             graph.getId(),
             graph.getName(),
-            payload.data(),
+            data,
             payload.layout(),
             payload.config(),
             payload.style(),

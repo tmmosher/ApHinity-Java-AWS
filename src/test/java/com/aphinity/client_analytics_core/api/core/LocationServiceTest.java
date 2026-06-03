@@ -1209,6 +1209,68 @@ class LocationServiceTest {
     }
 
     @Test
+    void updateLocationGraphDataAcceptsExpectedTimestampWithDatabaseMicrosecondPrecision() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-06-03T18:24:58.368362Z"));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                31L,
+                List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
+                null,
+                "2026-06-03T18:24:58.368362285Z"
+            ))
+        );
+
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
+        verify(locationDashboardTimeRangeService).refreshLocationDateGroups(99L);
+    }
+
+    @Test
+    void updateLocationGraphDataAcceptsExpectedTimestampRoundedToDatabaseMicrosecondPrecision() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(43L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-06-03T18:57:58.413598Z"));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                43L,
+                List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
+                null,
+                "2026-06-03T18:57:58.413597842Z"
+            ))
+        );
+
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
+        verify(locationDashboardTimeRangeService).refreshLocationDateGroups(99L);
+    }
+
+    @Test
     void updateLocationGraphDataPreservesSubmittedDerivedGraphsByRefreshingImportedRangesOnly() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
@@ -1412,7 +1474,9 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(11L)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(11L), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(11L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(7L, 11L);
 
@@ -1425,7 +1489,7 @@ class LocationServiceTest {
         assertEquals(Map.of("title", "Sessions"), response.layout());
         assertEquals(Map.of("displayModeBar", false), response.config());
         assertEquals(Map.of("height", 320), response.style());
-        verify(locationGraphRepository).findByLocationIdWithGraph(11L);
+        verify(locationGraphRepository).findByLocationIdWithGraphDetails(11L);
     }
 
     @Test
@@ -1454,7 +1518,9 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(44L)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(44L), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(44L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(17L, 44L);
 
@@ -1488,7 +1554,9 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(57L)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(57L), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(57L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(23L, 57L);
 
@@ -1521,7 +1589,9 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(58L)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(58L), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(58L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(24L, 58L);
 

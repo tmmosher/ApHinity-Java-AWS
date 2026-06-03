@@ -10,6 +10,7 @@ import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayload
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.core.services.location.DashboardGraphMonthRange;
 import com.aphinity.client_analytics_core.api.core.services.location.GraphTimeRangePayloadProjector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,6 +129,54 @@ public class LocationDashboardTimeRangeService {
             refreshContext.assignedGraphs().size(),
             refreshContext.anchorDate()
         );
+    }
+
+    @Transactional
+    public Map<Long, List<Map<String, Object>>> resolveLocationMonthRangePayloads(
+        Long locationId,
+        DashboardGraphMonthRange monthRange
+    ) {
+        RefreshContext refreshContext = loadRefreshContext(locationId);
+        if (refreshContext == null) {
+            return Map.of();
+        }
+        DashboardGraphMonthRange normalizedRange = monthRange == null ? DashboardGraphMonthRange.ALL_TIME : monthRange;
+        if (normalizedRange.isAllTime()) {
+            refreshDerivedGraphsForResponse(
+                locationId,
+                refreshContext.location(),
+                refreshContext.assignedGraphs(),
+                normalizedRange,
+                refreshContext.anchorDate(),
+                refreshContext.refreshedAt()
+            );
+            return Map.of();
+        }
+
+        Map<Long, List<Map<String, Object>>> payloadsByGraphId = new LinkedHashMap<>();
+        for (Graph graph : refreshContext.assignedGraphs()) {
+            if (graph == null || graph.getId() == null || isDerivedGraph(graph)) {
+                continue;
+            }
+            List<Map<String, Object>> allTimePayload =
+                GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
+            payloadsByGraphId.put(
+                graph.getId(),
+                graphContainsTimeSeries(graph)
+                    ? GraphTimeRangePayloadProjector.project(allTimePayload, normalizedRange, refreshContext.anchorDate())
+                    : allTimePayload
+            );
+        }
+
+        payloadsByGraphId.putAll(refreshDerivedGraphsForResponse(
+            locationId,
+            refreshContext.location(),
+            refreshContext.assignedGraphs(),
+            normalizedRange,
+            refreshContext.anchorDate(),
+            refreshContext.refreshedAt()
+        ));
+        return Map.copyOf(payloadsByGraphId);
     }
 
     private RefreshContext loadRefreshContext(Long locationId) {
@@ -265,6 +314,117 @@ public class LocationDashboardTimeRangeService {
             }
             graph.setUpdatedAt(refreshedAt);
         }
+    }
+
+    private Map<Long, List<Map<String, Object>>> refreshDerivedGraphsForResponse(
+        Long locationId,
+        Location location,
+        List<Graph> assignedGraphs,
+        DashboardGraphMonthRange monthRange,
+        LocalDate anchorDate,
+        Instant refreshedAt
+    ) {
+        return strategyRegistry.resolve(location.getName())
+            .map(strategy -> buildDerivedGraphPayloadsForResponse(
+                locationId,
+                location,
+                assignedGraphs,
+                strategy,
+                monthRange,
+                anchorDate,
+                refreshedAt
+            ))
+            .orElseGet(Map::of);
+    }
+
+    private Map<Long, List<Map<String, Object>>> buildDerivedGraphPayloadsForResponse(
+        Long locationId,
+        Location location,
+        List<Graph> assignedGraphs,
+        LocationDashboardImportStrategy strategy,
+        DashboardGraphMonthRange monthRange,
+        LocalDate anchorDate,
+        Instant refreshedAt
+    ) {
+        Map<String, Graph> matchedImportGraphsByDefinitionId = graphMatcher.matchImportGraphs(
+            strategy.graphDefinitions(),
+            assignedGraphs,
+            location.getName()
+        );
+        Map<String, Graph> matchedDerivedGraphsByDefinitionId = graphMatcher.matchDerivedGraphs(
+            strategy.derivedGraphDefinitions(),
+            assignedGraphs,
+            location.getName()
+        );
+        if (matchedDerivedGraphsByDefinitionId.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Graph> assignedGraphsById = assignedGraphs.stream()
+            .filter(graph -> graph != null && graph.getId() != null)
+            .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
+        List<ServiceEvent> correctiveActions =
+            serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            historicalDataAssembler.buildHistoricalDerivedData(
+                strategy.graphDefinitions(),
+                matchedImportGraphsByDefinitionId,
+                assignedGraphsById,
+                assignedGraphsById,
+                List.of(),
+                correctiveActions
+            );
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData rangedHistoricalData =
+            HistoricalDerivedDataTimeRangeProjector.project(historicalData, monthRange, anchorDate);
+
+        Map<Long, List<Map<String, Object>>> payloadsByGraphId = new LinkedHashMap<>();
+        for (DerivedGraphConfig derivedGraphDefinition : strategy.derivedGraphDefinitions()) {
+            if (derivedGraphDefinition == null) {
+                continue;
+            }
+            Graph graph = matchedDerivedGraphsByDefinitionId.get(
+                LocationDashboardGraphMetadataSupport.normalizeKey(derivedGraphDefinition.id())
+            );
+            if (graph == null || graph.getId() == null) {
+                continue;
+            }
+            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition, correctiveActions)) {
+                if (monthRange != null && !monthRange.isAllTime()) {
+                    payloadsByGraphId.put(graph.getId(), storedPayloadForMonthRange(graph, monthRange));
+                }
+                continue;
+            }
+            if (monthRange == null || monthRange.isAllTime()) {
+                GraphRelationalPayloadMapper.syncGraphData(
+                    graph,
+                    LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, rangedHistoricalData),
+                    GraphTimeRange.ALL_TIME
+                );
+                graph.setUpdatedAt(refreshedAt);
+                continue;
+            }
+            payloadsByGraphId.put(
+                graph.getId(),
+                LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, rangedHistoricalData)
+            );
+        }
+        return payloadsByGraphId;
+    }
+
+    private List<Map<String, Object>> storedPayloadForMonthRange(Graph graph, DashboardGraphMonthRange monthRange) {
+        if (graph == null) {
+            return List.of();
+        }
+        if (monthRange == null || monthRange.isAllTime()) {
+            return GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
+        }
+        if (Objects.equals(monthRange.months(), GraphTimeRange.THREE_MONTHS.getLookbackMonths())) {
+            return GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.THREE_MONTHS).data();
+        }
+        if (Objects.equals(monthRange.months(), GraphTimeRange.TWELVE_MONTHS.getLookbackMonths())) {
+            return GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.TWELVE_MONTHS).data();
+        }
+        return GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
     }
 
     private boolean shouldPreserveExistingResolutionGraph(

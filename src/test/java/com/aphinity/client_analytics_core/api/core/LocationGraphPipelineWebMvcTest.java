@@ -163,7 +163,9 @@ class LocationGraphPipelineWebMvcTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(locationId)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(locationId), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(locationId)).thenReturn(List.of(locationGraph));
 
         mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
             .andExpect(status().isOk())
@@ -179,7 +181,7 @@ class LocationGraphPipelineWebMvcTest {
 
         verify(locationRepository).existsById(locationId);
         verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
-        verify(locationGraphRepository).findByLocationIdWithGraph(locationId);
+        verify(locationGraphRepository).findByLocationIdWithGraphDetails(locationId);
     }
 
     @Test
@@ -233,7 +235,9 @@ class LocationGraphPipelineWebMvcTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(locationId)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(locationId), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(locationId)).thenReturn(List.of(locationGraph));
 
         mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
             .andExpect(status().isOk())
@@ -256,7 +260,7 @@ class LocationGraphPipelineWebMvcTest {
 
         verify(locationRepository).existsById(locationId);
         verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
-        verify(locationGraphRepository).findByLocationIdWithGraph(locationId);
+        verify(locationGraphRepository).findByLocationIdWithGraphDetails(locationId);
     }
 
     @Test
@@ -281,7 +285,9 @@ class LocationGraphPipelineWebMvcTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(locationId)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(locationId), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(locationId)).thenReturn(List.of(locationGraph));
 
         mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
             .andExpect(status().isOk())
@@ -316,7 +322,9 @@ class LocationGraphPipelineWebMvcTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationGraphRepository.findByLocationIdWithGraph(locationId)).thenReturn(List.of(locationGraph));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(locationId), any()))
+            .thenReturn(Map.of());
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(locationId)).thenReturn(List.of(locationGraph));
 
         mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
             .andExpect(status().isOk())

@@ -25,6 +25,8 @@ vi.mock("../context/LocationDetailContext", () => ({
     graphs: () => undefined,
     graphsLoading: () => false,
     graphsError: () => undefined,
+    graphTimeRange: () => "allTime",
+    setGraphTimeRange: vi.fn(),
     refetchLocation: async () => undefined,
     refetchGraphs: refetchGraphsMock
   })

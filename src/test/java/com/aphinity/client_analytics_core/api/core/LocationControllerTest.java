@@ -66,13 +66,13 @@ class LocationControllerTest {
         );
         List<GraphResponse> expected = List.of(graphResponse);
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(7L);
-        when(locationService.getAccessibleLocationGraphs(7L, 14L)).thenReturn(expected);
+        when(locationService.getAccessibleLocationGraphs(7L, 14L, 3)).thenReturn(expected);
 
-        List<GraphResponse> actual = locationController.locationGraphs(jwt, 14L);
+        List<GraphResponse> actual = locationController.locationGraphs(jwt, 14L, 3);
 
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
-        verify(locationService).getAccessibleLocationGraphs(7L, 14L);
+        verify(locationService).getAccessibleLocationGraphs(7L, 14L, 3);
     }
 
     @Test
@@ -416,7 +416,7 @@ class LocationControllerTest {
 
         ResponseStatusException ex = assertThrows(
             ResponseStatusException.class,
-            () -> locationController.locationGraphs(null, 14L)
+            () -> locationController.locationGraphs(null, 14L, null)
         );
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());

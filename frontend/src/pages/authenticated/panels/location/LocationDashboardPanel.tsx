@@ -2,16 +2,13 @@ import {A} from "@solidjs/router";
 import GraphCreateModal from "../../../../components/graph-editor/GraphCreateModal";
 import GraphEditorModal from "../../../../components/graph-editor/GraphEditorModal";
 import LocationDashboardLayoutModal from "../../../../components/location/LocationDashboardLayoutModal";
-import {For, Show, createEffect, createMemo, createResource, createSignal, on} from "solid-js";
+import {For, Show, createEffect, createMemo, createResource, on} from "solid-js";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "../../../../context/LocationDetailContext";
 import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
-import {
-  materializeLocationGraphForTimeRange,
-  type DashboardTimeRange
-} from "../../../../util/location/dashboardTimeRange";
+import type {DashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 import LocationDashboardToolbar from "../../../../components/location/LocationDashboardToolbar";
 import LocationDashboardSection from "../../../../components/location/LocationDashboardSection";
@@ -25,7 +22,15 @@ type LocationDashboardPanelProps = {
 export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   const host = useApiHost();
   const profileContext = useProfile();
-  const {location, graphs, graphsError, refetchLocation, refetchGraphs} = useLocationDetail();
+  const {
+    location,
+    graphs,
+    graphsError,
+    graphTimeRange,
+    setGraphTimeRange,
+    refetchLocation,
+    refetchGraphs
+  } = useLocationDetail();
   const canEditGraphs = createMemo(() => canEditLocationGraphs(profileContext.profile()?.role));
   const shouldResetDashboardState = createDashboardLocationResetGuard(props.locationId);
   const dashboard = createLocationDashboardEditController({
@@ -52,17 +57,17 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   const orderedSections = dashboard.orderedSections;
   const sectionGraphs = dashboard.sectionGraphs;
   const missingGraphIds = dashboard.missingGraphIds;
-  const [selectedTimeRange, setSelectedTimeRange] = createSignal<DashboardTimeRange>("allTime");
+  const selectedTimeRange = () => graphTimeRange() as DashboardTimeRange;
 
   createEffect(on(
     () => props.locationId,
     () => {
-      setSelectedTimeRange("allTime");
+      setGraphTimeRange("allTime");
     }
   ));
 
   const displayedSectionGraphs = (section: ReturnType<typeof orderedSections>[number]) =>
-    sectionGraphs(section).map((graph) => materializeLocationGraphForTimeRange(graph, selectedTimeRange()));
+    sectionGraphs(section);
 
   const [plotlyModule] = createResource(
     () => {
@@ -107,7 +112,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           <div class="flex justify-center md:justify-end">
             <LocationDashboardTimeRangeSelector
               selectedRange={selectedTimeRange}
-              onSelectRange={setSelectedTimeRange}
+              onSelectRange={setGraphTimeRange}
             />
           </div>
         </div>

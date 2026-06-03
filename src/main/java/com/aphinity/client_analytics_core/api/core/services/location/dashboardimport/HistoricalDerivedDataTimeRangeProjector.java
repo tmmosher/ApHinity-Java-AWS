@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
+import com.aphinity.client_analytics_core.api.core.services.location.DashboardGraphMonthRange;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
@@ -24,7 +25,28 @@ final class HistoricalDerivedDataTimeRangeProjector {
         if (windowStart == null) {
             return historicalData;
         }
+        return projectFromWindowStart(historicalData, windowStart);
+    }
 
+    static LocationDashboardDerivedGraphSupport.HistoricalDerivedData project(
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
+        DashboardGraphMonthRange monthRange,
+        LocalDate anchorDate
+    ) {
+        if (historicalData == null || monthRange == null || monthRange.isAllTime()) {
+            return historicalData;
+        }
+        LocalDate windowStart = monthRange.windowStartInclusive(anchorDate);
+        if (windowStart == null) {
+            return historicalData;
+        }
+        return projectFromWindowStart(historicalData, windowStart);
+    }
+
+    private static LocationDashboardDerivedGraphSupport.HistoricalDerivedData projectFromWindowStart(
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
+        LocalDate windowStart
+    ) {
         Map<LocalDate, List<LocationDashboardDerivedGraphSupport.HistoricalSamplePoint>> filteredSamplesByDate =
             historicalData.samplesByDate().entrySet().stream()
                 .filter(entry -> entry.getKey() != null && !entry.getKey().isBefore(windowStart))
