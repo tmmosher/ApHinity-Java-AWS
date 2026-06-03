@@ -1,4 +1,4 @@
-import type {LocationSectionLayout, LocationSectionLayoutConfig} from "../../types/Types";
+import type {LocationGraph, LocationSectionLayout, LocationSectionLayoutConfig} from "../../types/Types";
 
 export const cloneLocationSectionLayout = (
   layout: LocationSectionLayoutConfig
@@ -13,6 +13,51 @@ export const areLocationSectionLayoutsEqual = (
   left: LocationSectionLayoutConfig,
   right: LocationSectionLayoutConfig
 ): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+export const reconcileLocationSectionLayoutWithGraphs = (
+  layout: LocationSectionLayoutConfig,
+  graphs: LocationGraph[]
+): LocationSectionLayoutConfig => {
+  const assignedGraphIds = graphs.map((graph) => graph.id);
+  const assignedGraphIdSet = new Set(assignedGraphIds);
+  const seenGraphIds = new Set<number>();
+  const sections = layout.sections.map((section) => {
+    const graphIds = section.graph_ids.filter((graphId) => {
+      if (!assignedGraphIdSet.has(graphId) || seenGraphIds.has(graphId)) {
+        return false;
+      }
+      seenGraphIds.add(graphId);
+      return true;
+    });
+
+    return {
+      section_id: section.section_id,
+      graph_ids: graphIds
+    };
+  });
+
+  const missingGraphIds = assignedGraphIds.filter((graphId) => !seenGraphIds.has(graphId));
+  if (missingGraphIds.length === 0) {
+    return {sections};
+  }
+
+  if (sections.length === 0) {
+    return {
+      sections: [
+        {
+          section_id: 1,
+          graph_ids: missingGraphIds
+        }
+      ]
+    };
+  }
+
+  const nextSections = cloneSections(sections);
+  nextSections[nextSections.length - 1].graph_ids.push(...missingGraphIds);
+  return {
+    sections: nextSections
+  };
+};
 
 const cloneSections = (sections: LocationSectionLayout[]): LocationSectionLayout[] =>
   sections.map((section) => ({

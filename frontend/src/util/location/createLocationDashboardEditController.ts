@@ -1,11 +1,18 @@
 import {createEffect, createMemo, createSignal, type Accessor, untrack} from "solid-js";
 import {toast} from "solid-toast";
-import type {LocationGraph, LocationSectionLayout, LocationSectionLayoutConfig, LocationSummary} from "../../types/Types";
+import type {
+  LocationGraph,
+  LocationGraphTimeRange,
+  LocationSectionLayout,
+  LocationSectionLayoutConfig,
+  LocationSummary
+} from "../../types/Types";
 import {createMapById} from "../common/indexById";
 import {
   applyGraphPayloadEdit,
   buildChangedLocationGraphUpdates,
   cloneLocationGraphs,
+  createEditableGraphForTimeRange,
   type GraphBaselineEntry,
   pruneDeletedLocationGraphState,
   reconcileLocationGraphUploadState,
@@ -19,7 +26,8 @@ import {
 } from "../graph/graphCreate";
 import {
   areLocationSectionLayoutsEqual,
-  cloneLocationSectionLayout
+  cloneLocationSectionLayout,
+  reconcileLocationSectionLayoutWithGraphs
 } from "./dashboardLayoutEdit";
 import {
   createLocationGraphById,
@@ -73,6 +81,31 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     }
     return graphById().get(graphId);
   });
+  let cachedEditingGraph: LocationGraph | undefined;
+  let cachedEditingGraphTimeRange: LocationGraphTimeRange | undefined;
+  let cachedEditableGraph: LocationGraph | undefined;
+  const editingGraphForTimeRange = (timeRange: LocationGraphTimeRange): LocationGraph | undefined => {
+    const graph = editingGraph();
+    if (!graph) {
+      cachedEditingGraph = undefined;
+      cachedEditingGraphTimeRange = undefined;
+      cachedEditableGraph = undefined;
+      return undefined;
+    }
+    if (
+      graph === cachedEditingGraph &&
+      timeRange === cachedEditingGraphTimeRange &&
+      cachedEditableGraph !== undefined
+    ) {
+      return cachedEditableGraph;
+    }
+
+    const editableGraph = createEditableGraphForTimeRange(graph, timeRange);
+    cachedEditingGraph = graph;
+    cachedEditingGraphTimeRange = timeRange;
+    cachedEditableGraph = editableGraph;
+    return editableGraph;
+  };
   const orderedSections = createMemo(() => workingSectionLayout().sections);
   const canCreateGraphs = createMemo(() =>
     props.canEditGraphs() && !hasPendingDashboardChanges() && !isGraphMutationBusy()
@@ -168,6 +201,15 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
   const closeCreateGraphModal = () => setIsCreateGraphModalOpen(false);
   const closeLayoutEditor = () => setIsLayoutEditorOpen(false);
 
+  const reconcileSectionLayoutWithWorkingGraphs = (
+    sectionLayout: LocationSectionLayoutConfig
+  ): LocationSectionLayoutConfig => {
+    const graphs = workingGraphs();
+    return graphs.length === 0
+      ? cloneLocationSectionLayout(sectionLayout)
+      : reconcileLocationSectionLayoutWithGraphs(sectionLayout, graphs);
+  };
+
   const openGraphEditor = (graphId: number) => {
     if (isGraphMutationBusy() || !props.canEditGraphs()) {
       return;
@@ -186,6 +228,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     if (isGraphMutationBusy() || !props.canEditGraphs()) {
       return;
     }
+    setWorkingSectionLayout((currentLayout) => reconcileSectionLayoutWithWorkingGraphs(currentLayout));
     setIsLayoutEditorOpen(true);
   };
 
@@ -202,12 +245,16 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     sectionLayout: cloneLocationSectionLayout(workingSectionLayout())
   });
 
-  const applyLocalGraphEdit = (graphId: number, payload: EditableGraphPayload) => {
+  const applyLocalGraphEdit = (
+    graphId: number,
+    payload: EditableGraphPayload,
+    timeRange: LocationGraphTimeRange = "allTime"
+  ) => {
     if (isGraphMutationBusy() || !props.canEditGraphs()) {
       return;
     }
 
-    const result = applyGraphPayloadEdit(workingGraphs(), [], graphId, payload);
+    const result = applyGraphPayloadEdit(workingGraphs(), [], graphId, payload, timeRange);
     if (!result.changed) {
       return;
     }
@@ -231,7 +278,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       ...currentUndoStack,
       createDashboardSnapshot()
     ]);
-    setWorkingSectionLayout(cloneLocationSectionLayout(nextSectionLayout));
+    setWorkingSectionLayout(reconcileSectionLayoutWithWorkingGraphs(nextSectionLayout));
   };
 
   // Spreadsheet uploads are preview-only on the backend, so stage the returned
@@ -469,7 +516,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     const saveLocationId = props.locationId();
     const saveSessionToken = locationSessionToken();
     const graphUpdates = buildChangedLocationGraphUpdates(workingGraphs(), graphBaselineIndex());
-    const sectionLayoutUpdate = cloneLocationSectionLayout(workingSectionLayout());
+    const sectionLayoutUpdate = reconcileSectionLayoutWithWorkingGraphs(workingSectionLayout());
 
     setIsSavingGraphChanges(true);
     try {
@@ -479,7 +526,8 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       }
       setSectionLayoutSyncUpdatedAt(props.location()?.updatedAt ?? null);
       setDashboardUndoStack([]);
-      setSectionLayoutBaseline(cloneLocationSectionLayout(workingSectionLayout()));
+      setWorkingSectionLayout(cloneLocationSectionLayout(sectionLayoutUpdate));
+      setSectionLayoutBaseline(cloneLocationSectionLayout(sectionLayoutUpdate));
       toast.success("Dashboard changes saved");
       try {
         await Promise.all([props.refetchGraphs(), props.refetchLocation()]);
@@ -571,6 +619,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     workingSectionLayout,
     editingGraphId,
     editingGraph,
+    editingGraphForTimeRange,
     isCreateGraphModalOpen,
     isLayoutEditorOpen,
     isCreatingGraph,

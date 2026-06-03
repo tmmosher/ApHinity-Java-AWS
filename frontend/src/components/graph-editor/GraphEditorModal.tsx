@@ -100,6 +100,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   // state from the current render pass instead of a cached snapshot.
   const visibleEditablePayload = () =>
     props.isOpen && props.graph !== undefined ? editablePayload() : EMPTY_EDITABLE_GRAPH_PAYLOAD;
+  let lastSyncedGraph: LocationGraph | undefined;
 
   const isBusy = () => props.isSaving || props.isDeleting || isRemovingTrace() || isSavingRename();
 
@@ -160,13 +161,17 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     });
   };
 
-  createEffect(on(() => [props.isOpen, props.graph?.id] as const, ([isOpen, graphId]) => {
-    if (!isOpen || graphId === undefined || props.graph === undefined) {
+  createEffect(on(() => (props.isOpen ? props.graph : undefined), (graph) => {
+    if (graph === lastSyncedGraph) {
+      return;
+    }
+    lastSyncedGraph = graph;
+
+    if (graph === undefined) {
       resetEditorState();
       return;
     }
 
-    const graph = props.graph;
     batch(() => {
       setEditablePayload(createEditableGraphPayload(graph));
       setGraphNameDraft(graph.name);

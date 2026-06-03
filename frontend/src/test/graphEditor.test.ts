@@ -6,6 +6,7 @@ import {
   buildGraphBaselineIndex,
   buildLocationGraphUpdates,
   createEditableGraphPayload,
+  createEditableGraphForTimeRange,
   getEditableGraphTitle,
   parseEditableGraphPayload,
   pruneDeletedLocationGraphState,
@@ -71,6 +72,47 @@ describe("graphEditor", () => {
     expect(result.changed).toBe(true);
     expect(result.nextUndoStack).toHaveLength(1);
     expect(result.nextGraphs[0].data).toEqual([{type: "bar", x: ["A"], y: [11]}]);
+    expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated", x: 0.02, xanchor: "left"}});
+  });
+
+  it("creates an editable graph view from the selected rolling range", () => {
+    const graph: LocationGraph = {
+      ...baseGraphs[0],
+      timeRangeData: {
+        threeMonths: [{type: "bar", x: ["Recent"], y: [2]}],
+        twelveMonths: [{type: "bar", x: ["Annual"], y: [6]}]
+      }
+    };
+
+    const editableGraph = createEditableGraphForTimeRange(graph, "threeMonths");
+
+    expect(editableGraph.data).toEqual([{type: "bar", x: ["Recent"], y: [2]}]);
+    expect(editableGraph.layout).toBe(graph.layout);
+    expect(createEditableGraphForTimeRange(graph, "allTime")).toBe(graph);
+  });
+
+  it("applies rolling range edits without replacing all-time graph data", () => {
+    const graph: LocationGraph = {
+      ...baseGraphs[0],
+      timeRangeData: {
+        threeMonths: [{type: "bar", x: ["Recent"], y: [2]}],
+        twelveMonths: [{type: "bar", x: ["Annual"], y: [6]}]
+      }
+    };
+
+    const result = applyGraphPayloadEdit([graph], [], graph.id, {
+      data: [{type: "bar", x: ["Recent"], y: [2], marker: {color: ["#d62728"], colors: ["#d62728"]}}],
+      layout: {title: {text: "Updated"}},
+      config: {displayModeBar: false},
+      style: {height: 320}
+    }, "threeMonths");
+
+    expect(result.changed).toBe(true);
+    expect(result.nextGraphs[0].data).toEqual(baseGraphs[0].data);
+    expect(result.nextGraphs[0].timeRangeData?.threeMonths).toEqual([
+      {type: "bar", x: ["Recent"], y: [2], marker: {color: ["#d62728"], colors: ["#d62728"]}}
+    ]);
+    expect(result.nextGraphs[0].timeRangeData?.twelveMonths).toEqual([{type: "bar", x: ["Annual"], y: [6]}]);
     expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated", x: 0.02, xanchor: "left"}});
   });
 

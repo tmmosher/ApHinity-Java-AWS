@@ -1,4 +1,4 @@
-import {LocationGraph, LocationGraphUpdate} from "../../types/Types";
+import {LocationGraph, LocationGraphTimeRange, LocationGraphUpdate} from "../../types/Types";
 import {normalizePlotlyLayoutTitle} from "./graphLayoutTitle";
 import {applyStateSnapshot, undoStateSnapshot} from "../common/stateHistory";
 
@@ -134,6 +134,21 @@ const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayl
 const graphPayloadSignature = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload));
 
+const isGraphDataList = (value: unknown): value is Record<string, unknown>[] =>
+  Array.isArray(value) && value.every((entry) => isRecord(entry));
+
+const resolveEditableGraphDataForTimeRange = (
+  graph: LocationGraph,
+  timeRange: LocationGraphTimeRange
+): Record<string, unknown>[] => {
+  if (timeRange === "allTime") {
+    return graph.data;
+  }
+
+  const timeRangeData = graph.timeRangeData?.[timeRange];
+  return isGraphDataList(timeRangeData) ? timeRangeData : graph.data;
+};
+
 const normalizeGraphTimeRangeData = (
   timeRangeData: LocationGraph["timeRangeData"]
 ): LocationGraphUpdate["timeRangeData"] => {
@@ -205,6 +220,21 @@ export const createEditableGraphPayload = (graph: LocationGraph): EditableGraphP
     config: graph.config ?? null,
     style: graph.style ?? null
   }));
+
+export const createEditableGraphForTimeRange = (
+  graph: LocationGraph,
+  timeRange: LocationGraphTimeRange
+): LocationGraph => {
+  const data = resolveEditableGraphDataForTimeRange(graph, timeRange);
+  if (data === graph.data) {
+    return graph;
+  }
+
+  return {
+    ...graph,
+    data
+  };
+};
 
 export const serializeEditableGraphPayload = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload), null, 2);
@@ -484,7 +514,8 @@ export const applyGraphPayloadEdit = (
   currentGraphs: LocationGraph[],
   undoStack: LocationGraph[][],
   graphId: number,
-  nextPayload: EditableGraphPayload
+  nextPayload: EditableGraphPayload,
+  timeRange: LocationGraphTimeRange = "allTime"
 ): GraphEditResult => {
   const normalizedNextPayload = normalizeGraphPayload(nextPayload);
   const currentGraph = currentGraphs.find((graph) => graph.id === graphId);
@@ -496,7 +527,8 @@ export const applyGraphPayloadEdit = (
     };
   }
 
-  if (graphPayloadSignature(createEditableGraphPayload(currentGraph)) === graphPayloadSignature(normalizedNextPayload)) {
+  const currentEditableGraph = createEditableGraphForTimeRange(currentGraph, timeRange);
+  if (graphPayloadSignature(createEditableGraphPayload(currentEditableGraph)) === graphPayloadSignature(normalizedNextPayload)) {
     return {
       nextGraphs: currentGraphs,
       nextUndoStack: undoStack,
@@ -506,13 +538,24 @@ export const applyGraphPayloadEdit = (
 
   const nextGraphs = currentGraphs.map((graph) =>
     graph.id === graphId
-      ? {
-          ...graph,
-          data: cloneJson(normalizedNextPayload.data),
-          layout: cloneJson(normalizedNextPayload.layout ?? null),
-          config: cloneJson(normalizedNextPayload.config ?? null),
-          style: cloneJson(normalizedNextPayload.style ?? null)
-        }
+      ? timeRange === "allTime"
+        ? {
+            ...graph,
+            data: cloneJson(normalizedNextPayload.data),
+            layout: cloneJson(normalizedNextPayload.layout ?? null),
+            config: cloneJson(normalizedNextPayload.config ?? null),
+            style: cloneJson(normalizedNextPayload.style ?? null)
+          }
+        : {
+            ...graph,
+            timeRangeData: {
+              ...(graph.timeRangeData ?? {}),
+              [timeRange]: cloneJson(normalizedNextPayload.data)
+            },
+            layout: cloneJson(normalizedNextPayload.layout ?? null),
+            config: cloneJson(normalizedNextPayload.config ?? null),
+            style: cloneJson(normalizedNextPayload.style ?? null)
+          }
       : graph
   );
 

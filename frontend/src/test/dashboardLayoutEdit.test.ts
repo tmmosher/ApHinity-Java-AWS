@@ -6,8 +6,10 @@ import {
   findGraphLayoutPosition,
   findSectionLayoutIndex,
   moveGraphWithinLayout,
-  moveSectionWithinLayout
+  moveSectionWithinLayout,
+  reconcileLocationSectionLayoutWithGraphs
 } from "../util/location/dashboardLayoutEdit";
+import type {LocationGraph} from "../types/Types";
 
 const baseLayout: LocationSectionLayoutConfig = {
   sections: [
@@ -55,5 +57,50 @@ describe("dashboardLayoutEdit", () => {
     expect(findSectionLayoutIndex(baseLayout, 99)).toBe(-1);
     expect(findGraphLayoutPosition(baseLayout, 22)).toEqual({sectionIndex: 1, graphIndex: 1});
     expect(findGraphLayoutPosition(baseLayout, 99)).toBeNull();
+  });
+
+  it("reconciles stale section layouts with the assigned graph list", () => {
+    const graphs = [11, 12, 21, 22, 34].map((id): LocationGraph => ({
+      id,
+      name: `Graph ${id}`,
+      data: [],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z"
+    }));
+    const staleLayout: LocationSectionLayoutConfig = {
+      sections: [
+        {section_id: 1, graph_ids: [11, 12, 999]},
+        {section_id: 2, graph_ids: [21, 22, 12]}
+      ]
+    };
+
+    expect(reconcileLocationSectionLayoutWithGraphs(staleLayout, graphs)).toEqual({
+      sections: [
+        {section_id: 1, graph_ids: [11, 12]},
+        {section_id: 2, graph_ids: [21, 22, 34]}
+      ]
+    });
+  });
+
+  it("creates a section when assigned graphs exist but the layout is empty", () => {
+    const graphs = [31].map((id): LocationGraph => ({
+      id,
+      name: `Graph ${id}`,
+      data: [],
+      layout: null,
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z"
+    }));
+
+    expect(reconcileLocationSectionLayoutWithGraphs({sections: []}, graphs)).toEqual({
+      sections: [
+        {section_id: 1, graph_ids: [31]}
+      ]
+    });
   });
 });
