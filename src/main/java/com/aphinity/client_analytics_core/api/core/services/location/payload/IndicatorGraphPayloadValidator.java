@@ -36,11 +36,13 @@ final class IndicatorGraphPayloadValidator implements LocationGraphUpdateTraceVa
         if (!"%".equals(GraphPayloadValidationSupport.requireStringField(number, "suffix"))) {
             throw invalidGraphData();
         }
-        Map<String, Object> font = GraphPayloadValidationSupport.requireObjectField(number, "font");
-        GraphPayloadValidationSupport.requireNumberField(font, "size");
+        if (number.containsKey("font")) {
+            Map<String, Object> font = GraphPayloadValidationSupport.requireObjectField(number, "font");
+            GraphPayloadValidationSupport.requireNumberField(font, "size");
+        }
 
         Map<String, Object> gauge = GraphPayloadValidationSupport.requireObjectField(trace, "gauge");
-        if (!"angular".equals(GraphPayloadValidationSupport.requireStringField(gauge, "shape"))) {
+        if (gauge.containsKey("shape") && !"angular".equals(GraphPayloadValidationSupport.requireStringField(gauge, "shape"))) {
             throw invalidGraphData();
         }
 
@@ -56,7 +58,9 @@ final class IndicatorGraphPayloadValidator implements LocationGraphUpdateTraceVa
             throw invalidGraphData();
         }
 
-        Map<String, Object> bar = GraphPayloadValidationSupport.requireObjectField(gauge, "bar");
-        GraphPayloadValidationSupport.requireStringField(bar, "color");
+        if (gauge.containsKey("bar")) {
+            Map<String, Object> bar = GraphPayloadValidationSupport.requireObjectField(gauge, "bar");
+            GraphPayloadValidationSupport.requireStringField(bar, "color");
+        }
     }
 }

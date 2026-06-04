@@ -24,6 +24,29 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateAcceptsGeneratedDashboardIndicatorPreviewPayloads() {
+        Map<String, Object> previewTrace = Map.of(
+            "type", "indicator",
+            "mode", "gauge+number",
+            "value", 72,
+            "number", Map.of("suffix", "%"),
+            "gauge", Map.of(
+                "axis", Map.of("range", List.of(0, 100)),
+                "bar", Map.of("color", "#16a34a")
+            )
+        );
+
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(indicatorTrace(68)),
+            List.of(previewTrace),
+            Map.of("showlegend", false)
+        );
+
+        assertEquals(List.of(previewTrace), payload.data());
+        assertEquals(Map.of("showlegend", false), payload.layout());
+    }
+
+    @Test
     void validateForUpdateAcceptsScatterglPayloadsAsCartesianUpdates() {
         LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
             List.of(scatterGlTrace(3, 5)),

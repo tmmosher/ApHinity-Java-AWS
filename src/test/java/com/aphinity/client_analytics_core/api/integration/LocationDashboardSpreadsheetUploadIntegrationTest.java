@@ -3,7 +3,11 @@ package com.aphinity.client_analytics_core.api.integration;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
+import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
@@ -17,13 +21,16 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
@@ -31,12 +38,16 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiIntegrationTest {
     private static final String PASSWORD = "ValidPass12!";
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void uploadLocationDashboardSpreadsheetReturnsPreviewWithoutPersistingGraphUpdatesOrCorrectiveActions() throws Exception {
@@ -112,6 +123,76 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(0, persistedEvents.size());
+    }
+
+    @Test
+    void appliedSpreadsheetPreviewPersistsAndRefetchesUpdatedDashboardGraphs() throws Exception {
+        createUser("partner-dashboard-upload-apply@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedMeasurement(location, "HPC", new BigDecimal("10"));
+        seedMeasurement(location, "Endotoxin", new BigDecimal("1"));
+
+        seedHoagStrategyGraphs(location);
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-apply@example.com", PASSWORD);
+
+        MvcResult previewResult = mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        createDashboardSpreadsheet("Hoag Hospital", "Drain Tank, install new DI bottles", 4)
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$[0].data[1].y[0]").value(2))
+            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$[4].data[0].value").value(0))
+            .andReturn();
+
+        List<Map<String, Object>> previewGraphs = objectMapper.readValue(
+            previewResult.getResponse().getContentAsString(),
+            new TypeReference<>() {
+            }
+        );
+        List<Map<String, Object>> graphUpdates = previewGraphs.stream()
+            .map(this::toGraphUpdateRequest)
+            .toList();
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("graphs", graphUpdates)))
+            )
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
+            .andExpect(jsonPath("$[0].data[1].y[0]").value(2))
+            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$[4].data[0].value").value(0));
+
+        mockMvc.perform(
+                get("/api/core/locations/{locationId}/graphs?monthRange=12", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
+            .andExpect(jsonPath("$[0].data[1].y[0]").value(2))
+            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$[4].data[0].value").value(0));
     }
 
     @Test
@@ -222,6 +303,99 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(0, persistedEvents.size());
+    }
+
+    @Test
+    void appliedExampleTwoSpreadsheetPreviewPreservesResolutionDerivedGraphsAfterRefetch() throws Exception {
+        createUser("partner-dashboard-upload-example2-apply@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Hoag Hospital");
+        seedHoagMeasurement(location, "HPC");
+        seedHoagMeasurement(location, "Endotoxin");
+        seedHoagMeasurement(location, "Legionella");
+        seedHoagMeasurement(location, "pH");
+        seedHoagMeasurement(location, "Conductivity");
+        seedHoagMeasurement(location, "Alkalinity");
+        seedHoagMeasurement(location, "Hardness");
+
+        seedHoagStrategyGraphs(location);
+        ServiceEvent persistedCorrectiveAction = createServiceEvent(
+            location,
+            "Existing corrective action",
+            ServiceEventResponsibility.PARTNER,
+            LocalDate.parse("2025-01-15"),
+            LocalTime.NOON,
+            LocalDate.parse("2025-01-20"),
+            LocalTime.NOON,
+            "Existing resolved action",
+            ServiceEventStatus.COMPLETED
+        );
+        persistedCorrectiveAction.setCorrectiveAction(true);
+        serviceEventRepository.saveAndFlush(persistedCorrectiveAction);
+
+        AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-example2-apply@example.com", PASSWORD);
+        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
+
+        MvcResult previewResult = mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard_upload_template_example_2.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
+            .andReturn();
+
+        List<Map<String, Object>> previewGraphs = objectMapper.readValue(
+            previewResult.getResponse().getContentAsString(),
+            new TypeReference<>() {
+            }
+        );
+        Map<String, Object> previewPercentResolved = findGraph(previewGraphs, "Percent Resolved", null);
+        Map<String, Object> previewTurnaround = findGraph(previewGraphs, "Non-Conformance Status", "Turnaround Time");
+        Map<String, Object> previewStatusByFacility = findGraph(previewGraphs, "Non-Conformance Status", "By Facility");
+
+        assertThat(((Number) firstTrace(previewPercentResolved).get("value")).intValue()).isGreaterThan(0);
+        assertThat((List<?>) firstTrace(previewTurnaround).get("x")).isNotEmpty();
+        assertThat((List<?>) firstTrace(previewStatusByFacility).get("x")).isNotEmpty();
+
+        List<Map<String, Object>> graphUpdates = previewGraphs.stream()
+            .map(this::toGraphUpdateRequest)
+            .toList();
+
+        mockMvc.perform(
+                put("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("graphs", graphUpdates)))
+            )
+            .andExpect(status().isNoContent());
+
+        MvcResult refetchResult = mockMvc.perform(
+                get("/api/core/locations/{locationId}/graphs", location.getId())
+                    .cookie(authCookies(authCookies))
+            )
+            .andExpect(status().isOk())
+            .andReturn();
+
+        List<Map<String, Object>> refetchedGraphs = objectMapper.readValue(
+            refetchResult.getResponse().getContentAsString(),
+            new TypeReference<>() {
+            }
+        );
+
+        assertThat(firstTrace(findGraph(refetchedGraphs, "Percent Resolved", null)).get("value"))
+            .isEqualTo(firstTrace(previewPercentResolved).get("value"));
+        assertThat(firstTrace(findGraph(refetchedGraphs, "Non-Conformance Status", "Turnaround Time")).get("x"))
+            .isEqualTo(firstTrace(previewTurnaround).get("x"));
+        assertThat(firstTrace(findGraph(refetchedGraphs, "Non-Conformance Status", "By Facility")).get("x"))
+            .isEqualTo(firstTrace(previewStatusByFacility).get("x"));
     }
 
     @Test
@@ -438,6 +612,44 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> graphData(Graph graph) {
         return (List<Map<String, Object>>) graph.getData();
+    }
+
+    private Map<String, Object> firstTrace(Map<String, Object> graph) {
+        List<Map<String, Object>> data = (List<Map<String, Object>>) graph.get("data");
+        return data.getFirst();
+    }
+
+    private Map<String, Object> findGraph(List<Map<String, Object>> graphs, String name, String title) {
+        return graphs.stream()
+            .filter(graph -> Objects.equals(name, graph.get("name")))
+            .filter(graph -> Objects.equals(title, graphTitle(graph)))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Expected graph not found: " + name + " / " + title));
+    }
+
+    @SuppressWarnings("unchecked")
+    private String graphTitle(Map<String, Object> graph) {
+        Object layoutValue = graph.get("layout");
+        if (!(layoutValue instanceof Map<?, ?> layout)) {
+            return null;
+        }
+        Object titleValue = layout.get("title");
+        if (!(titleValue instanceof Map<?, ?> title)) {
+            return null;
+        }
+        Object textValue = title.get("text");
+        return textValue instanceof String text ? text : null;
+    }
+
+    private Map<String, Object> toGraphUpdateRequest(Map<String, Object> graph) {
+        Map<String, Object> update = new java.util.LinkedHashMap<>();
+        update.put("graphId", graph.get("id"));
+        update.put("data", graph.get("data"));
+        update.put("layout", graph.get("layout"));
+        update.put("config", graph.get("config"));
+        update.put("style", graph.get("style"));
+        update.put("expectedUpdatedAt", graph.get("updatedAt"));
+        return update;
     }
 
     private List<Map<String, Object>> blankScatterData() {

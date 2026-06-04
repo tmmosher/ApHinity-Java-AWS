@@ -215,12 +215,19 @@ public class LocationDashboardTimeRangeService {
         }
 
         for (Graph graph : assignedGraphs) {
-            if (graph == null || graph.getId() == null || isDerivedGraph(graph)) {
+            if (!shouldMaterializeRollingTimeRangesFromStoredPayload(graph)) {
                 continue;
             }
             materializeRollingTimeRanges(graph, anchorDate);
             graph.setUpdatedAt(refreshedAt);
         }
+    }
+
+    private boolean shouldMaterializeRollingTimeRangesFromStoredPayload(Graph graph) {
+        if (graph == null || graph.getId() == null) {
+            return false;
+        }
+        return !isDerivedGraph(graph) || !graphContainsTimeSeries(graph);
     }
 
     private void materializeRollingTimeRanges(Graph graph, LocalDate anchorDate) {
@@ -294,7 +301,7 @@ public class LocationDashboardTimeRangeService {
             if (graph == null) {
                 continue;
             }
-            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition, correctiveActions)) {
+            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition)) {
                 continue;
             }
             graph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
@@ -388,7 +395,7 @@ public class LocationDashboardTimeRangeService {
             if (graph == null || graph.getId() == null) {
                 continue;
             }
-            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition, correctiveActions)) {
+            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition)) {
                 if (monthRange != null && !monthRange.isAllTime()) {
                     payloadsByGraphId.put(graph.getId(), storedPayloadForMonthRange(graph, monthRange));
                 }
@@ -427,20 +434,14 @@ public class LocationDashboardTimeRangeService {
         return GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
     }
 
-    private boolean shouldPreserveExistingResolutionGraph(
-        DerivedGraphConfig derivedGraphDefinition,
-        List<ServiceEvent> correctiveActions
-    ) {
+    private boolean shouldPreserveExistingResolutionGraph(DerivedGraphConfig derivedGraphDefinition) {
         if (derivedGraphDefinition == null || derivedGraphDefinition.derivedType() == null) {
             return false;
         }
-        if (!derivedGraphDefinition.derivedType().requiresResolvedNonConformanceState()) {
-            return false;
-        }
         // Generic dashboard refreshes do not have spreadsheet analyzed-sample context.
-        // When there are also no persisted corrective actions, recomputing these
-        // resolution-driven derived graphs would destructively collapse them to empty.
-        return correctiveActions == null || correctiveActions.isEmpty();
+        // These resolution-driven derived graphs must retain the payload produced by
+        // the spreadsheet analyzer until the next import recomputes them.
+        return derivedGraphDefinition.derivedType().requiresResolvedNonConformanceState();
     }
 
     private boolean graphContainsTimeSeries(Graph graph) {
