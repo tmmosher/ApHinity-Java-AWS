@@ -3,7 +3,6 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
@@ -1312,7 +1311,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void updateLocationGraphDataPersistsRollingTimeRangePayloadsForDerivedGraphs() {
+    void updateLocationGraphDataPersistsOnlyCanonicalPayloadForDerivedGraphs() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
@@ -1340,11 +1339,6 @@ class LocationServiceTest {
             List.of(new LocationGraphDataUpdateRequest(
                 31L,
                 List.of(indicatorTrace(68)),
-                Map.of(
-                    "threeMonths", List.of(indicatorTrace(40)),
-                    "twelveMonths", List.of(indicatorTrace(55)),
-                    "allTime", List.of(indicatorTrace(999))
-                ),
                 null,
                 null
             ))
@@ -1354,22 +1348,8 @@ class LocationServiceTest {
         verify(locationDashboardTimeRangeService).refreshLocationImportedGraphDateGroups(99L);
         verify(locationDashboardTimeRangeService, never()).refreshLocationDateGroups(anyLong());
         assertEquals(
-            40L,
-            ((Number) GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.THREE_MONTHS)
-                .data()
-                .getFirst()
-                .get("value")).longValue()
-        );
-        assertEquals(
-            55L,
-            ((Number) GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.TWELVE_MONTHS)
-                .data()
-                .getFirst()
-                .get("value")).longValue()
-        );
-        assertEquals(
             68L,
-            ((Number) GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME)
+            ((Number) GraphRelationalPayloadMapper.normalize(graph)
                 .data()
                 .getFirst()
                 .get("value")).longValue()

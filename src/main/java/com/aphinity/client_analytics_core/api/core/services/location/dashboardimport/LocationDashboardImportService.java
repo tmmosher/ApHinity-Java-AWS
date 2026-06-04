@@ -1,17 +1,14 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
-import com.aphinity.client_analytics_core.api.core.services.location.GraphTimeRangePayloadProjector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -265,7 +262,6 @@ public class LocationDashboardImportService {
                 computedGraphPayload.data(),
                 resetLegacyPercentHistory
             ));
-            materializePreviewRollingRanges(previewGraph);
             graphsToPersistById.put(previewGraph.getId(), previewGraph);
         }
         return graphsToPersistById;
@@ -318,29 +314,7 @@ public class LocationDashboardImportService {
                 previewGraph,
                 historicalDerivedData
             ));
-            for (GraphTimeRange timeRange : List.of(GraphTimeRange.THREE_MONTHS, GraphTimeRange.TWELVE_MONTHS)) {
-                GraphRelationalPayloadMapper.syncGraphData(
-                    previewGraph,
-                    LocationDashboardDerivedGraphSupport.buildPayload(
-                        derivedGraphDefinition,
-                        previewGraph,
-                        HistoricalDerivedDataTimeRangeProjector.project(historicalDerivedData, timeRange, LocalDate.now(clock))
-                    ),
-                    timeRange
-                );
-            }
             updatedPreviewGraphsById.put(previewGraph.getId(), previewGraph);
-        }
-    }
-
-    private void materializePreviewRollingRanges(Graph graph) {
-        List<Map<String, Object>> allTimePayload = GraphRelationalPayloadMapper.normalize(graph, GraphTimeRange.ALL_TIME).data();
-        for (GraphTimeRange timeRange : List.of(GraphTimeRange.THREE_MONTHS, GraphTimeRange.TWELVE_MONTHS)) {
-            GraphRelationalPayloadMapper.syncGraphData(
-                graph,
-                GraphTimeRangePayloadProjector.project(allTimePayload, timeRange, LocalDate.now(clock)),
-                timeRange
-            );
         }
     }
 

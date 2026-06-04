@@ -1,6 +1,5 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.services.location.DashboardGraphMonthRange;
 
 import java.time.LocalDate;
@@ -11,21 +10,6 @@ import java.util.stream.Collectors;
 
 final class HistoricalDerivedDataTimeRangeProjector {
     private HistoricalDerivedDataTimeRangeProjector() {
-    }
-
-    static LocationDashboardDerivedGraphSupport.HistoricalDerivedData project(
-        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
-        GraphTimeRange timeRange,
-        LocalDate anchorDate
-    ) {
-        if (historicalData == null || timeRange == null || timeRange == GraphTimeRange.ALL_TIME) {
-            return historicalData;
-        }
-        LocalDate windowStart = timeRange.windowStartInclusive(anchorDate);
-        if (windowStart == null) {
-            return historicalData;
-        }
-        return projectFromWindowStart(historicalData, windowStart);
     }
 
     static LocationDashboardDerivedGraphSupport.HistoricalDerivedData project(

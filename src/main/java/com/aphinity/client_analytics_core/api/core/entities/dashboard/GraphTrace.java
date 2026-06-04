@@ -2,7 +2,6 @@ package com.aphinity.client_analytics_core.api.core.entities.dashboard;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Index;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -33,13 +32,12 @@ import java.util.Map;
     name = "graph_trace",
     indexes = {
         @Index(name = "idx_graph_trace_graph_id", columnList = "graph_id"),
-        @Index(name = "idx_graph_trace_graph_order", columnList = "graph_id, time_range, trace_order"),
-        @Index(name = "idx_graph_trace_graph_key", columnList = "graph_id, time_range, trace_key"),
-        @Index(name = "idx_graph_trace_graph_time_range", columnList = "graph_id, time_range")
+        @Index(name = "idx_graph_trace_graph_order", columnList = "graph_id, trace_order"),
+        @Index(name = "idx_graph_trace_graph_key", columnList = "graph_id, trace_key")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_graph_trace_graph_key", columnNames = {"graph_id", "time_range", "trace_key"}),
-        @UniqueConstraint(name = "uk_graph_trace_graph_order", columnNames = {"graph_id", "time_range", "trace_order"})
+        @UniqueConstraint(name = "uk_graph_trace_graph_key", columnNames = {"graph_id", "trace_key"}),
+        @UniqueConstraint(name = "uk_graph_trace_graph_order", columnNames = {"graph_id", "trace_order"})
     }
 )
 public class GraphTrace {
@@ -62,10 +60,6 @@ public class GraphTrace {
 
     @Column(name = "data_mode", nullable = false)
     private String dataMode;
-
-    @Convert(converter = GraphTimeRangeConverter.class)
-    @Column(name = "time_range", nullable = false, length = 32)
-    private GraphTimeRange timeRange = GraphTimeRange.ALL_TIME;
 
     @Column(name = "trace_order", nullable = false)
     private int traceOrder;
@@ -102,9 +96,6 @@ public class GraphTrace {
         if (traceConfig == null) {
             traceConfig = new LinkedHashMap<>();
         }
-        if (timeRange == null) {
-            timeRange = GraphTimeRange.ALL_TIME;
-        }
     }
 
     @PreUpdate
@@ -112,9 +103,6 @@ public class GraphTrace {
         updatedAt = Instant.now();
         if (traceConfig == null) {
             traceConfig = new LinkedHashMap<>();
-        }
-        if (timeRange == null) {
-            timeRange = GraphTimeRange.ALL_TIME;
         }
     }
 
@@ -172,14 +160,6 @@ public class GraphTrace {
 
     public void setTraceOrder(int traceOrder) {
         this.traceOrder = traceOrder;
-    }
-
-    public GraphTimeRange getTimeRange() {
-        return timeRange;
-    }
-
-    public void setTimeRange(GraphTimeRange timeRange) {
-        this.timeRange = timeRange == null ? GraphTimeRange.ALL_TIME : timeRange;
     }
 
     public Map<String, Object> getTraceConfig() {

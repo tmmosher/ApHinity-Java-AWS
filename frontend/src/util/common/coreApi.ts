@@ -2,7 +2,6 @@ import {
     ActiveInvite,
     InviteStatus,
     LocationGraph,
-    LocationGraphTimeRange,
     LocationMembership, LocationMembershipWithStatus,
     LocationSectionLayout,
     LocationSectionLayoutConfig,
@@ -169,38 +168,6 @@ const parseGraphDataEntries = (value: unknown): Record<string, unknown>[] => {
   return value;
 };
 
-const parseOptionalTimeRangeData = (
-  value: unknown
-): Partial<Record<LocationGraphTimeRange, Record<string, unknown>[]>> | undefined => {
-  if (value === undefined) {
-    return undefined;
-  }
-  if (!isObject(value)) {
-    throw new Error("Invalid graph time range payload");
-  }
-
-  const parsed: Partial<Record<LocationGraphTimeRange, Record<string, unknown>[]>> = {};
-  const rawEntries = Object.entries(value);
-  const hasLegacyKeys = rawEntries.some(([key]) => key === "oneMonth");
-  for (const [key, entry] of Object.entries(value)) {
-    let normalizedKey: LocationGraphTimeRange | null = null;
-    if (key === "allTime") {
-      normalizedKey = "allTime";
-    } else if (key === "twelveMonths") {
-      normalizedKey = "twelveMonths";
-    } else if (key === "threeMonths") {
-      normalizedKey = hasLegacyKeys ? "twelveMonths" : "threeMonths";
-    } else if (key === "oneMonth") {
-      normalizedKey = "threeMonths";
-    }
-    if (normalizedKey === null) {
-      continue;
-    }
-    parsed[normalizedKey] = parseGraphDataEntries(entry);
-  }
-  return parsed;
-};
-
 const parseLocationGraphColumns = (value: Record<string, unknown>) => {
   const topLevelLayout = parseOptionalGraphObject(
     value.layout,
@@ -270,7 +237,6 @@ export const parseLocationGraph = (value: unknown): LocationGraph => {
     id: value.id,
     name: value.name,
     ...parseLocationGraphColumns(value),
-    timeRangeData: parseOptionalTimeRangeData(value.timeRangeData),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };

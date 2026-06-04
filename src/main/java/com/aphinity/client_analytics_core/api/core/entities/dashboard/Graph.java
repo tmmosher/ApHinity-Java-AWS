@@ -100,12 +100,6 @@ public class Graph {
         if (graphTraces == null || graphTraces.isEmpty()) {
             return;
         }
-        for (GraphTrace graphTrace : graphTraces) {
-            if (graphTrace != null && graphTrace.getTimeRange() == GraphTimeRange.ALL_TIME) {
-                graphType = graphTrace.getTraceType();
-                return;
-            }
-        }
         graphType = graphTraces.getFirst().getTraceType();
     }
 

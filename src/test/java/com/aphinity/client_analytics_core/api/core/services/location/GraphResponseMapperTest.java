@@ -1,8 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.services.location;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import org.junit.jupiter.api.Test;
 
@@ -36,43 +34,5 @@ class GraphResponseMapperTest {
             response.data().getFirst().get("x")
         );
         assertEquals(List.of(4L, 5L, 7L, 9L), response.data().getFirst().get("y"));
-    }
-
-    @Test
-    void ignoresMaterializedRollingRangePayloadsDuringResponseMapping() {
-        Graph graph = new Graph();
-        graph.setId(11L);
-        graph.setName("Derived");
-        graph.setCreatedAt(Instant.parse("2026-03-20T00:00:00Z"));
-        graph.setUpdatedAt(Instant.parse("2026-03-20T00:00:00Z"));
-        graph.setData(List.of(Map.of(
-            "type", "bar",
-            "name", "Non-Conformances",
-            "x", List.of(9),
-            "y", List.of("All Data")
-        )));
-        GraphRelationalPayloadMapper.syncGraphData(
-            graph,
-            List.of(Map.of(
-                "type", "bar",
-                "name", "Non-Conformances",
-                "x", List.of(2),
-                "y", List.of("Materialized 3M")
-            )),
-            GraphTimeRange.THREE_MONTHS
-        );
-
-        GraphResponse response = new GraphResponseMapper().toResponse(graph);
-
-        assertEquals(
-            List.of(Map.of(
-                "type", "bar",
-                "name", "Non-Conformances",
-                "orientation", "h",
-                "x", List.of(9L),
-                "y", List.of("All Data")
-            )),
-            response.data()
-        );
     }
 }

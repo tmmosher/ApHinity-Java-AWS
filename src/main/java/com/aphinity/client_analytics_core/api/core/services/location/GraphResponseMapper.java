@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.services.location;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
@@ -19,12 +18,12 @@ public class GraphResponseMapper {
     private static final Logger log = LoggerFactory.getLogger(GraphResponseMapper.class);
 
     public GraphResponse toResponse(Graph graph) {
-        GraphPayloadMapper.GraphPayload payload = normalize(graph, GraphTimeRange.ALL_TIME);
+        GraphPayloadMapper.GraphPayload payload = normalize(graph);
         return toResponse(graph, payload, payload.data());
     }
 
     public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data) {
-        GraphPayloadMapper.GraphPayload payload = normalize(graph, GraphTimeRange.ALL_TIME);
+        GraphPayloadMapper.GraphPayload payload = normalize(graph);
         return toResponse(graph, payload, data == null ? payload.data() : data);
     }
 
@@ -45,14 +44,13 @@ public class GraphResponseMapper {
         );
     }
 
-    private GraphPayloadMapper.GraphPayload normalize(Graph graph, GraphTimeRange timeRange) {
+    private GraphPayloadMapper.GraphPayload normalize(Graph graph) {
         try {
-            return GraphRelationalPayloadMapper.normalize(graph, timeRange);
+            return GraphRelationalPayloadMapper.normalize(graph);
         } catch (IllegalArgumentException ex) {
             log.warn(
-                "Invalid graph payload for graphId={} during response mapping range={}",
+                "Invalid graph payload for graphId={} during response mapping",
                 graph == null ? null : graph.getId(),
-                timeRange,
                 ex
             );
             throw new ApiClientException(

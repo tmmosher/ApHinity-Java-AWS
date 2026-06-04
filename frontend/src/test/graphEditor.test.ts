@@ -75,30 +75,16 @@ describe("graphEditor", () => {
     expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated", x: 0.02, xanchor: "left"}});
   });
 
-  it("creates editable graph views from canonical all-time data for every range", () => {
-    const graph: LocationGraph = {
-      ...baseGraphs[0],
-      timeRangeData: {
-        threeMonths: [{type: "bar", x: ["Recent"], y: [2]}],
-        twelveMonths: [{type: "bar", x: ["Annual"], y: [6]}]
-      }
-    };
+  it("creates editable graph views from canonical data for every selected range", () => {
+    const editableGraph = createEditableGraphForTimeRange(baseGraphs[0], "threeMonths");
 
-    const editableGraph = createEditableGraphForTimeRange(graph, "threeMonths");
-
-    expect(editableGraph).toBe(graph);
+    expect(editableGraph).toBe(baseGraphs[0]);
     expect(editableGraph.data).toEqual(baseGraphs[0].data);
-    expect(createEditableGraphForTimeRange(graph, "allTime")).toBe(graph);
+    expect(createEditableGraphForTimeRange(baseGraphs[0], "allTime")).toBe(baseGraphs[0]);
   });
 
-  it("applies rolling range edits to the canonical graph payload", () => {
-    const graph: LocationGraph = {
-      ...baseGraphs[0],
-      timeRangeData: {
-        threeMonths: [{type: "bar", x: ["Recent"], y: [2]}],
-        twelveMonths: [{type: "bar", x: ["Annual"], y: [6]}]
-      }
-    };
+  it("applies selected range edits to the canonical graph payload", () => {
+    const graph: LocationGraph = baseGraphs[0];
 
     const result = applyGraphPayloadEdit([graph], [], graph.id, {
       data: [{type: "bar", x: ["Recent"], y: [2], marker: {color: ["#d62728"], colors: ["#d62728"]}}],
@@ -111,7 +97,6 @@ describe("graphEditor", () => {
     expect(result.nextGraphs[0].data).toEqual([
       {type: "bar", x: ["Recent"], y: [2], marker: {color: ["#d62728"], colors: ["#d62728"]}}
     ]);
-    expect(result.nextGraphs[0].timeRangeData?.twelveMonths).toEqual([{type: "bar", x: ["Annual"], y: [6]}]);
     expect(result.nextGraphs[0].layout).toEqual({title: {text: "Updated", x: 0.02, xanchor: "left"}});
   });
 
@@ -141,14 +126,7 @@ describe("graphEditor", () => {
 
   it("builds save payloads for the graph update API", () => {
     expect(buildLocationGraphUpdates([
-      {
-        ...baseGraphs[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [2]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [4]}]
-        }
-      },
+      baseGraphs[0],
       baseGraphs[1]
     ])).toEqual([
       {
@@ -169,33 +147,14 @@ describe("graphEditor", () => {
   });
 
   it("builds save payloads only for changed graphs with expectedUpdatedAt values", () => {
-    const baseGraphsWithRanges: LocationGraph[] = [
-      {
-        ...baseGraphs[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
-        }
-      },
-      baseGraphs[1]
-    ];
-    const editedGraphs = applyGraphPayloadEdit(baseGraphsWithRanges, [], 10, {
+    const editedGraphs = applyGraphPayloadEdit(baseGraphs, [], 10, {
       data: [{type: "bar", x: ["A"], y: [15]}],
       layout: {title: {text: "Updated"}},
       config: {displayModeBar: false},
       style: {height: 360}
     }).nextGraphs;
-    editedGraphs[0] = {
-      ...editedGraphs[0],
-      timeRangeData: {
-        allTime: [{type: "bar", x: ["A"], y: [15]}],
-        threeMonths: [{type: "bar", x: ["A"], y: [5]}],
-        twelveMonths: [{type: "bar", x: ["A"], y: [7]}]
-      }
-    };
 
-    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphsWithRanges)).toEqual([
+    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphs)).toEqual([
       {
         graphId: 10,
         data: [{type: "bar", x: ["A"], y: [15]}],
@@ -209,31 +168,6 @@ describe("graphEditor", () => {
 
   it("returns no save payloads when there are no graph changes", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
-  });
-
-  it("ignores legacy rolling time-range payload changes when all-time data is unchanged", () => {
-    const baseGraphsWithRanges: LocationGraph[] = [
-      {
-        ...baseGraphs[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
-        }
-      }
-    ];
-    const editedGraphs: LocationGraph[] = [
-      {
-        ...baseGraphsWithRanges[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [6]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [8]}]
-        }
-      }
-    ];
-
-    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphsWithRanges)).toEqual([]);
   });
 
   it("prunes deleted graphs from the local dashboard caches", () => {
@@ -451,62 +385,4 @@ describe("graphEditor", () => {
     expect(merged[1]).toBe(baseGraphs[1]);
   });
 
-  it("can adopt refreshed legacy range payloads without treating them as local dirty state", () => {
-    const baseGraphsWithRanges: LocationGraph[] = [
-      {
-        ...baseGraphs[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
-        }
-      }
-    ];
-    const refreshedGraphs: LocationGraph[] = [
-      {
-        ...baseGraphsWithRanges[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [2]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [4]}]
-        }
-      }
-    ];
-
-    const refreshResult = reconcileLocationGraphRefreshState(
-      baseGraphsWithRanges,
-      [],
-      buildGraphBaselineIndex(baseGraphsWithRanges),
-      refreshedGraphs
-    );
-
-    expect(refreshResult.nextGraphs[0]).toBe(refreshedGraphs[0]);
-  });
-
-  it("ignores uploaded graphs when only legacy range payloads change", () => {
-    const baseGraphsWithRanges: LocationGraph[] = [
-      {
-        ...baseGraphs[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [1]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [3]}]
-        }
-      }
-    ];
-    const uploadedGraphs: LocationGraph[] = [
-      {
-        ...baseGraphsWithRanges[0],
-        timeRangeData: {
-          allTime: [{type: "bar", x: ["A"], y: [9]}],
-          threeMonths: [{type: "bar", x: ["A"], y: [5]}],
-          twelveMonths: [{type: "bar", x: ["A"], y: [7]}]
-        }
-      }
-    ];
-
-    const merged = reconcileLocationGraphUploadState(baseGraphsWithRanges, uploadedGraphs);
-
-    expect(merged).toBe(baseGraphsWithRanges);
-  });
 });

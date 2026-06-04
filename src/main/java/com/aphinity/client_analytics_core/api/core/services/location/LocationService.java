@@ -3,7 +3,6 @@ package com.aphinity.client_analytics_core.api.core.services.location;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
@@ -25,7 +24,6 @@ import com.aphinity.client_analytics_core.api.core.response.location.LocationRes
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory.GraphTemplate;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
@@ -424,7 +422,6 @@ public class LocationService {
             }
 
             Map<Long, ValidatedGraphPayload> validatedPayloads = new LinkedHashMap<>();
-            Map<Long, Map<GraphTimeRange, List<Map<String, Object>>>> validatedTimeRangePayloads = new LinkedHashMap<>();
             for (Graph graph : graphs) {
                 LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
                 try {
@@ -437,10 +434,6 @@ public class LocationService {
                     validatedPayloads.put(
                         graph.getId(),
                         validatedPayload
-                    );
-                    validatedTimeRangePayloads.put(
-                        graph.getId(),
-                        validateTimeRangePayloads(graph, update)
                     );
                 } catch (IllegalArgumentException ex) {
                     log.warn(
@@ -501,13 +494,6 @@ public class LocationService {
                     graph.setLayout(validatedPayload.layout());
                 }
                 graph.setData(validatedPayload.data());
-                Map<GraphTimeRange, List<Map<String, Object>>> timeRangePayloads =
-                    validatedTimeRangePayloads.get(graph.getId());
-                if (timeRangePayloads != null) {
-                    for (Map.Entry<GraphTimeRange, List<Map<String, Object>>> entry : timeRangePayloads.entrySet()) {
-                        GraphRelationalPayloadMapper.syncGraphData(graph, entry.getValue(), entry.getKey());
-                    }
-                }
             }
 
             try {
@@ -598,53 +584,6 @@ public class LocationService {
         }
         Object derivedGraphType = importMeta.get("derivedGraphType");
         return derivedGraphType instanceof String value && !value.isBlank();
-    }
-
-    private Map<GraphTimeRange, List<Map<String, Object>>> validateTimeRangePayloads(
-        Graph graph,
-        LocationGraphDataUpdateRequest update
-    ) {
-        Object rawTimeRangeData = update.timeRangeData();
-        if (rawTimeRangeData == null) {
-            return Map.of();
-        }
-        if (!(rawTimeRangeData instanceof Map<?, ?> rawMap)) {
-            throw new IllegalArgumentException("Graph timeRangeData payload must be an object");
-        }
-
-        Map<GraphTimeRange, List<Map<String, Object>>> validatedPayloads = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
-            GraphTimeRange timeRange = graphTimeRangeFromRequestKey(entry.getKey());
-            if (timeRange == GraphTimeRange.ALL_TIME) {
-                continue;
-            }
-            Object rawTracePayload = entry.getValue();
-            if (rawTracePayload == null) {
-                continue;
-            }
-            ValidatedGraphPayload validatedPayload = locationGraphUpdatePayloadValidationFactory.validateForUpdate(
-                graph.getData(),
-                rawTracePayload,
-                null
-            );
-            validatedPayloads.put(timeRange, validatedPayload.data());
-        }
-        return Map.copyOf(validatedPayloads);
-    }
-
-    private GraphTimeRange graphTimeRangeFromRequestKey(Object rawKey) {
-        if (!(rawKey instanceof String key) || key.isBlank()) {
-            throw new IllegalArgumentException("Graph time range key must be a non-empty string");
-        }
-        String normalized = key.strip();
-        for (GraphTimeRange timeRange : GraphTimeRange.values()) {
-            if (timeRange.getResponseKey().equals(normalized)
-                || timeRange.name().equalsIgnoreCase(normalized)
-                || timeRange.getDatabaseValue().equalsIgnoreCase(normalized)) {
-                return timeRange;
-            }
-        }
-        throw new IllegalArgumentException("Unknown graph time range: " + key);
     }
 
     /**

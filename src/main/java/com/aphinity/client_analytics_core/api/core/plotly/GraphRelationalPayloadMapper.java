@@ -2,7 +2,6 @@ package com.aphinity.client_analytics_core.api.core.plotly;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphCategoryPoint;
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeRange;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 
@@ -44,14 +43,9 @@ public final class GraphRelationalPayloadMapper {
     }
 
     public static void syncGraphData(Graph graph, List<Map<String, Object>> traces) {
-        syncGraphData(graph, traces, GraphTimeRange.ALL_TIME);
-    }
-
-    public static void syncGraphData(Graph graph, List<Map<String, Object>> traces, GraphTimeRange timeRange) {
         if (graph == null) {
             throw new IllegalArgumentException("Graph is required");
         }
-        GraphTimeRange normalizedTimeRange = timeRange == null ? GraphTimeRange.ALL_TIME : timeRange;
 
         List<GraphTrace> graphTraces = graph.getGraphTraces();
         if (graphTraces == null) {
@@ -59,45 +53,37 @@ public final class GraphRelationalPayloadMapper {
             graph.setGraphTraces(graphTraces);
         }
 
-        List<GraphTrace> scopedGraphTraces = graphTraces.stream()
-            .filter(graphTrace -> normalizedTimeRange == graphTrace.getTimeRange())
+        List<GraphTrace> sortedGraphTraces = graphTraces.stream()
             .sorted(java.util.Comparator
                 .comparingInt(GraphTrace::getTraceOrder)
                 .thenComparing(GraphTrace::getId, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
             .toList();
 
         if (traces == null || traces.isEmpty()) {
-            graphTraces.removeIf(graphTrace -> normalizedTimeRange == graphTrace.getTimeRange());
+            graphTraces.clear();
             return;
         }
 
-        if (normalizedTimeRange == GraphTimeRange.ALL_TIME) {
-            graph.setGraphType(resolveCanonicalTraceType(traces.getFirst()));
-        }
+        graph.setGraphType(resolveCanonicalTraceType(traces.getFirst()));
 
-        int sharedCount = Math.min(scopedGraphTraces.size(), traces.size());
+        int sharedCount = Math.min(sortedGraphTraces.size(), traces.size());
         for (int index = 0; index < sharedCount; index++) {
-            updateGraphTrace(graph, scopedGraphTraces.get(index), traces.get(index), index, normalizedTimeRange);
+            updateGraphTrace(graph, sortedGraphTraces.get(index), traces.get(index), index);
         }
 
         for (int index = sharedCount; index < traces.size(); index++) {
-            graphTraces.add(buildGraphTrace(graph, traces.get(index), index, normalizedTimeRange));
+            graphTraces.add(buildGraphTrace(graph, traces.get(index), index));
         }
 
-        for (int index = traces.size(); index < scopedGraphTraces.size(); index++) {
-            graphTraces.remove(scopedGraphTraces.get(index));
+        for (int index = traces.size(); index < sortedGraphTraces.size(); index++) {
+            graphTraces.remove(sortedGraphTraces.get(index));
         }
     }
 
     public static GraphPayloadMapper.GraphPayload normalize(Graph graph) {
-        return normalize(graph, GraphTimeRange.ALL_TIME);
-    }
-
-    public static GraphPayloadMapper.GraphPayload normalize(Graph graph, GraphTimeRange timeRange) {
         if (graph == null) {
             throw new IllegalArgumentException("Graph is required");
         }
-        GraphTimeRange normalizedTimeRange = timeRange == null ? GraphTimeRange.ALL_TIME : timeRange;
 
         List<GraphTrace> graphTraces = graph.getGraphTraces();
         if (graphTraces == null || graphTraces.isEmpty()) {
@@ -111,7 +97,7 @@ public final class GraphRelationalPayloadMapper {
 
         List<Map<String, Object>> traces = new ArrayList<>();
         for (GraphTrace graphTrace : graphTraces) {
-            if (graphTrace == null || graphTrace.getTimeRange() != normalizedTimeRange) {
+            if (graphTrace == null) {
                 continue;
             }
             traces.add(toTraceMap(graphTrace));
@@ -132,11 +118,10 @@ public final class GraphRelationalPayloadMapper {
     private static GraphTrace buildGraphTrace(
         Graph graph,
         Map<String, Object> trace,
-        int index,
-        GraphTimeRange timeRange
+        int index
     ) {
         GraphTrace graphTrace = new GraphTrace();
-        populateGraphTrace(graph, graphTrace, trace, index, false, timeRange);
+        populateGraphTrace(graph, graphTrace, trace, index, false);
         return graphTrace;
     }
 
@@ -144,10 +129,9 @@ public final class GraphRelationalPayloadMapper {
         Graph graph,
         GraphTrace graphTrace,
         Map<String, Object> trace,
-        int index,
-        GraphTimeRange timeRange
+        int index
     ) {
-        populateGraphTrace(graph, graphTrace, trace, index, true, timeRange);
+        populateGraphTrace(graph, graphTrace, trace, index, true);
     }
 
     private static void populateGraphTrace(
@@ -155,13 +139,11 @@ public final class GraphRelationalPayloadMapper {
         GraphTrace graphTrace,
         Map<String, Object> trace,
         int index,
-        boolean preserveExistingTraceKey,
-        GraphTimeRange timeRange
+        boolean preserveExistingTraceKey
     ) {
         String canonicalType = resolveCanonicalTraceType(trace);
         boolean timeSeriesTrace = "scatter".equals(canonicalType) && looksLikeTimeSeries(trace);
         graphTrace.setGraph(graph);
-        graphTrace.setTimeRange(timeRange);
         if (!preserveExistingTraceKey || graphTrace.getTraceKey() == null || graphTrace.getTraceKey().isBlank()) {
             graphTrace.setTraceKey(canonicalType + "-" + (index + 1));
         }
