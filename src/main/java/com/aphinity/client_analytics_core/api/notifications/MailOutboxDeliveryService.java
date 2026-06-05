@@ -1,8 +1,9 @@
 package com.aphinity.client_analytics_core.api.notifications;
 
 import com.aphinity.client_analytics_core.api.auth.services.MailSendingService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.springframework.data.domain.PageRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -16,6 +17,7 @@ import java.util.List;
  */
 @Service
 public class MailOutboxDeliveryService {
+    private static final Logger log = LoggerFactory.getLogger(MailOutboxDeliveryService.class);
     private static final int MAX_ATTEMPTS = 3;
     private static final int RETRY_BATCH_SIZE = 100;
     private static final Duration RETRY_DELAY = Duration.ofMinutes(1);
@@ -23,18 +25,15 @@ public class MailOutboxDeliveryService {
     private final MailSendingService mailSendingService;
     private final MailOutboxRepository mailOutboxRepository;
     private final TransactionTemplate transactionTemplate;
-    private final AsyncLogService asyncLogService;
 
     public MailOutboxDeliveryService(
         MailSendingService mailSendingService,
         MailOutboxRepository mailOutboxRepository,
-        TransactionTemplate transactionTemplate,
-        AsyncLogService asyncLogService
+        TransactionTemplate transactionTemplate
     ) {
         this.mailSendingService = mailSendingService;
         this.mailOutboxRepository = mailOutboxRepository;
         this.transactionTemplate = transactionTemplate;
-        this.asyncLogService = asyncLogService;
     }
 
     /**
@@ -48,10 +47,12 @@ public class MailOutboxDeliveryService {
             }
             deliverSnapshot(snapshot);
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox delivery failed | outboxId=" + outboxId
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox delivery failed | outboxId={}, errorType={}, errorMessage={}",
+                outboxId,
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
         }
     }
@@ -65,9 +66,11 @@ public class MailOutboxDeliveryService {
             drainDueMessages();
             reconcileTerminalMessages();
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox retry run failed | errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox retry run failed | errorType={}, errorMessage={}",
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
         }
     }
@@ -188,15 +191,17 @@ public class MailOutboxDeliveryService {
         recordFailureDetails(snapshot.id(), error);
         if (snapshot.attemptCount() >= MAX_ATTEMPTS) {
             markFailed(snapshot.id(), error);
-            asyncLogService.log(
-                "Mail outbox exhausted retries | outboxId=" + snapshot.id()
-                    + ", type=" + snapshot.mailType()
-                    + ", attemptCount=" + snapshot.attemptCount()
-                    + ", recipient=" + safeValue(snapshot.recipientEmail())
-                    + ", locationName=" + safeValue(snapshot.locationName())
-                    + ", authorizedUserId=" + snapshot.authorizedUserId()
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(error)
+            log.error(
+                "Mail outbox exhausted retries | outboxId={}, type={}, attemptCount={}, recipient={}, locationName={}, authorizedUserId={}, errorType={}, errorMessage={}",
+                snapshot.id(),
+                snapshot.mailType(),
+                snapshot.attemptCount(),
+                safeValue(snapshot.recipientEmail()),
+                safeValue(snapshot.locationName()),
+                snapshot.authorizedUserId(),
+                ex.getClass().getSimpleName(),
+                safeValue(error),
+                ex
             );
         }
     }
@@ -212,10 +217,12 @@ public class MailOutboxDeliveryService {
                 mailOutboxRepository.save(message);
             });
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox failure details update failed | outboxId=" + outboxId
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox failure details update failed | outboxId={}, errorType={}, errorMessage={}",
+                outboxId,
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
         }
     }
@@ -233,10 +240,12 @@ public class MailOutboxDeliveryService {
                 mailOutboxRepository.save(message);
             });
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox consumption state update failed | outboxId=" + outboxId
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox consumption state update failed | outboxId={}, errorType={}, errorMessage={}",
+                outboxId,
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
         }
     }
@@ -254,10 +263,12 @@ public class MailOutboxDeliveryService {
                 mailOutboxRepository.save(message);
             });
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox failure state update failed | outboxId=" + outboxId
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox failure state update failed | outboxId={}, errorType={}, errorMessage={}",
+                outboxId,
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
         }
     }

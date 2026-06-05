@@ -17,12 +17,12 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUser;
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
+import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationDashboardSampleRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.security.JwtProperties;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,6 +87,9 @@ abstract class AbstractApiIntegrationTest {
     protected LocationGraphRepository locationGraphRepository;
 
     @Autowired
+    protected LocationDashboardSampleRepository locationDashboardSampleRepository;
+
+    @Autowired
     protected LocationUserRepository locationUserRepository;
 
     @Autowired
@@ -112,9 +115,6 @@ abstract class AbstractApiIntegrationTest {
 
     @MockitoBean
     protected MailSendingService mailSendingService;
-
-    @MockitoBean
-    protected AsyncLogService asyncLogService;
 
     @BeforeEach
     void resetState() {
@@ -325,6 +325,7 @@ abstract class AbstractApiIntegrationTest {
             "graph_time_series_point",
             "graph_category_point",
             "graph_trace",
+            "location_dashboard_sample",
             "location_measurements",
             "location_graph",
             "location_user",

@@ -62,6 +62,9 @@ class LocationDashboardImportServiceTest {
     private ServiceEventRepository serviceEventRepository;
 
     @Mock
+    private LocationDashboardSamplePersistenceService samplePersistenceService;
+
+    @Mock
     private LocationRepository locationRepository;
 
     @Test
@@ -890,6 +893,7 @@ class LocationDashboardImportServiceTest {
             locationGraphRepository,
             serviceEventRepository,
             new LocationDashboardMutationLockService(),
+            samplePersistenceService,
             new GraphResponseMapper(),
             clock
         );

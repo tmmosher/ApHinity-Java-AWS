@@ -123,6 +123,14 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(0, persistedEvents.size());
+
+        var persistedSamples = locationDashboardSampleRepository.findByLocation_IdOrderByObservedDateAscIdAsc(location.getId());
+        assertEquals(6, persistedSamples.size());
+        assertEquals(2, persistedSamples.stream().filter(sample -> !sample.isCompliant()).count());
+        assertEquals(0, persistedSamples.stream().filter(sample -> sample.isResolved()).count());
+        assertThat(persistedSamples)
+            .extracting(sample -> sample.getMeasurementName())
+            .contains("HPC", "Endotoxin");
     }
 
     @Test
@@ -306,7 +314,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     }
 
     @Test
-    void appliedExampleTwoSpreadsheetPreviewPreservesResolutionDerivedGraphsAfterRefetch() throws Exception {
+    void appliedExampleTwoSpreadsheetPreviewRebuildsResolutionDerivedGraphsFromPersistedSampleFactsAfterRefetch() throws Exception {
         createUser("partner-dashboard-upload-example2-apply@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedHoagMeasurement(location, "HPC");
@@ -357,10 +365,14 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             }
         );
         Map<String, Object> previewPercentResolved = findGraph(previewGraphs, "Percent Resolved", null);
+        Map<String, Object> previewTotalSamples = findGraph(previewGraphs, "Total Number of Samples", null);
+        Map<String, Object> previewTotalNonConformances = findGraph(previewGraphs, "Total Non-Conformances", null);
         Map<String, Object> previewTurnaround = findGraph(previewGraphs, "Non-Conformance Status", "Turnaround Time");
         Map<String, Object> previewStatusByFacility = findGraph(previewGraphs, "Non-Conformance Status", "By Facility");
 
         assertThat(((Number) firstTrace(previewPercentResolved).get("value")).intValue()).isGreaterThan(0);
+        assertThat((List<?>) firstTrace(previewTotalSamples).get("values")).isNotEmpty();
+        assertThat((List<?>) firstTrace(previewTotalNonConformances).get("values")).isNotEmpty();
         assertThat((List<?>) firstTrace(previewTurnaround).get("x")).isNotEmpty();
         assertThat((List<?>) firstTrace(previewStatusByFacility).get("x")).isNotEmpty();
 
@@ -390,6 +402,10 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             }
         );
 
+        assertThat(firstTrace(findGraph(refetchedGraphs, "Total Number of Samples", null)).get("values"))
+            .isEqualTo(firstTrace(previewTotalSamples).get("values"));
+        assertThat(firstTrace(findGraph(refetchedGraphs, "Total Non-Conformances", null)).get("values"))
+            .isEqualTo(firstTrace(previewTotalNonConformances).get("values"));
         assertThat(firstTrace(findGraph(refetchedGraphs, "Percent Resolved", null)).get("value"))
             .isEqualTo(firstTrace(previewPercentResolved).get("value"));
         assertThat(firstTrace(findGraph(refetchedGraphs, "Non-Conformance Status", "Turnaround Time")).get("x"))

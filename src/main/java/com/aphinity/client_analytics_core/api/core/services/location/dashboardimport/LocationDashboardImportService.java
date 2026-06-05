@@ -43,6 +43,7 @@ public class LocationDashboardImportService {
     private final LocationDashboardGraphMatcher graphMatcher;
     private final LocationDashboardImportedGraphMerger importedGraphMerger;
     private final LocationDashboardCorrectiveActionService correctiveActionService;
+    private final LocationDashboardSamplePersistenceService samplePersistenceService;
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
     private final GraphResponseMapper graphResponseMapper;
     private final Clock clock;
@@ -55,6 +56,7 @@ public class LocationDashboardImportService {
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
         LocationDashboardMutationLockService mutationLockService,
+        LocationDashboardSamplePersistenceService samplePersistenceService,
         GraphResponseMapper graphResponseMapper
     ) {
         this(
@@ -64,6 +66,7 @@ public class LocationDashboardImportService {
             locationGraphRepository,
             serviceEventRepository,
             mutationLockService,
+            samplePersistenceService,
             graphResponseMapper,
             Clock.systemDefaultZone()
         );
@@ -76,6 +79,7 @@ public class LocationDashboardImportService {
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
         LocationDashboardMutationLockService mutationLockService,
+        LocationDashboardSamplePersistenceService samplePersistenceService,
         GraphResponseMapper graphResponseMapper,
         Clock clock
     ) {
@@ -88,6 +92,7 @@ public class LocationDashboardImportService {
             new LocationDashboardGraphMatcher(),
             new LocationDashboardImportedGraphMerger(),
             new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry),
+            samplePersistenceService,
             graphResponseMapper,
             clock
         );
@@ -102,6 +107,7 @@ public class LocationDashboardImportService {
         LocationDashboardGraphMatcher graphMatcher,
         LocationDashboardImportedGraphMerger importedGraphMerger,
         LocationDashboardCorrectiveActionService correctiveActionService,
+        LocationDashboardSamplePersistenceService samplePersistenceService,
         GraphResponseMapper graphResponseMapper,
         Clock clock
     ) {
@@ -113,6 +119,7 @@ public class LocationDashboardImportService {
         this.graphMatcher = graphMatcher;
         this.importedGraphMerger = importedGraphMerger;
         this.correctiveActionService = correctiveActionService;
+        this.samplePersistenceService = samplePersistenceService;
         this.historicalDataAssembler = new LocationDashboardHistoricalDataAssembler(correctiveActionService);
         this.graphResponseMapper = graphResponseMapper;
         this.clock = clock;
@@ -182,6 +189,7 @@ public class LocationDashboardImportService {
                 previewCorrectiveAction.setLocation(location);
             }
         }
+        samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
 
         Map<String, GraphConfig> graphDefinitionsById = strategy.graphDefinitions().stream()
             .collect(Collectors.toMap(

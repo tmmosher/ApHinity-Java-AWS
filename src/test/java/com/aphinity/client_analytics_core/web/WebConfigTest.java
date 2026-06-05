@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.web;
 
 import com.aphinity.client_analytics_core.api.security.AccessTokenRefreshFilter;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -9,7 +8,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,9 +28,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WebConfigTest {
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private AsyncLogService asyncLogService;
 
     @Test
     void forwardsDashboardNestedRoutesToSpaRoot() throws Exception {

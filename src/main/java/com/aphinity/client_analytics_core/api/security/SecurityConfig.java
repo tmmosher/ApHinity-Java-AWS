@@ -29,7 +29,6 @@ import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.properties.LoginAttemptProperties;
 import com.digitalsanctuary.cf.turnstile.TurnstileConfiguration;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.springframework.context.annotation.Import;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -157,10 +156,9 @@ public class SecurityConfig {
      */
     @Bean
     CoreApiCsrfEnforcementFilter coreApiCsrfEnforcementFilter(
-        CookieCsrfTokenRepository csrfTokenRepository,
-        AsyncLogService asyncLogService
+        CookieCsrfTokenRepository csrfTokenRepository
     ) {
-        return new CoreApiCsrfEnforcementFilter(csrfTokenRepository, asyncLogService);
+        return new CoreApiCsrfEnforcementFilter(csrfTokenRepository);
     }
 
     /**

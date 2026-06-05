@@ -54,7 +54,8 @@ public interface LocationDashboardImportStrategy {
     enum SampleOrigin {
         WORKSHEET,
         COMMENT_PRIMARY,
-        COMMENT_SUPPLEMENTAL
+        COMMENT_SUPPLEMENTAL,
+        CORRECTIVE_ACTION_DRAFT
     }
 
     record AnalyzedSamplePoint(

@@ -22,7 +22,6 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -114,9 +113,6 @@ class LocationGraphPipelineWebMvcTest {
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
-
-    @MockitoBean
-    private AsyncLogService asyncLogService;
 
     @Test
     void locationGraphsCoversRepositoryLookupDataFormationAndClientTransmission() throws Exception {

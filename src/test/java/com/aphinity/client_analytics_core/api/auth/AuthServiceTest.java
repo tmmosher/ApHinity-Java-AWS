@@ -11,7 +11,6 @@ import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
 import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
@@ -74,9 +73,6 @@ class AuthServiceTest {
 
     @Mock
     private TurnstileValidationService turnstileValidationService;
-
-    @Mock
-    private AsyncLogService asyncLogService;
 
     @Mock
     private JdbcTemplate jdbcTemplate;

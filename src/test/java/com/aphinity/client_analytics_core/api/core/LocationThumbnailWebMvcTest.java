@@ -3,7 +3,6 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -39,9 +38,6 @@ class LocationThumbnailWebMvcTest {
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
-
-    @MockitoBean
-    private AsyncLogService asyncLogService;
 
     @Test
     void postsThumbnailMultipartToControllerAndReturnsUpdatedLocation() throws Exception {

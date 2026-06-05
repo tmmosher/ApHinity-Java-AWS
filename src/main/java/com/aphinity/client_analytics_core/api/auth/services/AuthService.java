@@ -10,7 +10,6 @@ import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +60,6 @@ public class AuthService {
     private final TurnstileValidationService turnstileValidationService;
     private final JdbcTemplate jdbcTemplate;
     private final MailOutboxCommandService mailOutboxCommandService;
-    private final AsyncLogService asyncLogService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${app.recovery.token-ttl-seconds:3600}")
@@ -83,8 +81,7 @@ public class AuthService {
             LoginAttemptService loginAttemptService,
             TurnstileValidationService turnstileValidationService,
             JdbcTemplate jdbcTemplate,
-            MailOutboxCommandService mailOutboxCommandService,
-            AsyncLogService asyncLogService)
+            MailOutboxCommandService mailOutboxCommandService)
     {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
@@ -96,7 +93,6 @@ public class AuthService {
         this.turnstileValidationService = turnstileValidationService;
         this.jdbcTemplate = jdbcTemplate;
         this.mailOutboxCommandService = mailOutboxCommandService;
-        this.asyncLogService = asyncLogService;
     }
 
     /**
@@ -148,9 +144,7 @@ public class AuthService {
 
             String accessToken = jwtService.createAccessToken(user, session.getId());
             loginAttemptService.recordSuccess(email);
-            asyncLogService.log("User with email: '" + email +
-                    "' logged in at ipv4: '" + ipAddress +
-                    "' from agent '" + userAgent + "'.");
+            log.info("User with email: '{}' logged in at ipv4: '{}' from agent '{}'.", email, ipAddress, userAgent);
             return new IssuedTokens(
                 accessToken,
                 refreshToken,
@@ -189,8 +183,7 @@ public class AuthService {
         } catch (DataIntegrityViolationException ex) {
             throw userAlreadyExists();
         }
-        asyncLogService.log("User with email: '" + email + "' created at ipv4: '"
-                + ipAddress + "' from agent '" + userAgent + "'.");
+        log.info("User with email: '{}' created at ipv4: '{}' from agent '{}'.", email, ipAddress, userAgent);
 
         issueAndSendVerificationCode(user.getId(), user.getEmail());
     }

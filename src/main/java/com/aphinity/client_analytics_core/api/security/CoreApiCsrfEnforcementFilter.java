@@ -1,6 +1,5 @@
 package com.aphinity.client_analytics_core.api.security;
 
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,11 +29,9 @@ public class CoreApiCsrfEnforcementFilter extends OncePerRequestFilter {
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private final CsrfTokenRepository csrfTokenRepository;
-    private final AsyncLogService asyncLogService;
 
-    public CoreApiCsrfEnforcementFilter(CsrfTokenRepository csrfTokenRepository, AsyncLogService asyncLogService) {
+    public CoreApiCsrfEnforcementFilter(CsrfTokenRepository csrfTokenRepository) {
         this.csrfTokenRepository = csrfTokenRepository;
-        this.asyncLogService = asyncLogService;
     }
 
     @Override
@@ -95,14 +92,6 @@ public class CoreApiCsrfEnforcementFilter extends OncePerRequestFilter {
             method,
             path,
             reason
-        );
-        asyncLogService.log(
-            "CoreApiCsrfEnforcementFilter rejected request method="
-                + method
-                + " path="
-                + path
-                + " reason="
-                + reason
         );
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

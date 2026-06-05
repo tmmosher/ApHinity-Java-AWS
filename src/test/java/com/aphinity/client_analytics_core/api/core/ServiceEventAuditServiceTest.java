@@ -5,35 +5,27 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceEventAuditService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith(OutputCaptureExtension.class)
 class ServiceEventAuditServiceTest {
-    @Mock
-    private AsyncLogService asyncLogService;
-
     @Test
-    void recordDeletedWritesServiceEventAuditLineToAsyncLogger() {
-        ServiceEventAuditService auditService = new ServiceEventAuditService(asyncLogService);
+    void recordDeletedWritesServiceEventAuditLineToLogger(CapturedOutput output) {
+        ServiceEventAuditService auditService = new ServiceEventAuditService();
         ServiceEvent serviceEvent = serviceEvent();
 
         auditService.recordDeleted(5L, "203.0.113.8", serviceEvent);
 
-        ArgumentCaptor<String> logMessageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(asyncLogService).log(logMessageCaptor.capture());
-        String logMessage = logMessageCaptor.getValue();
+        String logMessage = output.getOut() + output.getErr();
         assertTrue(logMessage.contains("service-event-audit"));
         assertTrue(logMessage.contains("action=DELETED"));
         assertTrue(logMessage.contains("actorUserId=5"));

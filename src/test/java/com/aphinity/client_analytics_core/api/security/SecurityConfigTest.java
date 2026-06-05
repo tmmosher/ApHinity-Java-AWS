@@ -2,7 +2,6 @@ package com.aphinity.client_analytics_core.api.security;
 
 import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -59,9 +58,6 @@ class SecurityConfigTest {
 
     @MockitoBean
     private ClientRequestMetadataResolver clientRequestMetadataResolver;
-
-    @MockitoBean
-    private AsyncLogService asyncLogService;
 
     @Test
     void usesApiAuthenticationEntryPointForApiRoutes() throws Exception {

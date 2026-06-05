@@ -20,16 +20,13 @@ final class LocationDashboardSampleImportPipeline {
 
     private final LocationDashboardImportContextResolver contextResolver;
     private final LocationDashboardCommentParser commentParser;
-    private final boolean enableCommentDerivedCorrectiveActions;
 
     LocationDashboardSampleImportPipeline(
         LocationDashboardImportContextResolver contextResolver,
-        LocationDashboardCommentParser commentParser,
-        boolean enableCommentDerivedCorrectiveActions
+        LocationDashboardCommentParser commentParser
     ) {
         this.contextResolver = contextResolver;
         this.commentParser = commentParser;
-        this.enableCommentDerivedCorrectiveActions = enableCommentDerivedCorrectiveActions;
     }
 
     SampleImportResult importSamples(
@@ -58,9 +55,7 @@ final class LocationDashboardSampleImportPipeline {
                 continue;
             }
 
-            if (enableCommentDerivedCorrectiveActions) {
-                validatePrimaryCommentSample(preparedCell.parsedComment(), preparedCell.cell(), preparedCell.row());
-            }
+            validatePrimaryCommentSample(preparedCell.parsedComment(), preparedCell.cell(), preparedCell.row());
             for (LocationDashboardImportedSample sample : extractCommentSamples(
                 preparedCell.parsedComment(),
                 preparedCell.cell(),

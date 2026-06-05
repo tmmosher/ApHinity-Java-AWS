@@ -38,6 +38,7 @@ public class LocationDashboardTimeRangeService {
     private final LocationGraphRepository locationGraphRepository;
     private final ServiceEventRepository serviceEventRepository;
     private final LocationDashboardImportStrategyRegistry strategyRegistry;
+    private final LocationDashboardSamplePersistenceService samplePersistenceService;
     private final Clock clock;
     private final LocationDashboardGraphMatcher graphMatcher = new LocationDashboardGraphMatcher();
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
@@ -47,13 +48,15 @@ public class LocationDashboardTimeRangeService {
         LocationRepository locationRepository,
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
-        LocationDashboardImportStrategyRegistry strategyRegistry
+        LocationDashboardImportStrategyRegistry strategyRegistry,
+        LocationDashboardSamplePersistenceService samplePersistenceService
     ) {
         this(
             locationRepository,
             locationGraphRepository,
             serviceEventRepository,
             strategyRegistry,
+            samplePersistenceService,
             Clock.system(PHOENIX_ZONE)
         );
     }
@@ -63,12 +66,14 @@ public class LocationDashboardTimeRangeService {
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
         LocationDashboardImportStrategyRegistry strategyRegistry,
+        LocationDashboardSamplePersistenceService samplePersistenceService,
         Clock clock
     ) {
         this.locationRepository = locationRepository;
         this.locationGraphRepository = locationGraphRepository;
         this.serviceEventRepository = serviceEventRepository;
         this.strategyRegistry = strategyRegistry;
+        this.samplePersistenceService = samplePersistenceService;
         this.clock = clock;
         this.historicalDataAssembler = new LocationDashboardHistoricalDataAssembler(
             new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry)
@@ -215,13 +220,15 @@ public class LocationDashboardTimeRangeService {
             .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
         List<ServiceEvent> correctiveActions =
             serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> persistedSamples =
+            samplePersistenceService.loadLocationSamples(locationId);
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData allTimeHistoricalData =
             historicalDataAssembler.buildHistoricalDerivedData(
                 strategy.graphDefinitions(),
                 matchedImportGraphsByDefinitionId,
                 assignedGraphsById,
                 assignedGraphsById,
-                List.of(),
+                persistedSamples,
                 correctiveActions
             );
 
@@ -233,9 +240,6 @@ public class LocationDashboardTimeRangeService {
                 LocationDashboardGraphMetadataSupport.normalizeKey(derivedGraphDefinition.id())
             );
             if (graph == null) {
-                continue;
-            }
-            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition)) {
                 continue;
             }
             graph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
@@ -301,13 +305,15 @@ public class LocationDashboardTimeRangeService {
             .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
         List<ServiceEvent> correctiveActions =
             serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> persistedSamples =
+            samplePersistenceService.loadLocationSamples(locationId);
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             historicalDataAssembler.buildHistoricalDerivedData(
                 strategy.graphDefinitions(),
                 matchedImportGraphsByDefinitionId,
                 assignedGraphsById,
                 assignedGraphsById,
-                List.of(),
+                persistedSamples,
                 correctiveActions
             );
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData rangedHistoricalData =
@@ -324,12 +330,6 @@ public class LocationDashboardTimeRangeService {
             if (graph == null || graph.getId() == null) {
                 continue;
             }
-            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition)) {
-                if (monthRange != null && !monthRange.isAllTime()) {
-                    payloadsByGraphId.put(graph.getId(), storedPayloadForMonthRange(graph));
-                }
-                continue;
-            }
             if (monthRange == null || monthRange.isAllTime()) {
                 GraphRelationalPayloadMapper.syncGraphData(
                     graph,
@@ -344,23 +344,6 @@ public class LocationDashboardTimeRangeService {
             );
         }
         return payloadsByGraphId;
-    }
-
-    private List<Map<String, Object>> storedPayloadForMonthRange(Graph graph) {
-        if (graph == null) {
-            return List.of();
-        }
-        return GraphRelationalPayloadMapper.normalize(graph).data();
-    }
-
-    private boolean shouldPreserveExistingResolutionGraph(DerivedGraphConfig derivedGraphDefinition) {
-        if (derivedGraphDefinition == null || derivedGraphDefinition.derivedType() == null) {
-            return false;
-        }
-        // Generic dashboard refreshes do not have spreadsheet analyzed-sample context.
-        // These resolution-driven derived graphs must retain the payload produced by
-        // the spreadsheet analyzer until the next import recomputes them.
-        return derivedGraphDefinition.derivedType().requiresResolvedNonConformanceState();
     }
 
     private boolean graphContainsTimeSeries(Graph graph) {

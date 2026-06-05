@@ -56,6 +56,10 @@ COPY --from=frontend-build /app/src/main/resources/static /app/static
 
 ENV SPRING_WEB_RESOURCES_STATIC_LOCATIONS=file:/app/static/
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
+ENV LOG_DIR=/logs
+
+RUN mkdir -p /logs
+VOLUME ["/logs"]
 
 EXPOSE 8080
 ENTRYPOINT ["java","org.springframework.boot.loader.launch.JarLauncher"]

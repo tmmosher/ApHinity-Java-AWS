@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.api.auth.services;
 
 import com.aphinity.client_analytics_core.api.notifications.MailTemplateService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.mail.Session;
 import jakarta.mail.Message;
 import jakarta.mail.internet.InternetAddress;
@@ -12,6 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -33,19 +34,16 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class MailSendingServiceTest {
     @Mock
     private JavaMailSender mailSender;
-
-    @Mock
-    private AsyncLogService logService;
 
     private MailSendingService mailSendingService;
 
     @BeforeEach
     void setUp() {
-        mailSendingService = new MailSendingService(mailSender, logService, new MailTemplateService());
+        mailSendingService = new MailSendingService(mailSender, new MailTemplateService());
         ReflectionTestUtils.setField(mailSendingService, "serviceFromEmail", "no-reply@example.com");
     }
 
@@ -69,7 +67,7 @@ class MailSendingServiceTest {
     }
 
     @Test
-    void sendVerificationEmailLogsAndRethrowsGenericMailException() {
+    void sendVerificationEmailLogsAndRethrowsGenericMailException(CapturedOutput output) {
         MailException exception = new MailException("smtp\ndown") {
         };
         doThrow(exception).when(mailSender).send(any(MimeMessagePreparator.class));
@@ -78,9 +76,7 @@ class MailSendingServiceTest {
             mailSendingService.sendVerificationEmail("client@example.com\nalias", "V-123", 300)
         );
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logService).log(logCaptor.capture());
-        String logLine = logCaptor.getValue();
+        String logLine = output.getAll();
         assertTrue(logLine.contains("Mail send failed"));
         assertTrue(logLine.contains("smtp\\ndown"));
         assertTrue(logLine.contains("client@example.com\\nalias"));
@@ -106,7 +102,7 @@ class MailSendingServiceTest {
     }
 
     @Test
-    void sendRecoveryEmailLogsMailSendExceptionWithoutOptionalDiagnosticCollections() {
+    void sendRecoveryEmailLogsMailSendExceptionWithoutOptionalDiagnosticCollections(CapturedOutput output) {
         MailSendException exception = mock(MailSendException.class);
         org.mockito.Mockito.when(exception.getMessage()).thenReturn(null);
         org.mockito.Mockito.when(exception.getMessageExceptions()).thenReturn(new Exception[0]);
@@ -119,16 +115,14 @@ class MailSendingServiceTest {
             mailSendingService.sendRecoveryEmail("client@example.com", "R-123", 300)
         );
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logService).log(logCaptor.capture());
-        String logLine = logCaptor.getValue();
+        String logLine = output.getAll();
         assertTrue(logLine.contains("Mail send failed"));
         assertFalse(logLine.contains("messageExceptions="));
         assertFalse(logLine.contains("failedMessages="));
     }
 
     @Test
-    void sendRecoveryEmailLogsMailSendExceptionDetailsAndRethrows() {
+    void sendRecoveryEmailLogsMailSendExceptionDetailsAndRethrows(CapturedOutput output) {
         MailSendException exception = mock(MailSendException.class);
         Map<Object, Exception> failedMessages = new HashMap<>();
         failedMessages.put("mimeMessage-1", new IllegalArgumentException("invalid recipient"));
@@ -145,9 +139,7 @@ class MailSendingServiceTest {
             mailSendingService.sendRecoveryEmail("client@example.com", "R-123", 300)
         );
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logService).log(logCaptor.capture());
-        String logLine = logCaptor.getValue();
+        String logLine = output.getAll();
         assertTrue(logLine.contains("Mail send failed"));
         assertTrue(logLine.contains("messageExceptions="));
         assertTrue(logLine.contains("failedMessages="));
@@ -155,7 +147,7 @@ class MailSendingServiceTest {
     }
 
     @Test
-    void sendRecoveryEmailLogsMimeMessageDiagnosticsForFailedTransportPayloads() throws Exception {
+    void sendRecoveryEmailLogsMimeMessageDiagnosticsForFailedTransportPayloads(CapturedOutput output) throws Exception {
         MailSendException exception = mock(MailSendException.class);
         MimeMessage failedMimeMessage = new MimeMessage(Session.getInstance(new Properties()));
         failedMimeMessage.setFrom(new InternetAddress("no-reply@example.com"));
@@ -177,9 +169,7 @@ class MailSendingServiceTest {
             mailSendingService.sendRecoveryEmail("client@example.com", "R-123", 300)
         );
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logService).log(logCaptor.capture());
-        String logLine = logCaptor.getValue();
+        String logLine = output.getAll();
         assertTrue(logLine.contains("Mail send failed"));
         assertTrue(logLine.contains("MimeMessage{"));
         assertTrue(logLine.contains("subject=Password reset"));

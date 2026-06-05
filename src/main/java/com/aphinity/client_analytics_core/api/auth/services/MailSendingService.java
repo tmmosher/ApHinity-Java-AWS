@@ -2,8 +2,9 @@ package com.aphinity.client_analytics_core.api.auth.services;
 
 import com.aphinity.client_analytics_core.api.notifications.MailDraft;
 import com.aphinity.client_analytics_core.api.notifications.MailTemplateService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.mail.Address;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSendException;
@@ -25,10 +26,10 @@ import java.util.stream.Collectors;
  */
 @Service
 public class MailSendingService {
+    private static final Logger log = LoggerFactory.getLogger(MailSendingService.class);
     private static final int MAX_CAUSE_DEPTH = 6;
 
     private final JavaMailSender mailSender;
-    private final AsyncLogService logService;
     private final MailTemplateService mailTemplateService;
 
     @Value("${app.recovery.from-email}")
@@ -36,11 +37,9 @@ public class MailSendingService {
 
     public MailSendingService(
         JavaMailSender mailSender,
-        AsyncLogService logService,
         MailTemplateService mailTemplateService
     ) {
         this.mailSender = mailSender;
-        this.logService = logService;
         this.mailTemplateService = mailTemplateService;
     }
 
@@ -89,10 +88,12 @@ public class MailSendingService {
             mailSender.send(preparator);
         } catch (MailException ex) {
             // Log high-signal diagnostic metadata for operators. Client-facing errors stay sanitized separately.
-            logService.log(
-                "Mail send failed | to=" + safeValue(toEmail)
-                    + ", from=" + safeValue(serviceFromEmail)
-                    + ", details={" + describeMailException(ex) + "}"
+            log.error(
+                "Mail send failed | to={}, from={}, details={}",
+                safeValue(toEmail),
+                safeValue(serviceFromEmail),
+                describeMailException(ex),
+                ex
             );
             throw ex;
         }

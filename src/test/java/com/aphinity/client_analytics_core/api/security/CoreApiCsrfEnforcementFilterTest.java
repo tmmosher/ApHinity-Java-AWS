@@ -1,6 +1,5 @@
 package com.aphinity.client_analytics_core.api.security;
 
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,14 +29,11 @@ class CoreApiCsrfEnforcementFilterTest {
     @Mock
     private CsrfTokenRepository csrfTokenRepository;
 
-    @Mock
-    private AsyncLogService asyncLogService;
-
     private CoreApiCsrfEnforcementFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new CoreApiCsrfEnforcementFilter(csrfTokenRepository, asyncLogService);
+        filter = new CoreApiCsrfEnforcementFilter(csrfTokenRepository);
     }
 
     @Test
@@ -75,7 +71,6 @@ class CoreApiCsrfEnforcementFilterTest {
         assertEquals(403, response.getStatus());
         assertTrue(response.getContentAsString().contains("\"code\":\"csrf_invalid\""));
         verify(chain, never()).doFilter(request, response);
-        verify(asyncLogService).log(org.mockito.ArgumentMatchers.contains("missing_expected_token"));
     }
 
     @Test
@@ -91,7 +86,6 @@ class CoreApiCsrfEnforcementFilterTest {
         assertEquals(403, response.getStatus());
         assertTrue(response.getContentAsString().contains("\"code\":\"csrf_invalid\""));
         verify(chain, never()).doFilter(request, response);
-        verify(asyncLogService).log(org.mockito.ArgumentMatchers.contains("missing_request_token"));
     }
 
     @Test
@@ -107,7 +101,6 @@ class CoreApiCsrfEnforcementFilterTest {
 
         assertEquals(403, response.getStatus());
         verify(chain, never()).doFilter(request, response);
-        verify(asyncLogService).log(org.mockito.ArgumentMatchers.contains("token_mismatch"));
     }
 
     @Test
@@ -122,7 +115,6 @@ class CoreApiCsrfEnforcementFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         verify(chain).doFilter(request, response);
-        verifyNoInteractions(asyncLogService);
     }
 
     @Test
@@ -159,7 +151,6 @@ class CoreApiCsrfEnforcementFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         verify(response, never()).setStatus(anyInt());
-        verifyNoInteractions(asyncLogService);
         verify(chain, never()).doFilter(request, response);
     }
 }

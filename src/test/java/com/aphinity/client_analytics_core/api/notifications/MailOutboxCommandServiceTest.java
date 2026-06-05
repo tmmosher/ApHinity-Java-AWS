@@ -1,6 +1,5 @@
 package com.aphinity.client_analytics_core.api.notifications;
 
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,9 +27,6 @@ class MailOutboxCommandServiceTest {
     @Mock
     private TaskExecutor mailTaskExecutor;
 
-    @Mock
-    private AsyncLogService asyncLogService;
-
     private MailOutboxCommandService mailOutboxCommandService;
 
     @BeforeEach
@@ -39,8 +35,7 @@ class MailOutboxCommandServiceTest {
             new MailTemplateService(),
             mailOutboxRepository,
             mailOutboxDeliveryService,
-            mailTaskExecutor,
-            asyncLogService
+            mailTaskExecutor
         );
     }
 

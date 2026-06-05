@@ -3,18 +3,15 @@ package com.aphinity.client_analytics_core.api.core.services.gantt;
 import com.aphinity.client_analytics_core.api.core.entities.gantt.GanttTask;
 import com.aphinity.client_analytics_core.api.core.entities.gantt.GanttTaskAuditAction;
 import com.aphinity.client_analytics_core.api.core.entities.gantt.GanttTaskAuditLog;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class GanttTaskAuditService {
-    private final AsyncLogService asyncLogService;
-
-    public GanttTaskAuditService(AsyncLogService asyncLogService) {
-        this.asyncLogService = asyncLogService;
-    }
+    private static final Logger log = LoggerFactory.getLogger(GanttTaskAuditService.class);
 
     public void recordCreated(Long actorUserId, GanttTask task) {
         recordCreated(actorUserId, task, List.of());
@@ -48,6 +45,6 @@ public class GanttTaskAuditService {
         GanttTaskAuditAction action
     ) {
         GanttTaskAuditLog auditLog = GanttTaskAuditLog.from(actorUserId, actorIpAddress, task, dependencyTaskIds, action);
-        asyncLogService.log(auditLog.toLogLine());
+        log.info(auditLog.toLogLine());
     }
 }

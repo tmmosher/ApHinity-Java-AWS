@@ -5,7 +5,6 @@ import com.aphinity.client_analytics_core.api.notifications.MailOutboxDeliverySe
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxMessage;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxRepository;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxType;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,13 +48,10 @@ class MailOutboxIntegrationTest {
     @MockitoBean
     private JavaMailSender mailSender;
 
-    @MockitoBean
-    private AsyncLogService asyncLogService;
-
     @BeforeEach
     void setUp() {
         mailOutboxRepository.deleteAll();
-        reset(mailSender, asyncLogService);
+        reset(mailSender);
     }
 
     @Test
@@ -139,6 +135,5 @@ class MailOutboxIntegrationTest {
         assertNull(reloaded.getConsumedAt());
         assertNull(reloaded.getNextAttemptAt());
         assertTrue(reloaded.getLastError().contains("smtp unavailable"));
-        verify(asyncLogService).log(org.mockito.ArgumentMatchers.contains("Mail outbox exhausted retries"));
     }
 }

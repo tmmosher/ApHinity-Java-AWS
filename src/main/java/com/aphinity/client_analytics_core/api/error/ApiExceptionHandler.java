@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.error;
 
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -27,7 +28,7 @@ import java.util.Map;
  */
 @RestControllerAdvice(basePackages = "com.aphinity.client_analytics_core.api")
 public class ApiExceptionHandler {
-    private final AsyncLogService logService;
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     // Only reasons explicitly listed here are surfaced directly to API clients.
     // I should probably write these in a file somewhere and read them in because this is getting huge.
@@ -123,17 +124,10 @@ public class ApiExceptionHandler {
         Map.entry("Unable to issue invite", new ErrorDefinition("invite_issue_failed", "Unable to issue invite"))
     );
 
-    /**
-     * @param logService asynchronous logging service for handled/unhandled exception diagnostics
-     */
-    public ApiExceptionHandler(AsyncLogService logService) {
-        this.logService = logService;
-    }
-
     @ExceptionHandler(ApiClientException.class)
     public ResponseEntity<ApiErrorResponse> handleApiClientException(ApiClientException ex) {
         int status = ex.getStatus().value();
-        logService.log(formatHandledException(
+        log.warn(formatHandledException(
             "ApiClientException",
             ex,
             "status=" + status + ", code=" + ex.getCode()
@@ -158,7 +152,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException ex) {
         ErrorDefinition definition = safeDefinition(ex.getReason());
         int status = ex.getStatusCode().value();
-        logService.log(formatHandledException(
+        log.warn(formatHandledException(
             "ResponseStatusException",
             ex,
             "status=" + status + ", reason=" + safeMessage(ex.getReason())
@@ -191,7 +185,7 @@ public class ApiExceptionHandler {
             }
             fieldErrors.put(field, mapValidationCode(error.getCode()));
         }
-        logService.log(formatHandledException(
+        log.warn(formatHandledException(
             "MethodArgumentNotValidException",
             ex,
             "fields=" + fieldErrors
@@ -214,7 +208,7 @@ public class ApiExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidBody(HttpMessageNotReadableException ex) {
-        logService.log(formatHandledException("HttpMessageNotReadableException", ex, null));
+        log.warn(formatHandledException("HttpMessageNotReadableException", ex, null));
         ApiErrorResponse response = new ApiErrorResponse(
             "invalid_request_body",
             "Request body is invalid",
@@ -236,7 +230,7 @@ public class ApiExceptionHandler {
         boolean csrfError = ex instanceof MissingCsrfTokenException || ex instanceof InvalidCsrfTokenException;
         String code = csrfError ? "csrf_invalid" : "forbidden";
         String message = csrfError ? "Missing or invalid CSRF token" : "Insufficient permissions";
-        logService.log(formatHandledException("AccessDeniedException", ex, "code=" + code));
+        log.warn(formatHandledException("AccessDeniedException", ex, "code=" + code));
         ApiErrorResponse response = new ApiErrorResponse(
             code,
             message,
@@ -255,7 +249,7 @@ public class ApiExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex) {
-        logService.log(formatUnhandledException(ex));
+        log.error(formatUnhandledException(ex));
         ApiErrorResponse response = new ApiErrorResponse(
             "internal_error",
             "Unexpected error",

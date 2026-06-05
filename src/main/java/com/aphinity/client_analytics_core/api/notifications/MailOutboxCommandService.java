@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.notifications;
 
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
@@ -16,24 +17,23 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Service
 public class MailOutboxCommandService {
+    private static final Logger log = LoggerFactory.getLogger(MailOutboxCommandService.class);
+
     private final MailTemplateService mailTemplateService;
     private final MailOutboxRepository mailOutboxRepository;
     private final MailOutboxDeliveryService mailOutboxDeliveryService;
     private final TaskExecutor mailTaskExecutor;
-    private final AsyncLogService asyncLogService;
 
     public MailOutboxCommandService(
         MailTemplateService mailTemplateService,
         MailOutboxRepository mailOutboxRepository,
         MailOutboxDeliveryService mailOutboxDeliveryService,
-        @Qualifier("mailTaskExecutor") TaskExecutor mailTaskExecutor,
-        AsyncLogService asyncLogService
+        @Qualifier("mailTaskExecutor") TaskExecutor mailTaskExecutor
     ) {
         this.mailTemplateService = mailTemplateService;
         this.mailOutboxRepository = mailOutboxRepository;
         this.mailOutboxDeliveryService = mailOutboxDeliveryService;
         this.mailTaskExecutor = mailTaskExecutor;
-        this.asyncLogService = asyncLogService;
     }
 
     /**
@@ -109,13 +109,15 @@ public class MailOutboxCommandService {
             MailOutboxMessage saved = mailOutboxRepository.saveAndFlush(message);
             runAfterCommit(() -> submitForDelivery(saved.getId()));
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox enqueue failed | type=" + type
-                    + ", recipient=" + safeValue(recipientEmail)
-                    + ", locationName=" + safeValue(locationName)
-                    + ", authorizedUserId=" + authorizedUserId
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox enqueue failed | type={}, recipient={}, locationName={}, authorizedUserId={}, errorType={}, errorMessage={}",
+                type,
+                safeValue(recipientEmail),
+                safeValue(locationName),
+                authorizedUserId,
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, failureReason, ex);
         }
@@ -125,10 +127,12 @@ public class MailOutboxCommandService {
         try {
             mailTaskExecutor.execute(() -> mailOutboxDeliveryService.deliverQueuedMessage(outboxId));
         } catch (RuntimeException ex) {
-            asyncLogService.log(
-                "Mail outbox dispatch submission failed | outboxId=" + outboxId
-                    + ", errorType=" + ex.getClass().getSimpleName()
-                    + ", errorMessage=" + safeValue(ex.getMessage())
+            log.error(
+                "Mail outbox dispatch submission failed | outboxId={}, errorType={}, errorMessage={}",
+                outboxId,
+                ex.getClass().getSimpleName(),
+                safeValue(ex.getMessage()),
+                ex
             );
         }
     }

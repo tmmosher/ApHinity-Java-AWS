@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.api.notifications;
 
 import com.aphinity.client_analytics_core.api.auth.services.MailSendingService;
-import com.aphinity.client_analytics_core.logging.AsyncLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,9 +39,6 @@ class MailOutboxDeliveryServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
-    @Mock
-    private AsyncLogService asyncLogService;
-
     private MailOutboxDeliveryService mailOutboxDeliveryService;
 
     @BeforeEach
@@ -50,8 +46,7 @@ class MailOutboxDeliveryServiceTest {
         mailOutboxDeliveryService = new MailOutboxDeliveryService(
             mailSendingService,
             mailOutboxRepository,
-            transactionTemplate,
-            asyncLogService
+            transactionTemplate
         );
     }
 
@@ -139,7 +134,6 @@ class MailOutboxDeliveryServiceTest {
         assertNull(pending.getNextAttemptAt());
         assertNotNull(pending.getLastError());
         assertTrue(pending.getLastError().contains("smtp unavailable"));
-        verify(asyncLogService).log(org.mockito.ArgumentMatchers.contains("Mail outbox exhausted retries"));
     }
 
     @Test

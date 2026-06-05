@@ -198,7 +198,8 @@ final class LocationDashboardHistoricalDataAssembler {
             if (analyzedSample == null
                 || analyzedSample.observedDate() == null
                 || analyzedSample.facilityName() == null
-                || analyzedSample.measurementName() == null) {
+                || analyzedSample.measurementName() == null
+                || analyzedSample.origin() == LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT) {
                 continue;
             }
 
