@@ -437,14 +437,18 @@ export const reconcileLocationGraphUploadState = (
       continue;
     }
 
-    const samePayload = graphStateSignature(currentGraph) === graphStateSignature(uploadedGraph);
-    const sameVersion = currentGraph.updatedAt === uploadedGraph.updatedAt;
-    if (samePayload && sameVersion) {
+    const stagedGraph = {
+      ...uploadedGraph,
+      createdAt: currentGraph.createdAt,
+      updatedAt: currentGraph.updatedAt
+    };
+    const samePayload = graphStateSignature(currentGraph) === graphStateSignature(stagedGraph);
+    if (samePayload) {
       nextGraphs.push(currentGraph);
       continue;
     }
 
-    nextGraphs.push(cloneLocationGraphs([uploadedGraph])[0]);
+    nextGraphs.push(cloneLocationGraphs([stagedGraph])[0]);
     changed = true;
   }
 

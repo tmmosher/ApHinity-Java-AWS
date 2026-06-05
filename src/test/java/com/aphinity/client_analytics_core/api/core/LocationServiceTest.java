@@ -1270,6 +1270,41 @@ class LocationServiceTest {
     }
 
     @Test
+    void updateLocationGraphDataRejectsExpectedTimestampThatIsNewerThanStoredGraphVersion() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Graph");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        graph.setUpdatedAt(Instant.parse("2026-06-05T21:47:34.429345Z"));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.updateLocationGraphData(
+                5L,
+                99L,
+                List.of(new LocationGraphDataUpdateRequest(
+                    31L,
+                    List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
+                    null,
+                    "2026-06-05T21:47:34.697126370Z"
+                ))
+            )
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Graph update conflict", ex.getReason());
+        verify(graphRepository, never()).saveAllAndFlush(anyList());
+        verifyNoInteractions(locationDashboardTimeRangeService);
+    }
+
+    @Test
     void updateLocationGraphDataPreservesSubmittedDerivedGraphsByRefreshingImportedRangesOnly() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));

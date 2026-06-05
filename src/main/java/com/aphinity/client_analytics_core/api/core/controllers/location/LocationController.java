@@ -671,6 +671,7 @@ public class LocationController {
             }
             summary.append("{row=").append(index)
                 .append(", graphId=").append(update.graphId())
+                .append(", expectedUpdatedAt=").append(update.expectedUpdatedAt())
                 .append(", dataType=").append(describePayloadType(update.data()))
                 .append(", traceCount=").append(inferTraceCount(update.data()))
                 .append(", layoutType=").append(describePayloadType(update.layout()))

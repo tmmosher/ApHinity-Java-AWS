@@ -369,7 +369,7 @@ describe("graphEditor", () => {
     expect(merged[2].id).toBe(12);
   });
 
-  it("replaces a graph when the backend preview returns a newer timestamp", () => {
+  it("does not replace a graph when only the backend preview timestamp changed", () => {
     const uploadedGraphs: LocationGraph[] = [
       {
         ...baseGraphs[0],
@@ -380,9 +380,32 @@ describe("graphEditor", () => {
     const merged = reconcileLocationGraphUploadState(baseGraphs, uploadedGraphs);
 
     expect(merged).toHaveLength(2);
-    expect(merged[0]).not.toBe(baseGraphs[0]);
-    expect(merged[0].updatedAt).toBe("2026-01-03T00:00:00Z");
+    expect(merged[0]).toBe(baseGraphs[0]);
     expect(merged[1]).toBe(baseGraphs[1]);
+  });
+
+  it("keeps persisted timestamps and the optimistic-lock baseline after staging spreadsheet upload changes", () => {
+    const baseline = buildGraphBaselineIndex(baseGraphs);
+    const stagedGraphs = reconcileLocationGraphUploadState(baseGraphs, [
+      {
+        ...baseGraphs[0],
+        data: [{type: "bar", x: ["A"], y: [12]}],
+        updatedAt: "2026-01-03T00:00:00Z"
+      }
+    ]);
+
+    expect(stagedGraphs[0].createdAt).toBe("2026-01-01T00:00:00Z");
+    expect(stagedGraphs[0].updatedAt).toBe("2026-01-02T00:00:00Z");
+    expect(buildChangedLocationGraphUpdates(stagedGraphs, baseline)).toEqual([
+      {
+        graphId: 10,
+        data: [{type: "bar", x: ["A"], y: [12]}],
+        layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
+        config: {displayModeBar: false},
+        style: {height: 320},
+        expectedUpdatedAt: "2026-01-02T00:00:00Z"
+      }
+    ]);
   });
 
 });
