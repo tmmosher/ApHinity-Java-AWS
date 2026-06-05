@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -43,5 +44,18 @@ class GraphTest {
         );
 
         assertTrue(ex.getMessage().contains("index 1"));
+    }
+
+    @Test
+    void preUpdateDoesNotReplaceDatabaseManagedUpdatedAt() throws Exception {
+        Graph graph = new Graph();
+        Instant persistedUpdatedAt = Instant.parse("2026-06-05T22:49:40.097305Z");
+        graph.setUpdatedAt(persistedUpdatedAt);
+
+        var preUpdate = Graph.class.getDeclaredMethod("preUpdate");
+        preUpdate.setAccessible(true);
+        preUpdate.invoke(graph);
+
+        assertEquals(persistedUpdatedAt, graph.getUpdatedAt());
     }
 }

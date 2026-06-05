@@ -247,7 +247,6 @@ public class LocationDashboardTimeRangeService {
                 graph,
                 LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, allTimeHistoricalData)
             );
-            graph.setUpdatedAt(refreshedAt);
         }
     }
 

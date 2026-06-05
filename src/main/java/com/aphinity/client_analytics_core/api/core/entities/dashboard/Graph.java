@@ -89,7 +89,6 @@ public class Graph {
 
     @PreUpdate
     void preUpdate() {
-        updatedAt = Instant.now();
         applyDerivedGraphType();
     }
 
