@@ -115,7 +115,7 @@ public class LocationDashboardTimeRangeService {
         );
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Map<Long, List<Map<String, Object>>> resolveLocationMonthRangePayloads(
         Long locationId,
         DashboardGraphMonthRange monthRange
@@ -126,7 +126,7 @@ public class LocationDashboardTimeRangeService {
         }
         DashboardGraphMonthRange normalizedRange = monthRange == null ? DashboardGraphMonthRange.ALL_TIME : monthRange;
         if (normalizedRange.isAllTime()) {
-            refreshDerivedGraphsForResponse(
+            return refreshDerivedGraphsForResponse(
                 locationId,
                 refreshContext.location(),
                 refreshContext.assignedGraphs(),
@@ -134,7 +134,6 @@ public class LocationDashboardTimeRangeService {
                 refreshContext.anchorDate(),
                 refreshContext.refreshedAt()
             );
-            return Map.of();
         }
 
         Map<Long, List<Map<String, Object>>> payloadsByGraphId = new LinkedHashMap<>();
@@ -328,14 +327,6 @@ public class LocationDashboardTimeRangeService {
                 if (monthRange != null && !monthRange.isAllTime()) {
                     payloadsByGraphId.put(graph.getId(), storedPayloadForMonthRange(graph));
                 }
-                continue;
-            }
-            if (monthRange == null || monthRange.isAllTime()) {
-                GraphRelationalPayloadMapper.syncGraphData(
-                    graph,
-                    LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, rangedHistoricalData)
-                );
-                graph.setUpdatedAt(refreshedAt);
                 continue;
             }
             payloadsByGraphId.put(
