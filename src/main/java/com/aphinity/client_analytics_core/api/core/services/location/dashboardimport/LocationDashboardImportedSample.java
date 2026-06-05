@@ -100,8 +100,40 @@ record LocationDashboardWorksheetSample(
     String resolvedSystem,
     String pointOfUse,
     String basis,
-    String cellReference
+    String cellReference,
+    LocationDashboardCommentParser.ParsedComment parsedComment
 ) implements LocationDashboardImportedSample {
+    LocationDashboardWorksheetSample(
+        LocalDate observedDate,
+        BigDecimal numericValue,
+        String measurementName,
+        String facilityName,
+        SublocationConfig sublocation,
+        SystemTypeConfig systemType,
+        MeasurementBound measurementBound,
+        String resolvedBuilding,
+        String resolvedSystem,
+        String pointOfUse,
+        String basis,
+        String cellReference
+    ) {
+        this(
+            observedDate,
+            numericValue,
+            measurementName,
+            facilityName,
+            sublocation,
+            systemType,
+            measurementBound,
+            resolvedBuilding,
+            resolvedSystem,
+            pointOfUse,
+            basis,
+            cellReference,
+            null
+        );
+    }
+
     @Override
     public LocationDashboardImportStrategy.SampleOrigin origin() {
         return LocationDashboardImportStrategy.SampleOrigin.WORKSHEET;

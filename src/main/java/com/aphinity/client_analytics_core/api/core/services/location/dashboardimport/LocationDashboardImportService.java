@@ -183,12 +183,7 @@ public class LocationDashboardImportService {
         LocationDashboardImportStrategy.LocationDashboardImportComputation computation =
             strategy.computeImport(workbook, measurementBounds);
         List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions =
-            correctiveActionService.buildPreviewCorrectiveActions(location.getId(), computation.correctiveActions());
-        for (com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent previewCorrectiveAction : previewCorrectiveActions) {
-            if (previewCorrectiveAction != null && previewCorrectiveAction.getLocation() == null) {
-                previewCorrectiveAction.setLocation(location);
-            }
-        }
+            correctiveActionService.persistCorrectiveActions(location, computation.correctiveActions());
         samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
 
         Map<String, GraphConfig> graphDefinitionsById = strategy.graphDefinitions().stream()

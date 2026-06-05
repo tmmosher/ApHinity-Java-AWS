@@ -92,7 +92,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         return new LocationDashboardImportComputation(
             aggregationResult.graphs(),
             aggregationResult.observations(),
-            correctiveActionDraftFactory.buildWorksheetCorrectiveActions(analyzedSamples),
+            correctiveActionDraftFactory.buildCorrectiveActions(analyzedSamples),
             aggregationResult.analyzedSamples()
         );
     }

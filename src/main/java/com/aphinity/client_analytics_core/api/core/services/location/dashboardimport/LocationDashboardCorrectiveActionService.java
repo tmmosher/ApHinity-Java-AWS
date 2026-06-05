@@ -1,5 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
+import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
@@ -73,6 +74,53 @@ final class LocationDashboardCorrectiveActionService {
         }
 
         return List.copyOf(previewCorrectiveActions);
+    }
+
+    List<ServiceEvent> persistCorrectiveActions(
+        Location location,
+        List<LocationDashboardImportStrategy.CorrectiveActionDraft> correctiveActions
+    ) {
+        if (location == null || location.getId() == null) {
+            throw new IllegalArgumentException("Location is required");
+        }
+
+        List<ServiceEvent> persistedCorrectiveActions =
+            serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(location.getId());
+        if (correctiveActions == null || correctiveActions.isEmpty()) {
+            return persistedCorrectiveActions;
+        }
+
+        Map<String, ServiceEvent> persistedByIdentity = new LinkedHashMap<>();
+        for (ServiceEvent persistedCorrectiveAction : persistedCorrectiveActions) {
+            persistedByIdentity.putIfAbsent(
+                correctiveActionIdentity(
+                    persistedCorrectiveAction.getTitle(),
+                    persistedCorrectiveAction.getDescription()
+                ),
+                persistedCorrectiveAction
+            );
+        }
+
+        List<ServiceEvent> correctiveActionsToSave = new ArrayList<>();
+        List<ServiceEvent> effectiveCorrectiveActions = new ArrayList<>(persistedCorrectiveActions);
+        for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
+            String correctiveActionIdentity = correctiveActionIdentity(draft.title(), draft.description());
+            ServiceEvent existingCorrectiveAction = persistedByIdentity.get(correctiveActionIdentity);
+            if (existingCorrectiveAction != null) {
+                continue;
+            }
+
+            ServiceEvent correctiveAction = createPreviewServiceEvent(draft);
+            correctiveAction.setLocation(location);
+            correctiveActionsToSave.add(correctiveAction);
+            effectiveCorrectiveActions.add(correctiveAction);
+            persistedByIdentity.put(correctiveActionIdentity, correctiveAction);
+        }
+
+        if (!correctiveActionsToSave.isEmpty()) {
+            serviceEventRepository.saveAllAndFlush(correctiveActionsToSave);
+        }
+        return List.copyOf(effectiveCorrectiveActions);
     }
 
     LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction toHistoricalCorrectiveAction(ServiceEvent serviceEvent) {

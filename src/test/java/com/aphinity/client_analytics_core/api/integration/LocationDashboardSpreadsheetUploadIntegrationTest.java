@@ -50,7 +50,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void uploadLocationDashboardSpreadsheetReturnsPreviewWithoutPersistingGraphUpdatesOrCorrectiveActions() throws Exception {
+    void uploadLocationDashboardSpreadsheetReturnsPreviewWithoutPersistingGraphUpdatesAndPersistsCorrectiveActions() throws Exception {
         createUser("partner-dashboard-upload@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
@@ -122,7 +122,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         assertEquals(List.of(), graphData(persistedByFacilityGraph).getFirst().get("y"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(0, persistedEvents.size());
+        assertEquals(1, persistedEvents.size());
 
         var persistedSamples = locationDashboardSampleRepository.findByLocation_IdOrderByObservedDateAscIdAsc(location.getId());
         assertEquals(6, persistedSamples.size());
@@ -263,7 +263,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(0, persistedEvents.size());
+        assertEquals(2, persistedEvents.size());
     }
 
     @Test
@@ -310,7 +310,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$[5].name").value("Percent Conformance"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(0, persistedEvents.size());
+        assertEquals(86, persistedEvents.size());
     }
 
     @Test
@@ -524,11 +524,11 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$[2].data[0].values[0]").value(6));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(0, persistedEvents.size());
+        assertEquals(1, persistedEvents.size());
     }
 
     @Test
-    void reuploadingShiftedSpreadsheetDoesNotPersistCorrectiveActions() throws Exception {
+    void reuploadingShiftedSpreadsheetDoesNotDuplicateCorrectiveActions() throws Exception {
         createUser("partner-dashboard-reupload@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
@@ -549,7 +549,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         ));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(0, persistedEvents.size());
+        assertEquals(1, persistedEvents.size());
     }
 
     private void uploadDashboardSpreadsheet(Long locationId, AuthCookies authCookies, byte[] spreadsheet) throws Exception {

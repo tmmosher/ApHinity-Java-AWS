@@ -36,6 +36,7 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -203,6 +204,7 @@ class LocationDashboardImportServiceTest {
         Map<String, Object> meta = (Map<String, Object>) findResponseByName(responses, "Percent Conformance").layout().get("meta");
         assertTrue(meta.containsKey("aphinityImport"));
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
+        verify(serviceEventRepository).saveAllAndFlush(anyList());
         verifyNoInteractions(graphRepository, locationRepository);
         verifyNoMoreInteractions(serviceEventRepository);
     }
@@ -715,6 +717,7 @@ class LocationDashboardImportServiceTest {
         assertEquals(Map.of("color", List.of("#15803d"), "colors", List.of("#15803d")), resolvedByFacility.get("marker"));
 
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
+        verify(serviceEventRepository).saveAllAndFlush(anyList());
         verifyNoInteractions(graphRepository, locationRepository);
         verifyNoMoreInteractions(serviceEventRepository);
     }

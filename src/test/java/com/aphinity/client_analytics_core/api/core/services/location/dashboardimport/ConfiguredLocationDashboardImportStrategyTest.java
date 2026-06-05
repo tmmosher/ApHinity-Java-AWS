@@ -105,15 +105,14 @@ class ConfiguredLocationDashboardImportStrategyTest {
         List<Map<String, Object>> customData = (List<Map<String, Object>>) waterQualityHpcTrace.get("customdata");
         assertEquals(2L, ((Number) customData.getFirst().get("sampleCount")).longValue());
         assertEquals(1L, ((Number) customData.get(1).get("sampleCount")).longValue());
-        assertEquals(2, result.correctiveActions().size());
-        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
-            draft.description().contains("Sample Location: Cooling Tower Sample Port")
-                || draft.description().contains("CA: External note")
+        assertEquals(3, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
+            draft.description().contains("External note")
         ));
     }
 
     @Test
-    void computeImportDoesNotCreateCorrectiveActionsForOutOfSpecWorkbookCommentSamplesWhileCommentParsingIsDisabled() {
+    void computeImportCreatesCorrectiveActionsForOutOfSpecWorkbookCommentSamples() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
@@ -146,10 +145,11 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertEquals(2, result.correctiveActions().size());
-        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+        assertEquals(3, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-08-15").equals(draft.observedDate())
                 && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Disinfect and retest")
         ));
     }
 
@@ -469,7 +469,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
-    void computeImportDoesNotCreateCorrectiveActionForFailedFollowUpSamplesWhenCommentParsingIsDisabled() {
+    void computeImportCreatesCorrectiveActionForFailedFollowUpSamples() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
@@ -499,15 +499,16 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertEquals(2, result.correctiveActions().size());
-        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+        assertEquals(3, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-08-15").equals(draft.observedDate())
                 && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Disinfect and retest")
         ));
     }
 
     @Test
-    void computeImportDoesNotCreateSeparateCorrectiveActionForLaterMonthFailedFollowUpsWhenCommentParsingIsDisabled() {
+    void computeImportCreatesCorrectiveActionForLaterMonthFailedFollowUps() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 
         String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
@@ -537,10 +538,11 @@ class ConfiguredLocationDashboardImportStrategyTest {
             measurementBounds()
         );
 
-        assertEquals(2, result.correctiveActions().size());
-        assertFalse(result.correctiveActions().stream().anyMatch(draft ->
+        assertEquals(3, result.correctiveActions().size());
+        assertTrue(result.correctiveActions().stream().anyMatch(draft ->
             LocalDate.parse("2025-09-15").equals(draft.observedDate())
                 && "HPC".equals(draft.measurementName())
+                && draft.description().contains("Disinfect and retest")
         ));
     }
 

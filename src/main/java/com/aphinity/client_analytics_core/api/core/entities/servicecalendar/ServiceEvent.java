@@ -24,6 +24,7 @@ import java.time.LocalTime;
 @Table(name = "service_event")
 public class ServiceEvent {
     private static final int TITLE_COLUMN_LENGTH = 1024;
+    private static final String TEXT_COLUMN_DEFINITION = "text";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,7 +53,7 @@ public class ServiceEvent {
     @Column(name = "end_event_time", nullable = false)
     private LocalTime endEventTime;
 
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = TEXT_COLUMN_DEFINITION)
     private String description;
 
     @Convert(converter = ServiceEventStatusConverter.class)

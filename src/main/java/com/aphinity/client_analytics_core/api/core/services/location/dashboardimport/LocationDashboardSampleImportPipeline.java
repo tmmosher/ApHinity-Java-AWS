@@ -205,7 +205,8 @@ final class LocationDashboardSampleImportPipeline {
             rowContext.resolvedSystem(),
             row == null ? null : row.pointOfUse(),
             row == null ? null : row.basis(),
-            cell.cellReference()
+            cell.cellReference(),
+            parsedComment
         );
     }
 
