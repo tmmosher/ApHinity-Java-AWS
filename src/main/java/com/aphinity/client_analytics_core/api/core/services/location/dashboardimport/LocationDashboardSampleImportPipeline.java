@@ -4,12 +4,10 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Measuremen
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.springframework.http.HttpStatus;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;

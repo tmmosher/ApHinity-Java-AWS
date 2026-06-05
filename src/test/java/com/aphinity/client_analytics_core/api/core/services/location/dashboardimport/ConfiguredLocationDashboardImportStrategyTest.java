@@ -46,7 +46,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals(List.of(2L), systemTypeTrace.get("y"));
 
         assertEquals(4, result.observations().size());
-        assertEquals(2, result.observations().stream().filter(observation -> observation.compliant()).count());
+        assertEquals(2, result.observations().stream().filter(LocationDashboardImportStrategy.ImportedObservation::compliant).count());
         assertEquals(2, result.correctiveActions().size());
         assertFalse(result.correctiveActions().stream().anyMatch(draft ->
             draft.description().contains("Drain Tank, install new DI bottles")

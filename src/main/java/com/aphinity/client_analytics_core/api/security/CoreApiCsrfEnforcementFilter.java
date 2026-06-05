@@ -19,7 +19,6 @@ import java.util.Set;
 
 /**
  * Enforces CSRF validation for state-changing core API requests.
- *
  * Spring's OAuth2 resource-server setup skips CSRF checks for bearer-authenticated
  * requests by default. Because this application authenticates browser callers with
  * cookie-backed bearer tokens, core write endpoints still require CSRF protection.
