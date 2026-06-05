@@ -234,7 +234,7 @@ public class LocationDashboardTimeRangeService {
             if (graph == null) {
                 continue;
             }
-            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition)) {
+            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition, graph)) {
                 continue;
             }
             graph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
@@ -322,7 +322,7 @@ public class LocationDashboardTimeRangeService {
             if (graph == null || graph.getId() == null) {
                 continue;
             }
-            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition)) {
+            if (shouldPreserveExistingResolutionGraph(derivedGraphDefinition, graph)) {
                 if (monthRange != null && !monthRange.isAllTime()) {
                     payloadsByGraphId.put(graph.getId(), storedPayloadForMonthRange(graph));
                 }
@@ -343,7 +343,11 @@ public class LocationDashboardTimeRangeService {
         return GraphRelationalPayloadMapper.normalize(graph).data();
     }
 
-    private boolean shouldPreserveExistingResolutionGraph(DerivedGraphConfig derivedGraphDefinition) {
+    private boolean shouldPreserveExistingResolutionGraph(DerivedGraphConfig derivedGraphDefinition, Graph graph) {
+        LocationDashboardImportStrategyConfig.DerivedGraphType graphDerivedType = graphDerivedType(graph);
+        if (graphDerivedType != null) {
+            return graphDerivedType.requiresResolvedNonConformanceState();
+        }
         if (derivedGraphDefinition == null || derivedGraphDefinition.derivedType() == null) {
             return false;
         }
@@ -351,6 +355,27 @@ public class LocationDashboardTimeRangeService {
         // These resolution-driven derived graphs must retain the payload produced by
         // the spreadsheet analyzer until the next import recomputes them.
         return derivedGraphDefinition.derivedType().requiresResolvedNonConformanceState();
+    }
+
+    private LocationDashboardImportStrategyConfig.DerivedGraphType graphDerivedType(Graph graph) {
+        if (graph == null) {
+            return null;
+        }
+        Map<String, String> importMetadata = LocationDashboardGraphMetadataSupport.readImportMetadata(graph);
+        String rawDerivedGraphType = importMetadata.get("derivedGraphType");
+        if (rawDerivedGraphType == null || rawDerivedGraphType.isBlank()) {
+            return null;
+        }
+        try {
+            return LocationDashboardImportStrategyConfig.DerivedGraphType.fromValue(rawDerivedGraphType);
+        } catch (IllegalArgumentException ex) {
+            log.warn(
+                "Ignoring unknown dashboard derived graph type graphId={} derivedGraphType={}",
+                graph.getId(),
+                rawDerivedGraphType
+            );
+            return null;
+        }
     }
 
     private boolean graphContainsTimeSeries(Graph graph) {

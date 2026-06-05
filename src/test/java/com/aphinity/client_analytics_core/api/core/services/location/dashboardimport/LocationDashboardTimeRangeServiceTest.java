@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_SAMPLES;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType.WATER_QUALITY_COMPLIANCE;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.RangeProfile.TOWERS;
@@ -93,6 +95,63 @@ class LocationDashboardTimeRangeServiceTest {
         assertEquals(
             Instant.parse("2026-06-05T22:35:21.632076Z"),
             derivedGraph.getUpdatedAt()
+        );
+    }
+
+    @Test
+    void allTimeResponseProjectionPreservesResolutionGraphWhenStoredMetadataRequiresResolutionState() {
+        Location location = new Location();
+        location.setId(2L);
+        location.setName("Hoag");
+
+        Graph importedGraph = graph(
+            5L,
+            "Water Quality Conformance",
+            Map.of("title", Map.of("text", "Hoag")),
+            List.of(Map.of(
+                "type", "scatter",
+                "name", "HPC",
+                "x", List.of("2026-01-01"),
+                "y", List.of(100),
+                "customdata", List.of(Map.of("sampleCount", 3))
+            )),
+            Instant.parse("2026-06-05T21:40:12.769052Z")
+        );
+        Graph resolutionGraph = graph(
+            1L,
+            "Total Number of Samples",
+            Map.of("meta", Map.of("aphinityImport", Map.of(
+                "derivedGraphId", "total-samples",
+                "derivedGraphType", PERCENT_RESOLVED.value()
+            ))),
+            List.of(Map.of("type", "indicator", "name", "Resolved", "value", 68)),
+            Instant.parse("2026-06-05T22:35:21.632076Z")
+        );
+
+        when(locationRepository.findById(2L)).thenReturn(Optional.of(location));
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(2L))
+            .thenReturn(List.of(locationGraph(2L, importedGraph), locationGraph(2L, resolutionGraph)));
+        when(strategyRegistry.resolve("Hoag")).thenReturn(Optional.of(strategy()));
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(2L))
+            .thenReturn(List.of());
+
+        LocationDashboardTimeRangeService service = new LocationDashboardTimeRangeService(
+            locationRepository,
+            locationGraphRepository,
+            serviceEventRepository,
+            strategyRegistry,
+            Clock.fixed(Instant.parse("2026-06-05T22:35:22.064823225Z"), ZoneOffset.UTC)
+        );
+
+        Map<Long, List<Map<String, Object>>> payloads = service.resolveLocationMonthRangePayloads(
+            2L,
+            DashboardGraphMonthRange.ALL_TIME
+        );
+
+        assertFalse(payloads.containsKey(1L));
+        assertEquals(
+            68L,
+            ((Number) GraphRelationalPayloadMapper.normalize(resolutionGraph).data().getFirst().get("value")).longValue()
         );
     }
 
