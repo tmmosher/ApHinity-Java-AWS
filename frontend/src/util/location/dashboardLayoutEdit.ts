@@ -36,27 +36,7 @@ export const reconcileLocationSectionLayoutWithGraphs = (
     };
   });
 
-  const missingGraphIds = assignedGraphIds.filter((graphId) => !seenGraphIds.has(graphId));
-  if (missingGraphIds.length === 0) {
-    return {sections};
-  }
-
-  if (sections.length === 0) {
-    return {
-      sections: [
-        {
-          section_id: 1,
-          graph_ids: missingGraphIds
-        }
-      ]
-    };
-  }
-
-  const nextSections = cloneSections(sections);
-  nextSections[nextSections.length - 1].graph_ids.push(...missingGraphIds);
-  return {
-    sections: nextSections
-  };
+  return {sections};
 };
 
 const cloneSections = (sections: LocationSectionLayout[]): LocationSectionLayout[] =>

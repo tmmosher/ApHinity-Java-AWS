@@ -1,8 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.error.ApiClientException;
-import org.springframework.http.HttpStatus;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -65,10 +63,7 @@ final class LocationDashboardGraphMatcher {
                 .filter(graph -> !reservedGraphIds.contains(graph.getId()))
                 .filter(graph -> metadataMatcher.test(graph, graphDefinition))
                 .toList();
-            if (metadataMatches.size() > 1) {
-                throw ambiguousGraph("metadata", graphDefinition);
-            }
-            if (metadataMatches.size() == 1) {
+            if (!metadataMatches.isEmpty()) {
                 Graph matchedGraph = metadataMatches.getFirst();
                 reservedGraphIds.add(matchedGraph.getId());
                 matchedGraphsByDefinitionId.put(normalizedDefinitionId, matchedGraph);
@@ -88,10 +83,7 @@ final class LocationDashboardGraphMatcher {
                     normalizedDefinitionTitle
                 ))
                 .toList();
-            if (nameAndTitleMatches.size() > 1) {
-                throw ambiguousGraph("name/title", graphDefinition);
-            }
-            if (nameAndTitleMatches.size() == 1) {
+            if (!nameAndTitleMatches.isEmpty()) {
                 Graph matchedGraph = nameAndTitleMatches.getFirst();
                 reservedGraphIds.add(matchedGraph.getId());
                 matchedGraphsByDefinitionId.put(normalizedDefinitionId, matchedGraph);
@@ -99,15 +91,7 @@ final class LocationDashboardGraphMatcher {
             }
 
             if (normalizedDefinitionTitle != null) {
-                if (nameAndTitleMatches.size() > 1) {
-                    throw ambiguousGraph("name/title", graphDefinition);
-                }
-                throw new ApiClientException(
-                    HttpStatus.BAD_REQUEST,
-                    "location_dashboard_graph_not_found",
-                    "Required dashboard graph was not found for "
-                        + locationName + ": " + graphDefinition.name() + " / " + graphDefinition.title() + "."
-                );
+                continue;
             }
 
             List<Graph> nameMatches = assignedGraphs.stream()
@@ -117,24 +101,11 @@ final class LocationDashboardGraphMatcher {
                     normalizedDefinitionName
                 ))
                 .toList();
-            if (nameMatches.size() > 1) {
-                throw new ApiClientException(
-                    HttpStatus.BAD_REQUEST,
-                    "location_dashboard_graph_invalid",
-                    "Dashboard graph name is ambiguous for " + graphDefinition.name() + "."
-                );
+            if (!nameMatches.isEmpty()) {
+                Graph matchedGraph = nameMatches.getFirst();
+                reservedGraphIds.add(matchedGraph.getId());
+                matchedGraphsByDefinitionId.put(normalizedDefinitionId, matchedGraph);
             }
-            if (nameMatches.isEmpty()) {
-                throw new ApiClientException(
-                    HttpStatus.BAD_REQUEST,
-                    "location_dashboard_graph_not_found",
-                    "Required dashboard graph was not found for "
-                        + locationName + ": " + graphDefinition.name() + " / " + graphDefinition.title() + "."
-                );
-            }
-            Graph matchedGraph = nameMatches.getFirst();
-            reservedGraphIds.add(matchedGraph.getId());
-            matchedGraphsByDefinitionId.put(normalizedDefinitionId, matchedGraph);
         }
 
         return matchedGraphsByDefinitionId;
@@ -171,14 +142,6 @@ final class LocationDashboardGraphMatcher {
         ) && Objects.equals(
             LocationDashboardGraphMetadataSupport.normalizeKey(metadata.get("graphTitle")),
             LocationDashboardGraphMetadataSupport.normalizeKey(graphIdentity.title())
-        );
-    }
-
-    private ApiClientException ambiguousGraph(String discriminator, GraphIdentity graphDefinition) {
-        return new ApiClientException(
-            HttpStatus.BAD_REQUEST,
-            "location_dashboard_graph_invalid",
-            "Dashboard graph " + discriminator + " is ambiguous for " + graphDefinition.name() + " / " + graphDefinition.title() + "."
         );
     }
 

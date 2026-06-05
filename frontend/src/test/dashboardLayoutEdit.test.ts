@@ -80,12 +80,12 @@ describe("dashboardLayoutEdit", () => {
     expect(reconcileLocationSectionLayoutWithGraphs(staleLayout, graphs)).toEqual({
       sections: [
         {section_id: 1, graph_ids: [11, 12]},
-        {section_id: 2, graph_ids: [21, 22, 34]}
+        {section_id: 2, graph_ids: [21, 22]}
       ]
     });
   });
 
-  it("creates a section when assigned graphs exist but the layout is empty", () => {
+  it("ignores assigned graphs when the layout is empty", () => {
     const graphs = [31].map((id): LocationGraph => ({
       id,
       name: `Graph ${id}`,
@@ -97,10 +97,6 @@ describe("dashboardLayoutEdit", () => {
       updatedAt: "2026-01-01T00:00:00Z"
     }));
 
-    expect(reconcileLocationSectionLayoutWithGraphs({sections: []}, graphs)).toEqual({
-      sections: [
-        {section_id: 1, graph_ids: [31]}
-      ]
-    });
+    expect(reconcileLocationSectionLayoutWithGraphs({sections: []}, graphs)).toEqual({sections: []});
   });
 });

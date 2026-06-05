@@ -151,7 +151,10 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       return;
     }
 
-    const serverLayout = cloneLocationSectionLayout(currentLocation.sectionLayout);
+    const rawServerLayout = cloneLocationSectionLayout(currentLocation.sectionLayout);
+    const serverLayout = workingGraphs().length === 0
+      ? rawServerLayout
+      : reconcileLocationSectionLayoutWithGraphs(rawServerLayout, workingGraphs());
     if (!hasInitializedSectionLayout()) {
       setWorkingSectionLayout(serverLayout);
       setSectionLayoutBaseline(serverLayout);
@@ -237,8 +240,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       .map((graphId) => graphById().get(graphId))
       .filter((graph): graph is LocationGraph => graph !== undefined);
 
-  const missingGraphIds = (section: LocationSectionLayout): number[] =>
-    section.graph_ids.filter((graphId) => !graphById().has(graphId));
+  const missingGraphIds = (_section: LocationSectionLayout): number[] => [];
 
   const createDashboardSnapshot = (): DashboardSnapshot => ({
     graphs: cloneLocationGraphs(workingGraphs()),
