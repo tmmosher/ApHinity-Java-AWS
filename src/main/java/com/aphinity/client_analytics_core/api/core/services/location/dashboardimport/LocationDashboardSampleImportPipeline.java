@@ -327,11 +327,12 @@ final class LocationDashboardSampleImportPipeline {
         }
 
         LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
+        String cellReference = cell.cellReference() == null ? "" : " cell " + cell.cellReference();
         if (cell.observedDate() != null
             && primarySample.sampledOn() != null
-            && !sameObservationMonth(cell.observedDate(), primarySample.sampledOn())) {
+            && sameObservationMonth(cell.observedDate(), primarySample.sampledOn())) {
             throw invalidSpreadsheet(
-                "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
+                "Row " + row.rowNumber() + cellReference
                     + ": comment primary sample date must stay within the worksheet month bucket."
             );
         }
@@ -339,7 +340,7 @@ final class LocationDashboardSampleImportPipeline {
             && primarySample.resultValue() != null
             && cell.numericValue().compareTo(primarySample.resultValue()) != 0) {
             throw invalidSpreadsheet(
-                "Row " + row.rowNumber() + (cell.cellReference() == null ? "" : " cell " + cell.cellReference())
+                "Row " + row.rowNumber() + cellReference
                     + ": comment primary sample result does not match the worksheet cell."
             );
         }
@@ -367,7 +368,7 @@ final class LocationDashboardSampleImportPipeline {
         if (primaryCell.observedDate() == null || candidateSample.sampledOn() == null) {
             return false;
         }
-        if (!sameObservationMonth(primaryCell.observedDate(), candidateSample.sampledOn())) {
+        if (sameObservationMonth(primaryCell.observedDate(), candidateSample.sampledOn())) {
             return false;
         }
         if (primaryCell.numericValue() == null || candidateSample.resultValue() == null) {
@@ -407,10 +408,10 @@ final class LocationDashboardSampleImportPipeline {
 
     private boolean sameObservationMonth(LocalDate worksheetObservedDate, LocalDate commentSampleDate) {
         if (worksheetObservedDate == null || commentSampleDate == null) {
-            return false;
+            return true;
         }
-        return worksheetObservedDate.getYear() == commentSampleDate.getYear()
-            && worksheetObservedDate.getMonth() == commentSampleDate.getMonth();
+        return worksheetObservedDate.getYear() != commentSampleDate.getYear()
+                || worksheetObservedDate.getMonth() != commentSampleDate.getMonth();
     }
 
     private String resolveMeasurementName(String workbookMetricName, MeasurementBound measurementBound) {
