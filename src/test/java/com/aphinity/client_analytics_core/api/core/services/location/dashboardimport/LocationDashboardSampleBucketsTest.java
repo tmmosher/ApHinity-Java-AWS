@@ -125,7 +125,7 @@ class LocationDashboardSampleBucketsTest {
     }
 
     @Test
-    void analyzedSamplesCalculatesTurnaroundToNextSampleWithoutResolvingWhenNoFutureConformanceExists() {
+    void analyzedSamplesResolvesToNextSampleEvenWhenNoFutureConformanceExists() {
         LocationDashboardSampleBuckets buckets = new LocationDashboardSampleBuckets();
 
         buckets.add(sample(
@@ -151,7 +151,7 @@ class LocationDashboardSampleBucketsTest {
 
         List<LocationDashboardAnalyzedSample> analyzedSamples = buckets.analyzedSamples();
 
-        assertFalse(analyzedSamples.getFirst().resolved());
+        assertTrue(analyzedSamples.getFirst().resolved());
         assertEquals(2L, analyzedSamples.getFirst().turnaroundDays());
     }
 

@@ -1,8 +1,6 @@
-import {DefaultColorPicker} from "@thednp/solid-color-picker";
-import "@thednp/solid-color-picker/style.css";
+import {ColorPicker, parseColor, type Color} from "@ark-ui/solid";
 import Popover from "corvu/popover";
-import {For, Show, createSignal} from "solid-js";
-import {getDocumentThemePreference} from "../../util/common/themePreference";
+import {For, createMemo, createSignal} from "solid-js";
 
 type GraphColorPickerProps = {
   value: string;
@@ -11,17 +9,30 @@ type GraphColorPickerProps = {
   onChange: (colorHex: string) => void;
 };
 
+const FALLBACK_COLOR = "#1f77b4";
+
+const parsePickerColor = (color: string): Color => {
+  try {
+    return parseColor(color);
+  } catch {
+    return parseColor(FALLBACK_COLOR);
+  }
+};
+
+const toGraphColor = (color: Color): string => {
+  const rgbColor = color.toFormat("rgba");
+  return rgbColor.getChannelValue("alpha") >= 1 ? rgbColor.toString("hex") : rgbColor.toString("hexa");
+};
+
 const GraphColorPicker = (props: GraphColorPickerProps) => {
   const [isOpen, setIsOpen] = createSignal(false);
-  const [pickerResetKey, setPickerResetKey] = createSignal(0);
-  let popoverContent: HTMLDivElement | undefined;
   const colorOptionEntries = () => Object.entries(props.colorOptions);
   const pickerValue = () =>
-    props.value || Object.values(props.colorOptions)[0] || "#1f77b4";
+    props.value || Object.values(props.colorOptions)[0] || FALLBACK_COLOR;
+  const pickerColor = createMemo(() => parsePickerColor(pickerValue()));
   const selectedPresetValue = () => (
     colorOptionEntries().some(([, color]) => color === pickerValue()) ? pickerValue() : ""
   );
-  const pickerTheme = getDocumentThemePreference();
 
   const applyPresetColor = (colorHex: string) => {
     if (!colorHex || props.disabled) {
@@ -30,7 +41,6 @@ const GraphColorPicker = (props: GraphColorPickerProps) => {
     if (colorHex !== props.value) {
       props.onChange(colorHex);
     }
-    setPickerResetKey((key) => key + 1);
   };
 
   return (
@@ -43,14 +53,7 @@ const GraphColorPicker = (props: GraphColorPickerProps) => {
             restoreFocus={false}
             closeOnOutsideFocus={false}
             open={isOpen()}
-            onOpenChange={(open) => {
-              setIsOpen(open);
-              if (open) {
-                setTimeout(() => {
-                  popoverContent?.querySelector<HTMLButtonElement>(".picker-toggle")?.click();
-                });
-              }
-            }}
+            onOpenChange={setIsOpen}
           >
             <Popover.Trigger
               type="button"
@@ -63,27 +66,48 @@ const GraphColorPicker = (props: GraphColorPickerProps) => {
               <span class="min-w-0 truncate">{pickerValue()}</span>
             </Popover.Trigger>
 
-            <Popover.Content
-              ref={popoverContent}
-              class="graph-color-picker-popover-content z-[80] w-[min(92vw,22rem)] rounded-lg border border-base-300 bg-base-100 p-2 shadow-xl"
-            >
-              <Show when={pickerValue()} keyed>
-                {(value) => (
-                  <DefaultColorPicker
-                    value={value}
-                    format="hex"
-                    theme={pickerTheme}
-                    colorKeywords={[]}
-                    class="graph-color-picker"
-                    onChange={(colorHex) => {
-                      if (!props.disabled && colorHex !== props.value) {
-                        props.onChange(colorHex);
-                      }
-                    }}
-                  />
-                )}
-              </Show>
-            </Popover.Content>
+            <Popover.Portal>
+              <Popover.Content class="graph-color-picker-popover-content z-[80] w-[min(92vw,22rem)] rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl">
+                <ColorPicker.Root
+                  class="graph-color-picker"
+                  value={pickerColor()}
+                  format="rgba"
+                  inline
+                  disabled={props.disabled}
+                  onValueChange={({value}) => {
+                    const nextColor = toGraphColor(value);
+                    if (!props.disabled && nextColor !== props.value) {
+                      props.onChange(nextColor);
+                    }
+                  }}
+                >
+                  <ColorPicker.HiddenInput />
+                  <ColorPicker.Content class="space-y-3">
+                    <ColorPicker.Area class="graph-color-picker-area">
+                      <ColorPicker.AreaBackground class="graph-color-picker-area-background" />
+                      <ColorPicker.AreaThumb class="graph-color-picker-thumb" />
+                    </ColorPicker.Area>
+
+                    <ColorPicker.ChannelSlider class="graph-color-picker-slider" channel="hue">
+                      <ColorPicker.ChannelSliderTrack class="graph-color-picker-slider-track" />
+                      <ColorPicker.ChannelSliderThumb class="graph-color-picker-thumb" />
+                    </ColorPicker.ChannelSlider>
+
+                    <ColorPicker.ChannelSlider class="graph-color-picker-slider" channel="alpha">
+                      <ColorPicker.TransparencyGrid />
+                      <ColorPicker.ChannelSliderTrack class="graph-color-picker-slider-track" />
+                      <ColorPicker.ChannelSliderThumb class="graph-color-picker-thumb" />
+                    </ColorPicker.ChannelSlider>
+
+                    <ColorPicker.ChannelInput
+                      class="input input-bordered input-sm w-full"
+                      channel="hex"
+                      aria-label="Custom color"
+                    />
+                  </ColorPicker.Content>
+                </ColorPicker.Root>
+              </Popover.Content>
+            </Popover.Portal>
           </Popover>
         </div>
 

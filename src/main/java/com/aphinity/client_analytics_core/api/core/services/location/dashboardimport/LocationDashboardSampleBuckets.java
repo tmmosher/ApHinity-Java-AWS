@@ -64,12 +64,6 @@ final class LocationDashboardSampleBuckets {
             return;
         }
 
-        List<LocalDate> sortedConformingDates = leaf.conformingIndexes().stream()
-            .map(this::resolutionAnchorDate)
-            .filter(date -> date != null)
-            .sorted(Comparator.naturalOrder())
-            .toList();
-
         for (Integer nonConformingIndex : leaf.nonConformingIndexes()) {
             if (nonConformingIndex == null || nonConformingIndex < 0 || nonConformingIndex >= analyzedSamples.size()) {
                 continue;
@@ -86,9 +80,8 @@ final class LocationDashboardSampleBuckets {
             if (nextSampleAt == null) {
                 continue;
             }
-            boolean resolved = firstDateAfter(sortedConformingDates, resolutionAnchorDate) != null;
             long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(resolutionAnchorDate, nextSampleAt));
-            analyzedSamples.set(nonConformingIndex, analyzedSample.withResolution(resolved, turnaroundDays));
+            analyzedSamples.set(nonConformingIndex, analyzedSample.withResolution(true, turnaroundDays));
         }
     }
 
@@ -161,24 +154,17 @@ final class LocationDashboardSampleBuckets {
 
     private static final class ResolutionBucketLeaf {
         private final List<Integer> sampleIndexes = new ArrayList<>();
-        private final List<Integer> conformingIndexes = new ArrayList<>();
         private final List<Integer> nonConformingIndexes = new ArrayList<>();
 
         void append(int analyzedSampleIndex, boolean compliant) {
             sampleIndexes.add(analyzedSampleIndex);
-            if (compliant) {
-                conformingIndexes.add(analyzedSampleIndex);
-            } else {
+            if (!compliant) {
                 nonConformingIndexes.add(analyzedSampleIndex);
             }
         }
 
         List<Integer> sampleIndexes() {
             return sampleIndexes;
-        }
-
-        List<Integer> conformingIndexes() {
-            return conformingIndexes;
         }
 
         List<Integer> nonConformingIndexes() {

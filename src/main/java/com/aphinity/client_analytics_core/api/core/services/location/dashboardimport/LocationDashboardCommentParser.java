@@ -41,6 +41,11 @@ final class LocationDashboardCommentParser {
             .withResolverStyle(ResolverStyle.STRICT)
     );
 
+    /**
+     * Entry point for workbook comment text. This method normalizes the raw text, strips an optional
+     * leading {@code Comment:} marker, rejects blank payloads, and skips compact semicolon-delimited
+     * comments that are handled by the worksheet row data instead of by this free-text parser.
+     */
     ParsedComment parse(String rawCommentText) {
         if (rawCommentText == null || rawCommentText.isBlank()) {
             return new ParsedComment(false, null, null, List.of(), List.of(), List.of());
@@ -58,6 +63,13 @@ final class LocationDashboardCommentParser {
         return parseLegacyComment(payload);
     }
 
+    /**
+     * Parses a pre-screened legacy free-text payload. Unlike {@link #parse(String)}, this method assumes
+     * the caller already removed workbook comment wrapping and filtered unsupported compact formats; it
+     * focuses only on extracting sample location, primary/follow-up samples, corrective actions, and
+     * leftover notes from inconsistent line-oriented legacy text.
+     * This is the most commonly used parser. Shorthand parsing is deprecated and unlikely to supported in the future.
+     */
     private ParsedComment parseLegacyComment(String payload) {
         String[] lines = payload.replace("\r\n", "\n").split("\\R");
         String sampleLocation = null;

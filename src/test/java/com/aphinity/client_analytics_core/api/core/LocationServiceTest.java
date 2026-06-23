@@ -1311,6 +1311,75 @@ class LocationServiceTest {
     }
 
     @Test
+    void updateLocationGraphDataThenRefetchDoesNotRehydrateClearedDerivedGraph() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Non-Conformance Status");
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "orientation", "h",
+            "x", List.of(3),
+            "y", List.of("Newport Beach")
+        )));
+        graph.setLayout(new LinkedHashMap<>(Map.of(
+            "meta", Map.of(
+                "aphinityImport", Map.of(
+                    "derivedGraphId", "non-conformance-status-by-turnaround-time",
+                    "derivedGraphType", "non_conformance_turnaround_time"
+                )
+            )
+        )));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                31L,
+                List.of(Map.of(
+                    "type", "bar",
+                    "orientation", "h",
+                    "x", List.of(),
+                    "y", List.of()
+                ))
+            ))
+        );
+
+        List<Map<String, Object>> clearedTraces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, clearedTraces.size());
+        assertEquals(List.of(), clearedTraces.getFirst().get("x"));
+        assertEquals(List.of(), clearedTraces.getFirst().get("y"));
+        verify(locationDashboardTimeRangeService).refreshLocationImportedGraphDateGroups(99L);
+
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setGraph(graph);
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(99L), any()))
+            .thenAnswer(invocation -> {
+                graph.setData(List.of(Map.of(
+                    "type", "bar",
+                    "orientation", "h",
+                    "x", List.of(3),
+                    "y", List.of("Newport Beach")
+                )));
+                return Map.of();
+            });
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(99L)).thenReturn(List.of(locationGraph));
+
+        List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(5L, 99L, -1);
+
+        assertEquals(1, responses.size());
+        assertEquals(List.of(), responses.getFirst().data().getFirst().get("x"));
+        assertEquals(List.of(), responses.getFirst().data().getFirst().get("y"));
+    }
+
+    @Test
     void updateLocationGraphDataPersistsOnlyCanonicalPayloadForDerivedGraphs() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));

@@ -143,28 +143,50 @@
 
 @layer components {
   .graph-color-picker-popover-content .graph-color-picker {
-    @apply block w-full min-w-0;
+    @apply w-full min-w-0;
   }
 
-  .graph-color-picker-popover-content .graph-color-picker .color-preview {
-    @apply input input-bordered input-sm w-full min-w-0;
+  .graph-color-picker-area {
+    height: 10rem;
+    width: 100%;
+    position: relative;
+    touch-action: none;
+    border-radius: 0.5rem;
+    overflow: hidden;
   }
 
-  .graph-color-picker-popover-content .graph-color-picker .picker-toggle {
-    top: 0;
-    bottom: auto;
-    height: 2rem;
+  .graph-color-picker-area-background {
+    position: absolute;
+    inset: 0;
+    height: 100%;
     width: 100%;
   }
 
-  .graph-color-picker-popover-content .graph-color-picker .menu-toggle,
-  .graph-color-picker-popover-content .graph-color-picker .color-dropdown.menu {
-    display: none;
+  .graph-color-picker-slider {
+    height: 1rem;
+    width: 100%;
+    position: relative;
+    touch-action: none;
+    border-radius: 9999px;
+    overflow: hidden;
   }
 
-  .graph-color-picker-popover-content .graph-color-picker .color-dropdown.picker {
-    position: static;
-    margin-top: 0.5rem;
-    transform: none;
+  .graph-color-picker-slider-track {
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+  }
+
+  .graph-color-picker-thumb {
+    height: 1rem;
+    width: 1rem;
+    border: 2px solid hsl(var(--b1));
+    border-radius: 9999px;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  }
+
+  .graph-color-picker-area .graph-color-picker-thumb {
+    height: 0.875rem;
+    width: 0.875rem;
   }
 }
