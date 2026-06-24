@@ -1,7 +1,14 @@
 package com.aphinity.client_analytics_core.api.core.services.location;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
+import java.time.format.SignStyle;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,6 +16,15 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class DashboardGraphMonthRangePayloadProjector {
+    private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
+        .appendValue(ChronoField.YEAR, 4)
+        .appendLiteral('-')
+        .appendValue(ChronoField.MONTH_OF_YEAR, 1, 2, SignStyle.NOT_NEGATIVE)
+        .appendLiteral('-')
+        .appendValue(ChronoField.DAY_OF_MONTH, 1, 2, SignStyle.NOT_NEGATIVE)
+        .toFormatter(Locale.ROOT)
+        .withResolverStyle(ResolverStyle.STRICT);
+
     private DashboardGraphMonthRangePayloadProjector() {
     }
 
@@ -102,6 +118,18 @@ public final class DashboardGraphMonthRangePayloadProjector {
         }
         try {
             return LocalDate.parse(rawValue);
+        } catch (DateTimeParseException ex) {
+        }
+        try {
+            return OffsetDateTime.parse(rawValue).toLocalDate();
+        } catch (DateTimeParseException ex) {
+        }
+        try {
+            return LocalDateTime.parse(rawValue).toLocalDate();
+        } catch (DateTimeParseException ex) {
+        }
+        try {
+            return LocalDate.parse(rawValue, FLEXIBLE_LOCAL_DATE_FORMATTER);
         } catch (DateTimeParseException ex) {
             return null;
         }
