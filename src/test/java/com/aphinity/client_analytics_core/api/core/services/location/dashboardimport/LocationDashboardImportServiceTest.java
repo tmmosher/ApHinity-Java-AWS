@@ -179,7 +179,7 @@ class LocationDashboardImportServiceTest {
         );
         GraphResponse totalNonConformancesResponse = findResponseByName(responses, "Total Non-Conformances");
         assertEquals(List.of(2L), totalNonConformancesResponse.data().getFirst().get("values"));
-        assertEquals(33L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
+        assertEquals(0L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> resolutionPercentGauge = (Map<String, Object>) findResponseByName(
             responses,
@@ -196,9 +196,9 @@ class LocationDashboardImportServiceTest {
         assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
         assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
-        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
-        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
-        assertEquals(List.of("< 3 days"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+        assertEquals(List.of(0L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
+        assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
+        assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> meta = (Map<String, Object>) findResponseByName(responses, "Percent Conformance").layout().get("meta");

@@ -128,6 +128,7 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
         String facility = LocationDashboardGraphMetadataSupport.normalizeKey(facilityName);
         String building = nullSafeNormalized(buildingName);
         String system = LocationDashboardGraphMetadataSupport.normalizeKey(systemName);
+        String normalizedSampleIdentity = normalizedExplicitSampleIdentity(sampleIdentity);
         if (measurement != null && observedAtNormalized != null && facility != null && system != null) {
             return String.join("|", List.of(
                 measurement,
@@ -137,7 +138,7 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
                 system,
                 nullSafeNormalized(pointOfUse),
                 nullSafeNormalized(basis),
-                nullSafeNormalized(sampleIdentity)
+                normalizedSampleIdentity
             ));
         }
         return null;
@@ -182,5 +183,13 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
     private static String nullSafeNormalized(String value) {
         String normalized = LocationDashboardGraphMetadataSupport.normalizeKey(value);
         return normalized == null ? "" : normalized;
+    }
+
+    private static String normalizedExplicitSampleIdentity(String sampleIdentity) {
+        if (sampleIdentity != null
+            && sampleIdentity.startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX)) {
+            return "";
+        }
+        return nullSafeNormalized(sampleIdentity);
     }
 }

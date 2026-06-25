@@ -8,6 +8,9 @@ services:
         VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     ports:
       - "8080:8080"
+      - "5005:5005"
     env_file:
       - .env.runtime
     network_mode: "host"
+    environment:
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005

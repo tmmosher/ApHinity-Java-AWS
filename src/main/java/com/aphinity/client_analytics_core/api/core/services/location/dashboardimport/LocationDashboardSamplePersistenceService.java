@@ -20,7 +20,7 @@ import java.util.Map;
 @Service
 public class LocationDashboardSamplePersistenceService {
     private static final int MAX_TEXT_LENGTH = 1024;
-    private static final String GENERATED_SAMPLE_IDENTITY_PREFIX = "__generated__|";
+    static final String GENERATED_SAMPLE_IDENTITY_PREFIX = "__generated__|";
 
     private final LocationDashboardSampleRepository sampleRepository;
 
@@ -210,10 +210,7 @@ public class LocationDashboardSamplePersistenceService {
             String buildingName = metadata.get("building");
             String systemName = metadata.get("system");
             String metadataSampleIdentity = metadata.get("sample identity");
-            String sampleIdentity = firstNonBlank(
-                metadataSampleIdentity,
-                LocationDashboardCorrectiveActionMetadataSupport.identityKey(correctiveAction.getTitle(), correctiveAction.getDescription())
-            );
+            String sampleIdentity = correctiveActionSampleIdentity(metadataSampleIdentity, correctiveAction);
             String identity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
                 measurementName,
                 observedDate,
@@ -246,6 +243,19 @@ public class LocationDashboardSamplePersistenceService {
             analyzedIdentities.put(identity, Boolean.TRUE);
         }
         return List.copyOf(samples);
+    }
+
+    private String correctiveActionSampleIdentity(String metadataSampleIdentity, ServiceEvent correctiveAction) {
+        if (notBlank(metadataSampleIdentity)) {
+            return metadataSampleIdentity;
+        }
+        String correctiveActionIdentity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+            correctiveAction.getTitle(),
+            correctiveAction.getDescription()
+        );
+        return correctiveActionIdentity == null
+            ? null
+            : GENERATED_SAMPLE_IDENTITY_PREFIX + correctiveActionIdentity;
     }
 
     private boolean canPersist(LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample) {
@@ -300,15 +310,7 @@ public class LocationDashboardSamplePersistenceService {
     }
 
     private String firstNonBlank(String... values) {
-        if (values == null) {
-            return null;
-        }
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
+        return LocationDashboardGraphMetadataSupport.firstNonBlank(values);
     }
 
     private Long turnaroundDays(LocalDate observedDate, ServiceEvent correctiveAction) {

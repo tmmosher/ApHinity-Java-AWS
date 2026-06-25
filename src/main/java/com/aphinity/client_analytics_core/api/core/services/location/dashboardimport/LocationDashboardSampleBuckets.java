@@ -2,11 +2,7 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 final class LocationDashboardSampleBuckets {
     private final List<LocationDashboardAnalyzedSample> analyzedSamples = new ArrayList<>();
@@ -57,7 +53,7 @@ final class LocationDashboardSampleBuckets {
 
         List<LocalDate> sortedSampleDates = leaf.sampleIndexes().stream()
             .map(this::resolutionAnchorDate)
-            .filter(date -> date != null)
+            .filter(Objects::nonNull)
             .sorted(Comparator.naturalOrder())
             .toList();
         if (sortedSampleDates.isEmpty()) {

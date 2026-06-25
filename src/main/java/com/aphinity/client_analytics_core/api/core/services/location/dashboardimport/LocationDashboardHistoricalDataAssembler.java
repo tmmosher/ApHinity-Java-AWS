@@ -4,6 +4,9 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardDerivedGraphSupport.HistoricalNonConformance;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategy.AnalyzedSamplePoint;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -78,7 +81,7 @@ final class LocationDashboardHistoricalDataAssembler {
                 .computeIfAbsent(samplePoint.observedDate(), ignored -> new ArrayList<>())
                 .add(samplePoint));
 
-        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> correctiveActions = effectiveCorrectiveActions.stream()
+        List<HistoricalCorrectiveAction> correctiveActions = effectiveCorrectiveActions.stream()
             .map(correctiveActionService::toHistoricalCorrectiveAction)
             .filter(Objects::nonNull)
             .toList();
@@ -262,26 +265,19 @@ final class LocationDashboardHistoricalDataAssembler {
             + LocationDashboardGraphMetadataSupport.nullSafeNormalized(systemTypeName);
     }
 
-    private List<LocationDashboardDerivedGraphSupport.HistoricalNonConformance> mergeHistoricalNonConformances(
-        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples,
-        List<LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction> correctiveActions
+    private List<HistoricalNonConformance> mergeHistoricalNonConformances(
+        List<AnalyzedSamplePoint> analyzedSamples,
+        List<HistoricalCorrectiveAction> correctiveActions
     ) {
-        Map<String, LocationDashboardDerivedGraphSupport.HistoricalNonConformance> nonConformancesByIdentity =
+        Map<String, HistoricalNonConformance> nonConformancesByIdentity =
             new LinkedHashMap<>();
+        Map<String, Integer> sampleIncidentOrdinalsByIdentity = new LinkedHashMap<>();
 
-        for (LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction correctiveAction : correctiveActions) {
-            if (correctiveAction == null) {
-                continue;
-            }
-            String identity = correctiveAction.identityKey();
-            if (identity == null) {
-                continue;
-            }
-            nonConformancesByIdentity.put(identity, correctiveAction.toHistoricalNonConformance());
-        }
-
-        for (LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample : analyzedSamples) {
+        for (AnalyzedSamplePoint analyzedSample : analyzedSamples) {
             if (analyzedSample == null || !analyzedSample.nonConforming()) {
+                continue;
+            }
+            if (analyzedSample.origin() == LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT) {
                 continue;
             }
             String identity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
@@ -297,7 +293,12 @@ final class LocationDashboardHistoricalDataAssembler {
             if (identity == null) {
                 continue;
             }
-            LocationDashboardDerivedGraphSupport.HistoricalNonConformance analyzedNonConformance =
+            String incidentIdentity = sampleIncidentIdentity(
+                identity,
+                analyzedSample,
+                sampleIncidentOrdinalsByIdentity
+            );
+            HistoricalNonConformance analyzedNonConformance =
                 new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
                     analyzedSample.observedDate(),
                     analyzedSample.facilityName(),
@@ -311,13 +312,49 @@ final class LocationDashboardHistoricalDataAssembler {
                     analyzedSample.turnaroundDays()
                 );
             nonConformancesByIdentity.merge(
-                identity,
+                incidentIdentity,
                 analyzedNonConformance,
+                HistoricalNonConformance::merge
+            );
+        }
+
+        for (HistoricalCorrectiveAction correctiveAction : correctiveActions) {
+            if (correctiveAction == null) {
+                continue;
+            }
+            String identity = correctiveAction.identityKey();
+            if (identity == null || !nonConformancesByIdentity.containsKey(identity)) {
+                continue;
+            }
+            nonConformancesByIdentity.merge(
+                identity,
+                correctiveAction.toHistoricalNonConformance(),
                 LocationDashboardDerivedGraphSupport.HistoricalNonConformance::merge
             );
         }
 
         return List.copyOf(nonConformancesByIdentity.values());
+    }
+
+    private String sampleIncidentIdentity(
+        String baseIdentity,
+        AnalyzedSamplePoint analyzedSample,
+        Map<String, Integer> sampleIncidentOrdinalsByIdentity
+    ) {
+        if (hasExplicitSampleIdentity(analyzedSample)) {
+            return baseIdentity;
+        }
+        int ordinal = sampleIncidentOrdinalsByIdentity.merge(baseIdentity, 1, Integer::sum);
+        return ordinal == 1 ? baseIdentity : baseIdentity + "|incident|" + ordinal;
+    }
+
+    private boolean hasExplicitSampleIdentity(AnalyzedSamplePoint analyzedSample) {
+        return analyzedSample != null
+            && analyzedSample.sampleIdentity() != null
+            && !analyzedSample.sampleIdentity().isBlank()
+            && !analyzedSample.sampleIdentity().startsWith(
+                LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX
+            );
     }
 
     private static final class ImportedSampleAggregate {
