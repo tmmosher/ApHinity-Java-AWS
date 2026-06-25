@@ -29,13 +29,11 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -63,7 +61,7 @@ public class LocationService {
     private static final Logger log = LoggerFactory.getLogger(LocationService.class);
 
     @Autowired(required = false)
-    private EntityManagerFactory entityManagerFactory;
+    private EntityManager entityManager;
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -1448,7 +1446,6 @@ public class LocationService {
     }
 
     private Graph refreshGraphFromStore(Long graphId, Graph fallbackGraph) {
-        EntityManager entityManager = currentEntityManager();
         if (entityManager != null) {
             if (entityManager.contains(fallbackGraph)) {
                 entityManager.refresh(fallbackGraph);
@@ -1464,7 +1461,6 @@ public class LocationService {
     }
 
     private Location refreshLocationFromStore(Long locationId, Location fallbackLocation) {
-        EntityManager entityManager = currentEntityManager();
         if (entityManager != null) {
             if (entityManager.contains(fallbackLocation)) {
                 entityManager.refresh(fallbackLocation);
@@ -1477,13 +1473,6 @@ public class LocationService {
             }
         }
         return locationRepository.findById(locationId).orElse(fallbackLocation);
-    }
-
-    private EntityManager currentEntityManager() {
-        if (entityManagerFactory == null) {
-            return null;
-        }
-        return SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory);
     }
 
     private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(
