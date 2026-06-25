@@ -154,6 +154,29 @@ const buildGraphBaselineEntry = (graph: LocationGraph): GraphBaselineEntry => ({
   expectedUpdatedAt: graph.updatedAt ?? null
 });
 
+const compareGraphUpdatedAt = (left: string | null | undefined, right: string | null | undefined): number => {
+  if (!left || !right) {
+    return 0;
+  }
+
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) {
+    return 0;
+  }
+  return leftTime - rightTime;
+};
+
+const isStaleGraphRefresh = (
+  currentGraph: LocationGraph,
+  baseline: GraphBaselineEntry,
+  nextGraph: LocationGraph
+): boolean => (
+  graphPersistenceSignature(currentGraph) === baseline.payloadSignature
+  && graphPersistenceSignature(nextGraph) !== baseline.payloadSignature
+  && compareGraphUpdatedAt(nextGraph.updatedAt ?? null, baseline.expectedUpdatedAt) < 0
+);
+
 const isGraphDirty = (
   graph: LocationGraph,
   baseline: GraphBaselineEntry | undefined
@@ -358,6 +381,11 @@ export const reconcileLocationGraphRefreshState = (
       continue;
     }
 
+    if (isStaleGraphRefresh(currentGraph, baseline, nextGraph)) {
+      nextWorkingGraphs.push(currentGraph);
+      continue;
+    }
+
     nextWorkingGraphs.push(nextGraph);
   }
 
@@ -383,7 +411,12 @@ export const reconcileLocationGraphRefreshState = (
     }
 
     const refreshedGraph = nextById.get(graph.id) ?? graph;
-    nextBaselineIndex.set(graph.id, buildGraphBaselineEntry(refreshedGraph));
+    nextBaselineIndex.set(
+      graph.id,
+      currentGraph && baseline && isStaleGraphRefresh(currentGraph, baseline, refreshedGraph)
+        ? baseline
+        : buildGraphBaselineEntry(refreshedGraph)
+    );
   }
 
   const nextUndoStack = currentUndoStack.map((snapshot) => {

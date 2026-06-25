@@ -298,6 +298,41 @@ describe("graphEditor", () => {
     });
   });
 
+  it("keeps just-saved graph edits when a stale refresh arrives after undo history is cleared", () => {
+    const savedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        data: [{type: "bar", x: ["Manual"], y: [15]}],
+        layout: {title: {text: "Manual edit"}},
+        config: {displayModeBar: false},
+        style: {height: 360},
+        updatedAt: "2026-01-03T00:00:00Z"
+      },
+      baseGraphs[1]
+    ];
+    const staleRefreshedGraphs: LocationGraph[] = [
+      {
+        ...baseGraphs[0],
+        updatedAt: "2026-01-02T00:00:00Z"
+      },
+      baseGraphs[1]
+    ];
+
+    const refreshResult = reconcileLocationGraphRefreshState(
+      savedGraphs,
+      [],
+      buildGraphBaselineIndex(savedGraphs),
+      staleRefreshedGraphs
+    );
+
+    expect(refreshResult.nextGraphs[0]).toBe(savedGraphs[0]);
+    expect(refreshResult.nextGraphs[0].data).toEqual([{type: "bar", x: ["Manual"], y: [15]}]);
+    expect(refreshResult.nextGraphs[0].layout).toEqual({title: {text: "Manual edit"}});
+    expect(refreshResult.nextBaselineIndex.get(10)).toMatchObject({
+      expectedUpdatedAt: "2026-01-03T00:00:00Z"
+    });
+  });
+
   it("reads graph titles from string and object Plotly layout shapes", () => {
     expect(getEditableGraphTitle({title: "Legacy title"})).toBe("Legacy title");
     expect(getEditableGraphTitle({title: {text: "Current title", x: 0.02}})).toBe("Current title");

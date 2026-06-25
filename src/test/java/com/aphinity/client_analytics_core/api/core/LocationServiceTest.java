@@ -1360,16 +1360,6 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(99L), any()))
-            .thenAnswer(invocation -> {
-                graph.setData(List.of(Map.of(
-                    "type", "bar",
-                    "orientation", "h",
-                    "x", List.of(3),
-                    "y", List.of("Newport Beach")
-                )));
-                return Map.of();
-            });
         when(locationGraphRepository.findByLocationIdWithGraphDetails(99L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(5L, 99L, -1);
@@ -1523,8 +1513,6 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(11L), any()))
-            .thenReturn(Map.of());
         when(locationGraphRepository.findByLocationIdWithGraphDetails(11L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(7L, 11L);
@@ -1567,8 +1555,6 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(44L), any()))
-            .thenReturn(Map.of());
         when(locationGraphRepository.findByLocationIdWithGraphDetails(44L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(17L, 44L);
@@ -1603,8 +1589,6 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(57L), any()))
-            .thenReturn(Map.of());
         when(locationGraphRepository.findByLocationIdWithGraphDetails(57L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(23L, 57L);
@@ -1638,8 +1622,6 @@ class LocationServiceTest {
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
-        when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(58L), any()))
-            .thenReturn(Map.of());
         when(locationGraphRepository.findByLocationIdWithGraphDetails(58L)).thenReturn(List.of(locationGraph));
 
         List<GraphResponse> responses = locationService.getAccessibleLocationGraphs(24L, 58L);

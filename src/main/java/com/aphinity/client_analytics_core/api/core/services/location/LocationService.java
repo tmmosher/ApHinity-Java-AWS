@@ -182,8 +182,9 @@ public class LocationService {
         }
 
         DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
-        Map<Long, List<Map<String, Object>>> rangePayloadsByGraphId =
-            locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(locationId, resolvedMonthRange);
+        Map<Long, List<Map<String, Object>>> rangePayloadsByGraphId = resolvedMonthRange.isAllTime()
+            ? Map.of()
+            : locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(locationId, resolvedMonthRange);
         return locationGraphRepository.findByLocationIdWithGraphDetails(locationId).stream()
             .map(LocationGraph::getGraph)
             .map(graph -> graphResponseMapper.toResponse(graph, rangePayloadsByGraphId.get(graph.getId())))
