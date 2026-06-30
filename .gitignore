@@ -66,4 +66,4 @@ src/main/resources/static/
 .env.runtime
 
 # Test resources
-/test/resources/sheets/
+/src/test/resources/sheets/
