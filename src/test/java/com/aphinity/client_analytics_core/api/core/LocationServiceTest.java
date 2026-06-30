@@ -19,6 +19,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.UserSub
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
@@ -1765,19 +1766,22 @@ class LocationServiceTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             new byte[] {1, 2, 3}
         );
-        List<GraphResponse> expected = List.of(new GraphResponse(
-            18L,
-            "Water Quality Compliance",
-            List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
-            Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
-            Map.of(),
-            Map.of(),
-            Instant.parse("2026-01-01T00:00:00Z"),
-            Instant.parse("2026-01-02T00:00:00Z")
-        ));
+        LocationDashboardSpreadsheetUploadResponse expected = new LocationDashboardSpreadsheetUploadResponse(
+            List.of(new GraphResponse(
+                18L,
+                "Water Quality Compliance",
+                List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
+                Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
+                Map.of(),
+                Map.of(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-02T00:00:00Z")
+            )),
+            List.of()
+        );
         when(locationDashboardImportService.importLocationDashboard(location, file)).thenReturn(expected);
 
-        List<GraphResponse> actual = locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file);
+        LocationDashboardSpreadsheetUploadResponse actual = locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file);
 
         assertSame(expected, actual);
         verify(locationRepository).findById(9L);

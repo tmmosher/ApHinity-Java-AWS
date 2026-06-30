@@ -13,6 +13,7 @@ import {
 import {toast} from "solid-toast";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
+import {useLocationDetail} from "../../../../context/LocationDetailContext";
 import type {CreateLocationGanttTaskRequest, LocationGanttTask} from "../../../../types/Types";
 import {GanttChartContent} from "../../../../components/gantt/GanttChartContent";
 import {GanttChartToolbar} from "../../../../components/gantt/GanttChartToolbar";
@@ -36,7 +37,6 @@ import {
 } from "../../../../util/location/locationGanttTaskApi";
 import {createDashboardLocationResetGuard, getFreshLocationScopedValue, type LocationScopedResource} from "../../../../util/location/locationView";
 import {createLocationReactiveSearchControl} from "../../../../util/location/locationReactiveSearchControl";
-import {createGanttTaskImportController} from "../../../../util/location/createGanttTaskImportController";
 import "../../../../styles/frappe-gantt.css";
 
 type GanttTaskResource = LocationScopedResource<LocationGanttTask[]> & {
@@ -48,6 +48,7 @@ type TimelineTask = TimelineTaskLike;
 export const LocationGanttChartPanel = () => {
   const host = useApiHost();
   const profileContext = useProfile();
+  const {ganttTaskImport: importController, setGanttTaskRefetcher} = useLocationDetail();
   const params = useParams<{ locationId: string }>();
   const role = createMemo(() => profileContext.profile()?.role);
   const canEditTasks = createMemo(() => canEditLocationGanttTask(role()));
@@ -57,7 +58,6 @@ export const LocationGanttChartPanel = () => {
     getLocationGanttTaskTemplateDownloadUrl(host, params.locationId)
   );
 
-  const [locationSessionToken, setLocationSessionToken] = createSignal(0);
   const [selectedTask, setSelectedTask] = createSignal<TimelineTask>();
   const [selectedTaskAnchorStyle, setSelectedTaskAnchorStyle] = createSignal<JSX.CSSProperties>();
   const [ganttContainerHeight, setGanttContainerHeight] = createSignal(1);
@@ -94,16 +94,6 @@ export const LocationGanttChartPanel = () => {
       value: await fetchLocationGanttTasksById(host, request.locationId, request.query)
     })
   );
-
-  const importController = createGanttTaskImportController({
-    host,
-    locationId: () => params.locationId,
-    locationSessionToken,
-    clearUploadInput,
-    refetchTasks: async () => {
-      await refetchTasks();
-    }
-  });
 
   const persistedTasks = createMemo(() => {
     const resource = ganttTaskResource();
@@ -173,9 +163,22 @@ export const LocationGanttChartPanel = () => {
     searchControl.setSearchDraft("");
     searchControl.setSearchQuery("");
     importController.reset();
-    setLocationSessionToken((token) => token + 1);
     clearSelectedTask();
     clearUploadInput();
+  });
+
+  createEffect(() => {
+    const locationId = params.locationId;
+    setGanttTaskRefetcher(() => async () => {
+      if (params.locationId === locationId) {
+        await refetchTasks();
+      }
+    });
+    onCleanup(() => {
+      if (params.locationId === locationId) {
+        setGanttTaskRefetcher(undefined);
+      }
+    });
   });
 
   const saveTask = async (task: TimelineTask, request: CreateLocationGanttTaskRequest): Promise<void> => {

@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core.controllers.servicecalendar;
 
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
+import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.ServiceCalendarBulkEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceCalendarUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -144,6 +145,18 @@ public class LocationEventController {
             );
             throw ex;
         }
+    }
+
+    @PostMapping("/locations/{locationId}/events/bulk")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ServiceCalendarUploadResponse createLocationEvents(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @Valid @RequestBody ServiceCalendarBulkEventRequest request
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        int importedCount = locationEventService.createLocationEvents(userId, locationId, request.events());
+        return new ServiceCalendarUploadResponse(importedCount);
     }
 
     @PostMapping("/locations/{locationId}/events")

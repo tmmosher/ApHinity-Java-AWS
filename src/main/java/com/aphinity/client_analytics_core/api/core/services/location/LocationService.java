@@ -19,6 +19,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.Locatio
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -739,15 +740,19 @@ public class LocationService {
     }
 
     /**
-     * Accepts a dashboard spreadsheet upload and returns the updated graph payloads.
+     * Accepts a dashboard spreadsheet upload and returns staged graph and corrective-action payloads.
      *
      * @param userId authenticated user id
      * @param locationId location id
      * @param file uploaded Excel workbook
-     * @return updated dashboard graph payloads
+     * @return staged dashboard graph and corrective-action payloads
      */
     @Transactional
-    public List<GraphResponse> uploadLocationDashboardSpreadsheet(Long userId, Long locationId, MultipartFile file) {
+    public LocationDashboardSpreadsheetUploadResponse uploadLocationDashboardSpreadsheet(
+        Long userId,
+        Long locationId,
+        MultipartFile file
+    ) {
         AppUser user = requireUser(userId);
         requirePartnerOrAdmin(user);
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);

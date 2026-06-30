@@ -6,7 +6,9 @@ import type {
   CreateLocationServiceEventRequest,
   LocationServiceEvent
 } from "../../types/Types";
+import type {ServiceCalendarBulkCreateRequest} from "./stagedServiceCalendar";
 import {
+  createLocationServiceEventRequestListSchema,
   locationServiceEventListSchema,
   locationServiceEventSchema,
   serviceCalendarUploadResponseSchema
@@ -14,7 +16,7 @@ import {
 
 const parseRouteEventId = (eventId: number): number => parsePositiveRouteId(eventId, "event id");
 
-const parseLocationServiceEvent = (value: unknown): LocationServiceEvent => {
+export const parseLocationServiceEvent = (value: unknown): LocationServiceEvent => {
   const parsed = locationServiceEventSchema.safeParse(value);
   if (!parsed.success) {
     throw new Error("Invalid service event response");
@@ -22,10 +24,20 @@ const parseLocationServiceEvent = (value: unknown): LocationServiceEvent => {
   return parsed.data;
 };
 
-const parseLocationServiceEventList = (value: unknown): LocationServiceEvent[] => {
+export const parseLocationServiceEventList = (value: unknown): LocationServiceEvent[] => {
   const parsed = locationServiceEventListSchema.safeParse(value);
   if (!parsed.success) {
     throw new Error("Invalid service event response");
+  }
+  return parsed.data;
+};
+
+export const parseCreateLocationServiceEventRequestList = (
+  value: unknown
+): CreateLocationServiceEventRequest[] => {
+  const parsed = createLocationServiceEventRequestListSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("Invalid service event request response");
   }
   return parsed.data;
 };
@@ -136,6 +148,27 @@ export const uploadLocationEventCalendarById = async (
   const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/events/calendar-upload", {
     method: "POST",
     body: formData
+  });
+
+  if (!response.ok) {
+    await throwLocationEventUploadError(response);
+  }
+
+  return parseServiceCalendarUploadResponse(await response.json());
+};
+
+export const createLocationEventsBulkById = async (
+  host: string,
+  locationId: string,
+  events: readonly ServiceCalendarBulkCreateRequest[]
+): Promise<{importedCount: number}> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const response = await apiFetch(host + "/api/core/locations/" + parsedLocationId + "/events/bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({events})
   });
 
   if (!response.ok) {

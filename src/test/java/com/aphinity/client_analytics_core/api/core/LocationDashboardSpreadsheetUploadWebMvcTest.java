@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
 import org.junit.jupiter.api.Test;
@@ -54,16 +55,19 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             new byte[] {4, 5, 6}
         );
         when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class)))
-            .thenReturn(List.of(new GraphResponse(
-                18L,
-                "Water Quality Compliance",
-                List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
-                Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
-                Map.of(),
-                Map.of(),
-                Instant.parse("2026-01-01T00:00:00Z"),
-                Instant.parse("2026-01-02T00:00:00Z")
-            )));
+            .thenReturn(new LocationDashboardSpreadsheetUploadResponse(
+                List.of(new GraphResponse(
+                    18L,
+                    "Water Quality Compliance",
+                    List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
+                    Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
+                    Map.of(),
+                    Map.of(),
+                    Instant.parse("2026-01-01T00:00:00Z"),
+                    Instant.parse("2026-01-02T00:00:00Z")
+                )),
+                List.of()
+            ));
 
         mockMvc.perform(
                 multipart("/core/locations/{locationId}/dashboard/spreadsheet-upload", 8L)
@@ -71,8 +75,9 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
                     .with(csrf().asHeader())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(18L))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Compliance"));
+            .andExpect(jsonPath("$.graphs[0].id").value(18L))
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Compliance"))
+            .andExpect(jsonPath("$.correctiveActions.length()").value(0));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
         verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class));

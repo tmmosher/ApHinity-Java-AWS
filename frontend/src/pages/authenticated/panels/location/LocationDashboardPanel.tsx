@@ -7,13 +7,12 @@ import {useApiHost} from "../../../../context/ApiHostContext";
 import {useProfile} from "../../../../context/ProfileContext";
 import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {useLocationDetail} from "../../../../context/LocationDetailContext";
-import {createDashboardLocationResetGuard} from "../../../../util/location/locationView";
 import type {DashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
-import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 import LocationDashboardToolbar from "../../../../components/location/LocationDashboardToolbar";
 import LocationDashboardSection from "../../../../components/location/LocationDashboardSection";
 import LocationDashboardTimeRangeSelector from "../../../../components/location/LocationDashboardTimeRangeSelector";
 import {loadPlotlyModule} from "../../../../components/common/Chart";
+import type {LocationDashboardSpreadsheetUploadResult} from "../../../../types/Types";
 
 type LocationDashboardPanelProps = {
   locationId: string;
@@ -28,21 +27,10 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
     graphsError,
     graphTimeRange,
     setGraphTimeRange,
-    refetchLocation,
-    refetchGraphs
+    dashboardEdit: dashboard,
+    serviceCalendarStaging
   } = useLocationDetail();
   const canEditGraphs = createMemo(() => canEditLocationGraphs(profileContext.profile()?.role));
-  const shouldResetDashboardState = createDashboardLocationResetGuard(props.locationId);
-  const dashboard = createLocationDashboardEditController({
-    host,
-    locationId: () => props.locationId,
-    location,
-    graphs,
-    refetchLocation,
-    refetchGraphs,
-    canEditGraphs,
-    shouldResetDashboardState
-  });
 
   const createGraphDisabledReason = () => {
     if (dashboard.hasPendingDashboardChanges()) {
@@ -68,6 +56,13 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
 
   const displayedSectionGraphs = (section: ReturnType<typeof orderedSections>[number]) =>
     sectionGraphs(section);
+
+  const applySpreadsheetUploadResult = (result: LocationDashboardSpreadsheetUploadResult): void => {
+    dashboard.applySpreadsheetUploadPreview(result.graphs);
+    if (result.correctiveActions.length > 0) {
+      serviceCalendarStaging.stageImportedRequests(result.correctiveActions, {isCorrectiveAction: true});
+    }
+  };
 
   const [plotlyModule] = createResource(
     () => {
@@ -97,7 +92,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
         onAddGraph={dashboard.openCreateGraphModal}
         onApply={() => void dashboard.applyGraphChanges()}
         onEditLayout={dashboard.openLayoutEditor}
-        onUploadSpreadsheetSuccess={dashboard.applySpreadsheetUploadPreview}
+        onUploadSpreadsheetSuccess={applySpreadsheetUploadResult}
         onUndo={dashboard.undoLastDashboardEdit}
       />
 

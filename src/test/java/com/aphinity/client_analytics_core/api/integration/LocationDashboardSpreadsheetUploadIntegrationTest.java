@@ -50,7 +50,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void uploadLocationDashboardSpreadsheetReturnsPreviewWithoutPersistingGraphUpdatesAndPersistsCorrectiveActions() throws Exception {
+    void uploadLocationDashboardSpreadsheetReturnsPreviewWithoutPersistingGraphUpdatesOrCorrectiveActions() throws Exception {
         createUser("partner-dashboard-upload@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Hoag Hospital");
         seedMeasurement(location, "HPC", new BigDecimal("10"));
@@ -72,33 +72,33 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(17))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
-            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].y[0]").value(0))
-            .andExpect(jsonPath("$[0].data[1].name").value("Endotoxin"))
-            .andExpect(jsonPath("$[0].data[1].y[0]").value(2))
-            .andExpect(jsonPath("$[1].name").value("System Type Conformance"))
-            .andExpect(jsonPath("$[1].data.length()").value(1))
-            .andExpect(jsonPath("$[1].data[0].name").value("Cooling Tower"))
-            .andExpect(jsonPath("$[1].data[0].y[0]").value(2))
-            .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
-            .andExpect(jsonPath("$[2].data[0].values[0]").value(6))
-            .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
-            .andExpect(jsonPath("$[3].data[0].values[0]").value(2))
-            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
-            .andExpect(jsonPath("$[4].data[0].value").value(0))
-            .andExpect(jsonPath("$[5].name").value("Percent Conformance"))
-            .andExpect(jsonPath("$[5].data[0].value").value(67))
-            .andExpect(jsonPath("$[6].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[6].data[0].x[0]").value(2))
-            .andExpect(jsonPath("$[6].data[0].y[0]").value("Endotoxin"))
-            .andExpect(jsonPath("$[7].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[7].data[0].x[0]").value(2))
-            .andExpect(jsonPath("$[7].data[0].y[0]").value("Cooling Tower"))
-            .andExpect(jsonPath("$[8].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[8].data[0].x[0]").value(2))
-            .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
+            .andExpect(jsonPath("$.graphs.length()").value(17))
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$.graphs[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$.graphs[0].data[0].y[0]").value(0))
+            .andExpect(jsonPath("$.graphs[0].data[1].name").value("Endotoxin"))
+            .andExpect(jsonPath("$.graphs[0].data[1].y[0]").value(2))
+            .andExpect(jsonPath("$.graphs[1].name").value("System Type Conformance"))
+            .andExpect(jsonPath("$.graphs[1].data.length()").value(1))
+            .andExpect(jsonPath("$.graphs[1].data[0].name").value("Cooling Tower"))
+            .andExpect(jsonPath("$.graphs[1].data[0].y[0]").value(2))
+            .andExpect(jsonPath("$.graphs[2].name").value("Total Number of Samples"))
+            .andExpect(jsonPath("$.graphs[2].data[0].values[0]").value(6))
+            .andExpect(jsonPath("$.graphs[3].name").value("Total Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[3].data[0].values[0]").value(2))
+            .andExpect(jsonPath("$.graphs[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$.graphs[4].data[0].value").value(0))
+            .andExpect(jsonPath("$.graphs[5].name").value("Percent Conformance"))
+            .andExpect(jsonPath("$.graphs[5].data[0].value").value(67))
+            .andExpect(jsonPath("$.graphs[6].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[6].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[6].data[0].y[0]").value("Endotoxin"))
+            .andExpect(jsonPath("$.graphs[7].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[7].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[7].data[0].y[0]").value("Cooling Tower"))
+            .andExpect(jsonPath("$.graphs[8].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[8].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[8].data[0].y[0]").value("Newport Beach"));
 
         Graph persistedWaterQualityGraph = reloadGraph(graphs.waterQualityGraph().getId());
         Graph persistedSystemTypeGraph = reloadGraph(graphs.systemTypeGraph().getId());
@@ -122,7 +122,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         assertEquals(List.of(), graphData(persistedByFacilityGraph).getFirst().get("y"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(1, persistedEvents.size());
+        assertEquals(0, persistedEvents.size());
 
         var persistedSamples = locationDashboardSampleRepository.findByLocation_IdOrderByObservedDateAscIdAsc(location.getId());
         assertEquals(6, persistedSamples.size());
@@ -156,16 +156,14 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
-            .andExpect(jsonPath("$[0].data[1].y[0]").value(2))
-            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
-            .andExpect(jsonPath("$[4].data[0].value").value(0))
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$.graphs[0].data[1].y[0]").value(2))
+            .andExpect(jsonPath("$.graphs[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$.graphs[4].data[0].value").value(0))
             .andReturn();
 
-        List<Map<String, Object>> previewGraphs = objectMapper.readValue(
-            previewResult.getResponse().getContentAsString(),
-            new TypeReference<>() {
-            }
+        List<Map<String, Object>> previewGraphs = readUploadResponseGraphs(
+            previewResult.getResponse().getContentAsString()
         );
         List<Map<String, Object>> graphUpdates = previewGraphs.stream()
             .map(this::toGraphUpdateRequest)
@@ -248,22 +246,22 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[3].name").value("Total Non-Conformances"))
-            .andExpect(jsonPath("$[3].data[0].values[0]").value(3))
-            .andExpect(jsonPath("$[6].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[6].data[0].x[0]").value(2))
-            .andExpect(jsonPath("$[6].data[0].y[0]").value("Endotoxin"))
-            .andExpect(jsonPath("$[6].data[0].x[1]").value(1))
-            .andExpect(jsonPath("$[6].data[0].y[1]").value("HPC"))
-            .andExpect(jsonPath("$[7].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[7].data[0].x[0]").value(3))
-            .andExpect(jsonPath("$[7].data[0].y[0]").value("Cooling Tower"))
-            .andExpect(jsonPath("$[8].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$[8].data[0].x[0]").value(3))
-            .andExpect(jsonPath("$[8].data[0].y[0]").value("Newport Beach"));
+            .andExpect(jsonPath("$.graphs[3].name").value("Total Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[3].data[0].values[0]").value(3))
+            .andExpect(jsonPath("$.graphs[6].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[6].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[6].data[0].y[0]").value("Endotoxin"))
+            .andExpect(jsonPath("$.graphs[6].data[0].x[1]").value(1))
+            .andExpect(jsonPath("$.graphs[6].data[0].y[1]").value("HPC"))
+            .andExpect(jsonPath("$.graphs[7].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[7].data[0].x[0]").value(3))
+            .andExpect(jsonPath("$.graphs[7].data[0].y[0]").value("Cooling Tower"))
+            .andExpect(jsonPath("$.graphs[8].name").value("Non-Conformances"))
+            .andExpect(jsonPath("$.graphs[8].data[0].x[0]").value(3))
+            .andExpect(jsonPath("$.graphs[8].data[0].y[0]").value("Newport Beach"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(2, persistedEvents.size());
+        assertEquals(0, persistedEvents.size());
     }
 
     @Test
@@ -295,22 +293,22 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(17))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
-            .andExpect(jsonPath("$[0].data.length()").value(7))
-            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].x[0]").exists())
-            .andExpect(jsonPath("$[1].name").value("System Type Conformance"))
-            .andExpect(jsonPath("$[1].data.length()").value(4))
-            .andExpect(jsonPath("$[1].data[0].name").value("Utility SPD"))
-            .andExpect(jsonPath("$[1].data[3].name").value("Cooling Tower"))
-            .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
-            .andExpect(jsonPath("$[2].data[0].values[0]").value(greaterThan(0)))
-            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
-            .andExpect(jsonPath("$[5].name").value("Percent Conformance"));
+            .andExpect(jsonPath("$.graphs.length()").value(17))
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$.graphs[0].data.length()").value(7))
+            .andExpect(jsonPath("$.graphs[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$.graphs[0].data[0].x[0]").exists())
+            .andExpect(jsonPath("$.graphs[1].name").value("System Type Conformance"))
+            .andExpect(jsonPath("$.graphs[1].data.length()").value(4))
+            .andExpect(jsonPath("$.graphs[1].data[0].name").value("Utility SPD"))
+            .andExpect(jsonPath("$.graphs[1].data[3].name").value("Cooling Tower"))
+            .andExpect(jsonPath("$.graphs[2].name").value("Total Number of Samples"))
+            .andExpect(jsonPath("$.graphs[2].data[0].values[0]").value(greaterThan(0)))
+            .andExpect(jsonPath("$.graphs[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$.graphs[5].name").value("Percent Conformance"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(86, persistedEvents.size());
+        assertEquals(0, persistedEvents.size());
     }
 
     @Test
@@ -356,13 +354,11 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[4].name").value("Percent Resolved"))
+            .andExpect(jsonPath("$.graphs[4].name").value("Percent Resolved"))
             .andReturn();
 
-        List<Map<String, Object>> previewGraphs = objectMapper.readValue(
-            previewResult.getResponse().getContentAsString(),
-            new TypeReference<>() {
-            }
+        List<Map<String, Object>> previewGraphs = readUploadResponseGraphs(
+            previewResult.getResponse().getContentAsString()
         );
         Map<String, Object> previewPercentResolved = findGraph(previewGraphs, "Percent Resolved", null);
         Map<String, Object> previewTotalSamples = findGraph(previewGraphs, "Total Number of Samples", null);
@@ -454,10 +450,10 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
-            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].x[0]").exists())
-            .andExpect(jsonPath("$[0].data[0].y[0]").isNumber());
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$.graphs[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$.graphs[0].data[0].x[0]").exists())
+            .andExpect(jsonPath("$.graphs[0].data[0].y[0]").isNumber());
     }
 
     @Test
@@ -489,10 +485,10 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
-            .andExpect(jsonPath("$[0].data[0].name").value("HPC"))
-            .andExpect(jsonPath("$[0].data[0].x[0]").exists())
-            .andExpect(jsonPath("$[0].data[0].y[0]").isNumber());
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$.graphs[0].data[0].name").value("HPC"))
+            .andExpect(jsonPath("$.graphs[0].data[0].x[0]").exists())
+            .andExpect(jsonPath("$.graphs[0].data[0].y[0]").isNumber());
     }
 
     @Test
@@ -518,13 +514,13 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(17))
-            .andExpect(jsonPath("$[0].name").value("Water Quality Conformance"))
-            .andExpect(jsonPath("$[2].name").value("Total Number of Samples"))
-            .andExpect(jsonPath("$[2].data[0].values[0]").value(6));
+            .andExpect(jsonPath("$.graphs.length()").value(17))
+            .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
+            .andExpect(jsonPath("$.graphs[2].name").value("Total Number of Samples"))
+            .andExpect(jsonPath("$.graphs[2].data[0].values[0]").value(6));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(1, persistedEvents.size());
+        assertEquals(0, persistedEvents.size());
     }
 
     @Test
@@ -549,7 +545,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         ));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
-        assertEquals(1, persistedEvents.size());
+        assertEquals(0, persistedEvents.size());
     }
 
     private void uploadDashboardSpreadsheet(Long locationId, AuthCookies authCookies, byte[] spreadsheet) throws Exception {
@@ -950,6 +946,20 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             LocalDate.parse("2025-08-01"),
             LocalDate.parse("2025-08-01"),
             LocalDate.parse("2025-08-01")
+        );
+    }
+
+    private List<Map<String, Object>> readUploadResponseGraphs(String responseBody) throws IOException {
+        Map<String, Object> response = objectMapper.readValue(
+            responseBody,
+            new TypeReference<>() {
+            }
+        );
+        Object graphs = response.get("graphs");
+        return objectMapper.convertValue(
+            graphs,
+            new TypeReference<>() {
+            }
         );
     }
 

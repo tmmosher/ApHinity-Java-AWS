@@ -155,7 +155,7 @@ class LocationDashboardImportServiceTest {
                 )
             ));
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(11, responses.size());
         GraphResponse waterQualityResponse = findResponseByName(responses, "Water Quality Conformance");
@@ -204,7 +204,6 @@ class LocationDashboardImportServiceTest {
         Map<String, Object> meta = (Map<String, Object>) findResponseByName(responses, "Percent Conformance").layout().get("meta");
         assertTrue(meta.containsKey("aphinityImport"));
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
-        verify(serviceEventRepository).saveAllAndFlush(anyList());
         verifyNoInteractions(graphRepository, locationRepository);
         verifyNoMoreInteractions(serviceEventRepository);
     }
@@ -290,7 +289,7 @@ class LocationDashboardImportServiceTest {
                 )
             ));
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(List.of("2025-07-01", "2025-08-01"), findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("x"));
         assertNumericValues(findResponseByName(responses, "Water Quality Conformance").data().getFirst().get("y"), 100.0d, 1.0d);
@@ -362,7 +361,7 @@ class LocationDashboardImportServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of());
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(List.of(3L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
         assertEquals(List.of(2L, 1L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("x"));
@@ -426,7 +425,7 @@ class LocationDashboardImportServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of());
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         Map<String, Object> waterQualityTrace =
             findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst();
@@ -548,7 +547,7 @@ class LocationDashboardImportServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of());
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(2, responses.size());
         @SuppressWarnings("unchecked")
@@ -614,7 +613,7 @@ class LocationDashboardImportServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of());
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         GraphResponse waterQualityResponse = findResponseByName(responses, "Water Quality Conformance");
         assertEquals(2, waterQualityResponse.data().size());
@@ -698,7 +697,7 @@ class LocationDashboardImportServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of(existingEvent));
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(5, responses.size());
         assertEquals(50L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
@@ -717,7 +716,6 @@ class LocationDashboardImportServiceTest {
         assertEquals(Map.of("color", List.of("#15803d"), "colors", List.of("#15803d")), resolvedByFacility.get("marker"));
 
         verify(serviceEventRepository).findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L);
-        verify(serviceEventRepository).saveAllAndFlush(anyList());
         verifyNoInteractions(graphRepository, locationRepository);
         verifyNoMoreInteractions(serviceEventRepository);
     }
@@ -794,7 +792,7 @@ class LocationDashboardImportServiceTest {
                 ServiceEventStatus.OVERDUE
             )));
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(100L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
         assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
@@ -873,7 +871,7 @@ class LocationDashboardImportServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of(importedEvent, legacyResolvedEvent));
 
-        List<GraphResponse> responses = importService.importLocationDashboard(location, file);
+        List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(List.of(2L), findResponseByName(responses, "Total Non-Conformances").data().getFirst().get("values"));
         assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));

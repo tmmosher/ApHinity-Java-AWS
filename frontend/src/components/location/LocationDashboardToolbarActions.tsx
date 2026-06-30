@@ -2,7 +2,7 @@ import {Show} from "solid-js";
 import LocationDashboardToolbarOverflowMenu from "./LocationDashboardToolbarOverflowMenu";
 import LocationLocationAlertsButton from "./LocationLocationAlertsButton";
 import {locationToolbarActionButtonClass} from "./locationToolbarStyles";
-import type {LocationGraph} from "../../types/Types";
+import type {LocationDashboardSpreadsheetUploadResult} from "../../types/Types";
 
 type LocationDashboardToolbarActionsProps = {
   canEditGraphs: boolean;
@@ -18,7 +18,7 @@ type LocationDashboardToolbarActionsProps = {
   onAddGraph: () => void;
   onApply: () => void;
   onEditLayout: () => void;
-  onUploadSpreadsheetSuccess?: (uploadedGraphs: LocationGraph[]) => Promise<void> | void;
+  onUploadSpreadsheetSuccess?: (result: LocationDashboardSpreadsheetUploadResult) => Promise<void> | void;
   onUndo: () => void;
 };
 

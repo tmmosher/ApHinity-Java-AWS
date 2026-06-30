@@ -1,5 +1,8 @@
 import {createContext, useContext, type Accessor, type ParentProps} from "solid-js";
 import type {LocationGraph, LocationGraphTimeRange, LocationSummary} from "../types/Types";
+import type {LocationDashboardEditController} from "../util/location/createLocationDashboardEditController";
+import type {ServiceCalendarStagingController} from "../util/location/createServiceCalendarStagingController";
+import type {GanttTaskImportController} from "../util/location/createGanttTaskImportController";
 
 export type LocationDetailContextValue = {
   location: Accessor<LocationSummary | undefined>;
@@ -8,6 +11,10 @@ export type LocationDetailContextValue = {
   graphsError: Accessor<unknown>;
   graphTimeRange: Accessor<LocationGraphTimeRange>;
   setGraphTimeRange: (timeRange: LocationGraphTimeRange) => void;
+  dashboardEdit: LocationDashboardEditController;
+  serviceCalendarStaging: ServiceCalendarStagingController;
+  ganttTaskImport: GanttTaskImportController;
+  setGanttTaskRefetcher: (refetcher: (() => Promise<void>) | undefined) => void;
   refetchLocation: () => Promise<void>;
   refetchGraphs: () => Promise<void>;
 };
@@ -24,6 +31,10 @@ export const LocationDetailProvider = (props: LocationDetailProviderProps) => (
     graphsError: props.graphsError,
     graphTimeRange: props.graphTimeRange,
     setGraphTimeRange: props.setGraphTimeRange,
+    dashboardEdit: props.dashboardEdit,
+    serviceCalendarStaging: props.serviceCalendarStaging,
+    ganttTaskImport: props.ganttTaskImport,
+    setGanttTaskRefetcher: props.setGanttTaskRefetcher,
     refetchLocation: props.refetchLocation,
     refetchGraphs: props.refetchGraphs
   }}>

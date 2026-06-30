@@ -6,7 +6,9 @@ import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import org.slf4j.Logger;
@@ -125,7 +127,7 @@ public class LocationDashboardImportService {
     }
 
     @Transactional
-    public List<GraphResponse> importLocationDashboard(Location location, org.springframework.web.multipart.MultipartFile file) {
+    public LocationDashboardSpreadsheetUploadResponse importLocationDashboard(Location location, org.springframework.web.multipart.MultipartFile file) {
         if (location == null || location.getId() == null) {
             throw new IllegalArgumentException("Location is required");
         }
@@ -154,7 +156,7 @@ public class LocationDashboardImportService {
         );
     }
 
-    private List<GraphResponse> importDashboardLocked(
+    private LocationDashboardSpreadsheetUploadResponse importDashboardLocked(
         Location location,
         LocationDashboardImportStrategy strategy,
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
@@ -182,7 +184,7 @@ public class LocationDashboardImportService {
         LocationDashboardImportStrategy.LocationDashboardImportComputation computation =
             strategy.computeImport(workbook, measurementBounds);
         List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions =
-            correctiveActionService.persistCorrectiveActions(location, computation.correctiveActions());
+            correctiveActionService.buildPreviewCorrectiveActions(location.getId(), computation.correctiveActions());
         samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
 
         Map<String, GraphConfig> graphDefinitionsById = strategy.graphDefinitions().stream()
@@ -219,10 +221,31 @@ public class LocationDashboardImportService {
             derivedGraphDefinitionsById
         );
 
-        return buildResponsesInGraphOrder(
-            assignedGraphs,
-            previewGraphsById,
-            updatedPreviewGraphsById.keySet()
+        return new LocationDashboardSpreadsheetUploadResponse(
+            buildResponsesInGraphOrder(
+                assignedGraphs,
+                previewGraphsById,
+                updatedPreviewGraphsById.keySet()
+            ),
+            previewCorrectiveActions.stream()
+                .filter(serviceEvent -> serviceEvent.getId() == null)
+                .map(this::toLocationEventRequest)
+                .toList()
+        );
+    }
+
+    private LocationEventRequest toLocationEventRequest(
+        com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent serviceEvent
+    ) {
+        return new LocationEventRequest(
+            serviceEvent.getTitle(),
+            serviceEvent.getResponsibility(),
+            serviceEvent.getEventDate(),
+            serviceEvent.getEventTime(),
+            serviceEvent.getEndEventDate(),
+            serviceEvent.getEndEventTime(),
+            serviceEvent.getDescription(),
+            serviceEvent.getStatus()
         );
     }
 

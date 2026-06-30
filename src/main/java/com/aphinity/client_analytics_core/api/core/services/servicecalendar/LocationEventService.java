@@ -9,6 +9,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
+import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.ServiceCalendarBulkEventRowRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.EntityManager;
@@ -23,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -90,6 +92,44 @@ public class LocationEventService {
         int importedCount = importService.uploadServiceCalendar(userId, locationId, file);
         locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
         return importedCount;
+    }
+
+    @Transactional
+    public int createLocationEvents(Long userId, Long locationId, List<ServiceCalendarBulkEventRowRequest> requests) {
+        AppUser user = authorizationService.requireUser(userId);
+        Location location = authorizationService.requireLocation(locationId);
+        authorizationService.requireReadableLocationAccess(user, locationId);
+
+        List<ServiceEvent> serviceEvents = new ArrayList<>(requests == null ? 0 : requests.size());
+        if (requests != null) {
+            for (ServiceCalendarBulkEventRowRequest request : requests) {
+                LocationEventRequest eventRequest = request.toLocationEventRequest();
+                ServiceEventResponsibility responsibility = requestMapper.requireResponsibility(eventRequest);
+                authorizationService.requireCreatePermission(user, locationId, responsibility);
+                ServiceEvent serviceEvent = requestMapper.createServiceEvent(location, eventRequest);
+                serviceEvent.setCorrectiveAction(Boolean.TRUE.equals(request.correctiveAction()));
+                serviceEvents.add(serviceEvent);
+            }
+        }
+
+        try {
+            serviceEventRepository.saveAllAndFlush(serviceEvents);
+            for (ServiceEvent serviceEvent : serviceEvents) {
+                auditService.recordCreated(userId, serviceEvent);
+            }
+            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+            locationRepository.touchUpdatedAt(locationId, Instant.now());
+            return serviceEvents.size();
+        } catch (RuntimeException ex) {
+            log.error(
+                "Bulk location event creation persistence failed actorUserId={} locationId={} eventCount={}",
+                userId,
+                locationId,
+                serviceEvents.size(),
+                ex
+            );
+            throw ex;
+        }
     }
 
     @Transactional

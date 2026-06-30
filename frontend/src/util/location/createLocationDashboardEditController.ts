@@ -654,3 +654,5 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     applyGraphChanges
   };
 };
+
+export type LocationDashboardEditController = ReturnType<typeof createLocationDashboardEditController>;

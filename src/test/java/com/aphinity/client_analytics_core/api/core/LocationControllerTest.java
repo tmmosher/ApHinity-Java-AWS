@@ -9,6 +9,7 @@ import com.aphinity.client_analytics_core.api.core.requests.location.LocationReq
 import com.aphinity.client_analytics_core.api.core.requests.location.LocationWorkOrderEmailUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
@@ -320,19 +321,22 @@ class LocationControllerTest {
             new byte[] {1, 2, 3}
         );
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(42L);
-        List<GraphResponse> expected = List.of(new GraphResponse(
-            31L,
-            "Water Quality Compliance",
-            List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
-            Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
-            Map.of(),
-            Map.of(),
-            Instant.parse("2026-01-01T00:00:00Z"),
-            Instant.parse("2026-01-02T00:00:00Z")
-        ));
+        LocationDashboardSpreadsheetUploadResponse expected = new LocationDashboardSpreadsheetUploadResponse(
+            List.of(new GraphResponse(
+                31L,
+                "Water Quality Compliance",
+                List.of(Map.of("type", "scatter", "name", "HPC", "x", List.of("2025-08-01"), "y", List.of(50.0d))),
+                Map.of("meta", Map.of("aphinityImport", Map.of("graphId", "graph-1"))),
+                Map.of(),
+                Map.of(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-02T00:00:00Z")
+            )),
+            List.of()
+        );
         when(locationService.uploadLocationDashboardSpreadsheet(42L, 8L, file)).thenReturn(expected);
 
-        List<GraphResponse> actual = locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file);
+        LocationDashboardSpreadsheetUploadResponse actual = locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file);
 
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);

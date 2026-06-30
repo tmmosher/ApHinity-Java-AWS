@@ -3,6 +3,7 @@ import {apiFetch} from "../common/apiFetch";
 import {parseApiErrorPayload, throwAuthenticationOrSecurityError} from "../common/apiError";
 import {parsePositiveRouteId, parseRouteLocationId} from "../common/routeParams";
 import {
+  LocationDashboardSpreadsheetUploadResult,
   LocationGraph,
   LocationGraphRenameResult,
   LocationGraphType,
@@ -10,6 +11,7 @@ import {
   LocationSectionLayoutConfig,
   LocationSummary
 } from "../../types/Types";
+import {parseCreateLocationServiceEventRequestList} from "../location/locationEventApi";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -293,7 +295,7 @@ export const uploadLocationDashboardSpreadsheetById = async (
   host: string,
   locationId: string,
   file: File
-): Promise<LocationGraph[]> => {
+): Promise<LocationDashboardSpreadsheetUploadResult> => {
   const parsedLocationId = parseRouteLocationId(locationId);
   const formData = new FormData();
   formData.set("file", file);
@@ -315,5 +317,23 @@ export const uploadLocationDashboardSpreadsheetById = async (
     throw new Error("Unable to upload dashboard spreadsheet");
   }
 
-  return parseLocationGraphList(await response.json());
+  return parseLocationDashboardSpreadsheetUploadResult(await response.json());
+};
+
+const parseLocationDashboardSpreadsheetUploadResult = (
+  value: unknown
+): LocationDashboardSpreadsheetUploadResult => {
+  if (Array.isArray(value)) {
+    return {
+      graphs: parseLocationGraphList(value),
+      correctiveActions: []
+    };
+  }
+  if (!isRecord(value)) {
+    throw new Error("Invalid dashboard spreadsheet upload response");
+  }
+  return {
+    graphs: parseLocationGraphList(value.graphs),
+    correctiveActions: parseCreateLocationServiceEventRequestList(value.correctiveActions ?? [])
+  };
 };

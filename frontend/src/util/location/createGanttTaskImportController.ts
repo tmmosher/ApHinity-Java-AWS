@@ -181,3 +181,5 @@ export const createGanttTaskImportController = (props: GanttTaskImportController
     deleteStagedTaskById
   };
 };
+
+export type GanttTaskImportController = ReturnType<typeof createGanttTaskImportController>;

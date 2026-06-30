@@ -8,7 +8,7 @@ import LocationDashboardToolbarOverflowMenuUploadSpreadsheetAction from "./Locat
 import LocationOverflowMenuIcon from "./LocationOverflowMenuIcon";
 import {locationToolbarIconButtonClass} from "./locationToolbarStyles";
 import {uploadLocationDashboardSpreadsheetById} from "../../util/graph/locationDetailApi";
-import type {LocationGraph} from "../../types/Types";
+import type {LocationDashboardSpreadsheetUploadResult} from "../../types/Types";
 
 const overflowMenuProps = {
   placement: "bottom-end" as const,
@@ -28,7 +28,7 @@ type LocationDashboardToolbarOverflowMenuProps = {
   createGraphDisabledReason?: string;
   onAddGraph: () => void;
   onEditLayout: () => void;
-  onUploadSpreadsheetSuccess?: (uploadedGraphs: LocationGraph[]) => Promise<void> | void;
+  onUploadSpreadsheetSuccess?: (result: LocationDashboardSpreadsheetUploadResult) => Promise<void> | void;
 };
 
 export const LocationDashboardToolbarOverflowMenu = (

@@ -42,6 +42,22 @@ export const locationServiceEventSchema = z.object({
 
 export const locationServiceEventListSchema = z.array(locationServiceEventSchema);
 
+export const createLocationServiceEventRequestSchema = z.object({
+  title: z.string(),
+  responsibility: serviceEventResponsibilitySchema,
+  date: z.string(),
+  time: z.string(),
+  endDate: z.string(),
+  endTime: z.string(),
+  description: z.string().nullable().optional(),
+  status: serviceEventStatusSchema
+}).transform((value) => ({
+  ...value,
+  description: value.description ?? null
+}));
+
+export const createLocationServiceEventRequestListSchema = z.array(createLocationServiceEventRequestSchema);
+
 export const serviceCalendarUploadResponseSchema = z.object({
   importedCount: z.number().min(0)
 });

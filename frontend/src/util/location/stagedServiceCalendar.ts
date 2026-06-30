@@ -17,6 +17,10 @@ type StagedEventUndoResult = {
   undone: boolean;
 };
 
+type StageImportedServiceCalendarEventOptions = {
+  isCorrectiveAction?: boolean;
+};
+
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 export const cloneStagedServiceCalendarEvents = (
@@ -48,7 +52,8 @@ const nextStagedEventId = (events: readonly StagedLocationServiceEvent[]): numbe
 
 const createStagedEventFromRequest = (
   request: CreateLocationServiceEventRequest,
-  id: number
+  id: number,
+  options: StageImportedServiceCalendarEventOptions = {}
 ): StagedLocationServiceEvent => {
   const timestamp = new Date().toISOString();
   return {
@@ -61,7 +66,7 @@ const createStagedEventFromRequest = (
     endTime: request.endTime,
     description: request.description,
     status: request.status,
-    isCorrectiveAction: false,
+    isCorrectiveAction: options.isCorrectiveAction === true,
     correctiveActionSourceEventId: null,
     correctiveActionSourceEventTitle: null,
     createdAt: timestamp,
@@ -99,13 +104,14 @@ export const isStagedServiceCalendarEvent = (
 export const stageImportedServiceCalendarEvents = (
   currentEvents: StagedLocationServiceEvent[],
   undoStack: StagedLocationServiceEvent[][],
-  requests: readonly CreateLocationServiceEventRequest[]
+  requests: readonly CreateLocationServiceEventRequest[],
+  options: StageImportedServiceCalendarEventOptions = {}
 ): StagedEventMutationResult => {
   let nextId = nextStagedEventId(currentEvents);
   const nextEvents = [
     ...currentEvents,
     ...requests.map((request) => {
-      const stagedEvent = createStagedEventFromRequest(request, nextId);
+      const stagedEvent = createStagedEventFromRequest(request, nextId, options);
       nextId -= 1;
       return stagedEvent;
     })
@@ -194,5 +200,25 @@ export const buildServiceCalendarRequestsFromStagedEvents = (
     endTime: event.endTime,
     description: event.description,
     status: event.status
+  }))
+);
+
+export type ServiceCalendarBulkCreateRequest = CreateLocationServiceEventRequest & {
+  correctiveAction?: boolean;
+};
+
+export const buildServiceCalendarBulkRequestsFromStagedEvents = (
+  events: readonly StagedLocationServiceEvent[]
+): ServiceCalendarBulkCreateRequest[] => (
+  events.map((event) => ({
+    title: event.title,
+    responsibility: event.responsibility,
+    date: event.date,
+    time: event.time,
+    endDate: event.endDate,
+    endTime: event.endTime,
+    description: event.description,
+    status: event.status,
+    correctiveAction: event.isCorrectiveAction === true
   }))
 );

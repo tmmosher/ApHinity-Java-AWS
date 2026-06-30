@@ -2,10 +2,16 @@ import {A} from "@solidjs/router";
 import {For, Show, createEffect, createMemo, createResource, createSignal, on, type ParentProps} from "solid-js";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {LocationDetailProvider} from "../../../../context/LocationDetailContext";
+import {useProfile} from "../../../../context/ProfileContext";
 import type {LocationGraph, LocationGraphTimeRange, LocationSummary} from "../../../../types/Types";
+import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
+import {createGanttTaskImportController} from "../../../../util/location/createGanttTaskImportController";
+import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
+import {createServiceCalendarStagingController} from "../../../../util/location/createServiceCalendarStagingController";
 import {fetchLocationById, fetchLocationGraphsById} from "../../../../util/graph/locationDetailApi";
 import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
 import {
+  createDashboardLocationResetGuard,
   createLocationViewActive,
   dashboardLocationViews,
   getFreshLocationScopedValue,
@@ -23,6 +29,23 @@ type LocationDetailShellProps = ParentProps & {
 
 export const LocationDetailShell = (props: LocationDetailShellProps) => {
   const host = useApiHost();
+  const profileContext = useProfile();
+  const canEditGraphs = createMemo(() => canEditLocationGraphs(profileContext.profile()?.role));
+  const shouldResetDashboardState = createDashboardLocationResetGuard(props.locationId);
+  const shouldResetServiceCalendarState = createDashboardLocationResetGuard(props.locationId);
+  const shouldResetGanttTaskState = createDashboardLocationResetGuard(props.locationId);
+  const serviceCalendarStaging = createServiceCalendarStagingController();
+  const [ganttTaskRefetcher, setGanttTaskRefetcher] = createSignal<(() => Promise<void>) | undefined>();
+  const [ganttLocationSessionToken, setGanttLocationSessionToken] = createSignal(0);
+  const ganttTaskImport = createGanttTaskImportController({
+    host,
+    locationId: () => props.locationId,
+    locationSessionToken: ganttLocationSessionToken,
+    clearUploadInput: () => undefined,
+    refetchTasks: async () => {
+      await ganttTaskRefetcher()?.();
+    }
+  });
 
   const [locationResource, {refetch: refetchLocation}] = createResource(
     () => props.locationId,
@@ -95,6 +118,16 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
   };
 
   const currentView = createMemo(() => props.currentView);
+  const dashboardEdit = createLocationDashboardEditController({
+    host,
+    locationId: () => props.locationId,
+    location,
+    graphs,
+    refetchLocation: refetchLocationDetail,
+    refetchGraphs: refetchLocationGraphs,
+    canEditGraphs,
+    shouldResetDashboardState
+  });
 
   createEffect(on(location, (currentLocation) => {
     recordRecentLocationIdIfLoaded(currentLocation);
@@ -108,6 +141,14 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
       );
       if (view !== "dashboard") {
         setGraphTimeRange("allTime");
+      }
+      if (shouldResetServiceCalendarState(locationId)) {
+        serviceCalendarStaging.reset();
+      }
+      if (shouldResetGanttTaskState(locationId)) {
+        ganttTaskImport.reset();
+        setGanttLocationSessionToken((token) => token + 1);
+        setGanttTaskRefetcher(undefined);
       }
     }
   ));
@@ -142,6 +183,10 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
               graphsError={graphsError}
               graphTimeRange={graphTimeRange}
               setGraphTimeRange={setGraphTimeRange}
+              dashboardEdit={dashboardEdit}
+              serviceCalendarStaging={serviceCalendarStaging}
+              ganttTaskImport={ganttTaskImport}
+              setGanttTaskRefetcher={setGanttTaskRefetcher}
               refetchLocation={refetchLocationDetail}
               refetchGraphs={refetchLocationGraphs}
             >

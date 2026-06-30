@@ -75,6 +75,11 @@ export interface LocationGraph {
     updatedAt: string;
 }
 
+export interface LocationDashboardSpreadsheetUploadResult {
+    graphs: LocationGraph[];
+    correctiveActions: CreateLocationServiceEventRequest[];
+}
+
 export type LocationGraphTimeRange = "threeMonths" | "twelveMonths" | "allTime";
 
 export interface LocationGraphUpdate {

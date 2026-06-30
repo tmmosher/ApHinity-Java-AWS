@@ -7,6 +7,7 @@ import com.aphinity.client_analytics_core.api.core.requests.location.LocationReq
 import com.aphinity.client_analytics_core.api.core.requests.location.LocationWorkOrderEmailUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -430,15 +431,15 @@ public class LocationController {
     }
 
     /**
-     * Accepts a dashboard spreadsheet upload for a location and returns the updated graphs.
+     * Accepts a dashboard spreadsheet upload for a location and returns the staged dashboard changes.
      *
      * @param jwt authenticated principal JWT
      * @param locationId location identifier
      * @param file uploaded Excel workbook
-     * @return updated graph payloads for the configured import graphs
+     * @return staged graph and corrective-action payloads for the configured import
      */
     @PostMapping(path = "/locations/{locationId}/dashboard/spreadsheet-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public List<GraphResponse> uploadLocationDashboardSpreadsheet(
+    public LocationDashboardSpreadsheetUploadResponse uploadLocationDashboardSpreadsheet(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable Long locationId,
         @RequestParam("file") MultipartFile file
@@ -452,7 +453,8 @@ public class LocationController {
             file == null ? null : file.getContentType()
         );
         try {
-            List<GraphResponse> response = locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file);
+            LocationDashboardSpreadsheetUploadResponse response =
+                locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file);
             log.info(
                 "Completed location dashboard spreadsheet upload request actorUserId={} locationId={}",
                 userId,
