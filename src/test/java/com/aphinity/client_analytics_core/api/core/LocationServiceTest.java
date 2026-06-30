@@ -1779,13 +1779,13 @@ class LocationServiceTest {
             )),
             List.of()
         );
-        when(locationDashboardImportService.importLocationDashboard(location, file)).thenReturn(expected);
+        when(locationDashboardImportService.importLocationDashboard(location, file, false)).thenReturn(expected);
 
         LocationDashboardSpreadsheetUploadResponse actual = locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file);
 
         assertSame(expected, actual);
         verify(locationRepository).findById(9L);
-        verify(locationDashboardImportService).importLocationDashboard(location, file);
+        verify(locationDashboardImportService).importLocationDashboard(location, file, false);
         verify(locationRepository, never()).saveAndFlush(any(Location.class));
         verifyNoInteractions(locationThumbnailImageService);
     }

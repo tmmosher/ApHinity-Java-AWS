@@ -294,14 +294,20 @@ export const deleteLocationGraphById = async (
 export const uploadLocationDashboardSpreadsheetById = async (
   host: string,
   locationId: string,
-  file: File
+  file: File,
+  persistSamples = false
 ): Promise<LocationDashboardSpreadsheetUploadResult> => {
   const parsedLocationId = parseRouteLocationId(locationId);
+  const query = new URLSearchParams();
+  if (persistSamples) {
+    query.set("persistSamples", "true");
+  }
   const formData = new FormData();
   formData.set("file", file);
 
   const response = await apiFetch(
-    host + "/api/core/locations/" + parsedLocationId + "/dashboard/spreadsheet-upload",
+    host + "/api/core/locations/" + parsedLocationId + "/dashboard/spreadsheet-upload"
+      + (query.size === 0 ? "" : "?" + query.toString()),
     {
       method: "POST",
       body: formData

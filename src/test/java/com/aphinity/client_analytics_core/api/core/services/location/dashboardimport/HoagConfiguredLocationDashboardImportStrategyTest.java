@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HoagConfiguredLocationDashboardImportStrategyTest {
-    private static final String DATA_UPLOAD_FIXTURE = "dashboard_upload_template_example_2.xlsx";
+    private static final String DATA_UPLOAD_FIXTURE = "sheets/dashboard_upload_template_example_2.xlsx";
     private static final int EXPECTED_ADDED_NON_CONFORMANCES = 6;
     private static final List<InjectedCommentPlan> INJECTED_COMMENT_PLANS = List.of(
         new InjectedCommentPlan(2, List.of(

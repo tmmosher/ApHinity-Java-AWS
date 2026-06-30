@@ -125,12 +125,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         assertEquals(0, persistedEvents.size());
 
         var persistedSamples = locationDashboardSampleRepository.findByLocation_IdOrderByObservedDateAscIdAsc(location.getId());
-        assertEquals(6, persistedSamples.size());
-        assertEquals(2, persistedSamples.stream().filter(sample -> !sample.isCompliant()).count());
-        assertEquals(0, persistedSamples.stream().filter(sample -> sample.isResolved()).count());
-        assertThat(persistedSamples)
-            .extracting(sample -> sample.getMeasurementName())
-            .contains("HPC", "Endotoxin");
+        assertEquals(0, persistedSamples.size());
     }
 
     @Test
@@ -142,6 +137,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-apply@example.com", PASSWORD);
+        byte[] spreadsheet = createDashboardSpreadsheet("Hoag Hospital", "Drain Tank, install new DI bottles", 4);
 
         MvcResult previewResult = mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
@@ -149,7 +145,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                         "file",
                         "dashboard.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        createDashboardSpreadsheet("Hoag Hospital", "Drain Tank, install new DI bottles", 4)
+                        spreadsheet
                     ))
                     .contentType("multipart/form-data")
                     .cookie(authCookies(authCookies))
@@ -177,6 +173,21 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .content(objectMapper.writeValueAsString(Map.of("graphs", graphUpdates)))
             )
             .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                        "dashboard.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .param("persistSamples", "true")
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk());
 
         mockMvc.perform(
                 get("/api/core/locations/{locationId}/graphs", location.getId())
@@ -278,13 +289,13 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-example2@example.com", PASSWORD);
-        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
+        byte[] spreadsheet = readFixtureBytes("sheets/dashboard_upload_template_example_2.xlsx");
 
         mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
                     .file(new MockMultipartFile(
                         "file",
-                        "dashboard_upload_template_example_2.xlsx",
+                            "sheets/dashboard_upload_template_example_2.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         spreadsheet
                     ))
@@ -339,13 +350,13 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         serviceEventRepository.saveAndFlush(persistedCorrectiveAction);
 
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-example2-apply@example.com", PASSWORD);
-        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
+        byte[] spreadsheet = readFixtureBytes("sheets/dashboard_upload_template_example_2.xlsx");
 
         MvcResult previewResult = mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
                     .file(new MockMultipartFile(
                         "file",
-                        "dashboard_upload_template_example_2.xlsx",
+                            "sheets/dashboard_upload_template_example_2.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         spreadsheet
                     ))
@@ -384,6 +395,21 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .content(objectMapper.writeValueAsString(Map.of("graphs", graphUpdates)))
             )
             .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
+                    .file(new MockMultipartFile(
+                        "file",
+                            "sheets/dashboard_upload_template_example_2.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        spreadsheet
+                    ))
+                    .param("persistSamples", "true")
+                    .contentType("multipart/form-data")
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+            )
+            .andExpect(status().isOk());
 
         MvcResult refetchResult = mockMvc.perform(
                 get("/api/core/locations/{locationId}/graphs", location.getId())
@@ -435,13 +461,13 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         graphRepository.saveAndFlush(graphs.waterQualityGraph());
 
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-placeholders@example.com", PASSWORD);
-        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
+        byte[] spreadsheet = readFixtureBytes("sheets/dashboard_upload_template_example_2.xlsx");
 
         mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
                     .file(new MockMultipartFile(
                         "file",
-                        "dashboard_upload_template_example_2.xlsx",
+                            "sheets/dashboard_upload_template_example_2.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         spreadsheet
                     ))
@@ -470,13 +496,13 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
         seedHoagStrategyGraphs(location);
         AuthCookies authCookies = loginAndCaptureCookies("partner-dashboard-upload-measurement-names@example.com", PASSWORD);
-        byte[] spreadsheet = readFixtureBytes("dashboard_upload_template_example_2.xlsx");
+        byte[] spreadsheet = readFixtureBytes("sheets/dashboard_upload_template_example_2.xlsx");
 
         mockMvc.perform(
                 multipart("/api/core/locations/{locationId}/dashboard/spreadsheet-upload", location.getId())
                     .file(new MockMultipartFile(
                         "file",
-                        "dashboard_upload_template_example_2.xlsx",
+                            "sheets/dashboard_upload_template_example_2.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         spreadsheet
                     ))

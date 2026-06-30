@@ -148,9 +148,16 @@ describe("LocationDashboardPanel upload refresh", () => {
       }]
     };
 
-    await (onUploadSpreadsheetSuccess as (result: LocationDashboardSpreadsheetUploadResult) => Promise<void>)(result);
+    const file = new File(["dashboard"], "dashboard.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
 
-    expect(applySpreadsheetUploadPreviewMock).toHaveBeenCalledWith(uploadedGraphs);
+    await (onUploadSpreadsheetSuccess as (
+      result: LocationDashboardSpreadsheetUploadResult,
+      file: File
+    ) => Promise<void>)(result, file);
+
+    expect(applySpreadsheetUploadPreviewMock).toHaveBeenCalledWith(uploadedGraphs, file);
     expect(stageImportedRequestsMock).toHaveBeenCalledWith(result.correctiveActions, {isCorrectiveAction: true});
     expect(refetchGraphsMock).not.toHaveBeenCalled();
   });

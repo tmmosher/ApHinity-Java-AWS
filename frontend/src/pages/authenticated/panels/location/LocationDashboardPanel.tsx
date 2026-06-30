@@ -57,8 +57,8 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   const displayedSectionGraphs = (section: ReturnType<typeof orderedSections>[number]) =>
     sectionGraphs(section);
 
-  const applySpreadsheetUploadResult = (result: LocationDashboardSpreadsheetUploadResult): void => {
-    dashboard.applySpreadsheetUploadPreview(result.graphs);
+  const applySpreadsheetUploadResult = (result: LocationDashboardSpreadsheetUploadResult, file: File): void => {
+    dashboard.applySpreadsheetUploadPreview(result.graphs, file);
     if (result.correctiveActions.length > 0) {
       serviceCalendarStaging.stageImportedRequests(result.correctiveActions, {isCorrectiveAction: true});
     }

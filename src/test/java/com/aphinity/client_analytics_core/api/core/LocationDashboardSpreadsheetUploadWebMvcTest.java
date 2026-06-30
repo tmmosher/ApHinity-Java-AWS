@@ -54,7 +54,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             new byte[] {4, 5, 6}
         );
-        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class)))
+        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false)))
             .thenReturn(new LocationDashboardSpreadsheetUploadResponse(
                 List.of(new GraphResponse(
                     18L,
@@ -80,7 +80,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             .andExpect(jsonPath("$.correctiveActions.length()").value(0));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
-        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class));
+        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false));
     }
 
     @Test
@@ -92,7 +92,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             new byte[] {4, 5, 6}
         );
-        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class)))
+        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false)))
             .thenThrow(new ApiClientException(
                 BAD_REQUEST,
                 "location_dashboard_file_invalid",
@@ -109,6 +109,6 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             .andExpect(jsonPath("$.message").value("Dashboard spreadsheet could not be parsed."));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
-        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class));
+        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false));
     }
 }

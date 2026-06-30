@@ -442,7 +442,8 @@ public class LocationController {
     public LocationDashboardSpreadsheetUploadResponse uploadLocationDashboardSpreadsheet(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable Long locationId,
-        @RequestParam("file") MultipartFile file
+        @RequestParam("file") MultipartFile file,
+        @RequestParam(defaultValue = "false") boolean persistSamples
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         log.info(
@@ -454,7 +455,7 @@ public class LocationController {
         );
         try {
             LocationDashboardSpreadsheetUploadResponse response =
-                locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file);
+                locationService.uploadLocationDashboardSpreadsheet(userId, locationId, file, persistSamples);
             log.info(
                 "Completed location dashboard spreadsheet upload request actorUserId={} locationId={}",
                 userId,

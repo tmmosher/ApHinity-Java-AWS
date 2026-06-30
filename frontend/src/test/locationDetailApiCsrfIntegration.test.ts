@@ -129,12 +129,15 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     });
 
-    await expect(uploadLocationDashboardSpreadsheetById("https://example.test", "42", file)).resolves.toMatchObject([
-      {
-        id: 18,
-        name: "Water Quality Compliance"
-      }
-    ]);
+    await expect(uploadLocationDashboardSpreadsheetById("https://example.test", "42", file)).resolves.toMatchObject({
+      graphs: [
+        {
+          id: 18,
+          name: "Water Quality Compliance"
+        }
+      ],
+      correctiveActions: []
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -142,6 +145,27 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
     expect(init?.method).toBe("POST");
     expect(init?.body).toBeInstanceOf(FormData);
     expect((init?.headers as Headers).get("X-XSRF-TOKEN")).toBe("token-fresh");
+
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      graphs: [],
+      correctiveActions: []
+    }), {
+      status: 200,
+      headers: {"Content-Type": "application/json"}
+    }));
+
+    await expect(uploadLocationDashboardSpreadsheetById(
+      "https://example.test",
+      "42",
+      file,
+      true
+    )).resolves.toMatchObject({graphs: [], correctiveActions: []});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://example.test/api/core/locations/42/dashboard/spreadsheet-upload?persistSamples=true"
+    );
   });
 
   afterAll(() => {

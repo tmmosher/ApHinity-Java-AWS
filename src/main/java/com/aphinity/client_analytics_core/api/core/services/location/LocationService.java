@@ -753,10 +753,20 @@ public class LocationService {
         Long locationId,
         MultipartFile file
     ) {
+        return uploadLocationDashboardSpreadsheet(userId, locationId, file, false);
+    }
+
+    @Transactional
+    public LocationDashboardSpreadsheetUploadResponse uploadLocationDashboardSpreadsheet(
+        Long userId,
+        Long locationId,
+        MultipartFile file,
+        boolean persistSamples
+    ) {
         AppUser user = requireUser(userId);
         requirePartnerOrAdmin(user);
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
-        return locationDashboardImportService.importLocationDashboard(location, file);
+        return locationDashboardImportService.importLocationDashboard(location, file, persistSamples);
     }
 
     /**

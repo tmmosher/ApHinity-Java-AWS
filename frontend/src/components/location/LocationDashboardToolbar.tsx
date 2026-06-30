@@ -16,7 +16,7 @@ type LocationDashboardToolbarProps = {
   onAddGraph: () => void;
   onApply: () => void;
   onEditLayout: () => void;
-  onUploadSpreadsheetSuccess?: (result: LocationDashboardSpreadsheetUploadResult) => Promise<void> | void;
+  onUploadSpreadsheetSuccess?: (result: LocationDashboardSpreadsheetUploadResult, file: File) => Promise<void> | void;
   onUndo: () => void;
 };
 

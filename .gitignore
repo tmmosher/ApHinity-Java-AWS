@@ -64,3 +64,6 @@ src/main/resources/static/
 
 # environment vars and database information
 .env.runtime
+
+# Test resources
+/test/resources/sheets/

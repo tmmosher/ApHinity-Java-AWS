@@ -33,7 +33,8 @@ import {
   createLocationGraphById,
   deleteLocationGraphById,
   renameLocationGraphById,
-  saveLocationGraphsById
+  saveLocationGraphsById,
+  uploadLocationDashboardSpreadsheetById
 } from "../graph/locationDetailApi";
 
 type LocationDashboardEditControllerProps = {
@@ -50,12 +51,14 @@ type LocationDashboardEditControllerProps = {
 type DashboardSnapshot = {
   graphs: LocationGraph[];
   sectionLayout: LocationSectionLayoutConfig;
+  spreadsheetFile: File | null;
 };
 
 export const createLocationDashboardEditController = (props: LocationDashboardEditControllerProps) => {
   const [workingGraphs, setWorkingGraphs] = createSignal<LocationGraph[]>([]);
   const [graphBaselineIndex, setGraphBaselineIndex] = createSignal<Map<number, GraphBaselineEntry>>(new Map());
   const [workingSectionLayout, setWorkingSectionLayout] = createSignal<LocationSectionLayoutConfig>({sections: []});
+  const [pendingSpreadsheetFile, setPendingSpreadsheetFile] = createSignal<File | null>(null);
   const [sectionLayoutBaseline, setSectionLayoutBaseline] = createSignal<LocationSectionLayoutConfig>({sections: []});
   const [sectionLayoutSyncUpdatedAt, setSectionLayoutSyncUpdatedAt] = createSignal<string | null>(null);
   const [hasInitializedSectionLayout, setHasInitializedSectionLayout] = createSignal(false);
@@ -137,7 +140,8 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setGraphBaselineIndex(refreshState.nextBaselineIndex);
     setDashboardUndoStack((currentUndoStack) => currentUndoStack.map((snapshot, index) => ({
       graphs: refreshState.nextUndoStack[index] ?? snapshot.graphs,
-      sectionLayout: snapshot.sectionLayout
+      sectionLayout: snapshot.sectionLayout,
+      spreadsheetFile: snapshot.spreadsheetFile
     })));
   });
 
@@ -181,6 +185,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setWorkingGraphs([]);
     setGraphBaselineIndex(new Map());
     setWorkingSectionLayout({sections: []});
+    setPendingSpreadsheetFile(null);
     setSectionLayoutBaseline({sections: []});
     setSectionLayoutSyncUpdatedAt(null);
     setHasInitializedSectionLayout(false);
@@ -242,7 +247,8 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
 
   const createDashboardSnapshot = (): DashboardSnapshot => ({
     graphs: cloneLocationGraphs(workingGraphs()),
-    sectionLayout: cloneLocationSectionLayout(workingSectionLayout())
+    sectionLayout: cloneLocationSectionLayout(workingSectionLayout()),
+    spreadsheetFile: pendingSpreadsheetFile()
   });
 
   const applyLocalGraphEdit = (
@@ -283,7 +289,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
 
   // Spreadsheet uploads are preview-only on the backend, so stage the returned
   // graphs locally as an undoable dashboard edit instead of refetching.
-  const applySpreadsheetUploadPreview = (uploadedGraphs: LocationGraph[]) => {
+  const applySpreadsheetUploadPreview = (uploadedGraphs: LocationGraph[], spreadsheetFile?: File) => {
     if (isGraphMutationBusy() || !props.canEditGraphs()) {
       return;
     }
@@ -298,6 +304,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       createDashboardSnapshot()
     ]);
     setWorkingGraphs(nextGraphs);
+    setPendingSpreadsheetFile(spreadsheetFile ?? null);
   };
 
   const renameGraphFromModal = async (graphId: number, name: string): Promise<void> => {
@@ -505,6 +512,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     const nextSnapshot = currentUndoStack[currentUndoStack.length - 1];
     setWorkingGraphs(cloneLocationGraphs(nextSnapshot.graphs));
     setWorkingSectionLayout(cloneLocationSectionLayout(nextSnapshot.sectionLayout));
+    setPendingSpreadsheetFile(nextSnapshot.spreadsheetFile);
     setDashboardUndoStack(currentUndoStack.slice(0, -1));
   };
 
@@ -517,15 +525,20 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     const saveSessionToken = locationSessionToken();
     const graphUpdates = buildChangedLocationGraphUpdates(workingGraphs(), graphBaselineIndex());
     const sectionLayoutUpdate = reconcileSectionLayoutWithWorkingGraphs(workingSectionLayout());
+    const spreadsheetFile = pendingSpreadsheetFile();
 
     setIsSavingGraphChanges(true);
     try {
       await saveLocationGraphsById(props.host, saveLocationId, graphUpdates, sectionLayoutUpdate);
+      if (spreadsheetFile) {
+        await uploadLocationDashboardSpreadsheetById(props.host, saveLocationId, spreadsheetFile, true);
+      }
       if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
         return;
       }
       setSectionLayoutSyncUpdatedAt(props.location()?.updatedAt ?? null);
       setDashboardUndoStack([]);
+      setPendingSpreadsheetFile(null);
       setWorkingSectionLayout(cloneLocationSectionLayout(sectionLayoutUpdate));
       setSectionLayoutBaseline(cloneLocationSectionLayout(sectionLayoutUpdate));
       toast.success("Dashboard changes saved");

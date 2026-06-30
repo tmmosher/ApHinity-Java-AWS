@@ -128,6 +128,15 @@ public class LocationDashboardImportService {
 
     @Transactional
     public LocationDashboardSpreadsheetUploadResponse importLocationDashboard(Location location, org.springframework.web.multipart.MultipartFile file) {
+        return importLocationDashboard(location, file, false);
+    }
+
+    @Transactional
+    public LocationDashboardSpreadsheetUploadResponse importLocationDashboard(
+        Location location,
+        org.springframework.web.multipart.MultipartFile file,
+        boolean persistSamples
+    ) {
         if (location == null || location.getId() == null) {
             throw new IllegalArgumentException("Location is required");
         }
@@ -152,7 +161,7 @@ public class LocationDashboardImportService {
         }
 
         return mutationLockService.executeWithLocationLock(location.getId(), () ->
-            importDashboardLocked(location, strategy, workbook, measurementBounds)
+            importDashboardLocked(location, strategy, workbook, measurementBounds, persistSamples)
         );
     }
 
@@ -160,7 +169,8 @@ public class LocationDashboardImportService {
         Location location,
         LocationDashboardImportStrategy strategy,
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
-        List<com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound> measurementBounds
+        List<com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound> measurementBounds,
+        boolean persistSamples
     ) {
         List<Graph> assignedGraphs = locationGraphRepository.findByLocationIdWithGraph(location.getId()).stream()
             .map(LocationGraph::getGraph)
@@ -185,7 +195,9 @@ public class LocationDashboardImportService {
             strategy.computeImport(workbook, measurementBounds);
         List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions =
             correctiveActionService.buildPreviewCorrectiveActions(location.getId(), computation.correctiveActions());
-        samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
+        if (persistSamples) {
+            samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
+        }
 
         Map<String, GraphConfig> graphDefinitionsById = strategy.graphDefinitions().stream()
             .collect(Collectors.toMap(

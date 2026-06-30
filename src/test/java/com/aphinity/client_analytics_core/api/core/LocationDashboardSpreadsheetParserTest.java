@@ -149,9 +149,9 @@ class LocationDashboardSpreadsheetParserTest {
     void parseReadsWorkbookCommentsFromExampleUploadWorkbook() throws IOException {
         MockMultipartFile file = new MockMultipartFile(
             "file",
-            "dashboard_upload_template_example_2.xlsx",
+                "sheets/dashboard_upload_template_example_2.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            readFixtureBytes("dashboard_upload_template_example_2.xlsx")
+            readFixtureBytes("sheets/dashboard_upload_template_example_2.xlsx")
         );
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
