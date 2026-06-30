@@ -13,14 +13,11 @@ final class LocationDashboardCorrectiveActionDraftFactory {
     List<CorrectiveActionDraft> buildCorrectiveActions(List<LocationDashboardAnalyzedSample> analyzedSamples) {
         List<CorrectiveActionDraft> drafts = new ArrayList<>();
         for (LocationDashboardAnalyzedSample analyzedSample : analyzedSamples) {
-            if (analyzedSample == null || analyzedSample.sample() == null) {
-                continue;
-            }
+            if (analyzedSample == null || analyzedSample.sample() == null) continue;
             drafts.addAll(buildCommentCorrectiveActionDrafts(analyzedSample.sample()));
             if (analyzedSample.sample() instanceof LocationDashboardWorksheetSample worksheetSample) {
-                if (!analyzedSample.compliant()) {
+                if (!analyzedSample.compliant())
                     buildSyntheticCorrectiveActionDraft(worksheetSample).ifPresent(drafts::add);
-                }
             }
         }
         return deduplicate(drafts);

@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardSampleImportPipeline.SampleImportResult;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -71,6 +72,11 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
     }
 
     @Override
+    public List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> spreadsheetIdentityPattern() {
+        return config.identityPattern();
+    }
+
+    @Override
     public LocationDashboardImportComputation computeImport(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
         List<MeasurementBound> measurementBounds
@@ -83,7 +89,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             measurementBoundsByName.put(normalizeKey(measurementBound.getMeasurementName()), measurementBound);
         }
 
-        LocationDashboardSampleImportPipeline.SampleImportResult sampleImportResult =
+        SampleImportResult sampleImportResult =
             sampleImportPipeline.importSamples(workbook, measurementBoundsByName);
         List<LocationDashboardAnalyzedSample> analyzedSamples = sampleImportResult.sampleBuckets().analyzedSamples();
         LocationDashboardObservationAggregator.ObservationAggregationResult aggregationResult =

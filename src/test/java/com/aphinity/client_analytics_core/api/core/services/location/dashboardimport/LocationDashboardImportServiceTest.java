@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -76,7 +77,7 @@ class LocationDashboardImportServiceTest {
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
-        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook);
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
@@ -216,7 +217,7 @@ class LocationDashboardImportServiceTest {
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
-        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook);
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
@@ -324,7 +325,7 @@ class LocationDashboardImportServiceTest {
             List.of()
         ));
 
-        when(spreadsheetParser.parse(file)).thenReturn(workbookWithRawComment("Newport Beach", workbookComment, "F5"));
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbookWithRawComment("Newport Beach", workbookComment, "F5"));
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
@@ -380,7 +381,7 @@ class LocationDashboardImportServiceTest {
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
-        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook);
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(allDerivedGraphDefinitions());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
@@ -481,7 +482,7 @@ class LocationDashboardImportServiceTest {
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
-        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook);
 
         ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
             new LocationDashboardImportStrategyConfig(
@@ -574,7 +575,7 @@ class LocationDashboardImportServiceTest {
 
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             workbook("Newport Beach", "Drain Tank, install new DI bottles", "F5");
-        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook);
 
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy(List.of());
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
@@ -630,7 +631,7 @@ class LocationDashboardImportServiceTest {
         MockMultipartFile file = dashboardFile();
         Location location = location(9L, "Newport Beach");
 
-        when(spreadsheetParser.parse(file)).thenReturn(workbook("Wrong Beach", "Drain Tank, install new DI bottles", "F5"));
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook("Wrong Beach", "Drain Tank, install new DI bottles", "F5"));
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(buildStrategy(allDerivedGraphDefinitions())));
 
         ApiClientException error = assertThrows(
@@ -654,7 +655,7 @@ class LocationDashboardImportServiceTest {
             derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")
         ));
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
-        when(spreadsheetParser.parse(file)).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
         Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
@@ -754,7 +755,7 @@ class LocationDashboardImportServiceTest {
         ));
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
             singleSampleWorkbook("Newport Beach", workbookComment, "F5", new BigDecimal("11"));
-        when(spreadsheetParser.parse(file)).thenReturn(workbook);
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook);
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
         Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");
@@ -817,7 +818,7 @@ class LocationDashboardImportServiceTest {
             derivedGraphDefinition("non-conformance-status-by-facility", "Non-Conformance Status", "By Facility", LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY, "bar")
         ));
         when(strategyRegistry.resolve("Newport Beach")).thenReturn(Optional.of(strategy));
-        when(spreadsheetParser.parse(file)).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
+        when(spreadsheetParser.parse(eq(file), anyList())).thenReturn(workbook("Newport Beach", "Replace DI bottles", "F6"));
         when(measurementBoundRepository.findByLocationId(9L)).thenReturn(measurementBounds());
 
         Graph waterQualityGraph = scatterGraph(18L, "Water Quality Conformance", "Newport Beach");

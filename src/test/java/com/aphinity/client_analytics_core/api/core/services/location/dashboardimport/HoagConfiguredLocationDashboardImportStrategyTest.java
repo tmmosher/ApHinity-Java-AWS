@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class HoagConfiguredLocationDashboardImportStrategyTest {
     private static final String DATA_UPLOAD_FIXTURE = "sheets/dashboard_upload_template_example_2.xlsx";
+    private static final String ST_108_REV_6_FIXTURE = "sheets/ST-108 Results - Rev 6 (6-1-2026).xlsx";
     private static final int EXPECTED_ADDED_NON_CONFORMANCES = 6;
     private static final List<InjectedCommentPlan> INJECTED_COMMENT_PLANS = List.of(
         new InjectedCommentPlan(2, List.of(
@@ -33,6 +34,31 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     );
 
     private final LocationDashboardSpreadsheetParser parser = new LocationDashboardSpreadsheetParser();
+
+    @Test
+    void computeImportIncludesNewportBeachSamplesFromVerboseValidationHeaders() throws IOException {
+        ConfiguredLocationDashboardImportStrategy strategy = resolveHoagStrategy();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parsedWorkbook =
+            parseWorkbook(
+                ST_108_REV_6_FIXTURE,
+                readFixtureBytes(ST_108_REV_6_FIXTURE),
+                strategy.spreadsheetIdentityPattern()
+            );
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result =
+            strategy.computeImport(parsedWorkbook, hoagMeasurementBounds());
+
+        long newportBeachSamples = result.analyzedSamples().stream()
+            .filter(sample -> "Newport Beach".equals(sample.facilityName()))
+            .count();
+        long newportBeachNonConformances = result.analyzedSamples().stream()
+            .filter(sample -> "Newport Beach".equals(sample.facilityName()))
+            .filter(LocationDashboardImportStrategy.AnalyzedSamplePoint::nonConforming)
+            .count();
+
+        assertTrue(newportBeachSamples > 0, "Expected Newport Beach worksheet samples to be analyzed");
+        assertTrue(newportBeachNonConformances > 0, "Expected Newport Beach non-conforming samples to be analyzed");
+    }
 
     @Test
     void computeImportTracksOnlyTheKnownSupplementalHoagCommentNonConformanceDelta() throws IOException {
@@ -95,12 +121,24 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     }
 
     private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parseWorkbook(byte[] bytes) {
+        return parseWorkbook(DATA_UPLOAD_FIXTURE, bytes);
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parseWorkbook(String fileName, byte[] bytes) {
+        return parseWorkbook(fileName, bytes, List.of());
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parseWorkbook(
+        String fileName,
+        byte[] bytes,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
         return parser.parse(new MockMultipartFile(
             "file",
-            DATA_UPLOAD_FIXTURE,
+            fileName,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             bytes
-        ));
+        ), identityPattern);
     }
 
     private byte[] readFixtureBytes(String fileName) throws IOException {

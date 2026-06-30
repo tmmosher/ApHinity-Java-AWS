@@ -1,5 +1,40 @@
 {
   "locationName": "Hoag Hospital",
+  "identityPattern": [
+    {
+      "column": "facility",
+      "aliases": [
+        "Facility"
+      ]
+    },
+    {
+      "column": "building",
+      "aliases": [
+        "Bldg",
+        "Building"
+      ]
+    },
+    {
+      "column": "system",
+      "aliases": [
+        "System",
+        "Water System"
+      ]
+    },
+    {
+      "column": "pointOfUse",
+      "aliases": [
+        "Point of Use"
+      ]
+    },
+    {
+      "column": "basis",
+      "aliases": [
+        "Basis",
+        "Basis for Sampling"
+      ]
+    }
+  ],
   "sublocations": [
     {
       "key": "newport-beach",

@@ -13,6 +13,10 @@ public interface LocationDashboardImportStrategy {
 
     List<LocationDashboardImportStrategyConfig.DerivedGraphConfig> derivedGraphDefinitions();
 
+    default List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> spreadsheetIdentityPattern() {
+        return List.of();
+    }
+
     LocationDashboardImportComputation computeImport(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
         List<MeasurementBound> measurementBounds

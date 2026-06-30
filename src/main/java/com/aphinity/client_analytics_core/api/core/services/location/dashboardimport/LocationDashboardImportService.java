@@ -141,13 +141,14 @@ public class LocationDashboardImportService {
             throw new IllegalArgumentException("Location is required");
         }
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = spreadsheetParser.parse(file);
         LocationDashboardImportStrategy strategy = strategyRegistry.resolve(location.getName())
             .orElseThrow(() -> new ApiClientException(
                 HttpStatus.BAD_REQUEST,
                 "location_dashboard_strategy_not_found",
                 "Dashboard import strategy is not configured for this location."
             ));
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            spreadsheetParser.parse(file, strategy.spreadsheetIdentityPattern());
         requireMatchingLocationTitle(workbook.locationTitle(), location.getName(), strategy.locationName());
 
         List<com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound> measurementBounds =

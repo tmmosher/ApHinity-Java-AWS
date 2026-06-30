@@ -16,8 +16,33 @@ public record LocationDashboardImportStrategyConfig(
     List<SystemTypeConfig> systems,
     List<GraphConfig> graphs,
     List<DerivedGraphConfig> derivedGraphs,
-    List<SystemTypeAliasConfig> systemTypeAliases
+    List<SystemTypeAliasConfig> systemTypeAliases,
+    List<SpreadsheetIdentityColumn> identityPattern
 ) {
+    public LocationDashboardImportStrategyConfig {
+        identityPattern = identityPattern == null ? List.of() : List.copyOf(identityPattern);
+    }
+
+    public LocationDashboardImportStrategyConfig(
+        String locationName,
+        List<SublocationConfig> sublocations,
+        List<SystemTypeConfig> systems,
+        List<GraphConfig> graphs,
+        List<DerivedGraphConfig> derivedGraphs,
+        List<SystemTypeAliasConfig> systemTypeAliases
+    ) {
+        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases, List.of());
+    }
+
+    public record SpreadsheetIdentityColumn(
+        String column,
+        List<String> aliases
+    ) {
+        public SpreadsheetIdentityColumn {
+            aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        }
+    }
+
     public record SublocationConfig(
         String key,
         String displayName,
