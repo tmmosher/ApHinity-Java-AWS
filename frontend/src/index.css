@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fade-in entrance adapted from Animate.css fadeInUp (MIT): https://animate.style/ */
+@keyframes aphinity-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+[data-scroll-reveal="hidden"] {
+  opacity: 0;
+  transform: translate3d(0, 32px, 0);
+}
+
+[data-scroll-reveal="visible"] {
+  animation: aphinity-fade-in-up 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll-reveal="hidden"],
+  [data-scroll-reveal="visible"] {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
 .service-calendar-transition-surface[data-service-calendar-transition="previous"] {
   /* animation hook for future use */
 }

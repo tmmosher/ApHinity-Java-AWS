@@ -1,6 +1,6 @@
 import { A } from "@solidjs/router";
 import Popover from "corvu/popover";
-import { For } from "solid-js";
+import { For, onCleanup, onMount } from "solid-js";
 import { Motion } from "solid-motionone";
 import { toast } from "solid-toast";
 import { z } from "zod";
@@ -44,6 +44,12 @@ const PORTAL_CAPABILITIES = [
 
 const CLIENT_EXAMPLES = ["Hoag Hospital", "TSMC", "HelloFresh", "Dexcom", "Leprino Foods"];
 
+const REPORTING_SIGNALS = [
+  { label: "Sites tracked", value: "42", tone: "bg-primary" },
+  { label: "Open actions", value: "18", tone: "bg-warning" },
+  { label: "Reports sent", value: "96%", tone: "bg-success" }
+];
+
 const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
   {
     id: "water-treatment",
@@ -73,6 +79,50 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
 ];
 
 export const HomePage = () => {
+  let pageRef: HTMLElement | undefined;
+
+  onMount(() => {
+    if (!pageRef) {
+      return;
+    }
+
+    const revealElements = Array.from(pageRef.querySelectorAll<HTMLElement>("[data-scroll-reveal]"));
+
+    if (!("IntersectionObserver" in window)) {
+      revealElements.forEach((element) => {
+        element.dataset.scrollReveal = "visible";
+      });
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            return;
+          }
+
+          const element = entry.target as HTMLElement;
+          element.dataset.scrollReveal = "visible";
+          observer.unobserve(element);
+        });
+      },
+      {
+        root: null,
+        rootMargin: "0px 0px -12% 0px",
+        threshold: 0.16
+      }
+    );
+
+    revealElements.forEach((element) => {
+      observer.observe(element);
+    });
+
+    onCleanup(() => {
+      observer.disconnect();
+    });
+  });
+
   const submitContactForm = (event: SubmitEvent) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -118,41 +168,81 @@ export const HomePage = () => {
   };
 
   return (
-    <>
-      <main class="w-full max-w-6xl mx-auto space-y-8 md:space-y-10" aria-labelledby="home-title">
-        <section class="rounded-2xl border border-base-300 bg-base-100 shadow-xl">
-          <div class="p-6 md:p-10 space-y-6">
-            <span class="badge badge-primary badge-outline">ApHinity Information Management (AIM)</span>
-            <h1 id="home-title" class="text-4xl md:text-5xl font-bold leading-tight">
-              Visual Reporting for Management Partner and Client Teams
-            </h1>
-            <p class="text-base md:text-lg text-base-content/80">
-              AIM supports ApHinity management partners in communicating key performance indicators to
-              clients through structured dashboards, validation workflows, and clear operational context.
-            </p>
-            <p class="text-sm text-base-content/70">
-              Aphinity Management Solutions is for partner/client data presentation only. Select our products and
-              services from our{" "}
-              <a class="link link-primary" href="https://aphinitytech.com/">
-                website
-              </a>
-              !
-            </p>
+    <div class="relative isolate w-full max-w-6xl mx-auto">
+      <main ref={pageRef} class="w-full space-y-8 md:space-y-10" aria-labelledby="home-title">
+        <section class="relative isolate overflow-hidden rounded-md border border-base-300 bg-gradient-to-br from-base-100 via-base-100 to-base-200 shadow">
+          <div class="grid gap-8 p-6 md:p-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
+            <div class="space-y-6">
+              <span class="select-none badge badge-primary badge-outline bg-base-100/70">ApHinity Information Management (AIM)</span>
+              <h1 id="home-title" class="text-4xl md:text-5xl font-bold leading-tight">
+                Visual Reporting for Management Partner and Client Teams
+              </h1>
+              <p class="text-base md:text-lg text-base-content/80">
+                AIM supports ApHinity management partners in communicating key performance indicators to
+                clients through structured dashboards, validation workflows, and clear operational context.
+              </p>
+              <p class="text-sm text-base-content/70">
+                Aphinity Management Solutions is for data presentation only. Select our products and
+                services from our{" "}
+                <a class="link link-primary" href="https://aphinitytech.com/">
+                  website
+                </a>
+                !
+              </p>
               <div class="flex flex-wrap gap-3">
-                  <A class="btn btn-primary" href="/login" preload>
-                      Partner and Client Login
-                  </A>
-                  <a class="btn btn-outline" href="#partner-contact-form">
-                      Contact Partner Team
-                  </a>
+                <A class="btn btn-primary" href="/login" preload>
+                  Partner and Client Login
+                </A>
+                <a class="btn btn-outline bg-base-100/70" href="#partner-contact-form">
+                  Contact Partner Team
+                </a>
+              </div>
+            </div>
+            <div class="select-none rounded-md bg-base-300/40 p-3 shadow" aria-hidden="true">
+              <div class="grid gap-3 rounded-md border border-base-300 bg-base-100/90 p-4">
+                <div class="flex gap-1.5 pb-1">
+                  <span class="h-2.5 w-2.5 rounded-full bg-base-content/25" />
+                  <span class="h-2.5 w-2.5 rounded-full bg-base-content/25" />
+                  <span class="h-2.5 w-2.5 rounded-full bg-base-content/25" />
+                </div>
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <For each={REPORTING_SIGNALS}>
+                    {(signal) => (
+                      <div class="flex min-h-[5.5rem] flex-col gap-1 rounded-md border border-base-300 bg-base-100/80 p-3">
+                        <div class={`h-2 w-10 rounded-full ${signal.tone}`} />
+                        <strong class="text-2xl leading-none">{signal.value}</strong>
+                        <span class="text-xs text-base-content/65">{signal.label}</span>
+                      </div>
+                    )}
+                  </For>
+                </div>
+                <div class="flex min-h-48 items-end gap-2 rounded-md border border-base-300 bg-base-100/80 p-4 sm:gap-4">
+                  <span class="h-[44%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
+                  <span class="h-[68%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
+                  <span class="h-[52%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
+                  <span class="h-[82%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
+                  <span class="h-[64%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
+                  <span class="h-[74%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
+                </div>
+                <div class="grid gap-3 sm:grid-cols-[1fr_0.72fr]">
+                  <div class="grid gap-3 rounded-md border border-base-300 bg-base-100/80 p-4">
+                    <span class="h-3 rounded-full bg-base-content/15" />
+                    <span class="h-3 w-[72%] rounded-full bg-base-content/15" />
+                    <span class="h-3 w-[86%] rounded-full bg-base-content/15" />
+                  </div>
+                  <div class="grid min-h-28 place-items-center rounded-md border border-base-300 bg-[radial-gradient(circle,hsl(var(--b1))_0_42%,transparent_43%),conic-gradient(hsl(var(--su))_0_86%,hsl(var(--b3))_86%_100%)]">
+                    <span class="font-bold">96%</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-scroll-reveal="hidden">
           <For each={PORTAL_CAPABILITIES}>
             {(capability) => (
-              <article class="card bg-base-100 border border-base-300 shadow-sm">
+              <article class="card select-none rounded-md border border-base-300 bg-base-100 shadow transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
                 <div class="card-body gap-3">
                   <h2 class="card-title text-xl">{capability.title}</h2>
                   <p class="text-sm text-base-content/75 leading-6">{capability.description}</p>
@@ -162,7 +252,7 @@ export const HomePage = () => {
           </For>
         </section>
 
-        <section class="rounded-2xl border border-base-300 bg-base-100 shadow-sm">
+        <section class="select-none rounded-md border border-base-300 bg-gradient-to-r from-base-100 via-base-100 to-base-200 shadow" data-scroll-reveal="hidden">
           <div class="p-6 md:p-8 space-y-4">
             <h2 class="text-2xl font-semibold">Client Coverage</h2>
             <p class="text-sm text-base-content/75 leading-6">
@@ -172,21 +262,21 @@ export const HomePage = () => {
             </p>
             <div class="flex flex-wrap gap-2">
               <For each={CLIENT_EXAMPLES}>
-                {(client) => <span class="badge badge-outline badge-lg">{client}</span>}
+                {(client) => <span class="select-none badge badge-outline badge-lg">{client}</span>}
               </For>
             </div>
           </div>
         </section>
 
-        <section class="space-y-4">
-          <div class="grid overflow-hidden rounded-2xl border border-base-300 md:grid-cols-3">
+        <section class="space-y-4" data-scroll-reveal="hidden">
+          <div class="grid overflow-hidden rounded-md border border-base-300 bg-base-100 shadow md:grid-cols-3">
             <For each={TECHNOLOGY_POPUPS}>
               {(panel, index) => (
                 <Popover placement="bottom-start">
                   {(popover) => (
                     <>
                       <Popover.Trigger
-                        class={`group w-full min-h-52 bg-base-100 p-6 text-left transition-colors hover:bg-base-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
+                        class={`group min-h-52 w-full bg-base-100 p-6 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-base-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
                           index() > 0 ? "border-t border-base-300 md:border-l md:border-t-0" : ""
                         }`}
                       >
@@ -198,7 +288,7 @@ export const HomePage = () => {
                         <Popover.Content
                           forceMount
                           as={Motion.div}
-                          class="z-50 w-[min(92vw,44rem)] rounded-2xl border border-base-300 bg-base-100 shadow-2xl"
+                          class="z-50 w-[min(92vw,44rem)] rounded-md border border-base-300 bg-base-100 shadow-lg"
                           initial={{ opacity: 0, y: 4, scale: 0.99 }}
                           animate={popover.open ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 4, scale: 0.99 }}
                           transition={{ duration: 0.12, easing: "ease-out" }}
@@ -228,10 +318,10 @@ export const HomePage = () => {
           </div>
         </section>
 
-        <section class="grid gap-6 lg:grid-cols-5">
+        <section class="grid gap-6 lg:grid-cols-5" data-scroll-reveal="hidden">
           <article
             id="partner-contact-form"
-            class="card scroll-mt-28 lg:col-span-3 border border-base-300 bg-base-100 shadow-sm"
+            class="card scroll-mt-28 rounded-md border border-base-300 bg-base-100 shadow transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md lg:col-span-3"
           >
             <div class="card-body">
               <h2 class="card-title text-2xl">Partner Contact Form</h2>
@@ -285,7 +375,7 @@ export const HomePage = () => {
             </div>
           </article>
 
-          <aside class="card lg:col-span-2 border border-base-300 bg-base-100 shadow-sm">
+          <aside class="card rounded-md border border-base-300 bg-base-100 shadow transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md lg:col-span-2">
               <div class="card-body gap-5">
                   <h2 class="card-title text-2xl">Office and Support</h2>
                   <div class="space-y-2 text-sm text-base-content/80">
@@ -324,6 +414,15 @@ export const HomePage = () => {
           </aside>
         </section>
       </main>
-    </>
+      <footer class="mt-8 flex flex-col gap-2 rounded-md border border-base-300 bg-base-100 px-4 py-3 text-sm text-base-content/70 shadow sm:flex-row sm:items-center sm:justify-between">
+        <span class="font-medium text-base-content">©Copyright 2026 ApHinity®: Technologies. All Rights Reserved.</span>
+        <a class="link link-primary" href="#" aria-label="ApHinity Inc. website">
+          Our site
+        </a>
+        <span class="font-medium text-base-content">Photo by {" "}
+          <a href="https://unsplash.com/@unstable_affliction?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Ivan Bandura</a> on <a href="https://unsplash.com/photos/an-overhead-view-of-a-street-with-a-lot-of-water-6wSevhW1Dzc?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+        </span>
+      </footer>
+    </div>
   );
 };

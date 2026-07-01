@@ -6,7 +6,8 @@ AWS backend for forward-facing Java server for the ApHinity Technologies partner
 - Frontend assets are compiled during Docker image build and copied into the runtime image as static files.
 - `TURNSTILE_SITE_KEY` is passed into the frontend build as `VITE_TURNSTILE_SITE_KEY` via `docker-compose.yml` build args, so key changes require an image rebuild.
 - If you change frontend code or Docker build context files, rebuild and recreate the container:
-  - `docker compose build --no-cache app && docker compose up -d --force-recreate app`
+  - `docker compose build --no-cache aphinity-app && docker compose up -d --force-recreate aphinity-app`
+- Runtime logs are written to `/logs` in the container and bind-mounted from `${LOG_HOST_DIR:-./logs}` on the host. Local development defaults to `logs/`; make sure that directory is writable by the user running Gradle.
 - If a stale bundle is still observed after deploy, purge CDN/browser cache for `index.html` and old `/assets/*` chunks. For testing, you can put Cloudflare into development mode to bypass CDN.
 - Server restarts every morning at 01:00 MST. Specific reaper threads run at 00:00 MST.
 - Server restart job completely deletes all dangling images.

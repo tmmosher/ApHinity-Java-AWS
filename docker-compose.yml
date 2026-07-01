@@ -12,5 +12,8 @@ services:
     env_file:
       - .env.runtime
     network_mode: "host"
+    volumes:
+      - ${LOG_HOST_DIR:-./logs}:/logs
     environment:
+      - LOG_DIR=/logs
       - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005

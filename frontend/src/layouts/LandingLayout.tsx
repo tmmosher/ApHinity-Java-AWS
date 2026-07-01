@@ -12,7 +12,8 @@ export const LandingLayout = (props: ParentProps) => {
       <div
         class="flex-1 w-full px-4 py-8 md:py-12"
         classList={{
-          "flex items-center justify-center": !isHomeRoute()
+          "flex items-center justify-center": !isHomeRoute(),
+          "bg-[linear-gradient(rgb(255_255_255/0.62),rgb(255_255_255/0.62)),url('/bg-splash.jpg')] bg-cover bg-center bg-fixed dark:bg-[linear-gradient(rgb(0_0_0/0.42),rgb(0_0_0/0.42)),url('/bg-splash.jpg')]": isHomeRoute()
         }}
       >
         {props.children}
