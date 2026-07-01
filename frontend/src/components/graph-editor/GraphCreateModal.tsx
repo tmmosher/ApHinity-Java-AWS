@@ -172,7 +172,7 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
                   onInput={(event) => setYAxisTitle(event.currentTarget.value)}
                 />
                 <span class="label-text-alt text-xs text-base-content/70">
-                  Defaults to % Compliance for new scatter graphs.
+                  Defaults to % Conformance for new scatter graphs.
                 </span>
               </label>
             </Show>

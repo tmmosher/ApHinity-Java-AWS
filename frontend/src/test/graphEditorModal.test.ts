@@ -411,7 +411,7 @@ describe("GraphEditorModal trace controls", () => {
       layout: {
         yaxis: {
           range: [0, 100],
-          title: {text: "% Compliance", font: {size: 14}}
+          title: {text: "% Conformance", font: {size: 14}}
         }
       },
       config: null,
@@ -425,7 +425,7 @@ describe("GraphEditorModal trace controls", () => {
       await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
-      expect(cartesianProps.yAxisTitle).toBe("% Compliance");
+      expect(cartesianProps.yAxisTitle).toBe("% Conformance");
 
       cartesianProps.onUpdateYAxisTitle("Monthly pass rate");
       await flushSolidUpdates();

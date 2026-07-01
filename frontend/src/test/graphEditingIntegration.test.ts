@@ -242,7 +242,7 @@ describe("graph editing integration", () => {
         title: { text: "Baseline" },
         yaxis: {
           range: [0, 100],
-          title: { text: "% Compliance", font: { size: 14 } }
+          title: { text: "% Conformance", font: { size: 14 } }
         }
       },
       config: { displayModeBar: false },

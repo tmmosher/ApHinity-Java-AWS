@@ -1935,7 +1935,7 @@ class LocationServiceTest {
         return Map.of(
             "title", Map.of("x", 0.02, "text", locationName, "xanchor", "left"),
             "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
-            "yaxis", Map.of("range", List.of(0, 100), "title", "% Compliance", "dtick", 1, "ticksuffix", "%"),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "% Conformance", "dtick", 1, "ticksuffix", "%"),
             "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
             "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
         );

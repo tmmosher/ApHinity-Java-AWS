@@ -212,7 +212,7 @@ public class LocationGraphTemplateFactory {
         ));
         layout.put("yaxis", Map.of(
             "range", List.of(0, 100),
-            "title", "% Compliance",
+            "title", "% Conformance",
             "dtick", 1,
             "ticksuffix", "%"
         ));

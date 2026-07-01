@@ -1,6 +1,6 @@
 import type {LocationGraph, LocationGraphType, LocationGraphUpdate} from "../../types/Types";
 
-const DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE = "% Compliance";
+const DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE = "% Conformance";
 
 type GraphCreateModalRequest = {
   graphType: LocationGraphType;

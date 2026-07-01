@@ -414,14 +414,18 @@ export const HomePage = () => {
           </aside>
         </section>
       </main>
-      <footer class="mt-8 flex flex-col gap-2 rounded-md border border-base-300 bg-base-100 px-4 py-3 text-sm text-base-content/70 shadow sm:flex-row sm:items-center sm:justify-between">
-        <span class="font-medium text-base-content">©Copyright 2026 ApHinity®: Technologies. All Rights Reserved.</span>
-        <a class="link link-primary" href="#" aria-label="ApHinity Inc. website">
-          Our site
-        </a>
-        <span class="font-medium text-base-content">Photo by {" "}
-          <a href="https://unsplash.com/@unstable_affliction?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Ivan Bandura</a> on <a href="https://unsplash.com/photos/an-overhead-view-of-a-street-with-a-lot-of-water-6wSevhW1Dzc?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
-        </span>
+      <footer class="w-fit mt-8 block rounded-md border border-base-300 bg-base-100 px-4 py-3 text-sm text-base-content/70 shadow">
+        <div class="flex flex-row items-start justify-start gap-3 sm:flex-row">
+          <div class="flex flex-col flex-wrap items-left justify-between gap-3">
+            <span class="font-medium text-base-content">© Copyright 2026 ApHinity®: Technologies. All Rights Reserved.</span>
+            <a class="font-medium link link-primary" href="https://aphinitytech.com" aria-label="ApHinity Inc. website">
+              Our site
+            </a>
+            <span class="font-medium text-base-content">Photo by {" "}
+              <a href="https://unsplash.com/@unstable_affliction?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Ivan Bandura</a> on <a href="https://unsplash.com/photos/an-overhead-view-of-a-street-with-a-lot-of-water-6wSevhW1Dzc?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
+          </span>
+          </div>
+        </div>
       </footer>
     </div>
   );

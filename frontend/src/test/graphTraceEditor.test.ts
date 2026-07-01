@@ -315,13 +315,13 @@ describe("graphTraceEditor", () => {
       yaxis: {
         range: [0, 100],
         title: {
-          text: "% Compliance",
+          text: "% Conformance",
           font: {size: 14}
         }
       }
     };
 
-    expect(getTraceYAxisTitle(layout, trace)).toBe("% Compliance");
+    expect(getTraceYAxisTitle(layout, trace)).toBe("% Conformance");
 
     expect(updateTraceYAxisTitle(layout, trace, "Monthly pass rate")).toEqual({
       yaxis: {
