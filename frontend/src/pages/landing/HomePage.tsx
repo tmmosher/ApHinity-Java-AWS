@@ -173,16 +173,16 @@ export const HomePage = () => {
         <section class="relative isolate overflow-hidden rounded-md border border-base-300 bg-gradient-to-br from-base-100 via-base-100 to-base-200 shadow">
           <div class="grid gap-8 p-6 md:p-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
             <div class="space-y-6">
-              <span class="select-none badge badge-primary badge-outline bg-base-100/70">ApHinity Information Management (AIM)</span>
               <h1 id="home-title" class="text-4xl md:text-5xl font-bold leading-tight">
-                Visual Reporting for Management Partner and Client Teams
+                Visual Reporting for Partner and Client Teams
               </h1>
+              <span class="select-none badge badge-primary badge-outline bg-base-100/70">ApHinity Information Management (AIM) System</span>
               <p class="text-base md:text-lg text-base-content/80">
                 AIM supports ApHinity management partners in communicating key performance indicators to
                 clients through structured dashboards, validation workflows, and clear operational context.
               </p>
               <p class="text-sm text-base-content/70">
-                Aphinity Management Solutions is for data presentation only. Select our products and
+                AIM is intended for data presentation only. Select our products and
                 services from our{" "}
                 <a class="link link-primary" href="https://aphinitytech.com/">
                   website
@@ -191,7 +191,7 @@ export const HomePage = () => {
               </p>
               <div class="flex flex-wrap gap-3">
                 <A class="btn btn-primary" href="/login" preload>
-                  Partner and Client Login
+                  Login
                 </A>
                 <a class="btn btn-outline bg-base-100/70" href="#partner-contact-form">
                   Contact Partner Team
@@ -199,42 +199,7 @@ export const HomePage = () => {
               </div>
             </div>
             <div class="select-none rounded-md bg-base-300/40 p-3 shadow" aria-hidden="true">
-              <div class="grid gap-3 rounded-md border border-base-300 bg-base-100/90 p-4">
-                <div class="flex gap-1.5 pb-1">
-                  <span class="h-2.5 w-2.5 rounded-full bg-base-content/25" />
-                  <span class="h-2.5 w-2.5 rounded-full bg-base-content/25" />
-                  <span class="h-2.5 w-2.5 rounded-full bg-base-content/25" />
-                </div>
-                <div class="grid gap-3 sm:grid-cols-3">
-                  <For each={REPORTING_SIGNALS}>
-                    {(signal) => (
-                      <div class="flex min-h-[5.5rem] flex-col gap-1 rounded-md border border-base-300 bg-base-100/80 p-3">
-                        <div class={`h-2 w-10 rounded-full ${signal.tone}`} />
-                        <strong class="text-2xl leading-none">{signal.value}</strong>
-                        <span class="text-xs text-base-content/65">{signal.label}</span>
-                      </div>
-                    )}
-                  </For>
-                </div>
-                <div class="flex min-h-48 items-end gap-2 rounded-md border border-base-300 bg-base-100/80 p-4 sm:gap-4">
-                  <span class="h-[44%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
-                  <span class="h-[68%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
-                  <span class="h-[52%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
-                  <span class="h-[82%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
-                  <span class="h-[64%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
-                  <span class="h-[74%] min-w-5 flex-1 rounded-t-full bg-gradient-to-b from-primary to-secondary shadow" />
-                </div>
-                <div class="grid gap-3 sm:grid-cols-[1fr_0.72fr]">
-                  <div class="grid gap-3 rounded-md border border-base-300 bg-base-100/80 p-4">
-                    <span class="h-3 rounded-full bg-base-content/15" />
-                    <span class="h-3 w-[72%] rounded-full bg-base-content/15" />
-                    <span class="h-3 w-[86%] rounded-full bg-base-content/15" />
-                  </div>
-                  <div class="grid min-h-28 place-items-center rounded-md border border-base-300 bg-[radial-gradient(circle,hsl(var(--b1))_0_42%,transparent_43%),conic-gradient(hsl(var(--su))_0_86%,hsl(var(--b3))_86%_100%)]">
-                    <span class="font-bold">96%</span>
-                  </div>
-                </div>
-              </div>
+              <img src="/example-board.png" alt="Portal Visual" />
             </div>
           </div>
         </section>

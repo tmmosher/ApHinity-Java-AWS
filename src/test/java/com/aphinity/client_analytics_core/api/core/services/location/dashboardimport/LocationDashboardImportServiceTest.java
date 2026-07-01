@@ -194,8 +194,14 @@ class LocationDashboardImportServiceTest {
         assertEquals(List.of("Endotoxin", "HPC"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water Quality Category").data().getFirst().get("y"));
         assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("x"));
         assertEquals(List.of("Cooling Towers"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Water System Type").data().getFirst().get("y"));
-        assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("x"));
-        assertEquals(List.of("Newport Beach"), findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility").data().getFirst().get("y"));
+        GraphResponse nonConformancesByFacility = findResponseByNameAndTitle(responses, "Non-Conformances", "By Facility");
+        assertEquals(List.of(2L), nonConformancesByFacility.data().getFirst().get("x"));
+        assertEquals(List.of("Newport Beach"), nonConformancesByFacility.data().getFirst().get("y"));
+        assertEquals(Map.of("title", "Non-Conformances"), nonConformancesByFacility.layout().get("xaxis"));
+        assertEquals(Map.of("automargin", true), nonConformancesByFacility.layout().get("yaxis"));
+        assertEquals(Map.of("b", 40, "l", 150, "r", 20, "t", 45), nonConformancesByFacility.layout().get("margin"));
+        assertEquals(false, nonConformancesByFacility.layout().get("showlegend"));
+        assertEquals(300, nonConformancesByFacility.style().get("height"));
         assertEquals(List.of(2L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst().get("x"));
         assertEquals(List.of(0L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1).get("x"));
         assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));

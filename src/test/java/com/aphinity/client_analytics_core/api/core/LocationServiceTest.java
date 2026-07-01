@@ -757,10 +757,29 @@ class LocationServiceTest {
         assertEquals(
             Map.of(
                 "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
-                "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                "xaxis", Map.of("title", "Value"),
+                "yaxis", Map.of("automargin", true),
+                "margin", Map.of("t", 45, "r", 20, "b", 40, "l", 150),
                 "showlegend", false
             ),
             response.layout()
+        );
+        assertEquals(
+            Map.of(
+                "theme",
+                Map.of(
+                    "dark", Map.of(
+                        "gridColor", "rgba(148, 163, 184, 0.3)",
+                        "textColor", "#e5e7eb"
+                    ),
+                    "light", Map.of(
+                        "gridColor", "rgba(15, 23, 42, 0.15)",
+                        "textColor", "#111827"
+                    )
+                ),
+                "height", 300
+            ),
+            response.style()
         );
         assertEquals(Map.of("displayModeBar", false, "responsive", false), response.config());
         verify(locationGraphRepository).save(any(LocationGraph.class));

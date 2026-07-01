@@ -689,9 +689,16 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].y").isArray())
             .andExpect(jsonPath("$.data[0].y").isEmpty())
             .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
+            .andExpect(jsonPath("$.layout.xaxis.title").value("Value"))
+            .andExpect(jsonPath("$.layout.yaxis.automargin").value(true))
+            .andExpect(jsonPath("$.layout.margin.t").value(45))
+            .andExpect(jsonPath("$.layout.margin.l").value(150))
+            .andExpect(jsonPath("$.layout.margin.r").value(20))
+            .andExpect(jsonPath("$.layout.margin.b").value(40))
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
             .andExpect(jsonPath("$.config.responsive").value(false))
-            .andExpect(jsonPath("$.style.height").value(320));
+            .andExpect(jsonPath("$.style.height").value(300))
+            .andExpect(jsonPath("$.style.theme.light.textColor").value("#111827"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
@@ -875,7 +882,9 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].y").isEmpty())
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
             .andExpect(jsonPath("$.config.responsive").value(false))
-            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"));
+            .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
+            .andExpect(jsonPath("$.layout.margin.t").value(45))
+            .andExpect(jsonPath("$.style.height").value(300));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");

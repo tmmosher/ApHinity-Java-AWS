@@ -346,6 +346,10 @@ public class LocationDashboardImportService {
                 derivedGraphDefinition,
                 strategy.locationName()
             ));
+            previewGraph.setStyle(LocationDashboardGraphMetadataSupport.withDerivedImportStyle(
+                previewGraph.getStyle(),
+                derivedGraphDefinition
+            ));
             previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
             previewGraph.setData(LocationDashboardDerivedGraphSupport.buildPayload(
                 derivedGraphDefinition,

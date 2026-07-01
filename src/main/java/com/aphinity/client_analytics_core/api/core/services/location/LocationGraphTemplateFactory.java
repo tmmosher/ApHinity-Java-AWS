@@ -85,11 +85,13 @@ public class LocationGraphTemplateFactory {
                 )),
                 Map.of(
                     "title", buildGraphTitle(locationName),
-                    "margin", Map.of("t", 24, "r", 24, "b", 48, "l", 48),
+                    "xaxis", Map.of("title", "Value"),
+                    "yaxis", Map.of("automargin", true),
+                    "margin", Map.of("t", 45, "r", 20, "b", 40, "l", 150),
                     "showlegend", false
                 ),
                 buildDefaultGraphConfig(),
-                Map.of("height", 320)
+                buildBarGraphStyle()
             );
             case SCATTER -> new GraphTemplate(
                 "New Plot Graph",
@@ -182,6 +184,12 @@ public class LocationGraphTemplateFactory {
             ),
             "height", 160
         );
+    }
+
+    private Map<String, Object> buildBarGraphStyle() {
+        Map<String, Object> style = new LinkedHashMap<>(buildCompactGraphStyle());
+        style.put("height", 300);
+        return Map.copyOf(style);
     }
 
     private List<Map<String, Object>> buildScatterTemplateData() {

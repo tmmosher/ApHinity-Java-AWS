@@ -125,7 +125,58 @@ final class LocationDashboardGraphMetadataSupport {
         importMeta.put("locationName", strategyLocationName);
         meta.put(IMPORT_LAYOUT_META_KEY, importMeta);
         layout.put("meta", meta);
+        if ("bar".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
+            applyDerivedBarLayoutDefaults(layout, derivedGraphDefinition);
+        }
         return layout;
+    }
+
+    static Map<String, Object> withDerivedImportStyle(
+        Map<String, Object> existingStyle,
+        DerivedGraphConfig derivedGraphDefinition
+    ) {
+        Map<String, Object> style = copyMutableMap(existingStyle);
+        if ("bar".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
+            style.put("theme", Map.of(
+                "dark", Map.of(
+                    "gridColor", "rgba(148, 163, 184, 0.3)",
+                    "textColor", "#e5e7eb"
+                ),
+                "light", Map.of(
+                    "gridColor", "rgba(15, 23, 42, 0.15)",
+                    "textColor", "#111827"
+                )
+            ));
+            style.put("height", 300);
+        }
+        return style;
+    }
+
+    private static void applyDerivedBarLayoutDefaults(
+        Map<String, Object> layout,
+        DerivedGraphConfig derivedGraphDefinition
+    ) {
+        boolean horizontal = derivedGraphDefinition.derivedType()
+            != LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY;
+        Map<String, Object> xAxis = copyMutableMap(asMap(layout.get("xaxis")));
+        Map<String, Object> yAxis = copyMutableMap(asMap(layout.get("yaxis")));
+        if (horizontal) {
+            xAxis.put("title", derivedGraphDefinition.name());
+            yAxis.put("automargin", true);
+            yAxis.remove("title");
+        } else {
+            xAxis.put("automargin", true);
+            xAxis.remove("title");
+            yAxis.put("title", derivedGraphDefinition.name());
+        }
+        layout.put("xaxis", xAxis);
+        layout.put("yaxis", yAxis);
+        layout.put("margin", horizontal
+            ? Map.of("b", 40, "l", 150, "r", 20, "t", 45)
+            : Map.of("b", 80, "l", 60, "r", 20, "t", 45));
+        if (horizontal) {
+            layout.put("showlegend", false);
+        }
     }
 
     private static String derivedMetricKey(LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType) {

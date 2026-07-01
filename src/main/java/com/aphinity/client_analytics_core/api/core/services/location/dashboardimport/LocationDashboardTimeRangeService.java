@@ -247,6 +247,10 @@ public class LocationDashboardTimeRangeService {
                 derivedGraphDefinition,
                 strategy.locationName()
             ));
+            graph.setStyle(LocationDashboardGraphMetadataSupport.withDerivedImportStyle(
+                graph.getStyle(),
+                derivedGraphDefinition
+            ));
             graph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
             GraphRelationalPayloadMapper.syncGraphData(
                 graph,
