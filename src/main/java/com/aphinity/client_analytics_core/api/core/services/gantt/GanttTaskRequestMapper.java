@@ -82,7 +82,13 @@ public class GanttTaskRequestMapper {
             return null;
         }
         String normalized = value.strip();
-        return normalized.isBlank() ? null : normalized;
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.length() > GanttTask.DESCRIPTION_MAX_LENGTH) {
+            throw invalidTaskDescriptionLength();
+        }
+        return normalized;
     }
 
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
@@ -109,5 +115,9 @@ public class GanttTaskRequestMapper {
 
     private ResponseStatusException invalidTaskDateRange() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Task end date must be on or after the start date");
+    }
+
+    private ResponseStatusException invalidTaskDescriptionLength() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Task description must be 1024 characters or fewer");
     }
 }

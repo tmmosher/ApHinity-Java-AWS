@@ -73,6 +73,20 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void handleResponseStatusMapsGanttDescriptionLengthReason() {
+        ResponseStatusException exception = new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "Task description must be 1024 characters or fewer"
+        );
+
+        ResponseEntity<ApiErrorResponse> response = apiExceptionHandler.handleResponseStatus(exception);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("task_description_invalid_length", response.getBody().code());
+        assertEquals("Task description must be 1024 characters or fewer", response.getBody().message());
+    }
+
+    @Test
     void handleResponseStatusMapsMissingLocationWorkOrderEmailReason() {
         ResponseStatusException exception = new ResponseStatusException(
             HttpStatus.BAD_REQUEST,

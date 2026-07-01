@@ -21,6 +21,7 @@ import java.time.LocalDate;
 public class GanttTask {
     public static final int TITLE_MIN_LENGTH = 3;
     public static final int TITLE_MAX_LENGTH = 60;
+    public static final int DESCRIPTION_MAX_LENGTH = 1024;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,7 +40,7 @@ public class GanttTask {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = "text")
     private String description;
 
     @Column(name = "created_at", nullable = false)

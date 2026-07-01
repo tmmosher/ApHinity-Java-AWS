@@ -100,6 +100,10 @@ public class ApiExceptionHandler {
             new ErrorDefinition("task_date_range_invalid", "Task end date must be on or after the start date")
         ),
         Map.entry(
+            "Task description must be 1024 characters or fewer",
+            new ErrorDefinition("task_description_invalid_length", "Task description must be 1024 characters or fewer")
+        ),
+        Map.entry(
             "Task cannot depend on itself",
             new ErrorDefinition("task_dependency_self_reference", "Task cannot depend on itself")
         ),

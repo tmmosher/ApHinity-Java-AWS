@@ -23,6 +23,10 @@ public record LocationGanttTaskRequest(
     @NotNull(message = "Task end date is required")
     LocalDate endDate,
 
+    @Size(
+        max = GanttTask.DESCRIPTION_MAX_LENGTH,
+        message = "Task description must be 1024 characters or fewer"
+    )
     String description,
 
     List<Long> dependencyTaskIds

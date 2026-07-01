@@ -1444,6 +1444,33 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void createGanttTaskRejectsDescriptionLongerThanLimit() throws Exception {
+        createUser("partner-gantt-description-limit@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Costa Mesa");
+        AuthCookies authCookies = loginAndCaptureCookies("partner-gantt-description-limit@example.com", PASSWORD);
+        String longDescription = "x".repeat(1025);
+
+        mockMvc.perform(
+                post("/api/core/locations/{locationId}/gantt-tasks", location.getId())
+                    .cookie(authCookies(authCookies))
+                    .with(csrfDoubleSubmit())
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Task Alpha",
+                          "startDate": "2026-05-01",
+                          "endDate": "2026-05-03",
+                          "description": "%s",
+                          "dependencyTaskIds": []
+                        }
+                        """.formatted(longDescription))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("validation_failed"))
+            .andExpect(jsonPath("$.fieldErrors.description").value("invalid_length"));
+    }
+
+    @Test
     void createGanttTasksBulkReturnsPersistedUpdatedAt() throws Exception {
         createUser("partner-gantt-bulk-timestamp@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Glendale");

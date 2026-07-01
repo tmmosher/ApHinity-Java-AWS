@@ -183,6 +183,26 @@ class LocationGanttTaskServiceTest {
     }
 
     @Test
+    void createLocationTaskRejectsDescriptionLongerThanLimit() {
+        AppUser user = verifiedUser(5L);
+        when(authorizationService.requireUser(5L)).thenReturn(user);
+        doNothing().when(authorizationService).requireWritePermission(user, 99L);
+        when(authorizationService.requireLocation(99L)).thenReturn(new Location());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationGanttTaskService.createLocationTask(
+                5L,
+                99L,
+                request("OPS", "x".repeat(GanttTask.DESCRIPTION_MAX_LENGTH + 1))
+            )
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Task description must be 1024 characters or fewer", ex.getReason());
+        verifyNoInteractions(ganttTaskRepository);
+    }
+
+    @Test
     void createLocationTasksBulkPersistsAllTasksAndTouchesLocationOnce() {
         AppUser user = verifiedUser(5L);
         Location location = new Location();
