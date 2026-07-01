@@ -32,13 +32,12 @@ const PORTAL_CAPABILITIES = [
   {
     title: "Client Visibility",
     description:
-      "Clients receive focused views of outcomes, trends, and risk signals without exposing partner administration controls."
+      "Clients receive focused views of long-and-short term outcomes, trends, and corrective actions."
   },
   {
     title: "Operations-to-Action Loop",
     description:
-      "The platform tracks operational events and turns them into measurable summaries for client communication" +
-      " and follow-up. "
+      "AIM generates detailed corrective action reports in a convenient calendar system based on operational exceptions for easy analysis."
   }
 ];
 
@@ -63,17 +62,18 @@ const TECHNOLOGY_POPUPS: TechnologyPopup[] = [
   {
     id: "oxidant-programs",
     title: "Oxidant Generation and Disinfection Programs",
-    tagline: "Chlorine dioxide, Sulfur Dioxide",
+    tagline: "Chlorine dioxide, Sulfur Dioxide, odor mitigation.",
     paragraphs: [
-      "ApHinity oxidant generation programs cover chlorine dioxide, mixed oxidants, hypochlorite generation, and high purity generation workflows.",
+      "ApHinity oxidant generation programs cover chlorine dioxide, mixed oxidants, and hypochlorite generation workflows. ApHinity's line of " +
+      "chlorine dioxide delivery products are engineered to make odor control reliable, safe, and invisible."
     ]
   },
   {
     id: "air-programs",
     title: "Engineered Air Programs",
-    tagline: "NOx/SOx abatement, odor mitigation, and airborne microbiological control.",
+    tagline: "NOx/SOx abatement and airborne microbiological control.",
     paragraphs: [
-      "ApHinity Technologies engineered air solutions focus on efficient removal of environmentally regulated compounds, including nitrogen oxides, sulfur oxides, and odor concerns.",
+      "ApHinity Technologies engineered air solutions provide efficient and budget-friendly removal of environmentally regulated airborne compounds such as nitrogen dioxide and sulfur dioxide. ",
     ]
   }
 ];
@@ -179,10 +179,10 @@ export const HomePage = () => {
               <span class="select-none badge badge-primary badge-outline bg-base-100/70">ApHinity Information Management (AIM) System</span>
               <p class="text-base md:text-lg text-base-content/80">
                 AIM supports ApHinity management partners in communicating key performance indicators to
-                clients through structured dashboards, validation workflows, and clear operational context.
+                clients through detailed dashboards, service records, and site management planning.
               </p>
               <p class="text-sm text-base-content/70">
-                AIM is intended for data presentation only. Select our products and
+                AIM is not a sales platform. Select our products and
                 services from our{" "}
                 <a class="link link-primary" href="https://aphinitytech.com/">
                   website
@@ -190,8 +190,8 @@ export const HomePage = () => {
                 !
               </p>
               <div class="flex flex-wrap gap-3">
-                <A class="btn btn-primary" href="/login" preload>
-                  Login
+                <A class="btn btn-primary" href="/signup" preload>
+                  Sign Up
                 </A>
                 <a class="btn btn-outline bg-base-100/70" href="#partner-contact-form">
                   Contact Partner Team
