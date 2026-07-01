@@ -447,8 +447,8 @@ class LocationControllerTest {
     private static Map<String, Object> scatterGraphLayout() {
         return Map.of(
             "title", Map.of("x", 0.02, "text", "Phoenix", "xanchor", "left"),
-            "xaxis", Map.of("type", "date", "tickformat", "%b %Y"),
-            "yaxis", Map.of("range", List.of(0, 100), "title", "% Conformance", "dtick", 1, "ticksuffix", "%"),
+            "xaxis", Map.of("type", "date", "tickformat", "%b %Y", "tickangle", 0),
+            "yaxis", Map.of("range", List.of(0, 100), "title", "Value", "dtick", 1),
             "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
             "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
         );

@@ -90,13 +90,14 @@ const applyLegendTheme = (legend: unknown, textColor: string): unknown => {
   };
 };
 
-const applyAxisTheme = (axis: unknown, textColor: string, gridColor: string): unknown => {
+const applyAxisTheme = (axis: unknown, textColor: string, gridColor: string, axisName: "x" | "y"): unknown => {
   if (!isRecord(axis)) {
     return axis;
   }
 
   return {
     ...axis,
+    ...(axisName === "x" && axis.type === "date" ? {tickangle: 0} : {}),
     color: textColor,
     title: applyTitleTheme(axis.title, textColor),
     tickfont: {
@@ -222,8 +223,8 @@ export const resolveThemedGraphLayout = (
     },
     title: applyLayoutTitleTheme(layout.title, themeStyle.textColor),
     legend: applyLegendTheme(layout.legend, themeStyle.textColor),
-    xaxis: applyAxisTheme(layout.xaxis, themeStyle.textColor, themeStyle.gridColor),
-    yaxis: applyAxisTheme(layout.yaxis, themeStyle.textColor, themeStyle.gridColor),
+    xaxis: applyAxisTheme(layout.xaxis, themeStyle.textColor, themeStyle.gridColor, "x"),
+    yaxis: applyAxisTheme(layout.yaxis, themeStyle.textColor, themeStyle.gridColor, "y"),
     annotations: applyAnnotationTheme(layout.annotations, themeStyle.textColor),
     paper_bgcolor: themeStyle.paperBackgroundColor ?? layout.paper_bgcolor,
     plot_bgcolor: themeStyle.plotBackgroundColor ?? layout.plot_bgcolor

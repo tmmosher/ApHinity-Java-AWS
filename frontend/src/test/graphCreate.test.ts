@@ -23,8 +23,8 @@ const buildScatterGraph = (yAxisTitle = DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE): Loc
   }],
   layout: {
     title: {x: 0.02, text: "", xanchor: "left"},
-    xaxis: {type: "date", tickformat: "%b %Y"},
-    yaxis: {range: [0, 100], title: yAxisTitle, ticksuffix: "%"},
+    xaxis: {type: "date", tickformat: "%b %Y", tickangle: 0},
+    yaxis: {range: [0, 100], title: yAxisTitle, dtick: 1},
     legend: {x: 0, y: -0.3, orientation: "h"},
     margin: {b: 60, l: 50, r: 20, t: 50}
   },
@@ -48,7 +48,7 @@ describe("graphCreate utilities", () => {
     });
   });
 
-  it("defaults blank y-axis titles to compliance", () => {
+  it("defaults blank y-axis titles to a neutral value axis", () => {
     expect(normalizeGraphCreateYAxisTitle("   ")).toBe(DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE);
     expect(normalizeGraphCreateYAxisTitle(undefined)).toBe(DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE);
   });
@@ -87,7 +87,7 @@ describe("graphCreate utilities", () => {
         yaxis: {
           range: [0, 100],
           title: "Monthly compliance",
-          ticksuffix: "%"
+          dtick: 1
         }
       },
       config: graph.config,

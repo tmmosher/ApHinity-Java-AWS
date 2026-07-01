@@ -73,6 +73,7 @@ final class LocationDashboardGraphMetadataSupport {
         Map<String, Object> xAxis = copyMutableMap(asMap(layout.get("xaxis")));
         xAxis.put("type", "date");
         xAxis.putIfAbsent("tickformat", "%b %Y");
+        xAxis.put("tickangle", 0);
         layout.put("xaxis", xAxis);
 
         Map<String, Object> yAxis = copyMutableMap(asMap(layout.get("yaxis")));

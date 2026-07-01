@@ -208,13 +208,13 @@ public class LocationGraphTemplateFactory {
         layout.put("title", buildGraphTitle(locationName));
         layout.put("xaxis", Map.of(
             "type", "date",
-            "tickformat", "%b %Y"
+            "tickformat", "%b %Y",
+            "tickangle", 0
         ));
         layout.put("yaxis", Map.of(
             "range", List.of(0, 100),
-            "title", "% Conformance",
-            "dtick", 1,
-            "ticksuffix", "%"
+            "title", "Value",
+            "dtick", 1
         ));
         layout.put("legend", Map.of(
             "x", 0,

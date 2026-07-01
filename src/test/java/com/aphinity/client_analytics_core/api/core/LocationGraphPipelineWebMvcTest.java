@@ -815,7 +815,9 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$.data[0].line.width").value(2))
             .andExpect(jsonPath("$.data[0].mode").value("lines+markers"))
             .andExpect(jsonPath("$.data[0].marker.size").value(6))
-            .andExpect(jsonPath("$.layout.yaxis.title").value("% Compliance"))
+            .andExpect(jsonPath("$.layout.xaxis.tickangle").value(0))
+            .andExpect(jsonPath("$.layout.yaxis.title").value("Value"))
+            .andExpect(jsonPath("$.layout.yaxis.ticksuffix").doesNotExist())
             .andExpect(jsonPath("$.layout.title.text").value("Phoenix"))
             .andExpect(jsonPath("$.config.displayModeBar").value(false))
             .andExpect(jsonPath("$.config.responsive").value(false));

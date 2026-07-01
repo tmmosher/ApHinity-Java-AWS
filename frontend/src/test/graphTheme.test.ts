@@ -142,6 +142,22 @@ describe("graphTheme", () => {
     });
   });
 
+  it("forces date x-axis tick labels to stay horizontal", () => {
+    const themedLayout = resolveThemedGraphLayout({
+      xaxis: {
+        type: "date",
+        tickformat: "%b %Y",
+        tickangle: -45
+      }
+    }, {}, "light");
+
+    expect(themedLayout.xaxis).toMatchObject({
+      type: "date",
+      tickformat: "%b %Y",
+      tickangle: 0
+    });
+  });
+
   it("does not inject undefined axis/title keys for donut KPI layouts", () => {
     const donutLayout = {
       margin: {b: 10, l: 10, r: 10, t: 10},
