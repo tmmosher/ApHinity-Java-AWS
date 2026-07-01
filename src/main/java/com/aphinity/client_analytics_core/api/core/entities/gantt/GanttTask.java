@@ -17,7 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "gantt_task")
+@Table(name = "gantt_task", schema = "public")
 public class GanttTask {
     public static final int TITLE_MIN_LENGTH = 3;
     public static final int TITLE_MAX_LENGTH = 60;

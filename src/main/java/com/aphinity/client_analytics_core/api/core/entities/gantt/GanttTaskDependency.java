@@ -20,6 +20,7 @@ import java.time.Instant;
 
 @Entity
 @Table(
+    schema = "public",
     name = "gantt_task_dependency",
     uniqueConstraints = @UniqueConstraint(name = "uq_gantt_task_dependency_pair", columnNames = {
         "gantt_task_id",
