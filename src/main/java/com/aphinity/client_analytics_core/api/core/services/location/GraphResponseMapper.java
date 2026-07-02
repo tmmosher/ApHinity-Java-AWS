@@ -23,8 +23,20 @@ public class GraphResponseMapper {
     }
 
     public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data) {
+        if (data != null) {
+            return new GraphResponse(
+                graph.getId(),
+                graph.getName(),
+                data,
+                graph.getLayout(),
+                graph.getConfig(),
+                graph.getStyle(),
+                graph.getCreatedAt(),
+                graph.getUpdatedAt()
+            );
+        }
         GraphPayloadMapper.GraphPayload payload = normalize(graph);
-        return toResponse(graph, payload, data == null ? payload.data() : data);
+        return toResponse(graph, payload, payload.data());
     }
 
     private GraphResponse toResponse(
