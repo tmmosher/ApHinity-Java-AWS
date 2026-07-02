@@ -170,6 +170,25 @@ describe("graphEditor", () => {
     expect(buildChangedLocationGraphUpdates(baseGraphs, baseGraphs)).toEqual([]);
   });
 
+  it("omits graph data from changed payloads for finite-range metadata saves", () => {
+    const editedGraphs = applyGraphPayloadEdit(baseGraphs, [], 10, {
+      data: [{type: "bar", x: ["A"], y: [10]}],
+      layout: {title: {text: "Finite range title"}},
+      config: {displayModeBar: false},
+      style: {height: 360}
+    }).nextGraphs;
+
+    expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphs, false)).toEqual([
+      {
+        graphId: 10,
+        layout: {title: {text: "Finite range title", x: 0.02, xanchor: "left"}},
+        config: {displayModeBar: false},
+        style: {height: 360},
+        expectedUpdatedAt: "2026-01-02T00:00:00Z"
+      }
+    ]);
+  });
+
   it("prunes deleted graphs from the local dashboard caches", () => {
     const baselineIndex = buildGraphBaselineIndex(baseGraphs);
     const cleanupResult = pruneDeletedLocationGraphState(

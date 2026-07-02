@@ -961,7 +961,87 @@ class LocationServiceTest {
     }
 
     @Test
-    void updateLocationGraphDataRejectsNullGraphDataPayload() {
+    void updateLocationGraphDataAllowsMetadataOnlyPayload() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(35L);
+        graph.setName("Layout Only");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2))));
+        graph.setLayout(Map.of("showlegend", false));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                35L,
+                null,
+                Map.of("showlegend", true),
+                null,
+                null,
+                null
+            ))
+        );
+
+        assertEquals(Map.of("showlegend", true), graph.getLayout());
+        verify(graphRepository).saveAllAndFlush(List.of(graph));
+        verify(locationRepository).touchUpdatedAt(eq(99L), any(Instant.class));
+    }
+
+    @Test
+    void updateLocationGraphDataPreservesBackendImportMetadata() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+        when(locationRepository.existsById(99L)).thenReturn(true);
+
+        Map<String, Object> importMetadata = Map.of(
+            "graphId", "source",
+            "derivedGraphType", "active"
+        );
+        Graph graph = new Graph();
+        graph.setId(36L);
+        graph.setName("Derived");
+        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2))));
+        graph.setLayout(Map.of(
+            "meta", Map.of("aphinityImport", importMetadata),
+            "showlegend", false
+        ));
+
+        when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(99L), anyCollection()))
+            .thenReturn(List.of(graph));
+
+        locationService.updateLocationGraphData(
+            5L,
+            99L,
+            List.of(new LocationGraphDataUpdateRequest(
+                36L,
+                null,
+                Map.of(
+                    "meta", Map.of("aphinityImport", Map.of("derivedGraphType", "tampered")),
+                    "showlegend", true
+                ),
+                null,
+                null,
+                null
+            ))
+        );
+
+        assertEquals(true, graph.getLayout().get("showlegend"));
+        assertEquals(
+            importMetadata,
+            ((Map<?, ?>) graph.getLayout().get("meta")).get("aphinityImport")
+        );
+    }
+
+    @Test
+    void updateLocationGraphDataRejectsFiniteRangeDataPayload() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
@@ -971,13 +1051,16 @@ class LocationServiceTest {
             locationService.updateLocationGraphData(
                 5L,
                 99L,
-                List.of(new LocationGraphDataUpdateRequest(35L, null))
+                List.of(new LocationGraphDataUpdateRequest(35L, List.of(Map.of("type", "bar", "y", List.of(1, 2))))),
+                null,
+                3
             )
         );
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-        assertEquals("Graph data is invalid", ex.getReason());
-        verify(graphRepository, never()).saveAll(anyList());
+        assertEquals("Graph data can only be edited from All Data", ex.getReason());
+        verify(graphRepository, never()).findByLocationIdAndGraphIdInForUpdate(anyLong(), anyCollection());
+        verify(graphRepository, never()).saveAllAndFlush(anyList());
         verify(locationRepository, never()).touchUpdatedAt(eq(99L), any(Instant.class));
     }
 
@@ -1081,7 +1164,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void updateLocationGraphDataRejectsNonObjectLayoutPayload() {
+    void updateLocationGraphDataRejectsRowsWithoutMutableFields() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
@@ -1093,8 +1176,11 @@ class LocationServiceTest {
                 99L,
                 List.of(new LocationGraphDataUpdateRequest(
                     34L,
-                    List.of(indicatorTrace(72)),
-                    List.of("invalid")
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
                 ))
             )
         );

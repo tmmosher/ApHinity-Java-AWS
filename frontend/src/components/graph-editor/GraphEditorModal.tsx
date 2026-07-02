@@ -61,6 +61,7 @@ type GraphEditorModalProps = {
   graph: LocationGraph | undefined;
   canRenameGraph: boolean;
   canDeleteGraph: boolean;
+  canEditData?: boolean;
   canUndo: boolean;
   isDeleting: boolean;
   isSaving: boolean;
@@ -105,6 +106,8 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   let lastSyncedGraph: LocationGraph | undefined;
 
   const isBusy = () => props.isSaving || props.isDeleting || isRemovingTrace() || isSavingRename();
+  const canEditData = () => props.canEditData !== false;
+  const isDataEditingDisabled = () => isBusy() || !canEditData();
 
   const clearTraceDrafts = () => {
     setPieValueDrafts({});
@@ -333,6 +336,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const updateSelectedTrace = (
     mutator: (trace: Record<string, unknown>) => Record<string, unknown>
   ) => {
+    if (!canEditData()) {
+      return;
+    }
     const index = selectedTraceIndex();
     setEditablePayload((current) => {
       const existingTrace = current.data[index];
@@ -350,6 +356,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const updatePieValueDraft = (rowIndex: number, rawValue: string) => {
+    if (!canEditData()) {
+      return;
+    }
     if (parseNumericInput(rawValue) === null) {
       batch(() => {
         setPieValueDrafts((current) =>
@@ -370,6 +379,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const updateIndicatorValueDraft = (rawValue: string) => {
+    if (!canEditData()) {
+      return;
+    }
     const parsedValue = parseIndicatorValueInput(rawValue);
     if (parsedValue === null) {
       batch(() => {
@@ -393,6 +405,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     indicatorValueDraft() !== undefined && parseIndicatorValueInput(indicatorValueDraft() ?? "") === null;
 
   const updateCartesianXValue = (rowIndex: number, rawValue: string) => {
+    if (!canEditData()) {
+      return;
+    }
     const trace = selectedTrace();
     if (!trace) {
       return;
@@ -424,6 +439,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const updateCartesianYValue = (rowIndex: number, rawValue: string) => {
+    if (!canEditData()) {
+      return;
+    }
     const trace = selectedTrace();
     if (!trace) {
       return;
@@ -565,6 +583,9 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   });
 
   const applyTraceColor = (colorHex: string) => {
+    if (!canEditData()) {
+      return;
+    }
     const traceType = selectedTraceType();
     if (!traceType) {
       return;
@@ -574,7 +595,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const updateBarOrientation = (nextOrientation: "h" | "v") => {
-    if (isBusy() || selectedBarOrientation() === nextOrientation) {
+    if (isDataEditingDisabled() || selectedBarOrientation() === nextOrientation) {
       return;
     }
 
@@ -602,7 +623,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const addNewTrace = () => {
-    if (isBusy()) {
+    if (isDataEditingDisabled()) {
       return;
     }
 
@@ -633,7 +654,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const renameSelectedTrace = () => {
-    if (isBusy()) {
+    if (isDataEditingDisabled()) {
       return;
     }
 
@@ -646,7 +667,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   };
 
   const removeSelectedTrace = async () => {
-    if (isBusy()) {
+    if (isDataEditingDisabled()) {
       return;
     }
 
@@ -894,6 +915,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                 <input
                   type="text"
                   class="input input-bordered input-sm mt-2 w-full"
+                  data-graph-edit-field="layout"
                   value={graphTitleDraft()}
                   disabled={isBusy()}
                   placeholder="Optional graph title"
@@ -910,12 +932,12 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                 selectedTraceColor={selectedTraceColorValue()}
                 colorOptions={TRACE_COLOR_OPTIONS}
                 showColorSelect={selectedTraceType() !== "bar"}
-                disableAddTrace={isBusy()}
+                disableAddTrace={isDataEditingDisabled()}
                 disableTraceSelect={isBusy() || traceOptions().length === 0}
-                disableColorSelect={isBusy() || !selectedTraceType() || selectedTraceType() === "bar"}
-                disableTraceNameInput={isBusy() || !selectedTrace()}
-                disableRenameTrace={isBusy() || !selectedTrace()}
-                disableRemoveTrace={isBusy() || !selectedTrace()}
+                disableColorSelect={isDataEditingDisabled() || !selectedTraceType() || selectedTraceType() === "bar"}
+                disableTraceNameInput={isDataEditingDisabled() || !selectedTrace()}
+                disableRenameTrace={isDataEditingDisabled() || !selectedTrace()}
+                disableRemoveTrace={isDataEditingDisabled() || !selectedTrace()}
                 onAddTrace={addNewTrace}
                 onSelectTrace={selectTrace}
                 onChangeTraceName={setTraceNameDraft}
@@ -951,6 +973,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       rowColors={pieRowColors()}
                       colorOptions={TRACE_COLOR_OPTIONS}
                       isBusy={isBusy()}
+                      isDataEditingDisabled={isDataEditingDisabled()}
                       onAddRow={() => updateSelectedTrace((trace) => addPieRow(trace))}
                       onUpdateColor={(rowIndex, colorHex) =>
                         updateSelectedTrace((trace) => setPieRowColor(trace, rowIndex, colorHex))
@@ -974,6 +997,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       color={selectedTraceColorValue()}
                       colorOptions={TRACE_COLOR_OPTIONS}
                       isBusy={isBusy()}
+                      isDataEditingDisabled={isDataEditingDisabled()}
                       onUpdateValue={updateIndicatorValueDraft}
                       onUpdateColor={(colorHex) =>
                         updateSelectedTrace((trace) => setTraceColor(trace, "indicator", colorHex))
@@ -1002,6 +1026,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yRangeMinDraft={yRangeMinDraft()}
                       yRangeMaxDraft={yRangeMaxDraft()}
                       isBusy={isBusy()}
+                      isDataEditingDisabled={isDataEditingDisabled()}
                       onUpdateBarOrientation={updateBarOrientation}
                       onAddRow={() => updateSelectedTrace((trace) => addCartesianRow(trace))}
                       onUpdateX={(rowIndex, rawValue) =>
@@ -1040,6 +1065,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yRangeMinDraft={yRangeMinDraft()}
                       yRangeMaxDraft={yRangeMaxDraft()}
                       isBusy={isBusy()}
+                      isDataEditingDisabled={isDataEditingDisabled()}
                       onAddRow={() => updateSelectedTrace((trace) => addCartesianRow(trace))}
                       onUpdateX={(rowIndex, rawValue) =>
                         updateCartesianXValue(rowIndex, rawValue)

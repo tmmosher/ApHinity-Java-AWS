@@ -99,6 +99,27 @@ const renderModal = (graph?: LocationGraph) =>
     return dispose;
   });
 
+const renderModalWithDataEditing = (graph: LocationGraph | undefined, canEditData: boolean) =>
+  createRoot((dispose) => {
+    GraphEditorModal({
+      isOpen: true,
+      graph,
+      canRenameGraph: false,
+      canDeleteGraph: false,
+      canEditData,
+      canUndo: false,
+      isDeleting: false,
+      isSaving: false,
+      onApply: vi.fn(),
+      onDeleteGraph: vi.fn().mockResolvedValue(undefined),
+      onRenameGraph: vi.fn().mockResolvedValue(undefined),
+      onUndo: vi.fn(),
+      onClose: vi.fn()
+    });
+
+    return dispose;
+  });
+
 const flushSolidUpdates = async () => {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 };
@@ -165,6 +186,7 @@ const getCartesianTraceEditorProps = () => {
     yInputMode?: "decimal";
     yRangeMinDraft?: string;
     yRangeMaxDraft?: string;
+    isDataEditingDisabled: boolean;
     axisTitleControls?: Array<{
       key: string;
       label: string;
@@ -216,6 +238,39 @@ describe("GraphEditorModal trace controls", () => {
         props.onChangeTraceName("Renamed Trace");
         props.onRenameTrace();
       }).not.toThrow();
+    } finally {
+      dispose();
+    }
+  });
+
+  it("marks data controls disabled when graph data editing is not allowed", async () => {
+    const barGraph: LocationGraph = {
+      id: 14,
+      name: "Projected",
+      data: [{
+        type: "bar",
+        name: "Trace 1",
+        orientation: "h",
+        x: [3],
+        y: ["Open"]
+      }],
+      layout: {xaxis: {title: "Value"}},
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModalWithDataEditing(barGraph, false);
+    try {
+      await flushSolidUpdates();
+
+      const traceProps = getTraceControlsProps();
+      const cartesianProps = getCartesianTraceEditorProps();
+      expect(traceProps.disableRenameTrace).toBe(true);
+      expect(cartesianProps.isDataEditingDisabled).toBe(true);
+      expect(cartesianProps.axisTitleControls?.[0]?.label).toBe("Value axis title");
+      expect(typeof cartesianProps.axisTitleControls?.[0]?.onUpdate).toBe("function");
     } finally {
       dispose();
     }

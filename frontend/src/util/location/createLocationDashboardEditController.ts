@@ -36,6 +36,7 @@ import {
   saveLocationGraphsById,
   uploadLocationDashboardSpreadsheetById
 } from "../graph/locationDetailApi";
+import {monthRangeForDashboardTimeRange} from "./dashboardTimeRange";
 
 type LocationDashboardEditControllerProps = {
   host: string;
@@ -45,6 +46,7 @@ type LocationDashboardEditControllerProps = {
   refetchLocation: () => Promise<unknown>;
   refetchGraphs: () => Promise<unknown>;
   canEditGraphs: Accessor<boolean>;
+  graphTimeRange: Accessor<LocationGraphTimeRange>;
   shouldResetDashboardState: (nextLocationId: string) => boolean;
 };
 
@@ -52,6 +54,7 @@ type DashboardSnapshot = {
   graphs: LocationGraph[];
   sectionLayout: LocationSectionLayoutConfig;
   spreadsheetFile: File | null;
+  hasFiniteRangeGraphEdit: boolean;
 };
 
 export const createLocationDashboardEditController = (props: LocationDashboardEditControllerProps) => {
@@ -60,6 +63,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
   const [workingSectionLayout, setWorkingSectionLayout] = createSignal<LocationSectionLayoutConfig>({sections: []});
   const [pendingSpreadsheetFile, setPendingSpreadsheetFile] = createSignal<File | null>(null);
   const [sectionLayoutBaseline, setSectionLayoutBaseline] = createSignal<LocationSectionLayoutConfig>({sections: []});
+  const [hasFiniteRangeGraphEdit, setHasFiniteRangeGraphEdit] = createSignal(false);
   const [sectionLayoutSyncUpdatedAt, setSectionLayoutSyncUpdatedAt] = createSignal<string | null>(null);
   const [hasInitializedSectionLayout, setHasInitializedSectionLayout] = createSignal(false);
   const [dashboardUndoStack, setDashboardUndoStack] = createSignal<DashboardSnapshot[]>([]);
@@ -141,7 +145,8 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setDashboardUndoStack((currentUndoStack) => currentUndoStack.map((snapshot, index) => ({
       graphs: refreshState.nextUndoStack[index] ?? snapshot.graphs,
       sectionLayout: snapshot.sectionLayout,
-      spreadsheetFile: snapshot.spreadsheetFile
+      spreadsheetFile: snapshot.spreadsheetFile,
+      hasFiniteRangeGraphEdit: snapshot.hasFiniteRangeGraphEdit
     })));
   });
 
@@ -186,6 +191,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setGraphBaselineIndex(new Map());
     setWorkingSectionLayout({sections: []});
     setPendingSpreadsheetFile(null);
+    setHasFiniteRangeGraphEdit(false);
     setSectionLayoutBaseline({sections: []});
     setSectionLayoutSyncUpdatedAt(null);
     setHasInitializedSectionLayout(false);
@@ -248,7 +254,8 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
   const createDashboardSnapshot = (): DashboardSnapshot => ({
     graphs: cloneLocationGraphs(workingGraphs()),
     sectionLayout: cloneLocationSectionLayout(workingSectionLayout()),
-    spreadsheetFile: pendingSpreadsheetFile()
+    spreadsheetFile: pendingSpreadsheetFile(),
+    hasFiniteRangeGraphEdit: hasFiniteRangeGraphEdit()
   });
 
   const applyLocalGraphEdit = (
@@ -269,6 +276,9 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       ...currentUndoStack,
       createDashboardSnapshot()
     ]);
+    if (timeRange !== "allTime") {
+      setHasFiniteRangeGraphEdit(true);
+    }
     setWorkingGraphs(result.nextGraphs);
   };
 
@@ -305,6 +315,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     ]);
     setWorkingGraphs(nextGraphs);
     setPendingSpreadsheetFile(spreadsheetFile ?? null);
+    setHasFiniteRangeGraphEdit(false);
   };
 
   const renameGraphFromModal = async (graphId: number, name: string): Promise<void> => {
@@ -513,6 +524,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setWorkingGraphs(cloneLocationGraphs(nextSnapshot.graphs));
     setWorkingSectionLayout(cloneLocationSectionLayout(nextSnapshot.sectionLayout));
     setPendingSpreadsheetFile(nextSnapshot.spreadsheetFile);
+    setHasFiniteRangeGraphEdit(nextSnapshot.hasFiniteRangeGraphEdit);
     setDashboardUndoStack(currentUndoStack.slice(0, -1));
   };
 
@@ -523,13 +535,15 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
 
     const saveLocationId = props.locationId();
     const saveSessionToken = locationSessionToken();
-    const graphUpdates = buildChangedLocationGraphUpdates(workingGraphs(), graphBaselineIndex());
-    const sectionLayoutUpdate = reconcileSectionLayoutWithWorkingGraphs(workingSectionLayout());
     const spreadsheetFile = pendingSpreadsheetFile();
+    const includeGraphData = !hasFiniteRangeGraphEdit() || spreadsheetFile !== null;
+    const graphUpdates = buildChangedLocationGraphUpdates(workingGraphs(), graphBaselineIndex(), includeGraphData);
+    const sectionLayoutUpdate = reconcileSectionLayoutWithWorkingGraphs(workingSectionLayout());
+    const updateMonthRange = includeGraphData ? -1 : monthRangeForDashboardTimeRange(props.graphTimeRange());
 
     setIsSavingGraphChanges(true);
     try {
-      await saveLocationGraphsById(props.host, saveLocationId, graphUpdates, sectionLayoutUpdate);
+      await saveLocationGraphsById(props.host, saveLocationId, graphUpdates, sectionLayoutUpdate, updateMonthRange);
       if (spreadsheetFile) {
         await uploadLocationDashboardSpreadsheetById(props.host, saveLocationId, spreadsheetFile, true);
       }
@@ -539,6 +553,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       setSectionLayoutSyncUpdatedAt(props.location()?.updatedAt ?? null);
       setDashboardUndoStack([]);
       setPendingSpreadsheetFile(null);
+      setHasFiniteRangeGraphEdit(false);
       setWorkingSectionLayout(cloneLocationSectionLayout(sectionLayoutUpdate));
       setSectionLayoutBaseline(cloneLocationSectionLayout(sectionLayoutUpdate));
       toast.success("Dashboard changes saved");
@@ -569,6 +584,10 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
             toast.error("A graph was updated by another user, and automatic refresh failed. Please refresh the page");
           }
         }
+        return;
+      }
+      if (error instanceof Error && error.message === "Graph data can only be edited from All Data") {
+        toast.error("Switch to All Data to edit graph values; layout-only changes are still available in shorter ranges");
         return;
       }
       if (error instanceof Error && error.message === "CSRF invalid") {

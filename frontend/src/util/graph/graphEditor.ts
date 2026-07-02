@@ -134,10 +134,16 @@ const normalizeGraphPayload = (payload: EditableGraphPayload): EditableGraphPayl
 const graphPayloadSignature = (payload: EditableGraphPayload): string =>
   JSON.stringify(normalizeGraphPayload(payload));
 
-const buildGraphUpdatePayload = (graph: LocationGraph): LocationGraphUpdate => ({
-  graphId: graph.id,
-  ...createEditableGraphPayload(graph)
-});
+const buildGraphUpdatePayload = (graph: LocationGraph, includeData = true): LocationGraphUpdate => {
+  const payload = createEditableGraphPayload(graph);
+  return {
+    graphId: graph.id,
+    ...(includeData ? {data: payload.data} : {}),
+    layout: payload.layout,
+    config: payload.config,
+    style: payload.style
+  };
+};
 
 const graphPersistenceSignature = (graph: LocationGraph): string =>
   JSON.stringify({
@@ -270,7 +276,7 @@ export const reconcileLocationGraphs = (
 };
 
 export const buildLocationGraphUpdates = (graphs: LocationGraph[]): LocationGraphUpdate[] =>
-  graphs.map(buildGraphUpdatePayload);
+  graphs.map((graph) => buildGraphUpdatePayload(graph));
 
 export const buildGraphBaselineIndex = (graphs: LocationGraph[]): Map<number, GraphBaselineEntry> => {
   const baselineById = new Map<number, GraphBaselineEntry>();
@@ -313,7 +319,8 @@ export const pruneDeletedLocationGraphState = (
  */
 export const buildChangedLocationGraphUpdates = (
   currentGraphs: LocationGraph[],
-  baselineSource: LocationGraph[] | Map<number, GraphBaselineEntry>
+  baselineSource: LocationGraph[] | Map<number, GraphBaselineEntry>,
+  includeData = true
 ): LocationGraphUpdate[] => {
   const baselineById =
     baselineSource instanceof Map ? baselineSource : buildGraphBaselineIndex(baselineSource);
@@ -327,7 +334,7 @@ export const buildChangedLocationGraphUpdates = (
     }
 
     changedUpdates.push({
-      ...buildGraphUpdatePayload(currentGraph),
+      ...buildGraphUpdatePayload(currentGraph, includeData),
       expectedUpdatedAt: baseline?.expectedUpdatedAt ?? null
     });
   }

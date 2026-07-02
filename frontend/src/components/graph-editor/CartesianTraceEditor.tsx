@@ -31,6 +31,7 @@ type CartesianTraceEditorProps = {
   yRangeMinDraft?: string;
   yRangeMaxDraft?: string;
   isBusy: boolean;
+  isDataEditingDisabled: boolean;
   onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
   onAddRow: () => void;
   onUpdateX: (rowIndex: number, rawValue: string) => void;
@@ -54,8 +55,9 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
         <h3 class="text-sm font-semibold">{props.heading} Values</h3>
         <button
           type="button"
-          class={"btn btn-xs " + (props.isBusy ? "btn-disabled" : "btn-outline")}
-          disabled={props.isBusy}
+          class={"btn btn-xs " + (props.isDataEditingDisabled ? "btn-disabled" : "btn-outline")}
+          data-graph-edit-field="data"
+          disabled={props.isDataEditingDisabled}
           onClick={props.onAddRow}
         >
           Add Row
@@ -64,12 +66,12 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
 
       <div class={"grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 " + (props.onUpdateBarOrientation ? "md:grid-cols-3" : "md:grid-cols-2")}>
         <Show when={props.onUpdateBarOrientation}>
-          <label class="form-control">
+          <label class="form-control" data-graph-edit-field="data">
             <span class="label-text">Orientation</span>
             <select
               class="select select-bordered select-sm mt-1"
               value={props.barOrientation ?? "h"}
-              disabled={props.isBusy}
+              disabled={props.isDataEditingDisabled}
               onChange={(event) => props.onUpdateBarOrientation?.(event.currentTarget.value === "v" ? "v" : "h")}
             >
               <option value="h">Horizontal</option>
@@ -77,7 +79,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
             </select>
           </label>
         </Show>
-        <label class="form-control">
+        <label class="form-control" data-graph-edit-field="layout">
           <span class="label-text">{rangeLabel()} range min</span>
           <input
             class={"input input-bordered input-sm mt-1" + (props.yRangeMinDraft !== undefined ? " input-error" : "")}
@@ -90,7 +92,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
             onInput={(event) => props.onUpdateYRangeMin(event.currentTarget.value)}
           />
         </label>
-        <label class="form-control">
+        <label class="form-control" data-graph-edit-field="layout">
           <span class="label-text">{rangeLabel()} range max</span>
           <input
             class={"input input-bordered input-sm mt-1" + (props.yRangeMaxDraft !== undefined ? " input-error" : "")}
@@ -105,7 +107,7 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
         </label>
         <Index each={props.axisTitleControls ?? []}>
           {(axisTitleControl) => (
-            <label class="form-control">
+            <label class="form-control" data-graph-edit-field="layout">
               <span class="label-text">{axisTitleControl().label}</span>
               <input
                 class="input input-bordered input-sm mt-1"
@@ -133,12 +135,14 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                 }
               >
                 <Show when={props.onUpdateColor && props.colorOptions}>
-                  <GraphColorPicker
-                    value={props.rowColors?.[rowIndex] ?? ""}
-                    disabled={props.isBusy}
-                    colorOptions={props.colorOptions ?? {}}
-                    onChange={(nextColor) => props.onUpdateColor?.(rowIndex, nextColor)}
-                  />
+                  <div data-graph-edit-field="data">
+                    <GraphColorPicker
+                      value={props.rowColors?.[rowIndex] ?? ""}
+                      disabled={props.isDataEditingDisabled}
+                      colorOptions={props.colorOptions ?? {}}
+                      onChange={(nextColor) => props.onUpdateColor?.(rowIndex, nextColor)}
+                    />
+                  </div>
                 </Show>
                 <input
                   class={"input input-bordered input-sm" + (xDrafts()[rowIndex] !== undefined ? " input-error" : "")}
@@ -147,7 +151,8 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                   inputmode={props.xInputMode}
                   placeholder={`${xLabel()} value`}
                   value={xDrafts()[rowIndex] ?? toInputValue(props.xValues[rowIndex])}
-                  disabled={props.isBusy}
+                  data-graph-edit-field="data"
+                  disabled={props.isDataEditingDisabled}
                   onInput={(event) => props.onUpdateX(rowIndex, event.currentTarget.value)}
                 />
                 <input
@@ -157,13 +162,15 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
                   inputmode={props.yInputMode}
                   placeholder={`${yLabel()} value`}
                   value={yDrafts()[rowIndex] ?? toInputValue(props.yValues[rowIndex])}
-                  disabled={props.isBusy}
+                  data-graph-edit-field="data"
+                  disabled={props.isDataEditingDisabled}
                   onInput={(event) => props.onUpdateY(rowIndex, event.currentTarget.value)}
                 />
                 <button
                   type="button"
-                  class={"btn btn-xs " + (props.isBusy ? "btn-disabled" : "btn-ghost")}
-                  disabled={props.isBusy}
+                  class={"btn btn-xs " + (props.isDataEditingDisabled ? "btn-disabled" : "btn-ghost")}
+                  data-graph-edit-field="data"
+                  disabled={props.isDataEditingDisabled}
                   onClick={() => props.onRemoveRow(rowIndex)}
                 >
                   Remove

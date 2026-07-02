@@ -161,7 +161,7 @@ class LocationControllerTest {
         locationController.updateLocationGraphData(jwt, 8L, request);
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
-        verify(locationService).updateLocationGraphData(42L, 8L, request.graphs());
+        verify(locationService).updateLocationGraphData(42L, 8L, request.graphs(), null, request.monthRange());
     }
 
     @Test
@@ -182,7 +182,13 @@ class LocationControllerTest {
         locationController.updateLocationGraphData(jwt, 8L, request);
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
-        verify(locationService).updateLocationGraphData(42L, 8L, request.graphs(), request.sectionLayout());
+        verify(locationService).updateLocationGraphData(
+            42L,
+            8L,
+            request.graphs(),
+            request.sectionLayout(),
+            request.monthRange()
+        );
     }
 
     @Test

@@ -8,6 +8,7 @@ type IndicatorTraceEditorProps = {
   color: string;
   colorOptions: Record<string, string>;
   isBusy: boolean;
+  isDataEditingDisabled: boolean;
   onUpdateValue: (rawValue: string) => void;
   onUpdateColor: (colorHex: string) => void;
 };
@@ -33,18 +34,19 @@ const IndicatorTraceEditor = (props: IndicatorTraceEditorProps) => {
             aria-invalid={props.valueDraft !== undefined}
             type="text"
             inputmode="decimal"
+            data-graph-edit-field="data"
             placeholder={`${INDICATOR_VALUE_MIN}-${INDICATOR_VALUE_MAX}`}
             value={props.valueDraft ?? toInputValue(props.value)}
-            disabled={props.isBusy}
+            disabled={props.isDataEditingDisabled}
             onInput={(event) => props.onUpdateValue(event.currentTarget.value)}
           />
         </label>
 
-        <label class="form-control">
+        <label class="form-control" data-graph-edit-field="data">
           <span class="label-text">Gauge color</span>
           <GraphColorPicker
             value={props.color}
-            disabled={props.isBusy}
+            disabled={props.isDataEditingDisabled}
             colorOptions={props.colorOptions}
             onChange={props.onUpdateColor}
           />

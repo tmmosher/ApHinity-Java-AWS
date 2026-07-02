@@ -126,6 +126,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
     refetchLocation: refetchLocationDetail,
     refetchGraphs: refetchLocationGraphs,
     canEditGraphs,
+    graphTimeRange,
     shouldResetDashboardState
   });
 

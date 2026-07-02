@@ -44,6 +44,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -370,7 +371,7 @@ public class LocationService {
         Long locationId,
         List<LocationGraphDataUpdateRequest> graphUpdates
     ) {
-        updateLocationGraphData(userId, locationId, graphUpdates, null);
+        updateLocationGraphData(userId, locationId, graphUpdates, null, null);
     }
 
     @Transactional
@@ -379,6 +380,17 @@ public class LocationService {
         Long locationId,
         List<LocationGraphDataUpdateRequest> graphUpdates,
         Map<String, Object> sectionLayout
+    ) {
+        updateLocationGraphData(userId, locationId, graphUpdates, sectionLayout, null);
+    }
+
+    @Transactional
+    public void updateLocationGraphData(
+        Long userId,
+        Long locationId,
+        List<LocationGraphDataUpdateRequest> graphUpdates,
+        Map<String, Object> sectionLayout,
+        Integer monthRange
     ) {
         AppUser user = requireUser(userId);
         locationDashboardMutationLockService.executeWithLocationLock(locationId, () -> {
@@ -417,6 +429,17 @@ public class LocationService {
             Map<Long, LocationGraphDataUpdateRequest> updatesByGraphId = hasGraphUpdates
                 ? mapGraphUpdatesById(graphUpdates, locationId, userId)
                 : Map.of();
+            DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
+            if (!resolvedMonthRange.isAllTime() && containsGraphDataUpdates(updatesByGraphId.values())) {
+                log.warn(
+                    "Rejected finite-range graph data update actorUserId={} locationId={} monthRange={} graphIds={}",
+                    userId,
+                    locationId,
+                    monthRange,
+                    updatesByGraphId.keySet()
+                );
+                throw finiteRangeGraphDataUpdateNotAllowed();
+            }
             List<Graph> graphs = hasGraphUpdates
                 ? graphRepository.findByLocationIdAndGraphIdInForUpdate(locationId, updatesByGraphId.keySet())
                 : List.of();
@@ -438,15 +461,17 @@ public class LocationService {
                 LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
                 try {
                     validateExpectedGraphTimestamp(update, graph, locationId, userId);
-                    ValidatedGraphPayload validatedPayload = locationGraphUpdatePayloadValidationFactory.validateForUpdate(
-                        graph.getData(),
-                        update.data(),
-                        update.layout()
-                    );
-                    validatedPayloads.put(
-                        graph.getId(),
-                        validatedPayload
-                    );
+                    if (update.data() != null) {
+                        ValidatedGraphPayload validatedPayload = locationGraphUpdatePayloadValidationFactory.validateForUpdate(
+                            graph.getData(),
+                            update.data(),
+                            update.layout()
+                        );
+                        validatedPayloads.put(
+                            graph.getId(),
+                            validatedPayload
+                        );
+                    }
                 } catch (IllegalArgumentException ex) {
                     log.warn(
                         "Rejected invalid graph data update locationId={} graphId={} actorUserId={}",
@@ -497,15 +522,33 @@ public class LocationService {
             }
 
             for (Graph graph : graphs) {
-                ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
-                if (validatedPayload == null) {
-                    throw new IllegalStateException("Validated graph payload was missing");
-                }
                 LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
-                if (update.layout() != null) {
-                    graph.setLayout(validatedPayload.layout());
+                ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
+                if (update.data() != null) {
+                    if (validatedPayload == null) {
+                        throw new IllegalStateException("Validated graph payload was missing");
+                    }
+                    if (update.layout() != null) {
+                        graph.setLayout(preserveBackendGraphLayoutMetadata(graph.getLayout(), validatedPayload.layout()));
+                    }
+                    if (update.config() != null) {
+                        graph.setConfig(copyGraphObject(update.config()));
+                    }
+                    if (update.style() != null) {
+                        graph.setStyle(copyGraphObject(update.style()));
+                    }
+                    graph.setData(validatedPayload.data());
+                } else {
+                    if (update.layout() != null) {
+                        graph.setLayout(preserveBackendGraphLayoutMetadata(graph.getLayout(), copyGraphObject(update.layout())));
+                    }
+                    if (update.config() != null) {
+                        graph.setConfig(copyGraphObject(update.config()));
+                    }
+                    if (update.style() != null) {
+                        graph.setStyle(copyGraphObject(update.style()));
+                    }
                 }
-                graph.setData(validatedPayload.data());
             }
 
             try {
@@ -582,6 +625,18 @@ public class LocationService {
         return false;
     }
 
+    private boolean containsGraphDataUpdates(Collection<LocationGraphDataUpdateRequest> graphUpdates) {
+        if (graphUpdates == null || graphUpdates.isEmpty()) {
+            return false;
+        }
+        for (LocationGraphDataUpdateRequest graphUpdate : graphUpdates) {
+            if (graphUpdate != null && graphUpdate.data() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean graphHasDerivedDashboardMetadata(Map<String, Object> layout) {
         if (layout == null) {
             return false;
@@ -596,6 +651,52 @@ public class LocationService {
         }
         Object derivedGraphType = importMeta.get("derivedGraphType");
         return derivedGraphType instanceof String value && !value.isBlank();
+    }
+
+    private Map<String, Object> copyGraphObject(Map<String, Object> value) {
+        return value == null ? null : new LinkedHashMap<>(value);
+    }
+
+    private Map<String, Object> preserveBackendGraphLayoutMetadata(
+        Map<String, Object> currentLayout,
+        Map<String, Object> requestedLayout
+    ) {
+        if (requestedLayout == null) {
+            return null;
+        }
+        Map<String, Object> currentImportMetadata = readImportMetadata(currentLayout);
+        if (currentImportMetadata == null) {
+            return requestedLayout;
+        }
+
+        Map<String, Object> nextLayout = new LinkedHashMap<>(requestedLayout);
+        Map<String, Object> nextMeta = nextLayout.get("meta") instanceof Map<?, ?> rawMeta
+            ? copyUnknownObjectMap(rawMeta)
+            : new LinkedHashMap<>();
+        nextMeta.put("aphinityImport", currentImportMetadata);
+        nextLayout.put("meta", nextMeta);
+        return nextLayout;
+    }
+
+    private Map<String, Object> readImportMetadata(Map<String, Object> layout) {
+        if (layout == null || !(layout.get("meta") instanceof Map<?, ?> rawMeta)) {
+            return null;
+        }
+        Map<String, Object> meta = copyUnknownObjectMap(rawMeta);
+        if (!(meta.get("aphinityImport") instanceof Map<?, ?> rawImportMetadata)) {
+            return null;
+        }
+        return copyUnknownObjectMap(rawImportMetadata);
+    }
+
+    private Map<String, Object> copyUnknownObjectMap(Map<?, ?> rawMap) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() != null) {
+                copy.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        return copy;
     }
 
     /**
@@ -1448,6 +1549,10 @@ public class LocationService {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph data is invalid");
     }
 
+    private ResponseStatusException finiteRangeGraphDataUpdateNotAllowed() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph data can only be edited from All Data");
+    }
+
     private ResponseStatusException invalidGraphName() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph name is required");
     }
@@ -1519,9 +1624,9 @@ public class LocationService {
                 );
                 throw invalidGraphData();
             }
-            if (update.data() == null) {
+            if (update.data() == null && update.layout() == null && update.config() == null && update.style() == null) {
                 log.warn(
-                    "Rejected graph update row because graph data payload was null actorUserId={} locationId={} graphId={} rowIndex={}",
+                    "Rejected graph update row because no graph fields were supplied actorUserId={} locationId={} graphId={} rowIndex={}",
                     actorUserId,
                     locationId,
                     update.graphId(),
@@ -1529,18 +1634,20 @@ public class LocationService {
                 );
                 throw invalidGraphData();
             }
-            try {
-                GraphPayloadMapper.toTraceList(update.data());
-            } catch (IllegalArgumentException ex) {
-                log.warn(
-                    "Rejected graph update row because graph data payload was invalid actorUserId={} locationId={} graphId={} rowIndex={}",
-                    actorUserId,
-                    locationId,
-                    update.graphId(),
-                    index,
-                    ex
-                );
-                throw invalidGraphData();
+            if (update.data() != null) {
+                try {
+                    GraphPayloadMapper.toTraceList(update.data());
+                } catch (IllegalArgumentException ex) {
+                    log.warn(
+                        "Rejected graph update row because graph data payload was invalid actorUserId={} locationId={} graphId={} rowIndex={}",
+                        actorUserId,
+                        locationId,
+                        update.graphId(),
+                        index,
+                        ex
+                    );
+                    throw invalidGraphData();
+                }
             }
             if (update.layout() != null && !(update.layout() instanceof Map<?, ?>)) {
                 log.warn(

@@ -162,9 +162,11 @@ export const saveLocationGraphsById = async (
   host: string,
   locationId: string,
   graphUpdates: LocationGraphUpdate[],
-  sectionLayout?: LocationSectionLayoutConfig
+  sectionLayout?: LocationSectionLayoutConfig,
+  monthRange = -1
 ): Promise<void> => {
   const parsedId = parseRouteLocationId(locationId);
+  const parsedMonthRange = Number.isInteger(monthRange) ? monthRange : -1;
 
   const response = await apiFetch(host + "/api/core/locations/" + parsedId + "/graphs", {
     method: "PUT",
@@ -173,7 +175,8 @@ export const saveLocationGraphsById = async (
     },
     body: JSON.stringify({
       graphs: graphUpdates,
-      sectionLayout
+      sectionLayout,
+      monthRange: parsedMonthRange
     })
   });
 

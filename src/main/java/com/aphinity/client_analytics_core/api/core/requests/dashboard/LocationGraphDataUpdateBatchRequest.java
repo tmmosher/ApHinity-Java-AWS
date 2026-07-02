@@ -7,16 +7,26 @@ import java.util.Map;
 import java.util.List;
 
 /**
- * Batch request for graph data updates scoped to a single location.
+ * Batch request for graph updates scoped to a single location.
  *
  * @param graphs graph update rows
+ * @param sectionLayout optional dashboard section layout update
+ * @param monthRange dashboard month range active when the update was submitted
  */
 public record LocationGraphDataUpdateBatchRequest(
     @NotNull
     List<@Valid LocationGraphDataUpdateRequest> graphs,
-    Map<String, Object> sectionLayout
+    Map<String, Object> sectionLayout,
+    Integer monthRange
 ) {
     public LocationGraphDataUpdateBatchRequest(List<@Valid LocationGraphDataUpdateRequest> graphs) {
-        this(graphs, null);
+        this(graphs, null, null);
+    }
+
+    public LocationGraphDataUpdateBatchRequest(
+        List<@Valid LocationGraphDataUpdateRequest> graphs,
+        Map<String, Object> sectionLayout
+    ) {
+        this(graphs, sectionLayout, null);
     }
 }

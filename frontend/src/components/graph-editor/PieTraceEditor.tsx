@@ -10,6 +10,7 @@ type PieTraceEditorProps = {
   rowColors: string[];
   colorOptions: Record<string, string>;
   isBusy: boolean;
+  isDataEditingDisabled: boolean;
   onAddRow: () => void;
   onUpdateColor: (rowIndex: number, colorHex: string) => void;
   onUpdateLabel: (rowIndex: number, rawValue: string) => void;
@@ -31,8 +32,9 @@ const PieTraceEditor = (props: PieTraceEditorProps) => {
         </div>
         <button
           type="button"
-          class={"btn btn-xs " + (props.isBusy ? "btn-disabled" : "btn-outline")}
-          disabled={props.isBusy}
+          class={"btn btn-xs " + (props.isDataEditingDisabled ? "btn-disabled" : "btn-outline")}
+          data-graph-edit-field="data"
+          disabled={props.isDataEditingDisabled}
           onClick={props.onAddRow}
         >
           Add Row
@@ -46,9 +48,10 @@ const PieTraceEditor = (props: PieTraceEditorProps) => {
               <li class="grid grid-cols-1 gap-2 rounded-lg border border-base-300 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,13rem)_auto]">
                 <input
                   class="input input-bordered input-sm"
+                  data-graph-edit-field="data"
                   placeholder="Label"
                   value={toInputValue(props.labels[rowIndex])}
-                  disabled={props.isBusy}
+                  disabled={props.isDataEditingDisabled}
                   onInput={(event) => props.onUpdateLabel(rowIndex, event.currentTarget.value)}
                 />
                 <input
@@ -56,21 +59,25 @@ const PieTraceEditor = (props: PieTraceEditorProps) => {
                   aria-invalid={valueDrafts()[rowIndex] !== undefined}
                   type="text"
                   inputmode="decimal"
+                  data-graph-edit-field="data"
                   placeholder="Value"
                   value={valueDrafts()[rowIndex] ?? toInputValue(props.values[rowIndex])}
-                  disabled={props.isBusy}
+                  disabled={props.isDataEditingDisabled}
                   onInput={(event) => props.onUpdateValue(rowIndex, event.currentTarget.value)}
                 />
-                <GraphColorPicker
-                  value={props.rowColors[rowIndex] ?? ""}
-                  disabled={props.isBusy}
-                  colorOptions={props.colorOptions}
-                  onChange={(nextColor) => props.onUpdateColor(rowIndex, nextColor)}
-                />
+                <div data-graph-edit-field="data">
+                  <GraphColorPicker
+                    value={props.rowColors[rowIndex] ?? ""}
+                    disabled={props.isDataEditingDisabled}
+                    colorOptions={props.colorOptions}
+                    onChange={(nextColor) => props.onUpdateColor(rowIndex, nextColor)}
+                  />
+                </div>
                 <button
                   type="button"
-                  class={"btn btn-xs " + (props.isBusy ? "btn-disabled" : "btn-ghost")}
-                  disabled={props.isBusy}
+                  class={"btn btn-xs " + (props.isDataEditingDisabled ? "btn-disabled" : "btn-ghost")}
+                  data-graph-edit-field="data"
+                  disabled={props.isDataEditingDisabled}
                   onClick={() => props.onRemoveRow(rowIndex)}
                 >
                   Remove

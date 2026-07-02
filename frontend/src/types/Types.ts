@@ -84,7 +84,7 @@ export type LocationGraphTimeRange = "threeMonths" | "twelveMonths" | "allTime";
 
 export interface LocationGraphUpdate {
     graphId: number;
-    data: Record<string, unknown>[];
+    data?: Record<string, unknown>[];
     layout?: Record<string, unknown> | null;
     config?: Record<string, unknown> | null;
     style?: Record<string, unknown> | null;

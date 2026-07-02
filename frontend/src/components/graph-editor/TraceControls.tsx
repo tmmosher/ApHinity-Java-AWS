@@ -34,6 +34,7 @@ const TraceControls = (props: TraceControlsProps) => (
         <span class="label-text">Trace</span>
           <select
             class="select select-bordered select-sm mt-1"
+            data-graph-edit-field="data"
             value={String(props.selectedTraceIndex)}
             disabled={props.disableTraceSelect}
             onChange={(event) => {
@@ -55,6 +56,7 @@ const TraceControls = (props: TraceControlsProps) => (
         <span class="label-text">Trace name</span>
         <input
           class="input input-bordered input-sm mt-1"
+          data-graph-edit-field="data"
           type="text"
           value={props.traceNameDraft}
           disabled={props.disableTraceNameInput}
@@ -63,7 +65,7 @@ const TraceControls = (props: TraceControlsProps) => (
       </label>
 
       <Show when={props.showColorSelect}>
-        <label class="form-control">
+        <label class="form-control" data-graph-edit-field="data">
           <span class="label-text">Trace color</span>
           <GraphColorPicker
             value={props.selectedTraceColor}
@@ -79,6 +81,7 @@ const TraceControls = (props: TraceControlsProps) => (
       <button
         type="button"
         class={"btn btn-sm " + (props.disableAddTrace ? "btn-disabled" : "btn-outline")}
+        data-graph-edit-field="data"
         disabled={props.disableAddTrace}
         onClick={props.onAddTrace}
       >
@@ -87,6 +90,7 @@ const TraceControls = (props: TraceControlsProps) => (
       <button
         type="button"
         class={"btn btn-sm " + (props.disableRenameTrace ? "btn-disabled" : "btn-outline")}
+        data-graph-edit-field="data"
         disabled={props.disableRenameTrace}
         onClick={props.onRenameTrace}
       >
@@ -95,6 +99,7 @@ const TraceControls = (props: TraceControlsProps) => (
       <button
         type="button"
         class={"btn btn-sm " + (props.disableRemoveTrace ? "btn-disabled" : "btn-outline")}
+        data-graph-edit-field="data"
         disabled={props.disableRemoveTrace}
         onClick={props.onRemoveTrace}
       >

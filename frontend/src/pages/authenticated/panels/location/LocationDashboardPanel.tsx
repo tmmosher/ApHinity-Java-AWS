@@ -178,6 +178,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           graph={dashboard.editingGraphForTimeRange(selectedTimeRange())}
           canRenameGraph={canEditGraphs() && !dashboard.isGraphMutationBusy()}
           canDeleteGraph={canEditGraphs() && !dashboard.hasPendingGraphChanges() && !dashboard.isGraphMutationBusy()}
+          canEditData={selectedTimeRange() === "allTime"}
           canUndo={dashboard.hasPendingGraphChanges() && !dashboard.isGraphMutationBusy()}
           isDeleting={dashboard.isDeletingGraph()}
           isSaving={dashboard.isSavingGraphChanges()}

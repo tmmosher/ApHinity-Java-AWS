@@ -198,9 +198,15 @@ public class LocationController {
         );
         try {
             if (request.sectionLayout() == null) {
-                locationService.updateLocationGraphData(userId, locationId, request.graphs());
+                locationService.updateLocationGraphData(userId, locationId, request.graphs(), null, request.monthRange());
             } else {
-                locationService.updateLocationGraphData(userId, locationId, request.graphs(), request.sectionLayout());
+                locationService.updateLocationGraphData(
+                    userId,
+                    locationId,
+                    request.graphs(),
+                    request.sectionLayout(),
+                    request.monthRange()
+                );
             }
             log.info(
                 "Completed location graph update request actorUserId={} locationId={} graphCount={}",

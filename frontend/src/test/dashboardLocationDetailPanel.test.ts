@@ -189,7 +189,8 @@ describe("DashboardLocationDetailPanel data loaders", () => {
             config: {displayModeBar: false},
             style: {height: 280}
           }
-        ]
+        ],
+        monthRange: -1
       })
     });
   });
@@ -215,7 +216,35 @@ describe("DashboardLocationDetailPanel data loaders", () => {
             graphId: 99,
             data: [{type: "bar", y: [4, 5, 6]}]
           }
-        ]
+        ],
+        monthRange: -1
+      })
+    });
+  });
+
+  it("passes finite month range for metadata-only graph updates", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await saveLocationGraphsById(host, "55", [
+      {
+        graphId: 99,
+        layout: {title: {text: "Projected title"}}
+      }
+    ], undefined, 3);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        graphs: [
+          {
+            graphId: 99,
+            layout: {title: {text: "Projected title"}}
+          }
+        ],
+        monthRange: 3
       })
     });
   });
@@ -257,7 +286,8 @@ describe("DashboardLocationDetailPanel data loaders", () => {
             {section_id: 7, graph_ids: [99, 12]},
             {section_id: 8, graph_ids: []}
           ]
-        }
+        },
+        monthRange: -1
       })
     });
   });
@@ -285,7 +315,8 @@ describe("DashboardLocationDetailPanel data loaders", () => {
             data: [{type: "bar", y: [4, 5, 6]}],
             expectedUpdatedAt: "2026-01-04T00:00:00Z"
           }
-        ]
+        ],
+        monthRange: -1
       })
     });
   });
