@@ -500,11 +500,11 @@ public final class GraphRelationalPayloadMapper {
             point.setCategoryKey("row-" + (rowIndex + 1));
             point.setCategoryLabel("Row " + (rowIndex + 1));
             point.setPointOrder(rowIndex);
-            point.setValueText(rowValues.isEmpty() ? "" : String.valueOf(rowValues.getFirst()));
+            point.setValueText(String.valueOf(rowValues.getFirst()));
             point.setValueNumeric(null);
             point.setPointMeta(Map.of(INTERNAL_TABLE_ROW_VALUES_FIELD, List.copyOf(rowValues)));
         }
-        trimPoints(graphTrace.getCategoryPoints(), Math.max(rowCount, 0));
+        trimPoints(graphTrace.getCategoryPoints(), rowCount);
     }
 
     private static String resolveDataMode(String canonicalType, Map<String, Object> trace) {
@@ -839,7 +839,7 @@ public final class GraphRelationalPayloadMapper {
 
     private static <T> void trimPoints(List<T> points, int desiredSize) {
         while (points.size() > desiredSize) {
-            points.remove(points.size() - 1);
+            points.removeLast();
         }
     }
 

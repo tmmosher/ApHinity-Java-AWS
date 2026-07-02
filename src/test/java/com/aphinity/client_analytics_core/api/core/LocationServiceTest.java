@@ -1965,10 +1965,8 @@ class LocationServiceTest {
 
         assertEquals(true, response.alertsSubscribed());
         org.mockito.Mockito.verify(userSubscriptionToLocationRepository).save(
-            org.mockito.ArgumentMatchers.argThat(subscription -> {
-                return subscription.getLocation() == location
-                    && subscription.getUserEmail() == user;
-            })
+            org.mockito.ArgumentMatchers.argThat(subscription -> subscription.getLocation() == location
+                && subscription.getUserEmail() == user)
         );
     }
 
