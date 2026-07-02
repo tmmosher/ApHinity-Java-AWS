@@ -3,6 +3,8 @@ import {
   AUTO_SIZE_TRACE_FLAG,
   addCartesianRow,
   addPieRow,
+  addTableColumn,
+  addTableRow,
   coerceInputValue,
   createTrace,
   getBarOrientation,
@@ -16,6 +18,8 @@ import {
   parseNumericInput,
   removeCartesianRow,
   removePieRow,
+  removeTableColumn,
+  removeTableRow,
   renameTrace,
   setBarOrientation,
   setBarRowColor,
@@ -29,6 +33,8 @@ import {
   updateTraceYAxisTitle,
   updateTraceYAxisRange,
   updatePieValue,
+  updateTableCell,
+  updateTableHeader,
   updateIndicatorValue
 } from "../util/graph/graphTraceEditor";
 import {
@@ -504,6 +510,36 @@ describe("graphTraceEditor", () => {
     const withRemovedRow = removeCartesianRow(recolored, 0);
     expect((withRemovedRow.marker as {colors: string[]}).colors).toEqual(["#d62728"]);
     expect((withRemovedRow.marker as {color: string[]}).color).toEqual(["#d62728"]);
+  });
+
+  it("updates table headers, columns, rows, and cells", () => {
+    const trace: Record<string, unknown> = {
+      type: "table",
+      name: "Trace 1",
+      header: {values: ["Metric", "Value"]},
+      cells: {values: [["Open"], [3]]}
+    };
+
+    const renamed = updateTableHeader(trace, 1, "Count");
+    expect((renamed.header as {values: unknown[]}).values).toEqual(["Metric", "Count"]);
+
+    const withRow = addTableRow(renamed);
+    const withCell = updateTableCell(
+      updateTableCell(withRow, 1, 0, "Closed"),
+      1,
+      1,
+      "7"
+    );
+    expect((withCell.cells as {values: unknown[][]}).values).toEqual([["Open", "Closed"], [3, "7"]]);
+
+    const withColumn = addTableColumn(withCell);
+    expect((withColumn.header as {values: unknown[]}).values).toEqual(["Metric", "Count", "Column 3"]);
+    expect((withColumn.cells as {values: unknown[][]}).values).toEqual([["Open", "Closed"], [3, "7"], ["", ""]]);
+
+    const withoutColumn = removeTableColumn(withColumn, 2);
+    const withoutRow = removeTableRow(withoutColumn, 0);
+    expect((withoutRow.header as {values: unknown[]}).values).toEqual(["Metric", "Count"]);
+    expect((withoutRow.cells as {values: unknown[][]}).values).toEqual([["Closed"], ["7"]]);
   });
 
   it("creates pie traces with donut defaults", () => {

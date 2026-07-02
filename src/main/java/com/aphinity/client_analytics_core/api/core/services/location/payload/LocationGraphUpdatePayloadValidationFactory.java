@@ -17,7 +17,8 @@ public class LocationGraphUpdatePayloadValidationFactory {
     private final List<LocationGraphUpdateTraceValidator> validators = List.of(
         new PieGraphPayloadValidator(),
         new IndicatorGraphPayloadValidator(),
-        new CartesianGraphPayloadValidator()
+        new CartesianGraphPayloadValidator(),
+        new TableGraphPayloadValidator()
     );
 
     /**

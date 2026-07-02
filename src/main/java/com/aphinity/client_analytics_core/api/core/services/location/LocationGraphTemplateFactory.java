@@ -16,6 +16,7 @@ public class LocationGraphTemplateFactory {
     private static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
     private static final String GRAPH_SIZE_HALF = "half";
     private static final String GRAPH_SIZE_FULL = "full";
+    private static final String GRAPH_SIZE_DOUBLE = "double";
     private static final String DEFAULT_TIME_SERIES_LINE_SHAPE = "hv";
     private static final double DEFAULT_TIME_SERIES_LINE_SMOOTHING = 1.0d;
     private static final String INDICATOR_GAUGE_BACKGROUND_COLOR = "#6b728040";
@@ -43,7 +44,8 @@ public class LocationGraphTemplateFactory {
         PIE,
         INDICATOR,
         BAR,
-        SCATTER
+        SCATTER,
+        TABLE
     }
 
     /**
@@ -122,6 +124,15 @@ public class LocationGraphTemplateFactory {
                 buildScatterTemplateConfig(),
                 buildScatterTemplateStyle()
             );
+            case TABLE -> new GraphTemplate(
+                "New Table Graph",
+                buildTableTemplateData(),
+                withGraphSize(Map.of(
+                    "margin", Map.of("t", 20, "r", 10, "b", 10, "l", 10)
+                ), GRAPH_SIZE_DOUBLE),
+                buildDefaultGraphConfig(),
+                buildFullGraphStyle(640)
+            );
         };
     }
 
@@ -135,6 +146,7 @@ public class LocationGraphTemplateFactory {
             case "indicator" -> GraphTemplateType.INDICATOR;
             case "bar" -> GraphTemplateType.BAR;
             case "scatter", "line" -> GraphTemplateType.SCATTER;
+            case "table" -> GraphTemplateType.TABLE;
             default -> throw new IllegalArgumentException("Graph type is invalid");
         };
     }
@@ -209,8 +221,12 @@ public class LocationGraphTemplateFactory {
     }
 
     private Map<String, Object> buildBarGraphStyle() {
+        return buildFullGraphStyle(320);
+    }
+
+    private Map<String, Object> buildFullGraphStyle(int height) {
         Map<String, Object> style = new LinkedHashMap<>(buildCompactGraphStyle());
-        style.put("height", 320);
+        style.put("height", height);
         return Map.copyOf(style);
     }
 
@@ -282,6 +298,23 @@ public class LocationGraphTemplateFactory {
             ),
             "height", 320
         );
+    }
+
+    private List<Map<String, Object>> buildTableTemplateData() {
+        return List.of(Map.of(
+            "type", "table",
+            "name", "Trace 1",
+            "header", Map.of(
+                "values", List.of("Column 1", "Column 2"),
+                "align", "left",
+                "fill", Map.of("color", "#e5e7eb"),
+                "font", Map.of("color", "#111827", "size", 12)
+            ),
+            "cells", Map.of(
+                "values", List.of(List.of(""), List.of("")),
+                "align", "left"
+            )
+        ));
     }
 
     private Map<String, Object> withGraphSize(Map<String, Object> rawLayout, String graphSize) {

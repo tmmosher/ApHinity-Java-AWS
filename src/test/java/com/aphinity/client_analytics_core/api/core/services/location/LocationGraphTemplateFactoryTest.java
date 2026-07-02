@@ -155,6 +155,38 @@ class LocationGraphTemplateFactoryTest {
     }
 
     @Test
+    void createTableTemplateUsesDoubleSizeTableLayout() {
+        LocationGraphTemplateFactory.GraphTemplate template = factory.create("table", "Phoenix");
+
+        assertEquals("New Table Graph", template.name());
+        assertEquals(
+            List.of(Map.of(
+                "type", "table",
+                "name", "Trace 1",
+                "header", Map.of(
+                    "values", List.of("Column 1", "Column 2"),
+                    "align", "left",
+                    "fill", Map.of("color", "#e5e7eb"),
+                    "font", Map.of("color", "#111827", "size", 12)
+                ),
+                "cells", Map.of(
+                    "values", List.of(List.of(""), List.of("")),
+                    "align", "left"
+                )
+            )),
+            template.data()
+        );
+        assertEquals(
+            Map.of(
+                "margin", Map.of("t", 20, "r", 10, "b", 10, "l", 10),
+                "meta", Map.of("aphinitySize", "double")
+            ),
+            template.layout()
+        );
+        assertEquals(640, template.style().get("height"));
+    }
+
+    @Test
     void createRejectsUnsupportedGraphTypes() {
         assertThrows(IllegalArgumentException.class, () -> factory.create("donut", "Phoenix"));
         assertThrows(IllegalArgumentException.class, () -> factory.create(null, "Phoenix"));

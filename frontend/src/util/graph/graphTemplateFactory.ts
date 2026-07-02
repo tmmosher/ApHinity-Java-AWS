@@ -1,6 +1,6 @@
 import {z} from "zod";
 
-export type TraceType = "pie" | "bar" | "scatter" | "indicator";
+export type TraceType = "pie" | "bar" | "scatter" | "indicator" | "table";
 
 export const TRACE_COLOR_OPTIONS: Record<string, string> = {
   "Legacy Blue": "#1f77b4",
@@ -198,6 +198,21 @@ export const createBarTraceTemplate = (traceName: string): Record<string, unknow
   marker: {color: DEFAULT_TRACE_COLOR}
 });
 
+export const createTableTraceTemplate = (traceName: string): Record<string, unknown> => ({
+  type: "table",
+  name: traceName,
+  header: {
+    values: ["Column 1", "Column 2"],
+    align: "left",
+    fill: {color: "#e5e7eb"},
+    font: {color: "#111827", size: 12}
+  },
+  cells: {
+    values: [[""], [""]],
+    align: "left"
+  }
+});
+
 export const createTraceTemplate = (
   traceType: TraceType | null,
   traceName: string
@@ -212,6 +227,9 @@ export const createTraceTemplate = (
   }
   if (normalizedType === "scatter") {
     return createScatterTraceTemplate(traceName);
+  }
+  if (normalizedType === "table") {
+    return createTableTraceTemplate(traceName);
   }
   return createBarTraceTemplate(traceName);
 };

@@ -5,6 +5,7 @@ import {loadPlotlyModule} from "../common/Chart";
 import CartesianTraceEditor from "./CartesianTraceEditor";
 import IndicatorTraceEditor from "./IndicatorTraceEditor";
 import PieTraceEditor from "./PieTraceEditor";
+import TableTraceEditor from "./TableTraceEditor";
 import TraceControls from "./TraceControls";
 import type {LocationGraph} from "../../types/Types";
 import {
@@ -16,6 +17,8 @@ import {
 import {
   addCartesianRow,
   addPieRow,
+  addTableColumn,
+  addTableRow,
   buildTraceLabel,
   createTrace,
   getCartesianAxisValueMode,
@@ -25,12 +28,17 @@ import {
   getTraceColor,
   getTraceArray,
   getTraceType,
+  getTableColumns,
+  getTableHeaders,
+  getTableRowCount,
   getTraceCartesianAxisTitle,
   getTraceYAxisRange,
   getTraceYAxisTitle,
   isRecord,
   removeCartesianRow,
   removePieRow,
+  removeTableColumn,
+  removeTableRow,
   removeTraceWithPlotly,
   renameTrace,
   setBarOrientation,
@@ -46,6 +54,8 @@ import {
   updateCartesianY,
   updatePieLabel,
   updatePieValue,
+  updateTableCell,
+  updateTableHeader,
   updateIndicatorValue as updateIndicatorTraceValue
 } from "../../util/graph/graphTraceEditor";
 import {
@@ -221,7 +231,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     }
 
     const traceType = getTraceType(firstTrace);
-    return traceType === "pie" || traceType === "indicator";
+    return traceType === "pie" || traceType === "indicator" || traceType === "table";
   });
 
   const selectedTrace = createMemo(() => {
@@ -283,6 +293,21 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       return [] as string[];
     }
     return pieRowIndexes().map((rowIndex) => getPieRowColor(trace, rowIndex));
+  });
+
+  const tableHeaders = createMemo(() => {
+    const trace = selectedTrace();
+    return trace ? getTableHeaders(trace) : [];
+  });
+
+  const tableColumns = createMemo(() => {
+    const trace = selectedTrace();
+    return trace ? getTableColumns(trace) : [];
+  });
+
+  const tableRowIndexes = createMemo(() => {
+    const trace = selectedTrace();
+    return trace ? Array.from({length: getTableRowCount(trace)}, (_, index) => index) : [];
   });
 
   const cartesianXValues = createMemo(() => {
@@ -959,7 +984,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                 when={selectedTraceType()}
                 fallback={
                   <p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                    Unsupported trace type "{unsupportedTraceType()}". Supported editors: pie, indicator, bar, scatter.
+                    Unsupported trace type "{unsupportedTraceType()}". Supported editors: pie, indicator, bar, scatter, table.
                   </p>
                 }
               >
@@ -1081,6 +1106,28 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                           setCartesianYDrafts((current) => shiftIndexedDrafts(current, rowIndex));
                           updateSelectedTrace((trace) => removeCartesianRow(trace, rowIndex));
                         })
+                      }
+                    />
+                  </Match>
+                  <Match when={selectedTraceType() === "table"}>
+                    <TableTraceEditor
+                      headers={tableHeaders()}
+                      columns={tableColumns()}
+                      rowIndexes={tableRowIndexes()}
+                      isDataEditingDisabled={isDataEditingDisabled()}
+                      onAddColumn={() => updateSelectedTrace((trace) => addTableColumn(trace))}
+                      onRemoveColumn={(columnIndex) =>
+                        updateSelectedTrace((trace) => removeTableColumn(trace, columnIndex))
+                      }
+                      onUpdateHeader={(columnIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updateTableHeader(trace, columnIndex, rawValue))
+                      }
+                      onAddRow={() => updateSelectedTrace((trace) => addTableRow(trace))}
+                      onUpdateCell={(rowIndex, columnIndex, rawValue) =>
+                        updateSelectedTrace((trace) => updateTableCell(trace, rowIndex, columnIndex, rawValue))
+                      }
+                      onRemoveRow={(rowIndex) =>
+                        updateSelectedTrace((trace) => removeTableRow(trace, rowIndex))
                       }
                     />
                   </Match>

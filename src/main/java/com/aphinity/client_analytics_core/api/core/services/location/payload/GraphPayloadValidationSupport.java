@@ -25,6 +25,7 @@ final class GraphPayloadValidationSupport {
             case "pie" -> GraphPayloadFamily.PIE;
             case "indicator" -> GraphPayloadFamily.INDICATOR;
             case "bar", "scatter", "scattergl", "line" -> GraphPayloadFamily.CARTESIAN;
+            case "table" -> GraphPayloadFamily.TABLE;
             default -> throw invalidGraphData();
         };
     }
@@ -39,6 +40,7 @@ final class GraphPayloadValidationSupport {
             case "indicator" -> "indicator";
             case "bar" -> "bar";
             case "scatter", "scattergl", "line" -> "scatter";
+            case "table" -> "table";
             default -> throw invalidGraphData();
         };
     }
@@ -102,14 +104,15 @@ final class GraphPayloadValidationSupport {
 
     static void requireScalarList(List<?> values) {
         for (Object value : values) {
-            if (value == null) {
-                continue;
-            }
-            if (value instanceof String || value instanceof Number || value instanceof Boolean) {
-                continue;
-            }
-            throw invalidGraphData();
+            requireScalarValue(value);
         }
+    }
+
+    static void requireScalarValue(Object value) {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
+            return;
+        }
+        throw invalidGraphData();
     }
 
     static List<?> requireListField(Map<String, Object> trace, String field) {

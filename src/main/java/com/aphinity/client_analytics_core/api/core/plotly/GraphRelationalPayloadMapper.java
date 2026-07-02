@@ -30,6 +30,7 @@ public final class GraphRelationalPayloadMapper {
     private static final String INTERNAL_LABEL_FIELD = "label";
     private static final String INTERNAL_CUSTOMDATA_FIELD = "customdata";
     private static final String INTERNAL_COLOR_FIELD = "color";
+    private static final String INTERNAL_TABLE_ROW_VALUES_FIELD = "values";
     private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
         .appendValue(ChronoField.YEAR, 4)
         .appendLiteral('-')
@@ -176,6 +177,7 @@ public final class GraphRelationalPayloadMapper {
             case "indicator" -> populateIndicatorPoint(graphTrace, trace);
             case "bar" -> populateCartesianPoints(graphTrace, trace);
             case "scatter" -> populateCartesianPoints(graphTrace, trace);
+            case "table" -> populateTableRows(graphTrace, trace);
             default -> throw new IllegalArgumentException("Graph data is invalid");
         }
     }
@@ -266,6 +268,33 @@ public final class GraphRelationalPayloadMapper {
                 if (hasPointCustomData) {
                     result.put(INTERNAL_CUSTOMDATA_FIELD, List.copyOf(customDataValues));
                 }
+            }
+            case "table" -> {
+                List<?> headers = readTableHeaders(result);
+                List<GraphCategoryPoint> rows = filteredCategoryPoints(trace);
+                int columnCount = resolveTableColumnCount(headers, rows);
+                List<List<Object>> columns = new ArrayList<>(columnCount);
+                for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+                    columns.add(new ArrayList<>());
+                }
+
+                for (GraphCategoryPoint point : rows) {
+                    List<?> rowValues = readTableRowValues(point);
+                    for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+                        Object value = columnIndex < rowValues.size() ? rowValues.get(columnIndex) : "";
+                        columns.get(columnIndex).add(normalizeJsonValue(value));
+                    }
+                }
+
+                Map<String, Object> header = extractTableHeader(result);
+                header.put("values", List.copyOf(headers));
+                result.put("header", header);
+
+                Map<String, Object> cells = extractTableCells(result);
+                cells.put("values", columns.stream()
+                    .map(List::copyOf)
+                    .toList());
+                result.put("cells", cells);
             }
             default -> throw new IllegalArgumentException("Graph data is invalid");
         }
@@ -436,7 +465,52 @@ public final class GraphRelationalPayloadMapper {
         trimPoints(graphTrace.getTimeSeriesPoints(), yValues.size());
     }
 
+    private static void populateTableRows(GraphTrace graphTrace, Map<String, Object> trace) {
+        Map<String, Object> cells = requireMap(trace, "cells");
+        List<?> rawColumns = requireList(cells, INTERNAL_TABLE_ROW_VALUES_FIELD);
+        if (rawColumns.isEmpty()) {
+            trimPoints(graphTrace.getCategoryPoints(), 0);
+            return;
+        }
+
+        List<List<?>> columns = new ArrayList<>();
+        int rowCount = -1;
+        for (Object rawColumn : rawColumns) {
+            if (!(rawColumn instanceof List<?> column)) {
+                throw new IllegalArgumentException("Graph data is invalid");
+            }
+            if (rowCount < 0) {
+                rowCount = column.size();
+            } else if (rowCount != column.size()) {
+                throw new IllegalArgumentException("Graph data is invalid");
+            }
+            columns.add(column);
+        }
+
+        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+            GraphCategoryPoint point = categoryPointAt(graphTrace, rowIndex);
+            List<Object> rowValues = new ArrayList<>(columns.size());
+            for (List<?> column : columns) {
+                Object value = column.get(rowIndex);
+                if (!isScalarValue(value)) {
+                    throw new IllegalArgumentException("Graph data is invalid");
+                }
+                rowValues.add(normalizeJsonValue(value));
+            }
+            point.setCategoryKey("row-" + (rowIndex + 1));
+            point.setCategoryLabel("Row " + (rowIndex + 1));
+            point.setPointOrder(rowIndex);
+            point.setValueText(rowValues.isEmpty() ? "" : String.valueOf(rowValues.getFirst()));
+            point.setValueNumeric(null);
+            point.setPointMeta(Map.of(INTERNAL_TABLE_ROW_VALUES_FIELD, List.copyOf(rowValues)));
+        }
+        trimPoints(graphTrace.getCategoryPoints(), Math.max(rowCount, 0));
+    }
+
     private static String resolveDataMode(String canonicalType, Map<String, Object> trace) {
+        if ("table".equals(canonicalType)) {
+            return "table";
+        }
         if (!"scatter".equals(canonicalType)) {
             return "categorical";
         }
@@ -479,6 +553,7 @@ public final class GraphRelationalPayloadMapper {
             case "indicator" -> "indicator";
             case "bar" -> "bar";
             case "scatter", "scattergl", "line" -> "scatter";
+            case "table" -> "table";
             default -> throw new IllegalArgumentException("Graph data is invalid");
         };
     }
@@ -579,7 +654,34 @@ public final class GraphRelationalPayloadMapper {
         config.remove("labels");
         config.remove("values");
         config.remove("value");
+        if ("table".equals(resolveCanonicalTraceType(trace))) {
+            config = extractTableTraceConfig(config);
+        }
         return config;
+    }
+
+    private static Map<String, Object> extractTableTraceConfig(Map<String, Object> traceConfig) {
+        Map<String, Object> config = new LinkedHashMap<>(traceConfig);
+        if (config.get("cells") instanceof Map<?, ?> rawCells) {
+            Map<String, Object> cells = copyStringObjectMap(rawCells);
+            cells.remove(INTERNAL_TABLE_ROW_VALUES_FIELD);
+            if (cells.isEmpty()) {
+                config.remove("cells");
+            } else {
+                config.put("cells", cells);
+            }
+        }
+        return config;
+    }
+
+    private static Map<String, Object> copyStringObjectMap(Map<?, ?> rawMap) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() != null) {
+                copy.put(String.valueOf(entry.getKey()), normalizeJsonValue(entry.getValue()));
+            }
+        }
+        return copy;
     }
 
     private static List<?> optionalMarkerColors(Map<String, Object> trace) {
@@ -749,6 +851,14 @@ public final class GraphRelationalPayloadMapper {
         return list;
     }
 
+    private static Map<String, Object> requireMap(Map<String, Object> trace, String field) {
+        Object value = trace.get(field);
+        if (!(value instanceof Map<?, ?> map)) {
+            throw new IllegalArgumentException("Graph data is invalid");
+        }
+        return copyStringObjectMap(map);
+    }
+
     private static List<?> optionalList(Map<String, Object> trace, String field) {
         Object value = trace.get(field);
         if (value == null) {
@@ -771,15 +881,55 @@ public final class GraphRelationalPayloadMapper {
 
     private static boolean isScalarList(List<?> values) {
         for (Object value : values) {
-            if (value == null) {
-                continue;
+            if (!isScalarValue(value)) {
+                return false;
             }
-            if (value instanceof String || value instanceof Number || value instanceof Boolean) {
-                continue;
-            }
-            return false;
         }
         return true;
+    }
+
+    private static boolean isScalarValue(Object value) {
+        return value == null || value instanceof String || value instanceof Number || value instanceof Boolean;
+    }
+
+    private static Map<String, Object> extractTableHeader(Map<String, Object> trace) {
+        Object headerValue = trace.get("header");
+        return headerValue instanceof Map<?, ?> header ? copyStringObjectMap(header) : new LinkedHashMap<>();
+    }
+
+    private static Map<String, Object> extractTableCells(Map<String, Object> trace) {
+        Object cellsValue = trace.get("cells");
+        return cellsValue instanceof Map<?, ?> cells ? copyStringObjectMap(cells) : new LinkedHashMap<>();
+    }
+
+    private static List<?> readTableHeaders(Map<String, Object> trace) {
+        Map<String, Object> header = extractTableHeader(trace);
+        Object rawHeaders = header.get(INTERNAL_TABLE_ROW_VALUES_FIELD);
+        if (!(rawHeaders instanceof List<?> headers)) {
+            return List.of();
+        }
+        return headers.stream()
+            .map(GraphRelationalPayloadMapper::normalizeJsonValue)
+            .toList();
+    }
+
+    private static int resolveTableColumnCount(List<?> headers, List<GraphCategoryPoint> rows) {
+        int columnCount = headers.size();
+        for (GraphCategoryPoint row : rows) {
+            columnCount = Math.max(columnCount, readTableRowValues(row).size());
+        }
+        return columnCount;
+    }
+
+    private static List<?> readTableRowValues(GraphCategoryPoint point) {
+        if (point == null || point.getPointMeta() == null) {
+            return List.of();
+        }
+        Object rawValues = point.getPointMeta().get(INTERNAL_TABLE_ROW_VALUES_FIELD);
+        if (!(rawValues instanceof List<?> values)) {
+            return List.of();
+        }
+        return values;
     }
 
     private static BigDecimal toBigDecimal(Number number) {

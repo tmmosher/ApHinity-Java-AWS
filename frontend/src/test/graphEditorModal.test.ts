@@ -7,6 +7,7 @@ let latestTraceControlsProps: Record<string, unknown> | null = null;
 let latestPieTraceEditorProps: Record<string, unknown> | null = null;
 let latestIndicatorTraceEditorProps: Record<string, unknown> | null = null;
 let latestCartesianTraceEditorProps: Record<string, unknown> | null = null;
+let latestTableTraceEditorProps: Record<string, unknown> | null = null;
 
 vi.mock("corvu/dialog", () => {
   const Dialog = (props: { children: unknown }) => props.children;
@@ -66,6 +67,27 @@ vi.mock("../components/graph-editor/PieTraceEditor", () => ({
 vi.mock("../components/graph-editor/IndicatorTraceEditor", () => ({
   default: (props: Record<string, unknown>) => {
     latestIndicatorTraceEditorProps = props;
+    return null;
+  }
+}));
+
+vi.mock("../components/graph-editor/TableTraceEditor", () => ({
+  default: (props: Record<string, unknown>) => {
+    latestTableTraceEditorProps = new Proxy({} as Record<string, unknown>, {
+      get: (_target, property: string | symbol) => {
+        if (typeof property !== "string") {
+          return undefined;
+        }
+        const value = props[property];
+        if (typeof value !== "function") {
+          return value;
+        }
+        return (...args: unknown[]) => {
+          const handler = props[property];
+          return typeof handler === "function" ? handler(...args) : undefined;
+        };
+      }
+    });
     return null;
   }
 }));
@@ -167,6 +189,24 @@ const getIndicatorTraceEditorProps = () => {
   };
 };
 
+const getTableTraceEditorProps = () => {
+  if (!latestTableTraceEditorProps) {
+    throw new Error("TableTraceEditor mock was not rendered.");
+  }
+  return latestTableTraceEditorProps as {
+    headers: unknown[];
+    columns: unknown[][];
+    rowIndexes: number[];
+    isDataEditingDisabled: boolean;
+    onAddColumn: () => void;
+    onRemoveColumn: (columnIndex: number) => void;
+    onUpdateHeader: (columnIndex: number, rawValue: string) => void;
+    onAddRow: () => void;
+    onUpdateCell: (rowIndex: number, columnIndex: number, rawValue: string) => void;
+    onRemoveRow: (rowIndex: number) => void;
+  };
+};
+
 const getCartesianTraceEditorProps = () => {
   if (!latestCartesianTraceEditorProps) {
     throw new Error("CartesianTraceEditor mock was not rendered.");
@@ -209,6 +249,7 @@ describe("GraphEditorModal trace controls", () => {
     latestPieTraceEditorProps = null;
     latestIndicatorTraceEditorProps = null;
     latestCartesianTraceEditorProps = null;
+    latestTableTraceEditorProps = null;
   });
 
   it("passes the trace-control contract from modal to controls", () => {
@@ -420,6 +461,44 @@ describe("GraphEditorModal trace controls", () => {
       const incompleteIndicatorProps = getIndicatorTraceEditorProps();
       expect(incompleteIndicatorProps.value).toBe(68);
       expect(incompleteIndicatorProps.valueDraft).toBe("1.");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("hides trace controls for table graphs and updates table cells", async () => {
+    const tableGraph: LocationGraph = {
+      id: 19,
+      name: "Summary Table",
+      data: [{
+        type: "table",
+        name: "Trace 1",
+        header: {values: ["Metric", "Value"]},
+        cells: {values: [["Open"], [3]]}
+      }],
+      layout: {meta: {aphinitySize: "double"}},
+      config: {displayModeBar: false, responsive: false},
+      style: {height: 640},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(tableGraph);
+    try {
+      await flushSolidUpdates();
+      const tableProps = getTableTraceEditorProps();
+
+      expect(latestTraceControlsProps).toBeNull();
+      expect(tableProps.headers).toEqual(["Metric", "Value"]);
+      expect(tableProps.columns).toEqual([["Open"], [3]]);
+      expect(tableProps.rowIndexes).toEqual([0]);
+
+      expect(() => {
+        tableProps.onUpdateHeader(1, "Count");
+        tableProps.onAddRow();
+        tableProps.onUpdateCell(0, 0, "Closed");
+        tableProps.onRemoveRow(0);
+      }).not.toThrow();
     } finally {
       dispose();
     }

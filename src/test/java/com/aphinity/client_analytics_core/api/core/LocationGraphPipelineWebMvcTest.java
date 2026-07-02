@@ -838,6 +838,58 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void createLocationGraphBuildsTableTemplateWithDoubleSizeLayout() throws Exception {
+        Long userId = 54L;
+        Long locationId = 88L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of("sections", List.of(Map.of("section_id", 1, "graph_ids", List.of()))));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(graphRepository.saveAndFlush(any(Graph.class))).thenAnswer(invocation -> {
+            Graph graph = invocation.getArgument(0);
+            graph.setId(514L);
+            graph.setCreatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            graph.setUpdatedAt(Instant.parse("2026-01-06T00:00:00Z"));
+            return graph;
+        });
+
+        mockMvc.perform(
+                post("/core/locations/{locationId}/graphs", locationId)
+                    .with(csrf().asHeader())
+                    .contentType("application/json")
+                    .content("""
+                        {
+                          "sectionId": 1,
+                          "graphType": "table"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(514))
+            .andExpect(jsonPath("$.name").value("New Table Graph"))
+            .andExpect(jsonPath("$.data[0].type").value("table"))
+            .andExpect(jsonPath("$.data[0].header.values[0]").value("Column 1"))
+            .andExpect(jsonPath("$.data[0].header.values[1]").value("Column 2"))
+            .andExpect(jsonPath("$.data[0].cells.values[0][0]").value(""))
+            .andExpect(jsonPath("$.data[0].cells.values[1][0]").value(""))
+            .andExpect(jsonPath("$.layout.meta.aphinitySize").value("double"))
+            .andExpect(jsonPath("$.style.height").value(640));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(List.of(514L), sections.getFirst().get("graph_ids"));
+        verify(locationGraphRepository).save(any(LocationGraph.class));
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
     void createLocationGraphCreatesANewSectionWhenRequested() throws Exception {
         Long userId = 48L;
         Long locationId = 84L;

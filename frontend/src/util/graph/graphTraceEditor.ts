@@ -20,6 +20,7 @@ export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
   bar: "bar",
   scatter: "scatter",
   indicator: "indicator",
+  table: "table",
   scattergl: "scatter"
 };
 
@@ -75,6 +76,9 @@ export const getTraceArray = (trace: Record<string, unknown>, field: string): un
   const value = trace[field];
   return Array.isArray(value) ? [...value] : [];
 };
+
+const getTraceObject = (trace: Record<string, unknown>, field: string): Record<string, unknown> =>
+  isRecord(trace[field]) ? {...trace[field]} : {};
 
 export const getTraceType = (trace: Record<string, unknown>): TraceType | null => {
   const typeValue = typeof trace.type === "string" ? trace.type.toLowerCase() : "";
@@ -245,6 +249,139 @@ export const createTrace = (
 ): Record<string, unknown> => {
   const traceName = buildDefaultTraceName(existingTraceCount);
   return createTraceTemplate(preferredType, traceName);
+};
+
+export const getTableHeaders = (trace: Record<string, unknown>): unknown[] => {
+  const header = getTraceObject(trace, "header");
+  return Array.isArray(header.values) ? [...header.values] : [];
+};
+
+export const getTableColumns = (trace: Record<string, unknown>): unknown[][] => {
+  const cells = getTraceObject(trace, "cells");
+  if (!Array.isArray(cells.values)) {
+    return [];
+  }
+  return cells.values.map((column) => Array.isArray(column) ? [...column] : []);
+};
+
+export const getTableRowCount = (trace: Record<string, unknown>): number =>
+  getTableColumns(trace).reduce((maxRowCount, column) => Math.max(maxRowCount, column.length), 0);
+
+const normalizeTableColumns = (
+  columns: unknown[][],
+  columnCount = columns.length,
+  rowCount = columns.reduce((maxRowCount, column) => Math.max(maxRowCount, column.length), 0)
+): unknown[][] =>
+  Array.from({length: columnCount}, (_, columnIndex) => {
+    const column = columns[columnIndex] ?? [];
+    return Array.from({length: rowCount}, (_, rowIndex) => column[rowIndex] ?? "");
+  });
+
+const withTableHeaders = (
+  trace: Record<string, unknown>,
+  headers: unknown[]
+): Record<string, unknown> => {
+  const header = getTraceObject(trace, "header");
+  return {
+    ...trace,
+    header: {
+      ...header,
+      values: headers
+    }
+  };
+};
+
+const withTableColumns = (
+  trace: Record<string, unknown>,
+  columns: unknown[][]
+): Record<string, unknown> => {
+  const cells = getTraceObject(trace, "cells");
+  return {
+    ...trace,
+    cells: {
+      ...cells,
+      values: columns
+    }
+  };
+};
+
+export const addTableColumn = (trace: Record<string, unknown>): Record<string, unknown> => {
+  const headers = getTableHeaders(trace);
+  const columns = normalizeTableColumns(getTableColumns(trace), headers.length);
+  const rowCount = getTableRowCount(trace);
+  const nextHeaders = [...headers, `Column ${headers.length + 1}`];
+  const nextColumns = [...columns, Array.from({length: rowCount}, () => "")];
+  return withTableColumns(withTableHeaders(trace, nextHeaders), nextColumns);
+};
+
+export const removeTableColumn = (
+  trace: Record<string, unknown>,
+  columnIndex: number
+): Record<string, unknown> => {
+  const headers = getTableHeaders(trace);
+  const columns = normalizeTableColumns(getTableColumns(trace), headers.length);
+  if (!Number.isInteger(columnIndex) || columnIndex < 0 || columnIndex >= headers.length) {
+    return trace;
+  }
+  const nextHeaders = headers.filter((_, index) => index !== columnIndex);
+  const nextColumns = columns.filter((_, index) => index !== columnIndex);
+  return withTableColumns(withTableHeaders(trace, nextHeaders), nextColumns);
+};
+
+export const updateTableHeader = (
+  trace: Record<string, unknown>,
+  columnIndex: number,
+  rawValue: string
+): Record<string, unknown> => {
+  const headers = getTableHeaders(trace);
+  if (!Number.isInteger(columnIndex) || columnIndex < 0 || columnIndex >= headers.length) {
+    return trace;
+  }
+  headers[columnIndex] = rawValue;
+  return withTableHeaders(trace, headers);
+};
+
+export const addTableRow = (trace: Record<string, unknown>): Record<string, unknown> => {
+  const headers = getTableHeaders(trace);
+  const columns = normalizeTableColumns(getTableColumns(trace), headers.length);
+  const nextColumns = columns.map((column) => [...column, ""]);
+  return withTableColumns(trace, nextColumns);
+};
+
+export const removeTableRow = (
+  trace: Record<string, unknown>,
+  rowIndex: number
+): Record<string, unknown> => {
+  const headers = getTableHeaders(trace);
+  const columns = normalizeTableColumns(getTableColumns(trace), headers.length);
+  if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= getTableRowCount(trace)) {
+    return trace;
+  }
+  const nextColumns = columns.map((column) => column.filter((_, index) => index !== rowIndex));
+  return withTableColumns(trace, nextColumns);
+};
+
+export const updateTableCell = (
+  trace: Record<string, unknown>,
+  rowIndex: number,
+  columnIndex: number,
+  rawValue: string
+): Record<string, unknown> => {
+  const headers = getTableHeaders(trace);
+  const rowCount = getTableRowCount(trace);
+  if (
+    !Number.isInteger(rowIndex) ||
+    !Number.isInteger(columnIndex) ||
+    rowIndex < 0 ||
+    columnIndex < 0 ||
+    columnIndex >= headers.length ||
+    rowIndex >= rowCount
+  ) {
+    return trace;
+  }
+  const columns = normalizeTableColumns(getTableColumns(trace), headers.length, rowCount);
+  columns[columnIndex][rowIndex] = rawValue;
+  return withTableColumns(trace, columns);
 };
 
 export const renameTrace = (

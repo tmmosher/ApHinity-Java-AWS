@@ -214,6 +214,48 @@ class GraphRelationalPayloadMapperTest {
     }
 
     @Test
+    void setDataRoundTripsTableTraceRows() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "table",
+            "name", "Summary",
+            "header", Map.of(
+                "values", List.of("Metric", "Value"),
+                "align", "left"
+            ),
+            "cells", Map.of(
+                "values", List.of(
+                    List.of("Open", "Closed"),
+                    List.of(3, 7)
+                ),
+                "align", "left"
+            )
+        )));
+
+        assertEquals("table", graph.getGraphType());
+        GraphTrace trace = graph.getGraphTraces().getFirst();
+        assertEquals("table", trace.getTraceType());
+        assertEquals("table", trace.getDataMode());
+        assertEquals(2, trace.getCategoryPoints().size());
+        assertEquals(List.of("Open", 3L), trace.getCategoryPoints().getFirst().getPointMeta().get("values"));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        assertEquals(1, traces.size());
+        assertEquals("table", traces.getFirst().get("type"));
+        assertEquals(Map.of(
+            "values", List.of("Metric", "Value"),
+            "align", "left"
+        ), traces.getFirst().get("header"));
+        assertEquals(Map.of(
+            "values", List.of(
+                List.of("Open", "Closed"),
+                List.of(3L, 7L)
+            ),
+            "align", "left"
+        ), traces.getFirst().get("cells"));
+    }
+
+    @Test
     void setDataDoesNotInventBarMarkerColorsWhenNoneAreProvided() {
         Graph graph = new Graph();
         graph.setData(List.of(Map.of(

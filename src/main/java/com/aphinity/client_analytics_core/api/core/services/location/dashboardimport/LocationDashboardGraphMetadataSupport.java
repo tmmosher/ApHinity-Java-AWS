@@ -23,6 +23,7 @@ final class LocationDashboardGraphMetadataSupport {
     static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
     private static final String GRAPH_SIZE_HALF = "half";
     private static final String GRAPH_SIZE_FULL = "full";
+    private static final String GRAPH_SIZE_DOUBLE = "double";
 
     private LocationDashboardGraphMetadataSupport() {
     }
@@ -160,6 +161,7 @@ final class LocationDashboardGraphMetadataSupport {
     private static String graphSizeForType(String rawGraphType) {
         return switch (normalizeGraphType(rawGraphType)) {
             case "pie", "indicator" -> GRAPH_SIZE_HALF;
+            case "table" -> GRAPH_SIZE_DOUBLE;
             default -> GRAPH_SIZE_FULL;
         };
     }

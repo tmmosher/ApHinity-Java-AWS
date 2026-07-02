@@ -157,6 +157,36 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateAcceptsTablePayloads() {
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(tableTrace("Open", 3)),
+            List.of(tableTrace("Closed", 7)),
+            Map.of("meta", Map.of("aphinitySize", "double"))
+        );
+
+        assertEquals(List.of(tableTrace("Closed", 7)), payload.data());
+        assertEquals(Map.of("meta", Map.of("aphinitySize", "double")), payload.layout());
+    }
+
+    @Test
+    void validateForUpdateRejectsRaggedTableColumns() {
+        assertThrows(IllegalArgumentException.class, () ->
+            factory.validateForUpdate(
+                List.of(tableTrace("Open", 3)),
+                List.of(Map.of(
+                    "type", "table",
+                    "header", Map.of("values", List.of("Metric", "Value")),
+                    "cells", Map.of("values", List.of(
+                        List.of("Open", "Closed"),
+                        List.of(3)
+                    ))
+                )),
+                Map.of()
+            )
+        );
+    }
+
+    @Test
     void validateForUpdateAcceptsHorizontalBarPayloads() {
         LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
             List.of(horizontalBarTrace(3, 5)),
@@ -314,6 +344,17 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
             "x", List.of("Jan", "Feb", "Mar"),
             "y", values.length == 0 ? List.of() : toIntegerList(values),
             "marker", Map.of("color", "#1f77b4")
+        );
+    }
+
+    private Map<String, Object> tableTrace(String metric, int value) {
+        return Map.of(
+            "type", "table",
+            "header", Map.of("values", List.of("Metric", "Value")),
+            "cells", Map.of("values", List.of(
+                List.of(metric),
+                List.of(value)
+            ))
         );
     }
 
