@@ -605,7 +605,8 @@ class LocationServiceTest {
                     "yref", "paper",
                     "showarrow", false,
                     "font", Map.of("size", 22)
-                ))
+                )),
+                "meta", Map.of("aphinitySize", "half")
             ),
             response.layout()
         );
@@ -647,7 +648,8 @@ class LocationServiceTest {
         assertEquals(
             Map.of(
                 "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
-                "showlegend", false
+                "showlegend", false,
+                "meta", Map.of("aphinitySize", "half")
             ),
             response.layout()
         );
@@ -760,7 +762,8 @@ class LocationServiceTest {
                 "xaxis", Map.of("title", "Value"),
                 "yaxis", Map.of("automargin", true),
                 "margin", Map.of("t", 45, "r", 20, "b", 40, "l", 150),
-                "showlegend", false
+                "showlegend", false,
+                "meta", Map.of("aphinitySize", "full")
             ),
             response.layout()
         );
@@ -777,7 +780,7 @@ class LocationServiceTest {
                         "textColor", "#111827"
                     )
                 ),
-                "height", 300
+                "height", 320
             ),
             response.style()
         );
@@ -1010,7 +1013,10 @@ class LocationServiceTest {
         graph.setName("Derived");
         graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2))));
         graph.setLayout(Map.of(
-            "meta", Map.of("aphinityImport", importMetadata),
+            "meta", Map.of(
+                "aphinityImport", importMetadata,
+                "aphinitySize", "full"
+            ),
             "showlegend", false
         ));
 
@@ -1024,7 +1030,10 @@ class LocationServiceTest {
                 36L,
                 null,
                 Map.of(
-                    "meta", Map.of("aphinityImport", Map.of("derivedGraphType", "tampered")),
+                    "meta", Map.of(
+                        "aphinityImport", Map.of("derivedGraphType", "tampered"),
+                        "aphinitySize", "half"
+                    ),
                     "showlegend", true
                 ),
                 null,
@@ -1037,6 +1046,10 @@ class LocationServiceTest {
         assertEquals(
             importMetadata,
             ((Map<?, ?>) graph.getLayout().get("meta")).get("aphinityImport")
+        );
+        assertEquals(
+            "full",
+            ((Map<?, ?>) graph.getLayout().get("meta")).get("aphinitySize")
         );
     }
 
@@ -2039,7 +2052,8 @@ class LocationServiceTest {
             "xaxis", Map.of("type", "date", "tickformat", "%b %Y", "tickangle", 0),
             "yaxis", Map.of("range", List.of(0, 100), "title", "Value", "dtick", 1),
             "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
-            "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+            "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50),
+            "meta", Map.of("aphinitySize", "full")
         );
     }
 

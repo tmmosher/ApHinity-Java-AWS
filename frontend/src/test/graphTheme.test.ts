@@ -1,6 +1,8 @@
 import {describe, expect, it} from "vitest";
 import {
   resolveGraphHeight,
+  resolveGraphGridClass,
+  resolveGraphSize,
   resolveGraphThemeStyle,
   resolveThemedGraphLayout
 } from "../util/graph/graphTheme";
@@ -52,6 +54,19 @@ describe("graphTheme", () => {
     expect(resolveGraphHeight({height: 0})).toBe("18rem");
     expect(resolveGraphHeight(null)).toBe("18rem");
     expect(resolveGraphHeight({height: "320"})).toBe("18rem");
+  });
+
+  it("resolves standardized graph sizing from layout metadata", () => {
+    expect(resolveGraphSize({meta: {aphinitySize: "half"}})).toBe("half");
+    expect(resolveGraphSize({meta: {aphinitySize: "full"}})).toBe("full");
+    expect(resolveGraphSize({meta: {aphinitySize: "double"}})).toBe("double");
+    expect(resolveGraphSize({meta: {aphinitySize: "unsupported"}})).toBeNull();
+
+    expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "half"}})).toBe("160px");
+    expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "full"}})).toBe("320px");
+    expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "double"}})).toBe("640px");
+    expect(resolveGraphGridClass({meta: {aphinitySize: "double"}})).toBe("lg:col-span-2");
+    expect(resolveGraphGridClass({meta: {aphinitySize: "full"}})).toBe("");
   });
 
   it("applies themed colors to layout while preserving existing axis settings", () => {

@@ -47,7 +47,8 @@ class LocationGraphTemplateFactoryTest {
         assertEquals(
             Map.of(
                 "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
-                "showlegend", false
+                "showlegend", false,
+                "meta", Map.of("aphinitySize", "half")
             ),
             template.layout()
         );
@@ -93,7 +94,8 @@ class LocationGraphTemplateFactoryTest {
                 "xaxis", Map.of("title", "Value"),
                 "yaxis", Map.of("automargin", true),
                 "margin", Map.of("t", 45, "r", 20, "b", 40, "l", 150),
-                "showlegend", false
+                "showlegend", false,
+                "meta", Map.of("aphinitySize", "full")
             ),
             template.layout()
         );
@@ -111,7 +113,7 @@ class LocationGraphTemplateFactoryTest {
                         "textColor", "#111827"
                     )
                 ),
-                "height", 300
+                "height", 320
             ),
             template.style()
         );
@@ -145,7 +147,8 @@ class LocationGraphTemplateFactoryTest {
                 "xaxis", Map.of("type", "date", "tickformat", "%b %Y", "tickangle", 0),
                 "yaxis", Map.of("range", List.of(0, 100), "title", "Value", "dtick", 1),
                 "legend", Map.of("x", 0, "y", -0.3, "orientation", "h"),
-                "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50)
+                "margin", Map.of("b", 60, "l", 50, "r", 20, "t", 50),
+                "meta", Map.of("aphinitySize", "full")
             ),
             template.layout()
         );

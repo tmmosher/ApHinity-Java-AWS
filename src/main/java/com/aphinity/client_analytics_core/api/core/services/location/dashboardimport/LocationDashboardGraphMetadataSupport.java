@@ -20,6 +20,9 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
  */
 final class LocationDashboardGraphMetadataSupport {
     static final String IMPORT_LAYOUT_META_KEY = "aphinityImport";
+    static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
+    private static final String GRAPH_SIZE_HALF = "half";
+    private static final String GRAPH_SIZE_FULL = "full";
 
     private LocationDashboardGraphMetadataSupport() {
     }
@@ -68,6 +71,7 @@ final class LocationDashboardGraphMetadataSupport {
 
         Map<String, Object> meta = copyMutableMap(asMap(layout.get("meta")));
         meta.put(IMPORT_LAYOUT_META_KEY, importMeta);
+        meta.put(GRAPH_SIZE_LAYOUT_META_KEY, graphSizeForType(graphDefinition.graphType()));
         layout.put("meta", meta);
 
         Map<String, Object> xAxis = copyMutableMap(asMap(layout.get("xaxis")));
@@ -124,6 +128,7 @@ final class LocationDashboardGraphMetadataSupport {
         importMeta.put("unit", derivedGraphUnit(derivedGraphDefinition.derivedType()));
         importMeta.put("locationName", strategyLocationName);
         meta.put(IMPORT_LAYOUT_META_KEY, importMeta);
+        meta.put(GRAPH_SIZE_LAYOUT_META_KEY, graphSizeForType(derivedGraphDefinition.graphType()));
         layout.put("meta", meta);
         if ("bar".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
             applyDerivedBarLayoutDefaults(layout, derivedGraphDefinition);
@@ -147,9 +152,16 @@ final class LocationDashboardGraphMetadataSupport {
                     "textColor", "#111827"
                 )
             ));
-            style.put("height", 300);
+            style.put("height", 320);
         }
         return style;
+    }
+
+    private static String graphSizeForType(String rawGraphType) {
+        return switch (normalizeGraphType(rawGraphType)) {
+            case "pie", "indicator" -> GRAPH_SIZE_HALF;
+            default -> GRAPH_SIZE_FULL;
+        };
     }
 
     private static void applyDerivedBarLayoutDefaults(

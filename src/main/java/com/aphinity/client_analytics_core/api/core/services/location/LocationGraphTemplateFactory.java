@@ -13,6 +13,9 @@ import java.util.Map;
 @Component
 public class LocationGraphTemplateFactory {
     private static final String DEFAULT_GRAPH_COLOR = "#1f77b4";
+    private static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
+    private static final String GRAPH_SIZE_HALF = "half";
+    private static final String GRAPH_SIZE_FULL = "full";
     private static final String DEFAULT_TIME_SERIES_LINE_SHAPE = "hv";
     private static final double DEFAULT_TIME_SERIES_LINE_SMOOTHING = 1.0d;
     private static final String INDICATOR_GAUGE_BACKGROUND_COLOR = "#6b728040";
@@ -69,7 +72,7 @@ public class LocationGraphTemplateFactory {
                     "direction", "clockwise",
                     "hovertemplate", "%{label}: %{value}<extra></extra>"
                 )),
-                Map.of(
+                withGraphSize(Map.of(
                     "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
                     "showlegend", false,
                     "annotations", List.of(Map.of(
@@ -81,7 +84,7 @@ public class LocationGraphTemplateFactory {
                         "showarrow", false,
                         "font", Map.of("size", 22)
                     ))
-                ),
+                ), GRAPH_SIZE_HALF),
                 buildDefaultGraphConfig(),
                 buildCompactGraphStyle()
             );
@@ -102,13 +105,13 @@ public class LocationGraphTemplateFactory {
                     "orientation", "h",
                     "marker", Map.of("color", DEFAULT_GRAPH_COLOR)
                 )),
-                Map.of(
+                withGraphSize(Map.of(
                     "title", buildGraphTitle(locationName),
                     "xaxis", Map.of("title", "Value"),
                     "yaxis", Map.of("automargin", true),
                     "margin", Map.of("t", 45, "r", 20, "b", 40, "l", 150),
                     "showlegend", false
-                ),
+                ), GRAPH_SIZE_FULL),
                 buildDefaultGraphConfig(),
                 buildBarGraphStyle()
             );
@@ -174,10 +177,10 @@ public class LocationGraphTemplateFactory {
     }
 
     private Map<String, Object> buildIndicatorTemplateLayout() {
-        return Map.of(
+        return withGraphSize(Map.of(
             "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
             "showlegend", false
-        );
+        ), GRAPH_SIZE_HALF);
     }
 
     private Map<String, Object> buildGraphTitle(String locationName) {
@@ -207,7 +210,7 @@ public class LocationGraphTemplateFactory {
 
     private Map<String, Object> buildBarGraphStyle() {
         Map<String, Object> style = new LinkedHashMap<>(buildCompactGraphStyle());
-        style.put("height", 300);
+        style.put("height", 320);
         return Map.copyOf(style);
     }
 
@@ -254,7 +257,7 @@ public class LocationGraphTemplateFactory {
             "r", 20,
             "t", 50
         ));
-        return layout;
+        return withGraphSize(layout, GRAPH_SIZE_FULL);
     }
 
     private Map<String, Object> buildScatterTemplateConfig() {
@@ -279,5 +282,26 @@ public class LocationGraphTemplateFactory {
             ),
             "height", 320
         );
+    }
+
+    private Map<String, Object> withGraphSize(Map<String, Object> rawLayout, String graphSize) {
+        Map<String, Object> layout = new LinkedHashMap<>(rawLayout);
+        Object rawMeta = layout.get("meta");
+        Map<String, Object> meta = rawMeta instanceof Map<?, ?> rawMetaMap
+            ? copyUnknownObjectMap(rawMetaMap)
+            : new LinkedHashMap<>();
+        meta.put(GRAPH_SIZE_LAYOUT_META_KEY, graphSize);
+        layout.put("meta", meta);
+        return Map.copyOf(layout);
+    }
+
+    private Map<String, Object> copyUnknownObjectMap(Map<?, ?> rawMap) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() != null) {
+                copy.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        return copy;
     }
 }

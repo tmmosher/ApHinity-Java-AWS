@@ -665,7 +665,8 @@ public class LocationService {
             return null;
         }
         Map<String, Object> currentImportMetadata = readImportMetadata(currentLayout);
-        if (currentImportMetadata == null) {
+        String currentGraphSize = readGraphSizeMetadata(currentLayout);
+        if (currentImportMetadata == null && currentGraphSize == null) {
             return requestedLayout;
         }
 
@@ -673,9 +674,28 @@ public class LocationService {
         Map<String, Object> nextMeta = nextLayout.get("meta") instanceof Map<?, ?> rawMeta
             ? copyUnknownObjectMap(rawMeta)
             : new LinkedHashMap<>();
-        nextMeta.put("aphinityImport", currentImportMetadata);
+        if (currentImportMetadata != null) {
+            nextMeta.put("aphinityImport", currentImportMetadata);
+        }
+        if (currentGraphSize != null) {
+            nextMeta.put("aphinitySize", currentGraphSize);
+        }
         nextLayout.put("meta", nextMeta);
         return nextLayout;
+    }
+
+    private String readGraphSizeMetadata(Map<String, Object> layout) {
+        if (layout == null || !(layout.get("meta") instanceof Map<?, ?> rawMeta)) {
+            return null;
+        }
+        Object rawGraphSize = rawMeta.get("aphinitySize");
+        if (!(rawGraphSize instanceof String graphSize)) {
+            return null;
+        }
+        return switch (graphSize) {
+            case "half", "full", "double" -> graphSize;
+            default -> null;
+        };
     }
 
     private Map<String, Object> readImportMetadata(Map<String, Object> layout) {

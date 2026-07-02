@@ -56,4 +56,41 @@ describe("LocationDashboardSection", () => {
       version: "2026-01-03T00:00:00Z"
     });
   });
+
+  it("sizes double graphs across the full section grid", () => {
+    capturedChartProps.length = 0;
+    const section: LocationSectionLayout = {
+      section_id: 7,
+      graph_ids: [101]
+    };
+    const graph: LocationGraph = {
+      id: 101,
+      name: "Water Quality Compliance",
+      data: [{type: "bar", x: ["A"], y: [1]}],
+      layout: {
+        title: {text: "Newport Beach"},
+        meta: {aphinitySize: "double"}
+      },
+      config: {},
+      style: {height: 320},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z"
+    };
+    const plotlyModule = Object.assign(() => ({}), {error: undefined});
+
+    const html = renderToString(() => (
+      <LocationDashboardSection
+        section={section}
+        graphs={[graph]}
+        missingGraphIds={[]}
+        canEditGraphs={false}
+        isGraphMutationBusy={false}
+        plotlyModule={plotlyModule as never}
+        onOpenGraphEditor={() => undefined}
+      />
+    ));
+
+    expect(html).toContain("lg:col-span-2");
+    expect(html).toContain("height:640px");
+  });
 });

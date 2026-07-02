@@ -22,7 +22,14 @@ const DEFAULT_GRAPH_THEME_STYLE: Record<ThemePreference, GraphThemeStyle> = {
 
 const FALLBACK_GRAPH_HEIGHT = "18rem";
 const FALLBACK_GRAPH_HEIGHT_PX = 288;
+const GRAPH_SIZE_HEIGHT_PX = {
+  half: 160,
+  full: 320,
+  double: 640
+} as const;
 const CARTESIAN_LEGEND_HEIGHT_RATIO = 1 / 3;
+
+export type GraphDisplaySize = keyof typeof GRAPH_SIZE_HEIGHT_PX;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -154,19 +161,41 @@ export const resolveGraphThemeStyle = (
   };
 };
 
-export const resolveGraphHeight = (graphStyle: unknown): string => {
+export const resolveGraphSize = (graphLayout: unknown): GraphDisplaySize | null => {
+  if (!isRecord(graphLayout) || !isRecord(graphLayout.meta)) {
+    return null;
+  }
+
+  const rawSize = graphLayout.meta.aphinitySize;
+  return rawSize === "half" || rawSize === "full" || rawSize === "double" ? rawSize : null;
+};
+
+export const resolveGraphHeight = (graphStyle: unknown, graphLayout?: unknown): string => {
+  const graphSize = resolveGraphSize(graphLayout);
+  if (graphSize) {
+    return `${GRAPH_SIZE_HEIGHT_PX[graphSize]}px`;
+  }
+
   if (!isRecord(graphStyle) || typeof graphStyle.height !== "number" || graphStyle.height <= 0) {
     return FALLBACK_GRAPH_HEIGHT;
   }
   return `${graphStyle.height}px`;
 };
 
-const resolveGraphHeightPixels = (graphStyle: unknown): number => {
+const resolveGraphHeightPixels = (graphStyle: unknown, graphLayout?: unknown): number => {
+  const graphSize = resolveGraphSize(graphLayout);
+  if (graphSize) {
+    return GRAPH_SIZE_HEIGHT_PX[graphSize];
+  }
+
   if (!isRecord(graphStyle) || typeof graphStyle.height !== "number" || graphStyle.height <= 0) {
     return FALLBACK_GRAPH_HEIGHT_PX;
   }
   return graphStyle.height;
 };
+
+export const resolveGraphGridClass = (graphLayout: unknown): string =>
+  resolveGraphSize(graphLayout) === "double" ? "lg:col-span-2" : "";
 
 const hasCartesianAxes = (layout: Record<string, unknown>): boolean =>
   Object.keys(layout).some((key) => /^xaxis\d*$/.test(key) || /^yaxis\d*$/.test(key));
@@ -185,7 +214,7 @@ const applyCartesianLegendGeometry = (
 
   const legend = isRecord(layout.legend) ? layout.legend : {};
   const margin = isRecord(layout.margin) ? layout.margin : {};
-  const graphHeight = resolveGraphHeightPixels(graphStyle);
+  const graphHeight = resolveGraphHeightPixels(graphStyle, layout);
   const reservedLegendBand = Math.round(graphHeight * CARTESIAN_LEGEND_HEIGHT_RATIO);
   const nextBottomMargin = Math.max(toFiniteNumber(margin.b) ?? 0, reservedLegendBand);
 

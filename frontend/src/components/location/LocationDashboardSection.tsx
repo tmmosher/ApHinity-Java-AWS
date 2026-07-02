@@ -2,7 +2,7 @@ import {For, Show, Suspense, type Resource} from "solid-js";
 import PlotlyChart, {type PlotlyConfig, type PlotlyData, type PlotlyLayout} from "../common/Chart";
 import GraphLoadingPlaceholder from "../graph/GraphLoadingPlaceholder";
 import type {LocationGraph, LocationSectionLayout} from "../../types/Types";
-import {resolveGraphHeight} from "../../util/graph/graphTheme";
+import {resolveGraphGridClass, resolveGraphHeight} from "../../util/graph/graphTheme";
 
 type LocationDashboardSectionProps = {
   section: LocationSectionLayout;
@@ -27,7 +27,7 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
       <div class="grid gap-4 lg:grid-cols-2">
         <For each={props.graphs}>
           {(graph) => (
-            <article class="rounded-lg border border-base-200 bg-base-200/40 p-3">
+            <article class={"rounded-lg border border-base-200 bg-base-200/40 p-3 " + resolveGraphGridClass(graph.layout)}>
               <div class="mb-2 flex items-start justify-between gap-2">
                 <h4 class="text-sm font-medium">{graph.name}</h4>
                 <Show when={props.canEditGraphs}>
@@ -55,7 +55,7 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
                   </div>
                 }>
                   <Show when={props.plotlyModule()}>
-                    <div class="w-full" style={{height: resolveGraphHeight(graph.style)}}>
+                    <div class="w-full" style={{height: resolveGraphHeight(graph.style, graph.layout)}}>
                       <PlotlyChart
                         name={graph.name}
                         version={graph.updatedAt}
