@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Shared low-level validators and normalizers for graph update payloads.
+ */
 final class GraphPayloadValidationSupport {
     private GraphPayloadValidationSupport() {
     }

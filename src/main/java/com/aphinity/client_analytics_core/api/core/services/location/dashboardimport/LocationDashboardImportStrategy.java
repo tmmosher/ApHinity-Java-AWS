@@ -6,17 +6,49 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Location-specific dashboard import rules used to convert a parsed workbook
+ * into graph updates, observations, corrective action drafts, and analyzed
+ * historical samples.
+ */
 public interface LocationDashboardImportStrategy {
+    /**
+     * Returns the canonical location name this strategy supports.
+     *
+     * @return configured location name
+     */
     String locationName();
 
+    /**
+     * Returns persisted graph definitions that should be matched for imports.
+     *
+     * @return configured graph definitions
+     */
     List<LocationDashboardImportStrategyConfig.GraphConfig> graphDefinitions();
 
+    /**
+     * Returns derived graph definitions that are rebuilt from historical data.
+     *
+     * @return configured derived graph definitions
+     */
     List<LocationDashboardImportStrategyConfig.DerivedGraphConfig> derivedGraphDefinitions();
 
+    /**
+     * Returns the spreadsheet identity columns required by this strategy.
+     *
+     * @return identity column pattern
+     */
     default List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> spreadsheetIdentityPattern() {
         return List.of();
     }
 
+    /**
+     * Computes imported graph payloads and historical records from a parsed workbook.
+     *
+     * @param workbook parsed dashboard workbook
+     * @param measurementBounds configured compliance bounds
+     * @return complete import computation
+     */
     LocationDashboardImportComputation computeImport(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
         List<MeasurementBound> measurementBounds

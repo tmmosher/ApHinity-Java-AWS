@@ -17,6 +17,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Persists imported dashboard sample facts used by rolling graph ranges and
+ * historical derived graph rebuilding.
+ */
 @Service
 public class LocationDashboardSamplePersistenceService {
     private static final int MAX_TEXT_LENGTH = 1024;
@@ -28,6 +32,13 @@ public class LocationDashboardSamplePersistenceService {
         this.sampleRepository = sampleRepository;
     }
 
+    /**
+     * Replaces stored samples for a location using the analyzed samples and
+     * observations from an import computation.
+     *
+     * @param location imported location
+     * @param computation import computation to persist
+     */
     @Transactional
     public void replaceLocationSamples(
         Location location,
@@ -41,6 +52,14 @@ public class LocationDashboardSamplePersistenceService {
         );
     }
 
+    /**
+     * Replaces stored samples and enriches them with matching corrective-action
+     * resolution data.
+     *
+     * @param location imported location
+     * @param computation import computation to persist
+     * @param correctiveActions corrective actions created or matched during import
+     */
     @Transactional
     public void replaceLocationSamples(
         Location location,
@@ -55,6 +74,12 @@ public class LocationDashboardSamplePersistenceService {
         );
     }
 
+    /**
+     * Replaces stored samples from pre-analyzed historical points.
+     *
+     * @param location target location
+     * @param analyzedSamples samples to persist
+     */
     @Transactional
     public void replaceLocationSamples(
         Location location,
@@ -89,6 +114,12 @@ public class LocationDashboardSamplePersistenceService {
         }
     }
 
+    /**
+     * Loads persisted samples as analyzed sample points for derived graph rebuilds.
+     *
+     * @param locationId location id
+     * @return persisted samples converted to import-domain records
+     */
     @Transactional(readOnly = true)
     public List<LocationDashboardImportStrategy.AnalyzedSamplePoint> loadLocationSamples(Long locationId) {
         if (locationId == null) {

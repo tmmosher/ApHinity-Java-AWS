@@ -21,6 +21,14 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
  * exact on name + title so same-name graphs remain unambiguous.
  */
 final class LocationDashboardGraphMatcher {
+    /**
+     * Matches configured imported graphs to the assigned graphs for a location.
+     *
+     * @param graphDefinitions strategy graph definitions
+     * @param assignedGraphs graphs currently assigned to the location
+     * @param locationName location name used in error messages
+     * @return matched graphs keyed by normalized strategy graph id
+     */
     Map<String, Graph> matchImportGraphs(List<GraphConfig> graphDefinitions, List<Graph> assignedGraphs, String locationName) {
         return matchGraphs(
             graphDefinitions.stream()
@@ -32,6 +40,14 @@ final class LocationDashboardGraphMatcher {
         );
     }
 
+    /**
+     * Matches configured derived graphs to the assigned graphs for a location.
+     *
+     * @param graphDefinitions derived graph definitions
+     * @param assignedGraphs graphs currently assigned to the location
+     * @param locationName location name used in error messages
+     * @return matched graphs keyed by normalized strategy graph id
+     */
     Map<String, Graph> matchDerivedGraphs(
         List<DerivedGraphConfig> graphDefinitions,
         List<Graph> assignedGraphs,

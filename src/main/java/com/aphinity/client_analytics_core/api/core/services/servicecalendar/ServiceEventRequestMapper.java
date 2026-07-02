@@ -17,8 +17,22 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
 
+/**
+ * Normalizes service event request payloads and maps entities to API responses.
+ * <p>
+ * This mapper owns calendar-specific defaults: missing end date/time inherit the
+ * start date/time, blank descriptions become {@code null}, and event ranges must
+ * not end before they start.
+ */
 @Service
 public class ServiceEventRequestMapper {
+    /**
+     * Builds a new service event entity for the given location.
+     *
+     * @param location owning location
+     * @param request event payload
+     * @return unsaved event entity
+     */
     public ServiceEvent createServiceEvent(Location location, LocationEventRequest request) {
         ServiceEvent serviceEvent = new ServiceEvent();
         serviceEvent.setLocation(location);
@@ -26,6 +40,12 @@ public class ServiceEventRequestMapper {
         return serviceEvent;
     }
 
+    /**
+     * Applies normalized request fields to an existing event entity.
+     *
+     * @param serviceEvent event to mutate
+     * @param request replacement event payload
+     */
     public void applyRequest(ServiceEvent serviceEvent, LocationEventRequest request) {
         LocalDate eventDate = normalizeDate(request == null ? null : request.date());
         LocalTime eventTime = normalizeTime(request == null ? null : request.time());
@@ -43,6 +63,14 @@ public class ServiceEventRequestMapper {
         serviceEvent.setStatus(normalizeStatus(request == null ? null : request.status()));
     }
 
+    /**
+     * Converts an entity to an API response, tolerating missing corrective-action
+     * source rows caused by legacy data or deliberately disabled foreign-key
+     * constraints.
+     *
+     * @param serviceEvent event entity
+     * @return response payload
+     */
     public ServiceEventResponse toResponse(ServiceEvent serviceEvent) {
         ServiceEvent sourceEvent = serviceEvent.getCorrectiveActionSourceEvent();
         Long correctiveActionSourceEventId = null;
@@ -73,10 +101,22 @@ public class ServiceEventRequestMapper {
         );
     }
 
+    /**
+     * Extracts and validates responsibility before an entity exists.
+     *
+     * @param request event request
+     * @return requested responsibility
+     */
     public ServiceEventResponsibility requireResponsibility(LocationEventRequest request) {
         return normalizeResponsibility(request == null ? null : request.responsibility());
     }
 
+    /**
+     * Ensures a calendar month is present for month-window queries.
+     *
+     * @param viewedMonth requested month
+     * @return same month when valid
+     */
     public YearMonth requireViewedMonth(YearMonth viewedMonth) {
         if (viewedMonth == null) {
             throw invalidViewedMonth();

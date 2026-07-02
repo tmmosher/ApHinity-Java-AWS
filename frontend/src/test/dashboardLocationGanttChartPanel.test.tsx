@@ -25,6 +25,27 @@ vi.mock("../context/ProfileContext", () => ({
   })
 }));
 
+vi.mock("../context/LocationDetailContext", () => ({
+  useLocationDetail: () => ({
+    ganttTaskImport: {
+      stagedTasks: () => [],
+      stagedUndoStack: () => [],
+      isImportingSpreadsheet: () => false,
+      isApplyingImports: () => false,
+      hasStagedTasks: () => false,
+      hasPendingTaskChanges: () => false,
+      isSpreadsheetMutationBusy: () => false,
+      stageSpreadsheetImportFile: vi.fn(),
+      undoLastTaskMutation: vi.fn(),
+      applyStagedImports: vi.fn(),
+      editStagedTask: vi.fn(() => false),
+      deleteStagedTaskById: vi.fn(() => false),
+      reset: vi.fn()
+    },
+    setGanttTaskRefetcher: vi.fn()
+  })
+}));
+
 vi.mock("../util/location/locationGanttTaskApi", () => ({
   createLocationGanttTaskById: vi.fn(),
   createLocationGanttTasksBulkById: vi.fn(),

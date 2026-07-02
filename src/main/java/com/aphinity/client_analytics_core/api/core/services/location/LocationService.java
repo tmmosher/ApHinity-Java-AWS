@@ -53,9 +53,12 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Business logic for location visibility and membership administration.
- * This whole file has sorta exploded out of control.
- *  TODO split this up into multiple services perhaps as an accessor / operator service pair?
+ * Coordinates location-facing business operations, including access checks, graph
+ * assignment and editing, dashboard spreadsheet imports, alert subscriptions,
+ * thumbnails, and membership administration.
+ *
+ * <p>Partner/admin users are treated as global operators while client users are
+ * scoped to explicit {@link LocationUser} memberships.</p>
  */
 @Service
 public class LocationService {
@@ -170,6 +173,15 @@ public class LocationService {
         return getAccessibleLocationGraphs(userId, locationId, DashboardGraphMonthRange.ALL_TIME_REQUEST_VALUE);
     }
 
+    /**
+     * Returns graphs assigned to a location, optionally projecting imported
+     * time-series traces to a finite month range.
+     *
+     * @param userId authenticated user id
+     * @param locationId location id
+     * @param monthRange requested rolling month range, or all-time when null/non-positive
+     * @return assigned graph payloads with any applicable time-series projection
+     */
     @Transactional(readOnly = true)
     public List<GraphResponse> getAccessibleLocationGraphs(Long userId, Long locationId, Integer monthRange) {
         AppUser user = requireUser(userId);

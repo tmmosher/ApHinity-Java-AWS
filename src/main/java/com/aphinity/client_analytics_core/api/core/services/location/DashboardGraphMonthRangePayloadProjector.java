@@ -15,6 +15,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Projects Plotly payloads to a requested dashboard month window without
+ * mutating the stored all-time graph data.
+ */
 public final class DashboardGraphMonthRangePayloadProjector {
     private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
         .appendValue(ChronoField.YEAR, 4)
@@ -28,6 +32,15 @@ public final class DashboardGraphMonthRangePayloadProjector {
     private DashboardGraphMonthRangePayloadProjector() {
     }
 
+    /**
+     * Filters time-series scatter traces to the requested month range while
+     * leaving non-time-series traces unchanged.
+     *
+     * @param allTimePayload graph data persisted for all time
+     * @param monthRange requested month range
+     * @param anchorDate upper-bound reference date for the rolling window
+     * @return projected payload suitable for API responses
+     */
     public static List<Map<String, Object>> project(
         List<Map<String, Object>> allTimePayload,
         DashboardGraphMonthRange monthRange,
@@ -48,6 +61,12 @@ public final class DashboardGraphMonthRangePayloadProjector {
         return List.copyOf(projectedPayload);
     }
 
+    /**
+     * Identifies scatter traces whose x-axis values can all be parsed as dates.
+     *
+     * @param trace Plotly trace payload
+     * @return true when the trace can be safely range-projected
+     */
     public static boolean isTimeSeriesTrace(Map<String, Object> trace) {
         if (trace == null) {
             return false;

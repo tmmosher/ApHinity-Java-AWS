@@ -12,6 +12,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Centralizes authorization for service calendar event operations.
+ * <p>
+ * Partners/admins can manage all service events for readable locations. Client
+ * users can read member locations and create/update/complete only client-owned
+ * events; deletes remain partner/admin-only.
+ */
 @Service
 public class ServiceCalendarAuthorizationService {
     private final AppUserRepository appUserRepository;
@@ -31,6 +38,12 @@ public class ServiceCalendarAuthorizationService {
         this.accountRoleService = accountRoleService;
     }
 
+    /**
+     * Loads the authenticated user and rejects unverified accounts.
+     *
+     * @param userId authenticated user id from the JWT subject
+     * @return verified user entity
+     */
     public AppUser requireUser(Long userId) {
         AppUser user = appUserRepository.findById(userId).orElseThrow(this::invalidAuthenticatedUser);
         requireVerified(user);
@@ -54,6 +67,13 @@ public class ServiceCalendarAuthorizationService {
         }
     }
 
+    /**
+     * Verifies that the user can create an event with the requested responsibility.
+     *
+     * @param user actor entity
+     * @param locationId target location id
+     * @param responsibility requested event responsibility
+     */
     public void requireCreatePermission(
         AppUser user,
         Long locationId,
@@ -68,6 +88,15 @@ public class ServiceCalendarAuthorizationService {
         throw forbidden();
     }
 
+    /**
+     * Verifies corrective-action creation rights against the source event.
+     * Client users may only create corrective actions for client-responsibility
+     * source events at locations they can access.
+     *
+     * @param user actor entity
+     * @param locationId target location id
+     * @param sourceEvent persisted source event
+     */
     public void requireCreateCorrectiveActionPermission(
         AppUser user,
         Long locationId,
@@ -82,6 +111,15 @@ public class ServiceCalendarAuthorizationService {
         throw forbidden();
     }
 
+    /**
+     * Verifies that the user can update an existing event into the requested
+     * responsibility state.
+     *
+     * @param user actor entity
+     * @param locationId target location id
+     * @param serviceEvent existing event
+     * @param responsibility requested replacement responsibility
+     */
     public void requireUpdatePermission(
         AppUser user,
         Long locationId,

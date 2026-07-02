@@ -9,7 +9,17 @@ import java.util.Optional;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategy.CorrectiveActionDraft;
 
+/**
+ * Converts non-compliant imported samples and embedded comment metadata into
+ * corrective-action drafts.
+ */
 final class LocationDashboardCorrectiveActionDraftFactory {
+    /**
+     * Builds deduplicated corrective-action drafts from analyzed samples.
+     *
+     * @param analyzedSamples imported samples after compliance analysis
+     * @return corrective-action drafts for preview or persistence
+     */
     List<CorrectiveActionDraft> buildCorrectiveActions(List<LocationDashboardAnalyzedSample> analyzedSamples) {
         List<CorrectiveActionDraft> drafts = new ArrayList<>();
         for (LocationDashboardAnalyzedSample analyzedSample : analyzedSamples) {

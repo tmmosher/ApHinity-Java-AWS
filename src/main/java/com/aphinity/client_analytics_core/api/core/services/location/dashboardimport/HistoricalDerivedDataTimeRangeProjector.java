@@ -8,10 +8,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Applies dashboard month-range windows to historical data used by derived graphs.
+ */
 final class HistoricalDerivedDataTimeRangeProjector {
     private HistoricalDerivedDataTimeRangeProjector() {
     }
 
+    /**
+     * Filters historical samples and corrective actions to the requested rolling window.
+     *
+     * @param historicalData all-time historical data
+     * @param monthRange requested month range
+     * @param anchorDate window anchor date
+     * @return projected historical data
+     */
     static LocationDashboardDerivedGraphSupport.HistoricalDerivedData project(
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
         DashboardGraphMonthRange monthRange,

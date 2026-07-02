@@ -79,10 +79,25 @@ public class LocationDashboardSpreadsheetParser {
             .withResolverStyle(ResolverStyle.STRICT)
     );
 
+    /**
+     * Parses a dashboard spreadsheet using the default facility/building/system
+     * identity columns.
+     *
+     * @param file uploaded .xlsx workbook
+     * @return parsed workbook rows and cells
+     */
     public ParsedDashboardWorkbook parse(MultipartFile file) {
         return parse(file, List.of());
     }
 
+    /**
+     * Parses a dashboard spreadsheet using a strategy-specific identity column
+     * pattern.
+     *
+     * @param file uploaded .xlsx workbook
+     * @param identityPattern configured identity headers and aliases
+     * @return parsed workbook rows and cells
+     */
     public ParsedDashboardWorkbook parse(
         MultipartFile file,
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern

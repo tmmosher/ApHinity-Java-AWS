@@ -32,6 +32,13 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * HTTP boundary for location-scoped Gantt task workflows.
+ * <p>
+ * The controller resolves the authenticated user id and request metadata, while
+ * {@link LocationGanttTaskService} performs authorization, persistence,
+ * dependency handling, and audit logging.
+ */
 @RestController
 @RequestMapping({"/core", "/api/core"})
 public class LocationGanttTaskController {
@@ -53,6 +60,14 @@ public class LocationGanttTaskController {
         this.requestMetadataResolver = requestMetadataResolver;
     }
 
+    /**
+     * Lists Gantt tasks visible to the caller, optionally filtered by title.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location id from the route
+     * @param search optional title search text
+     * @return task responses with dependency ids
+     */
     @GetMapping("/locations/{locationId}/gantt-tasks")
     public List<GanttTaskResponse> ganttTasks(
         @AuthenticationPrincipal Jwt jwt,
@@ -63,6 +78,13 @@ public class LocationGanttTaskController {
         return locationGanttTaskService.getAccessibleLocationTasks(userId, locationId, search);
     }
 
+    /**
+     * Streams the Excel template used for Gantt task spreadsheet imports.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @return response entity with attachment headers and workbook content
+     */
     @GetMapping("/locations/{locationId}/gantt-tasks/template")
     public ResponseEntity<Resource> downloadLocationGanttTaskTemplate(
         @AuthenticationPrincipal Jwt jwt,
@@ -88,6 +110,14 @@ public class LocationGanttTaskController {
         }
     }
 
+    /**
+     * Creates one Gantt task for a location.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @param request validated task payload
+     * @return created task response
+     */
     @PostMapping("/locations/{locationId}/gantt-tasks")
     @ResponseStatus(HttpStatus.CREATED)
     public GanttTaskResponse createGanttTask(
@@ -126,6 +156,14 @@ public class LocationGanttTaskController {
         }
     }
 
+    /**
+     * Creates multiple Gantt tasks from a staged spreadsheet/import payload.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @param requests validated task payloads
+     * @return created task responses
+     */
     @PostMapping("/locations/{locationId}/gantt-tasks/bulk")
     @ResponseStatus(HttpStatus.CREATED)
     public List<GanttTaskResponse> createGanttTasksBulk(
@@ -170,6 +208,15 @@ public class LocationGanttTaskController {
         }
     }
 
+    /**
+     * Replaces one Gantt task and its dependency ids.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location owning the task
+     * @param taskId task id from the route
+     * @param request replacement task payload
+     * @return updated task response
+     */
     @PutMapping("/locations/{locationId}/gantt-tasks/{taskId}")
     public GanttTaskResponse updateGanttTask(
         @AuthenticationPrincipal Jwt jwt,
@@ -215,6 +262,14 @@ public class LocationGanttTaskController {
         }
     }
 
+    /**
+     * Deletes one Gantt task and passes client IP metadata into the audit trail.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location owning the task
+     * @param taskId task id from the route
+     * @param request servlet request used for trusted-proxy IP resolution
+     */
     @DeleteMapping("/locations/{locationId}/gantt-tasks/{taskId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteGanttTask(

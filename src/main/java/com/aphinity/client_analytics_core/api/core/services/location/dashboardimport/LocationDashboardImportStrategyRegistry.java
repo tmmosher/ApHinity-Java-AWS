@@ -13,6 +13,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Loads configured dashboard import strategies from classpath JSON resources and
+ * resolves them by normalized location name.
+ */
 @Service
 public class LocationDashboardImportStrategyRegistry {
     private static final String RESOURCE_PATTERN = "classpath*:location-dashboard-import/*.json";
@@ -26,6 +30,12 @@ public class LocationDashboardImportStrategyRegistry {
         this.strategiesByLocationName = loadStrategies();
     }
 
+    /**
+     * Finds the configured strategy for a location.
+     *
+     * @param locationName location name from the persisted location record
+     * @return matching strategy, if one is configured
+     */
     public Optional<LocationDashboardImportStrategy> resolve(String locationName) {
         return Optional.ofNullable(strategiesByLocationName.get(normalizeKey(locationName)));
     }

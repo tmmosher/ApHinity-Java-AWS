@@ -38,6 +38,13 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
+/**
+ * HTTP boundary for location-scoped service calendar workflows.
+ * <p>
+ * This controller handles route parsing, template download response headers, and
+ * request metadata collection. Authorization, persistence, corrective-action
+ * linking, and audit logging live in {@link LocationEventService}.
+ */
 @RestController
 @RequestMapping({"/core", "/api/core"})
 public class LocationEventController {
@@ -59,6 +66,14 @@ public class LocationEventController {
         this.requestMetadataResolver = requestMetadataResolver;
     }
 
+    /**
+     * Lists events overlapping the requested calendar month.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location id from the route
+     * @param month optional {@code yyyy-MM} month; defaults to current month when absent
+     * @return visible service events for the month window
+     */
     @GetMapping("/locations/{locationId}/events")
     public List<ServiceEventResponse> locationEvents(
         @AuthenticationPrincipal Jwt jwt,
@@ -69,6 +84,13 @@ public class LocationEventController {
         return locationEventService.getAccessibleLocationEvents(userId, locationId, resolveViewedMonth(month));
     }
 
+    /**
+     * Streams the Excel template used for service calendar uploads.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @return response entity with attachment headers and workbook content
+     */
     @GetMapping("/locations/{locationId}/events/template")
     public ResponseEntity<Resource> downloadLocationEventTemplate(
         @AuthenticationPrincipal Jwt jwt,
@@ -94,6 +116,14 @@ public class LocationEventController {
         }
     }
 
+    /**
+     * Imports service events from an uploaded spreadsheet.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @param file multipart Excel workbook
+     * @return count of imported events
+     */
     @PostMapping(path = "/locations/{locationId}/events/calendar-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceCalendarUploadResponse uploadLocationEventCalendar(
@@ -147,6 +177,14 @@ public class LocationEventController {
         }
     }
 
+    /**
+     * Persists a frontend-staged batch of service calendar rows.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @param request bulk event rows
+     * @return count of created events
+     */
     @PostMapping("/locations/{locationId}/events/bulk")
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceCalendarUploadResponse createLocationEvents(
@@ -159,6 +197,14 @@ public class LocationEventController {
         return new ServiceCalendarUploadResponse(importedCount);
     }
 
+    /**
+     * Creates one service event.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId target location id
+     * @param request validated event payload
+     * @return created event response
+     */
     @PostMapping("/locations/{locationId}/events")
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceEventResponse createLocationEvent(
@@ -197,6 +243,15 @@ public class LocationEventController {
         }
     }
 
+    /**
+     * Creates a corrective action linked to an existing source event.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location owning the source event
+     * @param sourceEventId event that triggered the corrective action
+     * @param request corrective action payload
+     * @return created corrective action response
+     */
     @PostMapping("/locations/{locationId}/events/{sourceEventId}/corrective-actions")
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceEventResponse createCorrectiveAction(
@@ -249,6 +304,15 @@ public class LocationEventController {
         }
     }
 
+    /**
+     * Replaces one service event.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location owning the event
+     * @param eventId event id from the route
+     * @param request replacement event payload
+     * @return updated event response
+     */
     @PutMapping("/locations/{locationId}/events/{eventId}")
     public ServiceEventResponse updateLocationEvent(
         @AuthenticationPrincipal Jwt jwt,
@@ -294,6 +358,14 @@ public class LocationEventController {
         }
     }
 
+    /**
+     * Deletes one service event and passes client IP metadata into the audit trail.
+     *
+     * @param jwt authenticated principal JWT
+     * @param locationId location owning the event
+     * @param eventId event id from the route
+     * @param request servlet request used for trusted-proxy IP resolution
+     */
     @DeleteMapping("/locations/{locationId}/events/{eventId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteLocationEvent(

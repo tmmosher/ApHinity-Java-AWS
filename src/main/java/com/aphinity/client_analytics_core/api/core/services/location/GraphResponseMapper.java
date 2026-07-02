@@ -13,15 +13,33 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Converts persisted graph entities into API responses after normalizing their
+ * relational Plotly payload representation.
+ */
 @Component
 public class GraphResponseMapper {
     private static final Logger log = LoggerFactory.getLogger(GraphResponseMapper.class);
 
+    /**
+     * Maps a graph using its persisted data payload.
+     *
+     * @param graph graph entity to expose
+     * @return normalized graph response
+     */
     public GraphResponse toResponse(Graph graph) {
         GraphPayloadMapper.GraphPayload payload = normalize(graph);
         return toResponse(graph, payload, payload.data());
     }
 
+    /**
+     * Maps a graph with caller-supplied data, preserving persisted layout,
+     * configuration, and style values.
+     *
+     * @param graph graph entity to expose
+     * @param data optional pre-projected graph data
+     * @return normalized graph response
+     */
     public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data) {
         if (data != null) {
             return new GraphResponse(

@@ -9,6 +9,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Emits structured audit log entries for Gantt task mutations.
+ * <p>
+ * Audit records are currently log-backed rather than table-backed. Callers pass
+ * dependency ids explicitly so create/update/delete audit lines describe the task
+ * relationship state observed during the mutation transaction.
+ */
 @Service
 public class GanttTaskAuditService {
     private static final Logger log = LoggerFactory.getLogger(GanttTaskAuditService.class);

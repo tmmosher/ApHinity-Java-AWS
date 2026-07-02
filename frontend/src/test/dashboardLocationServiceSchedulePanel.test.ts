@@ -15,6 +15,30 @@ vi.mock("../context/ProfileContext", () => ({
   })
 }));
 
+vi.mock("../context/LocationDetailContext", () => ({
+  useLocationDetail: () => ({
+    serviceCalendarStaging: {
+      stagedImportedEvents: () => [],
+      stagedDeletedEvents: () => [],
+      stagedCalendarUndoStack: () => [],
+      isImportingSpreadsheet: () => false,
+      setIsImportingSpreadsheet: vi.fn(),
+      isApplyingImportedEvents: () => false,
+      setIsApplyingImportedEvents: vi.fn(),
+      isImportedEventMutationBusy: () => false,
+      hasStagedImportedEvents: () => false,
+      hasPendingImportedEventChanges: () => false,
+      stageImportedRequests: vi.fn(() => false),
+      editStagedEvent: vi.fn(() => false),
+      completeStagedEvent: vi.fn(() => false),
+      deleteStagedEvent: vi.fn(() => false),
+      queuePersistedEventDelete: vi.fn(() => false),
+      undoLastCalendarMutation: vi.fn(),
+      reset: vi.fn()
+    }
+  })
+}));
+
 vi.mock("../util/location/locationEventApi", () => ({
   createLocationEventById: vi.fn(),
   createLocationCorrectiveActionById: vi.fn(),

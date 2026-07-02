@@ -16,6 +16,17 @@ import java.util.function.Supplier;
 public class LocationDashboardMutationLockService {
     private final ConcurrentHashMap<Long, ReentrantLock> locationLocks = new ConcurrentHashMap<>();
 
+    /**
+     * Runs the supplied mutation under a per-location lock.
+     *
+     * <p>When invoked inside a Spring transaction, the lock is held until transaction
+     * completion so database writes remain serialized for the full commit window.</p>
+     *
+     * @param locationId location whose dashboard data is being mutated
+     * @param action mutation to execute
+     * @return action result
+     * @param <T> action return type
+     */
     public <T> T executeWithLocationLock(Long locationId, Supplier<T> action) {
         ReentrantLock locationLock = locationLocks.computeIfAbsent(locationId, ignored -> new ReentrantLock());
         locationLock.lock();

@@ -14,6 +14,9 @@ public class MailOutboxRetryScheduler {
         this.mailOutboxDeliveryService = mailOutboxDeliveryService;
     }
 
+    /**
+     * Runs the scheduled retry pass for due and exhausted outbox messages.
+     */
     @Scheduled(cron = "0 * * * * *", zone = "America/Phoenix")
     public void retryPendingMailOutbox() {
         mailOutboxDeliveryService.processPendingMailOutbox();

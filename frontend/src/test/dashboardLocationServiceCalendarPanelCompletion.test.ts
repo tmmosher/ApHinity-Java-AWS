@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   currentRole: "partner" as "partner" | "client",
   latestCalendarProps: null as Record<string, unknown> | null,
   latestToolbarProps: null as Record<string, unknown> | null,
+  stagedDeletedEvents: [] as LocationServiceEvent[],
+  stagedCalendarUndoStack: [] as LocationServiceEvent[][],
   createLocationEventById: vi.fn(),
   createLocationCorrectiveActionById: vi.fn(),
   deleteLocationEventById: vi.fn(),
@@ -26,6 +28,46 @@ vi.mock("../context/ApiHostContext", () => ({
 vi.mock("../context/ProfileContext", () => ({
   useProfile: () => ({
     profile: () => ({role: mocks.currentRole})
+  })
+}));
+
+vi.mock("../context/LocationDetailContext", () => ({
+  useLocationDetail: () => ({
+    serviceCalendarStaging: {
+      stagedImportedEvents: () => [],
+      stagedDeletedEvents: () => mocks.stagedDeletedEvents,
+      stagedCalendarUndoStack: () => mocks.stagedCalendarUndoStack,
+      isImportingSpreadsheet: () => false,
+      setIsImportingSpreadsheet: vi.fn(),
+      isApplyingImportedEvents: () => false,
+      setIsApplyingImportedEvents: vi.fn(),
+      isImportedEventMutationBusy: () => false,
+      hasStagedImportedEvents: () => false,
+      hasPendingImportedEventChanges: () => (
+        mocks.stagedDeletedEvents.length > 0 || mocks.stagedCalendarUndoStack.length > 0
+      ),
+      stageImportedRequests: vi.fn(() => false),
+      editStagedEvent: vi.fn(() => false),
+      completeStagedEvent: vi.fn(() => false),
+      deleteStagedEvent: vi.fn(() => false),
+      queuePersistedEventDelete: (event: LocationServiceEvent) => {
+        mocks.stagedCalendarUndoStack = [mocks.stagedDeletedEvents.slice()];
+        mocks.stagedDeletedEvents = [...mocks.stagedDeletedEvents, event];
+        return true;
+      },
+      undoLastCalendarMutation: () => {
+        const previous = mocks.stagedCalendarUndoStack.at(-1);
+        if (!previous) {
+          return;
+        }
+        mocks.stagedDeletedEvents = previous;
+        mocks.stagedCalendarUndoStack = mocks.stagedCalendarUndoStack.slice(0, -1);
+      },
+      reset: () => {
+        mocks.stagedDeletedEvents = [];
+        mocks.stagedCalendarUndoStack = [];
+      }
+    }
   })
 }));
 
@@ -104,6 +146,8 @@ describe("LocationServiceCalendarPanel completion wiring", () => {
     mocks.currentRole = "partner";
     mocks.latestCalendarProps = null;
     mocks.latestToolbarProps = null;
+    mocks.stagedDeletedEvents = [];
+    mocks.stagedCalendarUndoStack = [];
     mocks.createLocationEventById.mockReset();
     mocks.createLocationCorrectiveActionById.mockReset();
     mocks.deleteLocationEventById.mockReset();

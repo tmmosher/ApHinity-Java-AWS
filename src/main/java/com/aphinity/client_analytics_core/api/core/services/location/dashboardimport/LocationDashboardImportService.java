@@ -32,6 +32,15 @@ import java.util.stream.Collectors;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
 
+/**
+ * Imports configured dashboard spreadsheets into the graphs assigned to a location.
+ * <p>
+ * The service chooses a location-specific import strategy, validates that the
+ * workbook identity matches the location, computes imported and derived graph
+ * payloads, and optionally persists raw sample history used by time-range views.
+ * Imports run under a location-scoped database lock so two concurrent uploads
+ * cannot interleave graph and corrective-action changes for the same location.
+ */
 @Service
 public class LocationDashboardImportService {
     private static final Logger log = LoggerFactory.getLogger(LocationDashboardImportService.class);
@@ -126,11 +135,31 @@ public class LocationDashboardImportService {
         this.clock = clock;
     }
 
+    /**
+     * Imports a dashboard workbook without replacing the persisted sample history.
+     * This mode updates graph payload previews and corrective-action previews but
+     * leaves the raw sample table untouched.
+     *
+     * @param location location whose assigned dashboard graphs should be updated
+     * @param file uploaded dashboard workbook
+     * @return updated graph payloads and corrective-action drafts
+     */
     @Transactional
     public LocationDashboardSpreadsheetUploadResponse importLocationDashboard(Location location, org.springframework.web.multipart.MultipartFile file) {
         return importLocationDashboard(location, file, false);
     }
 
+    /**
+     * Imports a dashboard workbook and optionally replaces persisted sample history.
+     * Persisted samples are used by derived historical/time-range graphs; callers
+     * should enable {@code persistSamples} only for committed uploads, not transient
+     * preview flows.
+     *
+     * @param location location whose assigned dashboard graphs should be updated
+     * @param file uploaded dashboard workbook
+     * @param persistSamples whether raw parsed sample observations should replace existing samples
+     * @return updated graph payloads and corrective-action drafts
+     */
     @Transactional
     public LocationDashboardSpreadsheetUploadResponse importLocationDashboard(
         Location location,

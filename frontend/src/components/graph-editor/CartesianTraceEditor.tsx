@@ -2,6 +2,14 @@ import { Index, Show } from "solid-js";
 import { toInputValue } from "../../util/graph/graphTraceEditor";
 import GraphColorPicker from "./GraphColorPicker";
 
+export type CartesianAxisTitleControl = {
+  key: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  onUpdate: (rawValue: string) => void;
+};
+
 type CartesianTraceEditorProps = {
   heading: string;
   rowIndexes: number[];
@@ -15,7 +23,7 @@ type CartesianTraceEditorProps = {
   barOrientation?: "h" | "v";
   yRangeMin: unknown;
   yRangeMax: unknown;
-  yAxisTitle?: string;
+  axisTitleControls?: CartesianAxisTitleControl[];
   xDrafts: Record<number, string>;
   yDrafts: Record<number, string>;
   xInputMode?: "decimal";
@@ -30,7 +38,6 @@ type CartesianTraceEditorProps = {
   onUpdateColor?: (rowIndex: number, colorHex: string) => void;
   onUpdateYRangeMin: (rawValue: string) => void;
   onUpdateYRangeMax: (rawValue: string) => void;
-  onUpdateYAxisTitle: (rawValue: string) => void;
   onRemoveRow: (rowIndex: number) => void;
 };
 
@@ -96,17 +103,21 @@ const CartesianTraceEditor = (props: CartesianTraceEditorProps) => {
             onInput={(event) => props.onUpdateYRangeMax(event.currentTarget.value)}
           />
         </label>
-        <label class="form-control md:col-span-full">
-          <span class="label-text">{rangeLabel()} title</span>
-          <input
-            class="input input-bordered input-sm mt-1"
-            type="text"
-            placeholder={`Optional ${rangeLabel().toLowerCase()} title`}
-            value={props.yAxisTitle ?? ""}
-            disabled={props.isBusy}
-            onInput={(event) => props.onUpdateYAxisTitle(event.currentTarget.value)}
-          />
-        </label>
+        <Index each={props.axisTitleControls ?? []}>
+          {(axisTitleControl) => (
+            <label class="form-control">
+              <span class="label-text">{axisTitleControl().label}</span>
+              <input
+                class="input input-bordered input-sm mt-1"
+                type="text"
+                placeholder={axisTitleControl().placeholder}
+                value={axisTitleControl().value}
+                disabled={props.isBusy}
+                onInput={(event) => axisTitleControl().onUpdate(event.currentTarget.value)}
+              />
+            </label>
+          )}
+        </Index>
       </div>
 
       <Show when={props.rowIndexes.length > 0} fallback={<p class="text-sm text-base-content/70">No values in this trace.</p>}>

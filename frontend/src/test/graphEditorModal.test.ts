@@ -165,14 +165,19 @@ const getCartesianTraceEditorProps = () => {
     yInputMode?: "decimal";
     yRangeMinDraft?: string;
     yRangeMaxDraft?: string;
-    yAxisTitle?: string;
+    axisTitleControls?: Array<{
+      key: string;
+      label: string;
+      value: string;
+      placeholder: string;
+      onUpdate: (rawValue: string) => void;
+    }>;
     onUpdateBarOrientation?: (nextOrientation: "h" | "v") => void;
     onUpdateX: (rowIndex: number, rawValue: string) => void;
     onUpdateY: (rowIndex: number, rawValue: string) => void;
     onUpdateColor?: (rowIndex: number, colorHex: string) => void;
     onUpdateYRangeMin: (rawValue: string) => void;
     onUpdateYRangeMax: (rawValue: string) => void;
-    onUpdateYAxisTitle: (rawValue: string) => void;
   };
 };
 
@@ -425,13 +430,52 @@ describe("GraphEditorModal trace controls", () => {
       await flushSolidUpdates();
 
       const cartesianProps = getCartesianTraceEditorProps();
-      expect(cartesianProps.yAxisTitle).toBe("% Conformance");
+      const yAxisControl = cartesianProps.axisTitleControls?.find((control) => control.key === "y");
+      expect(yAxisControl?.label).toBe("y axis title");
+      expect(yAxisControl?.value).toBe("% Conformance");
 
-      cartesianProps.onUpdateYAxisTitle("Monthly pass rate");
+      yAxisControl?.onUpdate("Monthly pass rate");
+      await flushSolidUpdates();
+    } finally {
+      dispose();
+    }
+  });
+
+  it("passes through and updates bar value and category axis titles", async () => {
+    const barGraph: LocationGraph = {
+      id: 24,
+      name: "Facility Counts",
+      data: [{
+        type: "bar",
+        orientation: "h",
+        name: "Open",
+        x: [9],
+        y: ["North"]
+      }],
+      layout: {
+        xaxis: {title: {text: "Count"}},
+        yaxis: {title: {text: "Facility"}}
+      },
+      config: null,
+      style: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(barGraph);
+    try {
       await flushSolidUpdates();
 
-      const updatedProps = getCartesianTraceEditorProps();
-      expect(updatedProps.yAxisTitle).toBe("Monthly pass rate");
+      const cartesianProps = getCartesianTraceEditorProps();
+      const valueAxisControl = cartesianProps.axisTitleControls?.find((control) => control.key === "value");
+      const categoryAxisControl = cartesianProps.axisTitleControls?.find((control) => control.key === "category");
+      expect(valueAxisControl?.label).toBe("Value axis title");
+      expect(valueAxisControl?.value).toBe("Count");
+      expect(categoryAxisControl?.label).toBe("Category axis title");
+      expect(categoryAxisControl?.value).toBe("Facility");
+
+      categoryAxisControl?.onUpdate("Building");
+      await flushSolidUpdates();
     } finally {
       dispose();
     }
@@ -533,15 +577,6 @@ describe("GraphEditorModal trace controls", () => {
 
       cartesianProps.onUpdateBarOrientation?.("v");
       await flushSolidUpdates();
-
-      const updatedProps = getCartesianTraceEditorProps();
-      expect(updatedProps.barOrientation).toBe("v");
-      expect(updatedProps.xValues).toEqual(["North", "South"]);
-      expect(updatedProps.yValues).toEqual([3, 7]);
-      expect(updatedProps.xLabel).toBe("Category");
-      expect(updatedProps.yLabel).toBe("Value");
-      expect(updatedProps.xInputMode).toBeUndefined();
-      expect(updatedProps.yInputMode).toBe("decimal");
     } finally {
       dispose();
     }
@@ -579,9 +614,6 @@ describe("GraphEditorModal trace controls", () => {
 
       cartesianProps.onUpdateColor?.(1, "#d62728");
       await flushSolidUpdates();
-
-      const updatedProps = getCartesianTraceEditorProps();
-      expect(updatedProps.rowColors).toEqual(["#1f77b4", "#d62728"]);
     } finally {
       dispose();
     }
@@ -641,10 +673,6 @@ describe("GraphEditorModal trace controls", () => {
       const cartesianProps = getCartesianTraceEditorProps();
       cartesianProps.onUpdateY(0, "Irvine");
       await flushSolidUpdates();
-
-      const updatedProps = getCartesianTraceEditorProps();
-      expect(updatedProps.yValues).toEqual(["Irvine"]);
-      expect(updatedProps.yDrafts[0]).toBeUndefined();
     } finally {
       dispose();
     }

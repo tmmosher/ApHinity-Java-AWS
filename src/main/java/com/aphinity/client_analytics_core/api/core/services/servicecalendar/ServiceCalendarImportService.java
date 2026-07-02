@@ -19,6 +19,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Handles direct spreadsheet uploads for service calendar events.
+ * <p>
+ * Parsed rows are validated through {@link ServiceEventRequestMapper}; row-level
+ * validation failures are converted to API errors that include the spreadsheet row
+ * number, which is more useful to users than a generic validation response.
+ */
 @Service
 public class ServiceCalendarImportService {
     private static final Logger log = LoggerFactory.getLogger(ServiceCalendarImportService.class);
@@ -46,6 +53,16 @@ public class ServiceCalendarImportService {
         this.auditService = auditService;
     }
 
+    /**
+     * Parses and persists service calendar events from a workbook.
+     * Each row is authorized independently because client users may only create
+     * client-responsibility events even when they can access the location.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @param file uploaded workbook
+     * @return number of persisted events
+     */
     @Transactional
     public int uploadServiceCalendar(Long userId, Long locationId, MultipartFile file) {
         AppUser user = authorizationService.requireUser(userId);

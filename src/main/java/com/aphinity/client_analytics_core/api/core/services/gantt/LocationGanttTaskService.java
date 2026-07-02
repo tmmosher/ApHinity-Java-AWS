@@ -21,6 +21,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Coordinates the Gantt task API for a location.
+ * <p>
+ * This service owns the permission checks, persistence, dependency replacement,
+ * audit logging, and location timestamp updates for Gantt task reads and
+ * mutations. It deliberately keeps dependency updates in the same transaction as
+ * task writes so a task response always reflects the committed dependency set.
+ */
 @Service
 public class LocationGanttTaskService {
     private static final Logger log = LoggerFactory.getLogger(LocationGanttTaskService.class);
@@ -54,6 +62,16 @@ public class LocationGanttTaskService {
         this.auditService = auditService;
     }
 
+    /**
+     * Returns Gantt tasks visible to the caller, optionally filtered by title.
+     * Dependencies are loaded in one batch after task retrieval to avoid per-task
+     * dependency queries while preserving the task sort used by the UI.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location owning the task list
+     * @param searchTerm optional case-insensitive title search term
+     * @return tasks with dependency ids, ordered by start date, end date, and id
+     */
     @Transactional(readOnly = true)
     public List<GanttTaskResponse> getAccessibleLocationTasks(Long userId, Long locationId, String searchTerm) {
         AppUser user = authorizationService.requireUser(userId);
@@ -81,6 +99,14 @@ public class LocationGanttTaskService {
             .toList();
     }
 
+    /**
+     * Returns the downloadable spreadsheet template after confirming the caller can
+     * read the target location.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @return classpath resource for the Gantt upload template
+     */
     @Transactional(readOnly = true)
     public Resource getGanttChartTemplate(Long userId, Long locationId) {
         AppUser user = authorizationService.requireUser(userId);
@@ -88,6 +114,16 @@ public class LocationGanttTaskService {
         return templateService.getTemplate();
     }
 
+    /**
+     * Creates one task and replaces its dependency list with the request payload.
+     * The location's updated timestamp is touched only after task creation,
+     * dependency persistence, and audit logging succeed.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location receiving the task
+     * @param request validated task request
+     * @return created task response including dependency ids
+     */
     @Transactional
     public GanttTaskResponse createLocationTask(Long userId, Long locationId, LocationGanttTaskRequest request) {
         AppUser user = authorizationService.requireUser(userId);
@@ -113,6 +149,16 @@ public class LocationGanttTaskService {
         }
     }
 
+    /**
+     * Creates multiple tasks from spreadsheet/import requests in one transaction.
+     * Dependencies are applied per persisted task using the request order, so callers
+     * must pass dependency ids that refer to already existing tasks.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location receiving the tasks
+     * @param requests task creation requests; must not be empty
+     * @return created task responses including dependency ids
+     */
     @Transactional
     public List<GanttTaskResponse> createLocationTasksBulk(
         Long userId,
@@ -158,6 +204,17 @@ public class LocationGanttTaskService {
         }
     }
 
+    /**
+     * Replaces a task's editable fields and dependency list.
+     * Missing tasks are reported as 404 within the location scope rather than
+     * leaking cross-location task existence.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location owning the task
+     * @param taskId task to update
+     * @param request replacement task fields and dependency ids
+     * @return updated task response
+     */
     @Transactional
     public GanttTaskResponse updateLocationTask(
         Long userId,
@@ -208,6 +265,17 @@ public class LocationGanttTaskService {
         return ganttTaskRepository.findById(taskId).orElse(fallbackTask);
     }
 
+    /**
+     * Deletes a task and records a deletion audit entry before removal.
+     * Deleting a task may affect dependency visibility for other tasks; dependency
+     * ids are captured before deletion so the audit log can describe what was
+     * removed.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location owning the task
+     * @param taskId task to delete
+     * @param actorIpAddress request IP address for audit metadata
+     */
     @Transactional
     public void deleteLocationTask(Long userId, Long locationId, Long taskId, String actorIpAddress) {
         AppUser user = authorizationService.requireUser(userId);

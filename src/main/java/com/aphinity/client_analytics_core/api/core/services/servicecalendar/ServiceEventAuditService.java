@@ -7,6 +7,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * Emits structured audit log entries for service calendar mutations.
+ * Audit records are log-backed and include actor IP only for delete operations,
+ * where retaining request metadata is most useful after the row is removed.
+ */
 @Service
 public class ServiceEventAuditService {
     private static final Logger log = LoggerFactory.getLogger(ServiceEventAuditService.class);

@@ -25,6 +25,7 @@ import {
   getTraceColor,
   getTraceArray,
   getTraceType,
+  getTraceCartesianAxisTitle,
   getTraceYAxisRange,
   getTraceYAxisTitle,
   isRecord,
@@ -38,6 +39,7 @@ import {
   setTraceColor,
   parseNumericInput,
   swapCartesianLayoutAxes,
+  updateTraceCartesianAxisTitle,
   updateTraceYAxisTitle,
   updateTraceYAxisRange,
   updateCartesianX,
@@ -318,14 +320,6 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     return getTraceYAxisRange(visibleEditableGraphPayloadLayout(), trace);
   });
 
-  const selectedTraceYAxisTitle = createMemo(() => {
-    const trace = selectedTrace();
-    if (!trace) {
-      return "";
-    }
-    return getTraceYAxisTitle(visibleEditableGraphPayloadLayout(), trace);
-  });
-
   const selectedBarOrientation = createMemo(() => {
     const trace = selectedTrace();
     if (!trace || getTraceType(trace) !== "bar") {
@@ -509,6 +503,66 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     });
     setOperationError("");
   };
+
+  const updateSelectedTraceCartesianAxisTitle = (axis: "x" | "y", rawValue: string) => {
+    setEditablePayload((current) => {
+      const existingTrace = current.data[selectedTraceIndex()];
+      if (!isRecord(existingTrace)) {
+        return current;
+      }
+      return {
+        ...current,
+        layout: updateTraceCartesianAxisTitle(current.layout ?? null, existingTrace, axis, rawValue)
+      };
+    });
+    setOperationError("");
+  };
+
+  const cartesianAxisTitleControls = createMemo(() => {
+    const trace = selectedTrace();
+    const traceType = trace ? getTraceType(trace) : null;
+    if (!trace || (traceType !== "bar" && traceType !== "scatter")) {
+      return [];
+    }
+
+    const layout = visibleEditableGraphPayloadLayout();
+    if (traceType === "bar") {
+      const isHorizontal = getBarOrientation(trace) === "h";
+      return [
+        {
+          key: "value",
+          label: "Value axis title",
+          value: getTraceYAxisTitle(layout, trace),
+          placeholder: "Optional value axis title",
+          onUpdate: updateSelectedTraceYAxisTitle
+        },
+        {
+          key: "category",
+          label: "Category axis title",
+          value: getTraceCartesianAxisTitle(layout, trace, isHorizontal ? "y" : "x"),
+          placeholder: "Optional category axis title",
+          onUpdate: (rawValue: string) => updateSelectedTraceCartesianAxisTitle(isHorizontal ? "y" : "x", rawValue)
+        }
+      ];
+    }
+
+    return [
+      {
+        key: "x",
+        label: "x axis title",
+        value: getTraceCartesianAxisTitle(layout, trace, "x"),
+        placeholder: "Optional x axis title",
+        onUpdate: (rawValue: string) => updateSelectedTraceCartesianAxisTitle("x", rawValue)
+      },
+      {
+        key: "y",
+        label: "y axis title",
+        value: getTraceCartesianAxisTitle(layout, trace, "y"),
+        placeholder: "Optional y axis title",
+        onUpdate: (rawValue: string) => updateSelectedTraceCartesianAxisTitle("y", rawValue)
+      }
+    ];
+  });
 
   const applyTraceColor = (colorHex: string) => {
     const traceType = selectedTraceType();
@@ -936,7 +990,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       colorOptions={TRACE_COLOR_OPTIONS}
                       xLabel={selectedBarOrientation() === "h" ? "Value" : "Category"}
                       yLabel={selectedBarOrientation() === "h" ? "Category" : "Value"}
-                      rangeLabel={selectedBarOrientation() === "h" ? "Value axis" : "Y axis"}
+                      rangeLabel="Value axis"
                       barOrientation={selectedBarOrientation() ?? undefined}
                       xDrafts={cartesianXDrafts()}
                       yDrafts={cartesianYDrafts()}
@@ -944,7 +998,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yInputMode={selectedBarOrientation() === "v" ? "decimal" : undefined}
                       yRangeMin={selectedTraceYAxisRange()[0]}
                       yRangeMax={selectedTraceYAxisRange()[1]}
-                      yAxisTitle={selectedTraceYAxisTitle()}
+                      axisTitleControls={cartesianAxisTitleControls()}
                       yRangeMinDraft={yRangeMinDraft()}
                       yRangeMaxDraft={yRangeMaxDraft()}
                       isBusy={isBusy()}
@@ -961,7 +1015,6 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                       onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
                       onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}
-                      onUpdateYAxisTitle={updateSelectedTraceYAxisTitle}
                       onRemoveRow={(rowIndex) =>
                         batch(() => {
                           setCartesianXDrafts((current) => shiftIndexedDrafts(current, rowIndex));
@@ -983,7 +1036,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       yInputMode="decimal"
                       yRangeMin={selectedTraceYAxisRange()[0]}
                       yRangeMax={selectedTraceYAxisRange()[1]}
-                      yAxisTitle={selectedTraceYAxisTitle()}
+                      axisTitleControls={cartesianAxisTitleControls()}
                       yRangeMinDraft={yRangeMinDraft()}
                       yRangeMaxDraft={yRangeMaxDraft()}
                       isBusy={isBusy()}
@@ -996,7 +1049,6 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                       onUpdateYRangeMin={(rawValue) => updateSelectedTraceYRange(0, rawValue)}
                       onUpdateYRangeMax={(rawValue) => updateSelectedTraceYRange(1, rawValue)}
-                      onUpdateYAxisTitle={updateSelectedTraceYAxisTitle}
                       onRemoveRow={(rowIndex) =>
                         batch(() => {
                           setCartesianXDrafts((current) => shiftIndexedDrafts(current, rowIndex));

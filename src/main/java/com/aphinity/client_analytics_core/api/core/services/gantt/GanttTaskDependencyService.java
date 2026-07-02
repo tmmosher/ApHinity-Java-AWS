@@ -15,6 +15,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Maintains directed dependency edges between Gantt tasks in a single location.
+ * <p>
+ * Dependency replacement normalizes ids, rejects self-dependencies, and verifies
+ * that every dependency task belongs to the same location before recreating the
+ * persisted edge set.
+ */
 @Service
 public class GanttTaskDependencyService {
     private final GanttTaskRepository ganttTaskRepository;
@@ -28,12 +35,26 @@ public class GanttTaskDependencyService {
         this.ganttTaskDependencyRepository = ganttTaskDependencyRepository;
     }
 
+    /**
+     * Returns dependency task ids for one task.
+     *
+     * @param locationId location scope
+     * @param ganttTaskId task whose dependencies should be returned
+     * @return sorted dependency task ids
+     */
     @Transactional(readOnly = true)
     public List<Long> findDependencyTaskIds(Long locationId, Long ganttTaskId) {
         return ganttTaskDependencyRepository
             .findDependencyTaskIdsByLocationIdAndGanttTaskId(locationId, ganttTaskId);
     }
 
+    /**
+     * Loads dependency ids for a batch of tasks in one query.
+     *
+     * @param locationId location scope
+     * @param ganttTaskIds task ids to hydrate
+     * @return map of task id to sorted dependency ids
+     */
     @Transactional(readOnly = true)
     public Map<Long, List<Long>> findDependencyTaskIdsByTaskIds(Long locationId, Collection<Long> ganttTaskIds) {
         if (ganttTaskIds == null || ganttTaskIds.isEmpty()) {
@@ -54,6 +75,15 @@ public class GanttTaskDependencyService {
         return dependencyIdsByTaskId;
     }
 
+    /**
+     * Replaces all dependencies for a persisted task.
+     * Null, non-positive, and duplicate dependency ids are ignored; remaining ids
+     * are sorted for stable responses and audit logs.
+     *
+     * @param task persisted task whose dependency edges should be replaced
+     * @param dependencyTaskIds requested dependency task ids
+     * @return normalized dependency ids that were persisted
+     */
     @Transactional
     public List<Long> replaceDependencies(GanttTask task, Collection<Long> dependencyTaskIds) {
         if (task == null || task.getId() == null || task.getLocation() == null || task.getLocation().getId() == null) {
@@ -99,6 +129,13 @@ public class GanttTaskDependencyService {
         return normalizedDependencyTaskIds;
     }
 
+    /**
+     * Removes dependency edges where a task is either the dependent task or the
+     * prerequisite task.
+     *
+     * @param locationId location scope
+     * @param ganttTaskId task being deleted
+     */
     @Transactional
     public void deleteDependenciesForTask(Long locationId, Long ganttTaskId) {
         ganttTaskDependencyRepository.deleteByLocation_IdAndGanttTask_Id(locationId, ganttTaskId);

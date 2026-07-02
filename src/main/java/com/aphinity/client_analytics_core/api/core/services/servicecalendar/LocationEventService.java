@@ -27,6 +27,14 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Coordinates service calendar reads, imports, mutations, corrective actions,
+ * and audit logging for a location.
+ * <p>
+ * Authorization is delegated to {@link ServiceCalendarAuthorizationService}, while
+ * this service keeps calendar mutations, corrective-action links, location
+ * timestamp touches, and audit entries in the same transaction.
+ */
 @Service
 public class LocationEventService {
     private static final Logger log = LoggerFactory.getLogger(LocationEventService.class);
@@ -66,6 +74,16 @@ public class LocationEventService {
         this.locationDashboardTimeRangeService = locationDashboardTimeRangeService;
     }
 
+    /**
+     * Returns service events visible in the requested calendar month.
+     * The query includes events whose date range overlaps the month window rather
+     * than only events that start inside the month.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @param viewedMonth month currently rendered by the calendar UI
+     * @return ordered event responses for the visible window
+     */
     @Transactional(readOnly = true)
     public List<ServiceEventResponse> getAccessibleLocationEvents(Long userId, Long locationId, YearMonth viewedMonth) {
         AppUser user = authorizationService.requireUser(userId);
@@ -80,6 +98,14 @@ public class LocationEventService {
             .toList();
     }
 
+    /**
+     * Returns the service calendar spreadsheet template after verifying read access
+     * to the location.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @return classpath template resource
+     */
     @Transactional(readOnly = true)
     public Resource getServiceCalendarTemplate(Long userId, Long locationId) {
         AppUser user = authorizationService.requireUser(userId);
@@ -87,6 +113,16 @@ public class LocationEventService {
         return templateService.getTemplate();
     }
 
+    /**
+     * Imports service events from an uploaded spreadsheet.
+     * Parsed rows are mapped through the same request mapper used by the JSON API,
+     * so validation and defaults are consistent across upload and direct creation.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @param file uploaded spreadsheet
+     * @return number of imported rows
+     */
     @Transactional
     public int uploadServiceCalendar(Long userId, Long locationId, MultipartFile file) {
         int importedCount = importService.uploadServiceCalendar(userId, locationId, file);
@@ -94,6 +130,16 @@ public class LocationEventService {
         return importedCount;
     }
 
+    /**
+     * Creates a batch of service events, typically from frontend-staged imports.
+     * Empty batches are rejected because a successful no-op import would be
+     * ambiguous to callers.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @param requests event row requests to persist
+     * @return number of persisted events
+     */
     @Transactional
     public int createLocationEvents(Long userId, Long locationId, List<ServiceCalendarBulkEventRowRequest> requests) {
         AppUser user = authorizationService.requireUser(userId);
@@ -132,6 +178,14 @@ public class LocationEventService {
         }
     }
 
+    /**
+     * Creates one service event and records a creation audit entry.
+     *
+     * @param userId authenticated actor id
+     * @param locationId target location id
+     * @param request validated event request
+     * @return created event response
+     */
     @Transactional
     public ServiceEventResponse createLocationEvent(Long userId, Long locationId, LocationEventRequest request) {
         AppUser user = authorizationService.requireUser(userId);
@@ -160,6 +214,17 @@ public class LocationEventService {
         }
     }
 
+    /**
+     * Creates a corrective action linked to an existing service event.
+     * The source event must exist in the same location; the created event stores a
+     * source-event association that can later be cleared if the source is deleted.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location owning both source and corrective action
+     * @param sourceEventId persisted event that triggered the corrective action
+     * @param request corrective action request payload
+     * @return created corrective action response
+     */
     @Transactional
     public ServiceEventResponse createCorrectiveActionForLocationEvent(
         Long userId,
@@ -219,6 +284,17 @@ public class LocationEventService {
         return workOrderEmail.strip();
     }
 
+    /**
+     * Replaces one service event's editable fields and records an update audit
+     * entry. The lookup is scoped by location to avoid exposing cross-location
+     * event ids.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location owning the event
+     * @param eventId event to update
+     * @param request replacement event fields
+     * @return updated event response
+     */
     @Transactional
     public ServiceEventResponse updateLocationEvent(
         Long userId,
@@ -273,6 +349,15 @@ public class LocationEventService {
         return serviceEventRepository.findById(eventId).orElse(fallbackEvent);
     }
 
+    /**
+     * Deletes one service event after clearing any corrective actions that point at
+     * it. The deletion audit captures request IP metadata before the row is removed.
+     *
+     * @param userId authenticated actor id
+     * @param locationId location owning the event
+     * @param eventId event to delete
+     * @param actorIpAddress request IP address for audit metadata
+     */
     @Transactional
     public void deleteLocationEvent(Long userId, Long locationId, Long eventId, String actorIpAddress) {
         AppUser user = authorizationService.requireUser(userId);

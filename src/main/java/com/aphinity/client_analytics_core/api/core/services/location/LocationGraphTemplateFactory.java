@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Builds the initial Plotly payloads used when users create location graphs.
+ */
 @Component
 public class LocationGraphTemplateFactory {
     private static final String DEFAULT_GRAPH_COLOR = "#1f77b4";
@@ -15,6 +18,15 @@ public class LocationGraphTemplateFactory {
     private static final String INDICATOR_GAUGE_BACKGROUND_COLOR = "#6b728040";
     private static final String INDICATOR_THRESHOLD_COLOR = "red";
 
+    /**
+     * Immutable template for a newly-created graph.
+     *
+     * @param name default graph name
+     * @param data initial Plotly trace list
+     * @param layout initial Plotly layout
+     * @param config initial Plotly config
+     * @param style application-specific graph style metadata
+     */
     public record GraphTemplate(
         String name,
         List<Map<String, Object>> data,
@@ -31,6 +43,13 @@ public class LocationGraphTemplateFactory {
         SCATTER
     }
 
+    /**
+     * Creates a graph template for the requested graph type.
+     *
+     * @param rawGraphType request graph type
+     * @param locationName location name used for default chart titles
+     * @return graph template ready for persistence
+     */
     public GraphTemplate create(String rawGraphType, String locationName) {
         return switch (parseGraphTemplateType(rawGraphType)) {
             case PIE -> new GraphTemplate(

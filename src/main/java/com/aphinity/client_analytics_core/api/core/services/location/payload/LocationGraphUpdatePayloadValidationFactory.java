@@ -6,6 +6,10 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Validates user-submitted graph data updates against the existing graph family
+ * and returns normalized Plotly payloads for persistence.
+ */
 @Component
 public class LocationGraphUpdatePayloadValidationFactory {
     private final CartesianTraceDateOrderCanonicalizer cartesianTraceDateOrderCanonicalizer =
@@ -16,6 +20,14 @@ public class LocationGraphUpdatePayloadValidationFactory {
         new CartesianGraphPayloadValidator()
     );
 
+    /**
+     * Validates and normalizes a graph update payload.
+     *
+     * @param currentData current persisted graph data
+     * @param nextData proposed replacement graph data
+     * @param rawLayout proposed layout payload
+     * @return validated data and layout
+     */
     public ValidatedGraphPayload validateForUpdate(
         Object currentData,
         Object nextData,

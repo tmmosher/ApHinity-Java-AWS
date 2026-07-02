@@ -32,10 +32,26 @@ final class LocationDashboardImportedGraphMerger {
         "orientation"
     );
 
+    /**
+     * Merges imported data into a graph while preserving existing sparse
+     * time-series history.
+     *
+     * @param graph persisted graph
+     * @param importedData newly computed import traces
+     * @return merged graph data
+     */
     List<Map<String, Object>> mergeImportedGraphData(Graph graph, List<Map<String, Object>> importedData) {
         return mergeImportedGraphData(graph, importedData, false);
     }
 
+    /**
+     * Merges imported traces and optionally replaces all existing points.
+     *
+     * @param graph persisted graph
+     * @param importedData newly computed import traces
+     * @param resetExistingPoints whether existing trace points should be discarded
+     * @return merged graph data
+     */
     List<Map<String, Object>> mergeImportedGraphData(
         Graph graph,
         List<Map<String, Object>> importedData,

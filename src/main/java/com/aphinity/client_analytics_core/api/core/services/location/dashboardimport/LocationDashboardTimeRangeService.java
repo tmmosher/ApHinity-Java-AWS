@@ -29,6 +29,14 @@ import java.util.stream.Collectors;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
 
+/**
+ * Builds and refreshes dashboard graph payloads for finite month ranges.
+ * <p>
+ * Imported graphs can often be projected from their all-time payloads, while
+ * derived graphs must be recomputed from persisted samples and corrective-action
+ * events. This service centralizes that distinction so dashboard reads and
+ * scheduled refreshes use the same range semantics.
+ */
 @Service
 public class LocationDashboardTimeRangeService {
     private static final Logger log = LoggerFactory.getLogger(LocationDashboardTimeRangeService.class);
@@ -80,6 +88,14 @@ public class LocationDashboardTimeRangeService {
         );
     }
 
+    /**
+     * Refreshes persisted all-time derived graphs for one location.
+     * This is used by the scheduler to keep derived graph rows aligned with
+     * persisted sample history and corrective actions even when no user is
+     * requesting the dashboard.
+     *
+     * @param locationId location whose derived graph payloads should be refreshed
+     */
     @Transactional
     public void refreshLocationDateGroups(Long locationId) {
         RefreshContext refreshContext = loadRefreshContext(locationId);
@@ -105,6 +121,13 @@ public class LocationDashboardTimeRangeService {
         );
     }
 
+    /**
+     * Placeholder hook for imported graph range materialization.
+     * Imported graphs are currently projected at response time, so this method
+     * intentionally logs that no persistent imported-graph range refresh is needed.
+     *
+     * @param locationId location considered for imported graph range materialization
+     */
     @Transactional
     public void refreshLocationImportedGraphDateGroups(Long locationId) {
         RefreshContext refreshContext = loadRefreshContext(locationId);
@@ -120,6 +143,16 @@ public class LocationDashboardTimeRangeService {
         );
     }
 
+    /**
+     * Resolves graph data overrides for a finite dashboard month range.
+     * Non-derived imported graphs are projected from their all-time relational
+     * payload. Derived graphs are rebuilt from persisted historical data for the
+     * requested range so rollups and corrective-action overlays remain consistent.
+     *
+     * @param locationId location whose graph payloads are being requested
+     * @param monthRange requested range; {@code null} and all-time requests return no overrides
+     * @return graph id to replacement Plotly data payload, for graphs needing a range override
+     */
     @Transactional
     public Map<Long, List<Map<String, Object>>> resolveLocationMonthRangePayloads(
         Long locationId,

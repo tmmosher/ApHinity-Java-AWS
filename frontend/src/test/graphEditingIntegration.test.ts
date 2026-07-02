@@ -13,6 +13,7 @@ import {
   setBarRowColor,
   setPieRowColor,
   setTraceColor,
+  updateTraceCartesianAxisTitle,
   updateTraceYAxisTitle,
   updateCartesianX,
   updateCartesianY
@@ -278,6 +279,55 @@ describe("graph editing integration", () => {
         title: expect.objectContaining({
           text: "Monthly pass rate",
           font: { size: 14 }
+        })
+      })
+    });
+  });
+
+  it("applies x-axis title edits to the rendered layout", async () => {
+    const baseGraph: LocationGraph = {
+      id: 14,
+      name: "Compliance Trend",
+      data: [{ type: "scatter", name: "Daily", x: ["2026-01-01"], y: [9] }],
+      layout: {
+        title: { text: "Baseline" },
+        xaxis: {
+          type: "date",
+          title: { text: "Observed date", standoff: 8 }
+        },
+        yaxis: {
+          range: [0, 100],
+          title: { text: "% Conformance" }
+        }
+      },
+      config: { displayModeBar: false },
+      style: { height: 280 },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(baseGraph);
+    payload.layout = updateTraceCartesianAxisTitle(payload.layout ?? null, payload.data[0], "x", "Sample date");
+
+    const editResult = applyGraphPayloadEdit([baseGraph], [], 14, payload);
+    expect(editResult.changed).toBe(true);
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      { react } as unknown as { react: (...args: unknown[]) => Promise<unknown> },
+      { id: "chart-root" } as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any,
+      editResult.nextGraphs[0].layout as any,
+      editResult.nextGraphs[0].config as any
+    );
+
+    const [, , renderedLayout] = react.mock.calls[0];
+    expect(renderedLayout).toMatchObject({
+      xaxis: expect.objectContaining({
+        type: "date",
+        title: expect.objectContaining({
+          text: "Sample date",
+          standoff: 8
         })
       })
     });

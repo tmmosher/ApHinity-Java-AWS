@@ -11,8 +11,22 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Converts Gantt task request/response payloads at the service boundary.
+ * <p>
+ * Validation here is intentionally domain-specific rather than relying only on
+ * bean validation annotations: blank titles are normalized, descriptions collapse
+ * to {@code null}, and date ranges are checked before entity persistence.
+ */
 @Service
 public class GanttTaskRequestMapper {
+    /**
+     * Builds a new task entity for the provided location.
+     *
+     * @param location owning location
+     * @param request task payload
+     * @return unsaved task entity
+     */
     public GanttTask createTask(Location location, LocationGanttTaskRequest request) {
         GanttTask task = new GanttTask();
         task.setLocation(location);
@@ -20,6 +34,12 @@ public class GanttTaskRequestMapper {
         return task;
     }
 
+    /**
+     * Applies a request payload to an existing task entity.
+     *
+     * @param task task to mutate
+     * @param request replacement task fields
+     */
     public void applyRequest(GanttTask task, LocationGanttTaskRequest request) {
         String title = normalizeTitle(request == null ? null : request.title());
         LocalDate startDate = normalizeStartDate(request == null ? null : request.startDate());
@@ -32,10 +52,23 @@ public class GanttTaskRequestMapper {
         task.setDescription(normalizeDescription(request == null ? null : request.description()));
     }
 
+    /**
+     * Maps a task entity to an API response without dependency ids.
+     *
+     * @param task task entity
+     * @return response payload
+     */
     public GanttTaskResponse toResponse(GanttTask task) {
         return toResponse(task, List.of());
     }
 
+    /**
+     * Maps a task entity and its dependency ids to the API response shape.
+     *
+     * @param task task entity
+     * @param dependencyTaskIds normalized dependency ids
+     * @return response payload
+     */
     public GanttTaskResponse toResponse(GanttTask task, List<Long> dependencyTaskIds) {
         return new GanttTaskResponse(
             task.getId(),

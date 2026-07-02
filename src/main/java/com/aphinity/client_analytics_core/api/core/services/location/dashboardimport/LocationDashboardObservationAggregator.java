@@ -12,6 +12,10 @@ import java.util.Set;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 
+/**
+ * Aggregates analyzed workbook samples into configured dashboard graph payloads
+ * and flat observation records.
+ */
 final class LocationDashboardObservationAggregator {
     private static final String TIME_SERIES_LINE_SHAPE = "hv";
     private static final double TIME_SERIES_LINE_SMOOTHING = 0.3d;
@@ -39,6 +43,12 @@ final class LocationDashboardObservationAggregator {
         this.graphDefinitions = graphDefinitions == null ? List.of() : List.copyOf(graphDefinitions);
     }
 
+    /**
+     * Builds graph payloads and observation records from analyzed imported samples.
+     *
+     * @param analyzedSamples samples after compliance and resolution analysis
+     * @return aggregation output consumed by the import service
+     */
     ObservationAggregationResult aggregate(List<LocationDashboardAnalyzedSample> analyzedSamples) {
         Map<String, GraphAggregation> aggregationsByGraphId = new LinkedHashMap<>();
         for (GraphConfig graphDefinition : graphDefinitions) {

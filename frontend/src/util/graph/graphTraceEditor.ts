@@ -288,6 +288,16 @@ const getTraceValueAxisLayoutKey = (trace: Record<string, unknown>): string =>
     ? getTraceAxisLayoutKey(trace, "x")
     : getTraceAxisLayoutKey(trace, "y");
 
+const getTraceCategoryAxisLayoutKey = (trace: Record<string, unknown>): string =>
+  getTraceType(trace) === "bar" && getBarOrientation(trace) === "h"
+    ? getTraceAxisLayoutKey(trace, "y")
+    : getTraceAxisLayoutKey(trace, "x");
+
+export const getTraceCartesianAxisLayoutKey = (
+  trace: Record<string, unknown>,
+  axis: "x" | "y"
+): string => getTraceAxisLayoutKey(trace, axis);
+
 const swapTraceAxisReference = (
   value: unknown,
   axisPrefix: "x" | "y"
@@ -328,12 +338,28 @@ export const getTraceYAxisRange = (
 export const getTraceYAxisTitle = (
   layout: Record<string, unknown> | null | undefined,
   trace: Record<string, unknown>
+): string => getTraceAxisTitle(layout, getTraceValueAxisLayoutKey(trace));
+
+export const getTraceXAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>
+): string => getTraceAxisTitle(layout, getTraceCategoryAxisLayoutKey(trace));
+
+export const getTraceCartesianAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>,
+  axis: "x" | "y"
+): string => getTraceAxisTitle(layout, getTraceCartesianAxisLayoutKey(trace, axis));
+
+const getTraceAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  axisKey: string
 ): string => {
   if (!isRecord(layout)) {
     return "";
   }
 
-  const axis = layout[getTraceValueAxisLayoutKey(trace)];
+  const axis = layout[axisKey];
   if (!isRecord(axis)) {
     return "";
   }
@@ -391,8 +417,29 @@ export const updateTraceYAxisTitle = (
   layout: Record<string, unknown> | null | undefined,
   trace: Record<string, unknown>,
   rawTitle: string
+): Record<string, unknown> | null =>
+  updateTraceAxisTitle(layout, getTraceValueAxisLayoutKey(trace), rawTitle);
+
+export const updateTraceXAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>,
+  rawTitle: string
+): Record<string, unknown> | null =>
+  updateTraceAxisTitle(layout, getTraceCategoryAxisLayoutKey(trace), rawTitle);
+
+export const updateTraceCartesianAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  trace: Record<string, unknown>,
+  axis: "x" | "y",
+  rawTitle: string
+): Record<string, unknown> | null =>
+  updateTraceAxisTitle(layout, getTraceCartesianAxisLayoutKey(trace, axis), rawTitle);
+
+const updateTraceAxisTitle = (
+  layout: Record<string, unknown> | null | undefined,
+  axisKey: string,
+  rawTitle: string
 ): Record<string, unknown> | null => {
-  const axisKey = getTraceValueAxisLayoutKey(trace);
   const nextLayout = isRecord(layout) ? {...layout} : {};
   const nextAxis = isRecord(nextLayout[axisKey]) ? {...nextLayout[axisKey]} : {};
   const normalizedTitle = rawTitle.trim();

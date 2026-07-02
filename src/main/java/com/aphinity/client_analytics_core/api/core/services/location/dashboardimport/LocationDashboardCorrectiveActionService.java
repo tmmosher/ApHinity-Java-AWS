@@ -40,6 +40,14 @@ final class LocationDashboardCorrectiveActionService {
         this.strategyRegistry = strategyRegistry;
     }
 
+    /**
+     * Combines persisted corrective actions with new import drafts without
+     * saving the drafts.
+     *
+     * @param locationId location id
+     * @param correctiveActions draft corrective actions from the import
+     * @return preview events sorted for the service calendar response
+     */
     List<ServiceEvent> buildPreviewCorrectiveActions(
         Long locationId,
         List<LocationDashboardImportStrategy.CorrectiveActionDraft> correctiveActions
@@ -76,6 +84,14 @@ final class LocationDashboardCorrectiveActionService {
         return List.copyOf(previewCorrectiveActions);
     }
 
+    /**
+     * Persists newly imported corrective-action drafts, reusing existing matching
+     * corrective actions when present.
+     *
+     * @param location target location
+     * @param correctiveActions draft corrective actions from the import
+     * @return full corrective-action set for the location after persistence
+     */
     List<ServiceEvent> persistCorrectiveActions(
         Location location,
         List<LocationDashboardImportStrategy.CorrectiveActionDraft> correctiveActions

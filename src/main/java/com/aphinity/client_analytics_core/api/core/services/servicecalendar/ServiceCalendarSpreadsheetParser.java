@@ -33,6 +33,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Parses uploaded service-calendar spreadsheets into validated event requests.
+ */
 @Service
 public class ServiceCalendarSpreadsheetParser {
     private static final List<String> REQUIRED_HEADERS = List.of(
@@ -78,6 +81,12 @@ public class ServiceCalendarSpreadsheetParser {
             .withResolverStyle(ResolverStyle.STRICT)
     );
 
+    /**
+     * Parses an uploaded service-calendar workbook.
+     *
+     * @param file uploaded .xlsx workbook
+     * @return parsed rows with original spreadsheet row numbers
+     */
     public List<ParsedServiceCalendarRow> parse(MultipartFile file) {
         requireSpreadsheet(file);
         try (InputStream inputStream = file.getInputStream();

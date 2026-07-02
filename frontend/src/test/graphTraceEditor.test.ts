@@ -9,6 +9,7 @@ import {
   getBarRowColor,
   getCartesianAxisValueMode,
   getPieRowColor,
+  getTraceCartesianAxisTitle,
   getTraceYAxisRange,
   getTraceYAxisTitle,
   isAutoSizingPieTrace,
@@ -22,6 +23,7 @@ import {
   getTraceColor,
   setTraceColor,
   swapCartesianLayoutAxes,
+  updateTraceCartesianAxisTitle,
   updateCartesianX,
   updateCartesianY,
   updateTraceYAxisTitle,
@@ -370,6 +372,67 @@ describe("graphTraceEditor", () => {
         title: {
           text: "Facility"
         }
+      }
+    });
+  });
+
+  it("reads and updates cartesian x-axis titles", () => {
+    const trace: Record<string, unknown> = {
+      type: "scatter",
+      x: ["2026-01-01"],
+      y: [2]
+    };
+    const layout: Record<string, unknown> = {
+      xaxis: {
+        type: "date",
+        title: {
+          text: "Observed date",
+          standoff: 8
+        }
+      },
+      yaxis: {
+        title: "Count"
+      }
+    };
+
+    expect(getTraceCartesianAxisTitle(layout, trace, "x")).toBe("Observed date");
+
+    expect(updateTraceCartesianAxisTitle(layout, trace, "x", "Sample date")).toEqual({
+      xaxis: {
+        type: "date",
+        title: {
+          text: "Sample date",
+          standoff: 8
+        }
+      },
+      yaxis: {
+        title: "Count"
+      }
+    });
+  });
+
+  it("removes an empty cartesian axis title without dropping other axis settings", () => {
+    const trace: Record<string, unknown> = {
+      type: "bar",
+      orientation: "v",
+      x: ["North"],
+      y: [3]
+    };
+
+    expect(updateTraceCartesianAxisTitle({
+      xaxis: {
+        tickangle: -30,
+        title: "Facility"
+      },
+      yaxis: {
+        title: "Count"
+      }
+    }, trace, "x", "   ")).toEqual({
+      xaxis: {
+        tickangle: -30
+      },
+      yaxis: {
+        title: "Count"
       }
     });
   });

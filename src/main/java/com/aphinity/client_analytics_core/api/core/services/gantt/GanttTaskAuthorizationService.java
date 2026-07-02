@@ -10,6 +10,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Centralizes authorization decisions for location-scoped Gantt task operations.
+ * <p>
+ * Read access follows general location visibility: partner/admin users can read
+ * every location, while client users must be members of the location. Write
+ * access is intentionally stricter and limited to partner/admin users.
+ */
 @Service
 public class GanttTaskAuthorizationService {
     private final AppUserRepository appUserRepository;
@@ -29,12 +36,24 @@ public class GanttTaskAuthorizationService {
         this.accountRoleService = accountRoleService;
     }
 
+    /**
+     * Loads the authenticated user and rejects unverified accounts.
+     *
+     * @param userId authenticated user id from the JWT subject
+     * @return verified user entity
+     */
     public AppUser requireUser(Long userId) {
         AppUser user = appUserRepository.findById(userId).orElseThrow(this::invalidAuthenticatedUser);
         requireVerified(user);
         return user;
     }
 
+    /**
+     * Verifies that a location exists and the user may read it.
+     *
+     * @param user verified user entity
+     * @param locationId target location id
+     */
     public void requireReadableLocationAccess(AppUser user, Long locationId) {
         requireLocationExists(locationId);
         if (!hasLocationAccess(user, locationId)) {
@@ -42,6 +61,12 @@ public class GanttTaskAuthorizationService {
         }
     }
 
+    /**
+     * Loads a location or raises a location-scoped 404.
+     *
+     * @param locationId target location id
+     * @return location entity
+     */
     public Location requireLocation(Long locationId) {
         return locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
     }
@@ -52,6 +77,12 @@ public class GanttTaskAuthorizationService {
         }
     }
 
+    /**
+     * Verifies that the user can mutate Gantt tasks for the location.
+     *
+     * @param user verified user entity
+     * @param locationId target location id
+     */
     public void requireWritePermission(AppUser user, Long locationId) {
         requireReadableLocationAccess(user, locationId);
         if (accountRoleService.isPartnerOrAdmin(user)) {
