@@ -22,7 +22,6 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   const host = useApiHost();
   const profileContext = useProfile();
   const {
-    location,
     graphs,
     graphsError,
     graphTimeRange,

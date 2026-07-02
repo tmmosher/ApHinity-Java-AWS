@@ -696,16 +696,12 @@ public class LocationController {
     }
 
     private String describePayloadType(Object payload) {
-        if (payload == null) {
-            return "null";
-        }
-        if (payload instanceof List<?>) {
-            return "array";
-        }
-        if (payload instanceof Map<?, ?>) {
-            return "object";
-        }
-        return payload.getClass().getSimpleName();
+        return switch (payload) {
+            case null -> "null";
+            case List<?> objects -> "array";
+            case Map<?, ?> map -> "object";
+            default -> payload.getClass().getSimpleName();
+        };
     }
 
     private int inferTraceCount(Object payload) {

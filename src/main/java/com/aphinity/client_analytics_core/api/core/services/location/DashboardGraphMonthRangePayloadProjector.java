@@ -137,15 +137,15 @@ public final class DashboardGraphMonthRangePayloadProjector {
         }
         try {
             return LocalDate.parse(rawValue);
-        } catch (DateTimeParseException ex) {
+        } catch (DateTimeParseException ignored) {
         }
         try {
             return OffsetDateTime.parse(rawValue).toLocalDate();
-        } catch (DateTimeParseException ex) {
+        } catch (DateTimeParseException ignored) {
         }
         try {
             return LocalDateTime.parse(rawValue).toLocalDate();
-        } catch (DateTimeParseException ex) {
+        } catch (DateTimeParseException ignored) {
         }
         try {
             return LocalDate.parse(rawValue, FLEXIBLE_LOCAL_DATE_FORMATTER);

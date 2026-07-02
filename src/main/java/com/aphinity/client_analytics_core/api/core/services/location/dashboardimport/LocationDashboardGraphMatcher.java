@@ -115,13 +115,10 @@ final class LocationDashboardGraphMatcher {
             }
 
             if (normalizedDefinitionTitle != null) {
-                if (nameAndTitleMatches.size() > 1) {
-                    throw ambiguousGraph("name/title", graphDefinition);
-                }
                 throw new ApiClientException(
                     HttpStatus.BAD_REQUEST,
                     "location_dashboard_graph_not_found",
-                    "Required dashboard graph was not found for "
+                        "Required dashboard graph was not found for "
                         + locationName + ": " + graphDefinition.name() + " / " + graphDefinition.title() + "."
                 );
             }
@@ -144,7 +141,7 @@ final class LocationDashboardGraphMatcher {
                 throw new ApiClientException(
                     HttpStatus.BAD_REQUEST,
                     "location_dashboard_graph_not_found",
-                    "Required dashboard graph was not found for "
+                        "Required dashboard graph was not found for "
                         + locationName + ": " + graphDefinition.name() + " / " + graphDefinition.title() + "."
                 );
             }

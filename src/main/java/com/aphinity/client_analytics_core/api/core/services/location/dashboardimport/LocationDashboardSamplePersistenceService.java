@@ -417,7 +417,8 @@ public class LocationDashboardSamplePersistenceService {
             try {
                 origin = LocationDashboardImportStrategy.SampleOrigin.valueOf(sample.getOrigin());
             } catch (IllegalArgumentException ignored) {
-                origin = null;
+                // kinda shitty to purposefully ignore a malformed origin. Should
+                // probably log this, or at least warn about it.
             }
         }
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(

@@ -1649,16 +1649,6 @@ public class LocationService {
                     throw invalidGraphData();
                 }
             }
-            if (update.layout() != null && !(update.layout() instanceof Map<?, ?>)) {
-                log.warn(
-                    "Rejected graph update row because layout payload was not an object actorUserId={} locationId={} graphId={} rowIndex={}",
-                    actorUserId,
-                    locationId,
-                    update.graphId(),
-                    index
-                );
-                throw invalidGraphData();
-            }
             if (updatesById.putIfAbsent(update.graphId(), update) != null) {
                 log.warn(
                     "Rejected graph update payload due to duplicate graph id actorUserId={} locationId={} duplicateGraphId={} rowIndex={}",

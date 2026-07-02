@@ -293,7 +293,7 @@ public class LocationDashboardSpreadsheetParser {
                 bestRowIndex = rowIndex;
             }
         }
-        if (bestRowIndex < 0 || bestScore < MIN_DATE_ROW_SCORE) {
+        if (bestRowIndex < 0) {
             throw invalidSpreadsheet("Spreadsheet is missing the date row.");
         }
         return bestRowIndex;
@@ -317,7 +317,7 @@ public class LocationDashboardSpreadsheetParser {
                 bestRowIndex = rowIndex;
             }
         }
-        if (bestRowIndex < 0 || bestScore == 0) {
+        if (bestRowIndex < 0) {
             throw invalidSpreadsheet("Spreadsheet does not contain any metric columns.");
         }
         return bestRowIndex;
@@ -547,7 +547,7 @@ public class LocationDashboardSpreadsheetParser {
                 if (rawValue == null && commentText == null) {
                     continue;
                 }
-                if (rawValue != null && isIgnoredSemanticMeasurementValue(rawValue) && commentText == null) {
+                if (isIgnoredSemanticMeasurementValue(rawValue) && commentText == null) {
                     continue;
                 }
                 BigDecimal numericValue = parseMeasurementValue(cell, rawValue, evaluator);

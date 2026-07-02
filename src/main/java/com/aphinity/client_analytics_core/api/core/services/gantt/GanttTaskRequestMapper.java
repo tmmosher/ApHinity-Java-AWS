@@ -42,14 +42,14 @@ public class GanttTaskRequestMapper {
      */
     public void applyRequest(GanttTask task, LocationGanttTaskRequest request) {
         String title = normalizeTitle(request == null ? null : request.title());
-        LocalDate startDate = normalizeStartDate(request == null ? null : request.startDate());
-        LocalDate endDate = normalizeEndDate(request == null ? null : request.endDate());
+        LocalDate startDate = normalizeStartDate(request.startDate());
+        LocalDate endDate = normalizeEndDate(request.endDate());
         validateDateRange(startDate, endDate);
 
         task.setTitle(title);
         task.setStartDate(startDate);
         task.setEndDate(endDate);
-        task.setDescription(normalizeDescription(request == null ? null : request.description()));
+        task.setDescription(normalizeDescription(request.description()));
     }
 
     /**

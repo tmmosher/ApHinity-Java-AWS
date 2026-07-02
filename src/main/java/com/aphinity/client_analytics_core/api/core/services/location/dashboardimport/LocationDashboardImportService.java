@@ -408,9 +408,7 @@ public class LocationDashboardImportService {
         Collection<Long> updatedGraphIds
     ) {
         List<GraphResponse> responses = new ArrayList<>();
-        Set<Long> updatedGraphIdSet = updatedGraphIds instanceof Set<?>
-            ? updatedGraphIds.stream().collect(Collectors.toCollection(LinkedHashSet::new))
-            : new LinkedHashSet<>(updatedGraphIds);
+        Set<Long> updatedGraphIdSet = new LinkedHashSet<>(updatedGraphIds);
         for (Graph assignedGraph : assignedGraphs) {
             if (assignedGraph == null || assignedGraph.getId() == null || !updatedGraphIdSet.contains(assignedGraph.getId())) {
                 continue;

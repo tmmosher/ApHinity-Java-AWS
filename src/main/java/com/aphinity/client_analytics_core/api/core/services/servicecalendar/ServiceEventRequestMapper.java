@@ -48,19 +48,19 @@ public class ServiceEventRequestMapper {
      */
     public void applyRequest(ServiceEvent serviceEvent, LocationEventRequest request) {
         LocalDate eventDate = normalizeDate(request == null ? null : request.date());
-        LocalTime eventTime = normalizeTime(request == null ? null : request.time());
-        LocalDate endEventDate = normalizeEndDate(eventDate, request == null ? null : request.endDate());
-        LocalTime endEventTime = normalizeEndTime(eventTime, request == null ? null : request.endTime());
+        LocalTime eventTime = normalizeTime(request.time());
+        LocalDate endEventDate = normalizeEndDate(eventDate, request.endDate());
+        LocalTime endEventTime = normalizeEndTime(eventTime, request.endTime());
         validateEventRange(eventDate, eventTime, endEventDate, endEventTime);
 
-        serviceEvent.setTitle(normalizeTitle(request == null ? null : request.title()));
-        serviceEvent.setResponsibility(normalizeResponsibility(request == null ? null : request.responsibility()));
+        serviceEvent.setTitle(normalizeTitle(request.title()));
+        serviceEvent.setResponsibility(normalizeResponsibility(request.responsibility()));
         serviceEvent.setEventDate(eventDate);
         serviceEvent.setEventTime(eventTime);
         serviceEvent.setEndEventDate(endEventDate);
         serviceEvent.setEndEventTime(endEventTime);
-        serviceEvent.setDescription(normalizeDescription(request == null ? null : request.description()));
-        serviceEvent.setStatus(normalizeStatus(request == null ? null : request.status()));
+        serviceEvent.setDescription(normalizeDescription(request.description()));
+        serviceEvent.setStatus(normalizeStatus(request.status()));
     }
 
     /**
@@ -79,8 +79,8 @@ public class ServiceEventRequestMapper {
             correctiveActionSourceEventId = sourceEvent.getId();
             try {
                 correctiveActionSourceEventTitle = sourceEvent.getTitle();
-            } catch (EntityNotFoundException | ObjectNotFoundException ex) {
-                correctiveActionSourceEventTitle = null;
+            } catch (EntityNotFoundException | ObjectNotFoundException ignored) {
+                // again, kinda shitting to ignore an exception. Should probably be warned/logged
             }
         }
         return new ServiceEventResponse(

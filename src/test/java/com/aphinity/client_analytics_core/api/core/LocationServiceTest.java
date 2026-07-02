@@ -1552,7 +1552,7 @@ class LocationServiceTest {
         verify(graphRepository).saveAllAndFlush(List.of(graph));
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
         assertEquals(2, traces.size());
-        assertEquals("Actual", traces.get(0).get("name"));
+        assertEquals("Actual", traces.getFirst().get("name"));
         assertEquals("h", traces.get(0).get("orientation"));
         assertEquals(List.of(9L), traces.get(0).get("x"));
         assertEquals("Forecast", traces.get(1).get("name"));
@@ -1953,9 +1953,6 @@ class LocationServiceTest {
         assertEquals(true, response.alertsSubscribed());
         org.mockito.Mockito.verify(userSubscriptionToLocationRepository).save(
             org.mockito.ArgumentMatchers.argThat(subscription -> {
-                if (subscription == null) {
-                    return false;
-                }
                 return subscription.getLocation() == location
                     && subscription.getUserEmail() == user;
             })
