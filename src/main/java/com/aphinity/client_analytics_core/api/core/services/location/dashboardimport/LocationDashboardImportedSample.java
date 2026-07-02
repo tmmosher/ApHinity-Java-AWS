@@ -61,6 +61,8 @@ interface LocationDashboardImportedSample {
 
     String basis();
 
+    String rawValue();
+
     default String sampleIdentity() {
         return null;
     }
@@ -100,6 +102,7 @@ record LocationDashboardWorksheetSample(
     String resolvedSystem,
     String pointOfUse,
     String basis,
+    String rawValue,
     String cellReference,
     LocationDashboardCommentParser.ParsedComment parsedComment
 ) implements LocationDashboardImportedSample {
@@ -129,6 +132,40 @@ record LocationDashboardWorksheetSample(
             resolvedSystem,
             pointOfUse,
             basis,
+            null,
+            cellReference,
+            null
+        );
+    }
+
+    LocationDashboardWorksheetSample(
+        LocalDate observedDate,
+        BigDecimal numericValue,
+        String measurementName,
+        String facilityName,
+        SublocationConfig sublocation,
+        SystemTypeConfig systemType,
+        MeasurementBound measurementBound,
+        String resolvedBuilding,
+        String resolvedSystem,
+        String pointOfUse,
+        String basis,
+        String rawValue,
+        String cellReference
+    ) {
+        this(
+            observedDate,
+            numericValue,
+            measurementName,
+            facilityName,
+            sublocation,
+            systemType,
+            measurementBound,
+            resolvedBuilding,
+            resolvedSystem,
+            pointOfUse,
+            basis,
+            rawValue,
             cellReference,
             null
         );
@@ -153,12 +190,54 @@ record LocationDashboardCommentSample(
     String resolvedSystem,
     String pointOfUse,
     String basis,
+    String rawValue,
     String cellReference,
     LocationDashboardCommentParser.ParsedComment parsedComment,
     LocationDashboardCommentParser.ParsedCommentSample parsedSample,
     String sampleLabel,
     String sampleIdentity
 ) implements LocationDashboardImportedSample {
+    LocationDashboardCommentSample(
+        LocationDashboardImportStrategy.SampleOrigin origin,
+        LocalDate observedDate,
+        BigDecimal numericValue,
+        String measurementName,
+        String facilityName,
+        SublocationConfig sublocation,
+        SystemTypeConfig systemType,
+        MeasurementBound measurementBound,
+        String resolvedBuilding,
+        String resolvedSystem,
+        String pointOfUse,
+        String basis,
+        String cellReference,
+        LocationDashboardCommentParser.ParsedComment parsedComment,
+        LocationDashboardCommentParser.ParsedCommentSample parsedSample,
+        String sampleLabel,
+        String sampleIdentity
+    ) {
+        this(
+            origin,
+            observedDate,
+            numericValue,
+            measurementName,
+            facilityName,
+            sublocation,
+            systemType,
+            measurementBound,
+            resolvedBuilding,
+            resolvedSystem,
+            pointOfUse,
+            basis,
+            null,
+            cellReference,
+            parsedComment,
+            parsedSample,
+            sampleLabel,
+            sampleIdentity
+        );
+    }
+
     @Override
     public LocalDate resolutionAnchorDate() {
         if (parsedSample != null && parsedSample.resultReceivedOn() != null) {
@@ -202,6 +281,7 @@ record LocationDashboardAnalyzedSample(
             sample.measurementName(),
             sample.pointOfUse(),
             sample.basis(),
+            sample.rawValue(),
             sample.sampleIdentity(),
             compliant,
             resolved,

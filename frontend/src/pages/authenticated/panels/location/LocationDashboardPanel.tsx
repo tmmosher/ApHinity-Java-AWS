@@ -50,7 +50,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   createEffect(on(
     () => props.locationId,
     () => {
-      setGraphTimeRange("allTime");
+      setGraphTimeRange("threeMonths");
     }
   ));
 
@@ -145,7 +145,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
               </section>
             }
           >
-            <div class="space-y-4">
+            <div class="flex flex-row flex-wrap items-start gap-4">
               <For each={orderedSections()}>
                 {(section) => (
                   <LocationDashboardSection

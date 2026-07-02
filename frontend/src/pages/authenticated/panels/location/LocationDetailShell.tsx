@@ -56,7 +56,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
   );
 
   const [requestedGraphLocationId, setRequestedGraphLocationId] = createSignal<string | undefined>();
-  const [graphTimeRange, setGraphTimeRange] = createSignal<LocationGraphTimeRange>("allTime");
+  const [graphTimeRange, setGraphTimeRange] = createSignal<LocationGraphTimeRange>("threeMonths");
   const [graphCacheVersion, setGraphCacheVersion] = createSignal(0);
   const graphCache = new Map<string, LocationScopedResource<LocationGraph[]>>();
 
@@ -140,7 +140,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
         getNextLocationGraphRequestId(currentRequestedLocationId, locationId, view)
       );
       if (view !== "dashboard") {
-        setGraphTimeRange("allTime");
+        setGraphTimeRange("threeMonths");
       }
       if (shouldResetServiceCalendarState(locationId)) {
         serviceCalendarStaging.reset();
@@ -154,7 +154,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
   ));
 
   return (
-    <div class="w-full max-w-6xl mx-auto">
+    <div class="mx-auto w-full max-w-[96rem]">
       <div class="space-y-6">
         <Show
           when={!locationResource.error}

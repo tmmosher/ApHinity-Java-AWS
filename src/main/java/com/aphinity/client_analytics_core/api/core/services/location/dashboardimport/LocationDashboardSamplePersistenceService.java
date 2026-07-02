@@ -129,6 +129,7 @@ public class LocationDashboardSamplePersistenceService {
             persistedSample.setMeasurementName(truncate(analyzedSample.measurementName(), 256));
             persistedSample.setPointOfUse(truncate(analyzedSample.pointOfUse(), 512));
             persistedSample.setBasis(truncate(analyzedSample.basis(), MAX_TEXT_LENGTH));
+            persistedSample.setRawValue(truncate(analyzedSample.rawValue(), MAX_TEXT_LENGTH));
             persistedSample.setSampleIdentity(truncate(sampleIdentity, MAX_TEXT_LENGTH));
             persistedSample.setCompliant(analyzedSample.compliant());
             persistedSample.setResolved(analyzedSample.resolved());
@@ -397,6 +398,7 @@ public class LocationDashboardSamplePersistenceService {
             sample.getMeasurementName(),
             sample.getPointOfUse(),
             sample.getBasis(),
+            sample.getRawValue(),
             rehydratedSampleIdentity(sample.getSampleIdentity()),
             sample.isCompliant(),
             sample.isResolved(),

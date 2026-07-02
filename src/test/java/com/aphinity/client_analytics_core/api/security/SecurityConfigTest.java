@@ -98,6 +98,13 @@ class SecurityConfigTest {
     }
 
     @Test
+    void permitsRootLevelStaticImageAssets() throws Exception {
+        mockMvc.perform(get("/bg-splash.jpg"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_JPEG));
+    }
+
+    @Test
     void csrfCookieRepositoryUsesStrictSameSite() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setContextPath("");

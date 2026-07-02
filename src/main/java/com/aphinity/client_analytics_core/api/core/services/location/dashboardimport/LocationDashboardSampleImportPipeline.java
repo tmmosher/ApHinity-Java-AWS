@@ -203,6 +203,7 @@ final class LocationDashboardSampleImportPipeline {
             rowContext.resolvedSystem(),
             row == null ? null : row.pointOfUse(),
             row == null ? null : row.basis(),
+            cell.rawValue(),
             cell.cellReference(),
             parsedComment
         );
@@ -260,6 +261,7 @@ final class LocationDashboardSampleImportPipeline {
                 rowContext.resolvedSystem(),
                 row == null ? null : row.pointOfUse(),
                 row == null ? null : row.basis(),
+                primarySample.resultRaw(),
                 primaryCell.cellReference(),
                 parsedComment,
                 primarySample,
@@ -287,6 +289,7 @@ final class LocationDashboardSampleImportPipeline {
                 rowContext.resolvedSystem(),
                 row == null ? null : row.pointOfUse(),
                 row == null ? null : row.basis(),
+                sample.resultRaw(),
                 primaryCell.cellReference(),
                 parsedComment,
                 sample,

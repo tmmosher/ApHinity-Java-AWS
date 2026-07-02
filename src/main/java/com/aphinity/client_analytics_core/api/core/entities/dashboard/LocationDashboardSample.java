@@ -64,6 +64,9 @@ public class LocationDashboardSample {
     @Column(name = "basis", length = 1024)
     private String basis;
 
+    @Column(name = "raw_value", columnDefinition = "text")
+    private String rawValue;
+
     @Column(name = "sample_identity", nullable = false, length = 1024)
     private String sampleIdentity;
 
@@ -175,6 +178,14 @@ public class LocationDashboardSample {
 
     public void setBasis(String basis) {
         this.basis = basis;
+    }
+
+    public String getRawValue() {
+        return rawValue;
+    }
+
+    public void setRawValue(String rawValue) {
+        this.rawValue = rawValue;
     }
 
     public String getSampleIdentity() {

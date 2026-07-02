@@ -61,6 +61,7 @@ class LocationDashboardSamplePersistenceServiceTest {
         sample.setFacilityName("Irvine");
         sample.setSystemName("Critical SPD");
         sample.setMeasurementName("HPC");
+        sample.setRawValue("<1");
         sample.setSampleIdentity("__generated__|2025-01-01|irvine||||hpc|||WORKSHEET|1");
         sample.setCompliant(false);
         sample.setOrigin(LocationDashboardImportStrategy.SampleOrigin.WORKSHEET.name());
@@ -68,6 +69,20 @@ class LocationDashboardSamplePersistenceServiceTest {
         LocationDashboardImportStrategy.AnalyzedSamplePoint rehydratedSample = service.toAnalyzedSamplePoint(sample);
 
         assertNull(rehydratedSample.sampleIdentity());
+        assertEquals("<1", rehydratedSample.rawValue());
+    }
+
+    @Test
+    void persistsAnalyzedSampleRawValues() {
+        Location location = new Location();
+        location.setId(10L);
+
+        List<LocationDashboardSample> persistedSamples = service.toPersistedSamples(location, List.of(
+            analyzedSample("HPC", "sample-1", "ND", true, LocationDashboardImportStrategy.SampleOrigin.WORKSHEET)
+        ));
+
+        assertEquals(1, persistedSamples.size());
+        assertEquals("ND", persistedSamples.getFirst().getRawValue());
     }
 
     @Test
@@ -152,6 +167,31 @@ class LocationDashboardSamplePersistenceServiceTest {
             measurementName,
             "POU 1",
             "Range",
+            sampleIdentity,
+            compliant,
+            false,
+            null,
+            origin
+        );
+    }
+
+    private LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample(
+        String measurementName,
+        String sampleIdentity,
+        String rawValue,
+        boolean compliant,
+        LocationDashboardImportStrategy.SampleOrigin origin
+    ) {
+        return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
+            LocalDate.parse("2025-01-01"),
+            "Irvine",
+            "Irvine",
+            "Critical SPD",
+            "Critical SPD",
+            measurementName,
+            "POU 1",
+            "Range",
+            rawValue,
             sampleIdentity,
             compliant,
             false,
