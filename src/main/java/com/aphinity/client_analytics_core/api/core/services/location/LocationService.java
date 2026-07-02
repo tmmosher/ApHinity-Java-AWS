@@ -170,7 +170,7 @@ public class LocationService {
         return getAccessibleLocationGraphs(userId, locationId, DashboardGraphMonthRange.ALL_TIME_REQUEST_VALUE);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<GraphResponse> getAccessibleLocationGraphs(Long userId, Long locationId, Integer monthRange) {
         AppUser user = requireUser(userId);
         if (!locationRepository.existsById(locationId)) {
