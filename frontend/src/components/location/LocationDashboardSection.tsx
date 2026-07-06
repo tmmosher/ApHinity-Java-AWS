@@ -15,7 +15,7 @@ type LocationDashboardSectionProps = {
 };
 
 export const LocationDashboardSection = (props: LocationDashboardSectionProps) => (
-  <section class="min-w-[min(100%,34rem)] flex-1 rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm" data-section-id={props.section.section_id}>
+  <section class="min-w-[min(100%,34rem)] max-w-1/2 flex-1 rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm" data-section-id={props.section.section_id}>
     <Show
       when={props.graphs.length > 0}
       fallback={

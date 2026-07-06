@@ -309,7 +309,7 @@ export const HomePage = () => {
                   <input
                     type="text"
                     name="company"
-                    placeholder="Partner or Client Company"
+                    placeholder="Company"
                     class="input input-bordered w-full"
                     aria-label="Company"
                   />
