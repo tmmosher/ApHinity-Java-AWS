@@ -11,6 +11,7 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,7 +39,8 @@ final class LocationDashboardHistoricalDataAssembler {
         Map<Long, Graph> assignedGraphsById,
         Map<Long, Graph> previewGraphsById,
         List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples,
-        List<ServiceEvent> effectiveCorrectiveActions
+        List<ServiceEvent> effectiveCorrectiveActions,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
     ) {
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity = new LinkedHashMap<>();
         for (GraphConfig graphDefinition : graphDefinitions) {
@@ -88,8 +90,143 @@ final class LocationDashboardHistoricalDataAssembler {
 
         return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
             samplesByDate,
-            mergeHistoricalNonConformances(analyzedSamples, correctiveActions)
+            mergeHistoricalNonConformances(analyzedSamples, correctiveActions),
+            collectRawSamples(analyzedSamples, identityPattern)
         );
+    }
+
+    private List<LocationDashboardDerivedGraphSupport.HistoricalRawSample> collectRawSamples(
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        if (analyzedSamples == null || analyzedSamples.isEmpty()) {
+            return List.of();
+        }
+        List<LocationDashboardDerivedGraphSupport.HistoricalRawSample> rawSamples = new ArrayList<>();
+        for (AnalyzedSamplePoint analyzedSample : analyzedSamples) {
+            if (analyzedSample == null
+                || analyzedSample.origin() == LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT
+                || analyzedSample.observedDate() == null
+                || analyzedSample.measurementName() == null) {
+                continue;
+            }
+            Map<String, String> identityValues = identityValues(analyzedSample, identityPattern);
+            String rowIdentifier = rowIdentifier(identityValues, analyzedSample);
+            if (rowIdentifier == null) {
+                continue;
+            }
+            rawSamples.add(new LocationDashboardDerivedGraphSupport.HistoricalRawSample(
+                analyzedSample.observedDate(),
+                rowIdentifier,
+                identityValues,
+                analyzedSample.measurementName(),
+                analyzedSample.rawValue(),
+                analyzedSample.compliant(),
+                analyzedSample.resolved()
+            ));
+        }
+        return List.copyOf(rawSamples);
+    }
+
+    private Map<String, String> identityValues(
+        AnalyzedSamplePoint sample,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        Map<String, String> sampleIdentityValues = identityValuesFromSampleIdentity(sample, identityPattern);
+        if (!sampleIdentityValues.isEmpty()) {
+            return sampleIdentityValues;
+        }
+        Map<String, String> values = new LinkedHashMap<>();
+        putIfPresent(values, "facility", sample.facilityName());
+        putIfPresent(values, "building", sample.buildingName());
+        putIfPresent(values, "system", sample.systemName());
+        putIfPresent(values, "pointOfUse", sample.pointOfUse());
+        putIfPresent(values, "basis", sample.basis());
+        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+    }
+
+    private Map<String, String> identityValuesFromSampleIdentity(
+        AnalyzedSamplePoint sample,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        if (sample == null || sample.sampleIdentity() == null || sample.sampleIdentity().isBlank()) {
+            return Map.of();
+        }
+        List<String> tokens = List.of(sample.sampleIdentity().split("\\|", -1));
+        Map<String, Integer> tokenIndexesByIdentityColumn = sample.sampleIdentity().startsWith(
+            LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX
+        )
+            ? generatedSampleIdentityIndexes()
+            : worksheetSampleIdentityIndexes();
+        Map<String, String> values = new LinkedHashMap<>();
+        for (LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn : effectiveIdentityPattern(identityPattern)) {
+            if (identityColumn == null || identityColumn.column() == null || identityColumn.column().isBlank()) {
+                continue;
+            }
+            Integer tokenIndex = tokenIndexesByIdentityColumn.get(identityColumn.column());
+            if (tokenIndex == null || tokenIndex < 0 || tokenIndex >= tokens.size()) {
+                continue;
+            }
+            putIfPresent(values, identityColumn.column(), tokens.get(tokenIndex));
+        }
+        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+    }
+
+    private List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> effectiveIdentityPattern(
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        return identityPattern == null || identityPattern.isEmpty()
+            ? List.of(
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of()),
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("building", List.of()),
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of()),
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("pointOfUse", List.of()),
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("basis", List.of())
+            )
+            : identityPattern;
+    }
+
+    private Map<String, Integer> worksheetSampleIdentityIndexes() {
+        return Map.of(
+            "facility", 0,
+            "building", 1,
+            "system", 2,
+            "pointOfUse", 4,
+            "basis", 5
+        );
+    }
+
+    private Map<String, Integer> generatedSampleIdentityIndexes() {
+        return Map.of(
+            "facility", 2,
+            "building", 3,
+            "system", 4,
+            "pointOfUse", 7,
+            "basis", 8
+        );
+    }
+
+    private void putIfPresent(Map<String, String> values, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            values.put(key, value.strip());
+        }
+    }
+
+    private String rowIdentifier(Map<String, String> identityValues, AnalyzedSamplePoint sample) {
+        if ((identityValues == null || identityValues.isEmpty()) && (sample == null || sample.sampleIdentity() == null)) {
+            return null;
+        }
+        List<String> identityParts = new ArrayList<>();
+        if (identityValues != null) {
+            identityValues.values().stream()
+                .map(LocationDashboardGraphMetadataSupport::nullSafeNormalized)
+                .forEach(identityParts::add);
+        }
+        identityParts.add(LocationDashboardGraphMetadataSupport.nullSafeNormalized(sample == null ? null : sample.measurementName()));
+        if (identityParts.stream().allMatch(String::isBlank) && sample != null) {
+            identityParts.add(LocationDashboardGraphMetadataSupport.nullSafeNormalized(sample.sampleIdentity()));
+        }
+        return String.join("|", identityParts);
     }
 
     private void collectPersistedSamplePoints(

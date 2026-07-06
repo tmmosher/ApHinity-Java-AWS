@@ -76,7 +76,8 @@ class LocationDashboardHistoricalDataAssemblerTest {
                 Map.of(),
                 Map.of(),
                 List.of(worksheetFailure, correctiveActionDraftSample),
-                List.of(correctiveAction)
+                List.of(correctiveAction),
+                List.of()
             );
 
         assertEquals(1, historicalData.nonConformances().size());
@@ -103,10 +104,64 @@ class LocationDashboardHistoricalDataAssemblerTest {
                     worksheetFailure("HPC"),
                     worksheetFailure("HPC")
                 ),
+                List.of(),
                 List.of()
             );
 
         assertEquals(2, historicalData.nonConformances().size());
+    }
+
+    @Test
+    void buildsRawSampleIdentityFromDelimitedSampleIdentityBeforeLegacyFields() {
+        LocationDashboardHistoricalDataAssembler assembler = new LocationDashboardHistoricalDataAssembler(
+            new LocationDashboardCorrectiveActionService(
+                null,
+                Clock.fixed(Instant.parse("2025-01-10T00:00:00Z"), ZoneOffset.UTC)
+            )
+        );
+        LocationDashboardImportStrategy.AnalyzedSamplePoint sample =
+            new LocationDashboardImportStrategy.AnalyzedSamplePoint(
+                LocalDate.parse("2025-01-01"),
+                "Legacy Facility",
+                "Legacy Building",
+                "Legacy System",
+                "Legacy System Type",
+                "HPC",
+                "Legacy POU",
+                "Legacy Basis",
+                "Newport|Tower A|Critical SPD|HPC|Sink 1|Routine",
+                true,
+                false,
+                null,
+                LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+            );
+
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            assembler.buildHistoricalDerivedData(
+                List.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                List.of(sample),
+                List.of(),
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of()),
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("building", List.of()),
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of()),
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("pointOfUse", List.of()),
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("basis", List.of())
+                )
+            );
+
+        LocationDashboardDerivedGraphSupport.HistoricalRawSample rawSample = historicalData.rawSamples().getFirst();
+        assertEquals(Map.of(
+            "facility", "Newport",
+            "building", "Tower A",
+            "system", "Critical SPD",
+            "pointOfUse", "Sink 1",
+            "basis", "Routine"
+        ), rawSample.identityValues());
+        assertEquals("newport|tower a|critical spd|sink 1|routine|hpc", rawSample.rowIdentifier());
     }
 
     private LocationDashboardImportStrategy.AnalyzedSamplePoint worksheetFailure(String measurementName) {

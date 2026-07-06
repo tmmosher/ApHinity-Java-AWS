@@ -42,7 +42,8 @@ final class LocationDashboardDerivedGraphSupport {
     static List<Map<String, Object>> buildPayload(
         LocationDashboardImportStrategyConfig.DerivedGraphConfig derivedGraphDefinition,
         Graph graph,
-        HistoricalDerivedData historicalData
+        HistoricalDerivedData historicalData,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
     ) {
         LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType = derivedGraphDefinition.derivedType();
         List<HistoricalSamplePoint> waterQualitySamplePoints = historicalData.allSamplePoints().stream()
@@ -130,7 +131,131 @@ final class LocationDashboardDerivedGraphSupport {
                 RESOLVED_GRAPH_COLOR,
                 0
             ));
+            case RECENT_SAMPLE_MEASUREMENTS -> List.of(buildRecentSampleMeasurementsTrace(
+                historicalData.recentRawSamples(),
+                identityPattern
+            ));
         };
+    }
+
+    private static Map<String, Object> buildRecentSampleMeasurementsTrace(
+        List<HistoricalRawSample> rawSamples,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        List<IdentityColumnDefinition> identityColumns = identityColumns(identityPattern);
+        Map<String, RecentSampleRow> rowsByIdentifier = new LinkedHashMap<>();
+        for (HistoricalRawSample sample : rawSamples == null ? List.<HistoricalRawSample>of() : rawSamples) {
+            if (sample == null || sample.observedDate() == null || sample.measurementName() == null) {
+                continue;
+            }
+            String rowIdentifier = sample.rowIdentifier();
+            if (rowIdentifier == null) {
+                continue;
+            }
+            RecentSampleRow current = rowsByIdentifier.get(rowIdentifier);
+            if (current == null || sample.observedDate().isAfter(current.observedDate())) {
+                RecentSampleRow next = RecentSampleRow.from(sample);
+                if (current != null && sameMonth(sample.observedDate(), current.observedDate())) {
+                    next.addMonthlyMeasurement(current.toHistoricalRawSample());
+                    current.followUps().forEach(next::addFollowUp);
+                }
+                rowsByIdentifier.put(rowIdentifier, next);
+                continue;
+            }
+            if (sameMonth(sample.observedDate(), current.observedDate())) {
+                current.addMonthlyMeasurement(sample);
+            }
+        }
+
+        List<RecentSampleRow> rows = rowsByIdentifier.values().stream()
+            .sorted(Comparator
+                .comparing(RecentSampleRow::observedDate, Comparator.reverseOrder())
+                .thenComparing(RecentSampleRow::rowIdentifier))
+            .toList();
+        List<String> headers = new ArrayList<>();
+        identityColumns.stream().map(IdentityColumnDefinition::label).forEach(headers::add);
+        headers.add("Measurement");
+        headers.add("Observed");
+        headers.add("Value");
+        headers.add("CA Status");
+        headers.add("Follow-ups");
+
+        List<List<Object>> columns = new ArrayList<>();
+        for (int index = 0; index < headers.size(); index += 1) {
+            columns.add(new ArrayList<>());
+        }
+        List<Map<String, Object>> customData = new ArrayList<>();
+        for (RecentSampleRow row : rows) {
+            int columnIndex = 0;
+            for (IdentityColumnDefinition identityColumn : identityColumns) {
+                columns.get(columnIndex).add(row.identityValues().getOrDefault(identityColumn.key(), ""));
+                columnIndex += 1;
+            }
+            columns.get(columnIndex++).add(row.measurementName());
+            columns.get(columnIndex++).add(String.valueOf(row.observedDate()));
+            columns.get(columnIndex++).add(row.rawValue());
+            columns.get(columnIndex++).add(row.caStatus());
+            columns.get(columnIndex).add(row.followUps().isEmpty() ? "" : row.followUps().size());
+            customData.add(row.customData());
+        }
+
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("type", "table");
+        trace.put("name", "Recent Sample Measurements");
+        trace.put("header", Map.of(
+            "values", List.copyOf(headers),
+            "align", "left"
+        ));
+        trace.put("cells", Map.of(
+            "values", columns.stream().map(List::copyOf).toList(),
+            "align", "left"
+        ));
+        trace.put("customdata", List.copyOf(customData));
+        trace.put("meta", Map.of(
+            "renderer", "tabulator",
+            "rowKey", "rowIdentifier"
+        ));
+        return trace;
+    }
+
+    private static List<IdentityColumnDefinition> identityColumns(
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> effectivePattern =
+            identityPattern == null || identityPattern.isEmpty()
+                ? List.of(
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of()),
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("building", List.of()),
+                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of())
+                )
+                : identityPattern;
+        return effectivePattern.stream()
+            .filter(Objects::nonNull)
+            .map(column -> new IdentityColumnDefinition(column.column(), identityColumnLabel(column.column())))
+            .toList();
+    }
+
+    private static String identityColumnLabel(String key) {
+        if (key == null || key.isBlank()) {
+            return "Identity";
+        }
+        String[] tokens = key.strip().replace('_', ' ').split("(?=[A-Z])|\\s+");
+        List<String> labels = new ArrayList<>();
+        for (String token : tokens) {
+            if (token == null || token.isBlank()) {
+                continue;
+            }
+            String normalized = token.strip().toLowerCase(Locale.ROOT);
+            labels.add(normalized.substring(0, 1).toUpperCase(Locale.ROOT) + normalized.substring(1));
+        }
+        return labels.isEmpty() ? key : String.join(" ", labels);
+    }
+
+    private static boolean sameMonth(LocalDate left, LocalDate right) {
+        return left != null
+            && right != null
+            && left.getYear() == right.getYear()
+            && left.getMonth() == right.getMonth();
     }
 
     private static List<Map<String, Object>> buildPercentPayload(
@@ -570,6 +695,20 @@ final class LocationDashboardDerivedGraphSupport {
         }
     }
 
+    record HistoricalRawSample(
+        LocalDate observedDate,
+        String rowIdentifier,
+        Map<String, String> identityValues,
+        String measurementName,
+        String rawValue,
+        boolean compliant,
+        boolean resolved
+    ) {
+        HistoricalRawSample {
+            identityValues = identityValues == null ? Map.of() : Map.copyOf(identityValues);
+        }
+    }
+
     record HistoricalCorrectiveAction(
         LocalDate observedDate,
         String facilityName,
@@ -669,7 +808,8 @@ final class LocationDashboardDerivedGraphSupport {
 
     record HistoricalDerivedData(
         Map<LocalDate, List<HistoricalSamplePoint>> samplesByDate,
-        List<HistoricalNonConformance> nonConformances
+        List<HistoricalNonConformance> nonConformances,
+        List<HistoricalRawSample> rawSamples
     ) {
         HistoricalDerivedData {
             Map<LocalDate, List<HistoricalSamplePoint>> normalizedSamplesByDate = new LinkedHashMap<>();
@@ -683,6 +823,14 @@ final class LocationDashboardDerivedGraphSupport {
             }
             samplesByDate = Map.copyOf(normalizedSamplesByDate);
             nonConformances = nonConformances == null ? List.of() : List.copyOf(nonConformances);
+            rawSamples = rawSamples == null ? List.of() : List.copyOf(rawSamples);
+        }
+
+        HistoricalDerivedData(
+            Map<LocalDate, List<HistoricalSamplePoint>> samplesByDate,
+            List<HistoricalNonConformance> nonConformances
+        ) {
+            this(samplesByDate, nonConformances, List.of());
         }
 
         List<HistoricalSamplePoint> allSamplePoints() {
@@ -691,6 +839,126 @@ final class LocationDashboardDerivedGraphSupport {
                 samplePoints.addAll(bucket);
             }
             return List.copyOf(samplePoints);
+        }
+
+        List<HistoricalRawSample> recentRawSamples() {
+            return rawSamples.stream()
+                .filter(sample -> sample != null && sample.observedDate() != null)
+                .sorted(Comparator
+                    .comparing(HistoricalRawSample::observedDate, Comparator.reverseOrder())
+                    .thenComparing(HistoricalRawSample::rowIdentifier, Comparator.nullsLast(String::compareTo)))
+                .toList();
+        }
+    }
+
+    private record IdentityColumnDefinition(
+        String key,
+        String label
+    ) {
+    }
+
+    private static final class RecentSampleRow {
+        private final String rowIdentifier;
+        private final Map<String, String> identityValues;
+        private final LocalDate observedDate;
+        private final String measurementName;
+        private final String rawValue;
+        private final boolean resolved;
+        private final List<Map<String, Object>> followUps = new ArrayList<>();
+
+        private RecentSampleRow(
+            String rowIdentifier,
+            Map<String, String> identityValues,
+            LocalDate observedDate,
+            String measurementName,
+            String rawValue,
+            boolean resolved
+        ) {
+            this.rowIdentifier = rowIdentifier;
+            this.identityValues = identityValues == null ? Map.of() : Map.copyOf(identityValues);
+            this.observedDate = observedDate;
+            this.measurementName = measurementName;
+            this.rawValue = rawValue;
+            this.resolved = resolved;
+        }
+
+        static RecentSampleRow from(HistoricalRawSample sample) {
+            return new RecentSampleRow(
+                sample.rowIdentifier(),
+                sample.identityValues(),
+                sample.observedDate(),
+                sample.measurementName(),
+                displayValue(sample.rawValue()),
+                sample.resolved()
+            );
+        }
+
+        void addMonthlyMeasurement(HistoricalRawSample sample) {
+            if (sample == null) {
+                return;
+            }
+            addFollowUp(Map.of(
+                "date", String.valueOf(sample.observedDate()),
+                "value", displayValue(sample.rawValue())
+            ));
+        }
+
+        void addFollowUp(Map<String, Object> followUp) {
+            if (followUp != null) {
+                followUps.add(followUp);
+            }
+        }
+
+        String rowIdentifier() {
+            return rowIdentifier;
+        }
+
+        Map<String, String> identityValues() {
+            return identityValues;
+        }
+
+        LocalDate observedDate() {
+            return observedDate;
+        }
+
+        String measurementName() {
+            return measurementName;
+        }
+
+        String rawValue() {
+            return rawValue;
+        }
+
+        String caStatus() {
+            return resolved ? "Resolved" : "Active";
+        }
+
+        List<Map<String, Object>> followUps() {
+            return List.copyOf(followUps);
+        }
+
+        Map<String, Object> customData() {
+            return Map.of(
+                "rowIdentifier", rowIdentifier,
+                "caStatus", caStatus(),
+                "followUps", followUps()
+            );
+        }
+
+        HistoricalRawSample toHistoricalRawSample() {
+            return new HistoricalRawSample(
+                observedDate,
+                rowIdentifier,
+                identityValues,
+                measurementName,
+                rawValue,
+                true,
+                resolved
+            );
+        }
+
+        private static String displayValue(String rawValue) {
+            return rawValue == null || rawValue.isBlank() ? "" : rawValue.strip();
         }
     }
 }

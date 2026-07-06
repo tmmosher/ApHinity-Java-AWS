@@ -356,7 +356,8 @@ public class LocationDashboardImportService {
                 assignedGraphsById,
                 updatedPreviewGraphsById,
                 computation.analyzedSamples(),
-                previewCorrectiveActions
+                previewCorrectiveActions,
+                strategy.spreadsheetIdentityPattern()
             );
 
         for (Map.Entry<String, DerivedGraphConfig> entry : derivedGraphDefinitionsById.entrySet()) {
@@ -383,7 +384,8 @@ public class LocationDashboardImportService {
             previewGraph.setData(LocationDashboardDerivedGraphSupport.buildPayload(
                 derivedGraphDefinition,
                 previewGraph,
-                historicalDerivedData
+                historicalDerivedData,
+                strategy.spreadsheetIdentityPattern()
             ));
             updatedPreviewGraphsById.put(previewGraph.getId(), previewGraph);
         }

@@ -1,8 +1,10 @@
 import {For, Show, Suspense, type Resource} from "solid-js";
 import PlotlyChart, {type PlotlyConfig, type PlotlyData, type PlotlyLayout} from "../common/Chart";
 import GraphLoadingPlaceholder from "../graph/GraphLoadingPlaceholder";
+import TabulatorGraph from "../graph/TabulatorGraph";
 import type {LocationGraph, LocationSectionLayout} from "../../types/Types";
 import {resolveGraphGridClass, resolveGraphHeight} from "../../util/graph/graphTheme";
+import {isTabulatorGraph} from "../../util/graph/tabulatorGraph";
 
 type LocationDashboardSectionProps = {
   section: LocationSectionLayout;
@@ -15,7 +17,7 @@ type LocationDashboardSectionProps = {
 };
 
 export const LocationDashboardSection = (props: LocationDashboardSectionProps) => (
-  <section class="min-w-[min(100%,34rem)] max-w-1/2 flex-1 rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm" data-section-id={props.section.section_id}>
+  <section class="min-w-[min(100%,50rem)] max-w-1/2 flex-1 rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm" data-section-id={props.section.section_id}>
     <Show
       when={props.graphs.length > 0}
       fallback={
@@ -41,34 +43,39 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
                   </button>
                 </Show>
               </div>
-              <Show
-                when={!props.plotlyModule.error}
-                fallback={
-                  <p class="h-72 w-full rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">
-                    Unable to load graph renderer.
-                  </p>
-                }
-              >
-                <Suspense fallback={
-                  <div class="w-full overflow-hidden rounded-lg">
-                    <GraphLoadingPlaceholder graphName={graph.name} />
-                  </div>
-                }>
-                  <Show when={props.plotlyModule()}>
-                    <div class="w-full" style={{height: resolveGraphHeight(graph.style, graph.layout)}}>
-                      <PlotlyChart
-                        name={graph.name}
-                        version={graph.updatedAt}
-                        data={graph.data as PlotlyData[]}
-                        layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
-                        config={(graph.config ?? undefined) as PlotlyConfig | undefined}
-                        style={graph.style ?? undefined}
-                        class="h-full w-full"
-                      />
-                    </div>
+              <div class="w-full" style={{height: resolveGraphHeight(graph.style, graph.layout)}}>
+                <Show
+                  when={!isTabulatorGraph(graph)}
+                  fallback={<TabulatorGraph graph={graph} class="h-full w-full" />}
+                >
+                  <Show
+                    when={!props.plotlyModule.error}
+                    fallback={
+                      <p class="h-72 w-full rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">
+                        Unable to load graph renderer.
+                      </p>
+                    }
+                  >
+                    <Suspense fallback={
+                      <div class="w-full overflow-hidden rounded-lg">
+                        <GraphLoadingPlaceholder graphName={graph.name} />
+                      </div>
+                    }>
+                      <Show when={props.plotlyModule()}>
+                        <PlotlyChart
+                          name={graph.name}
+                          version={graph.updatedAt}
+                          data={graph.data as PlotlyData[]}
+                          layout={(graph.layout ?? undefined) as PlotlyLayout | undefined}
+                          config={(graph.config ?? undefined) as PlotlyConfig | undefined}
+                          style={graph.style ?? undefined}
+                          class="h-full w-full"
+                        />
+                      </Show>
+                    </Suspense>
                   </Show>
-                </Suspense>
-              </Show>
+                </Show>
+              </div>
             </article>
           )}
         </For>

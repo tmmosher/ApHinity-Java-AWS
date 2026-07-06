@@ -440,9 +440,6 @@ public class LocationDashboardSamplePersistenceService {
     }
 
     private String rehydratedSampleIdentity(String sampleIdentity) {
-        if (sampleIdentity == null || sampleIdentity.startsWith(GENERATED_SAMPLE_IDENTITY_PREFIX)) {
-            return null;
-        }
         return sampleIdentity;
     }
 }

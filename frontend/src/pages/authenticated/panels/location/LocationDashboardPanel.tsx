@@ -13,6 +13,7 @@ import LocationDashboardSection from "../../../../components/location/LocationDa
 import LocationDashboardTimeRangeSelector from "../../../../components/location/LocationDashboardTimeRangeSelector";
 import {loadPlotlyModule} from "../../../../components/common/Chart";
 import type {LocationDashboardSpreadsheetUploadResult} from "../../../../types/Types";
+import {isTabulatorGraph} from "../../../../util/graph/tabulatorGraph";
 
 type LocationDashboardPanelProps = {
   locationId: string;
@@ -69,7 +70,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
       if (sections.length === 0) {
         return false;
       }
-      return sections.some((section) => sectionGraphs(section).length > 0);
+      return sections.some((section) => sectionGraphs(section).some((graph) => !isTabulatorGraph(graph)));
     },
     async (shouldLoad) => (shouldLoad ? loadPlotlyModule() : null)
   );

@@ -262,7 +262,8 @@ public class LocationDashboardTimeRangeService {
                 assignedGraphsById,
                 assignedGraphsById,
                 persistedSamples,
-                correctiveActions
+                correctiveActions,
+                strategy.spreadsheetIdentityPattern()
             );
 
         for (DerivedGraphConfig derivedGraphDefinition : strategy.derivedGraphDefinitions()) {
@@ -287,7 +288,12 @@ public class LocationDashboardTimeRangeService {
             graph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
             GraphRelationalPayloadMapper.syncGraphData(
                 graph,
-                LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, allTimeHistoricalData)
+                LocationDashboardDerivedGraphSupport.buildPayload(
+                    derivedGraphDefinition,
+                    graph,
+                    allTimeHistoricalData,
+                    strategy.spreadsheetIdentityPattern()
+                )
             );
             graph.setUpdatedAt(refreshedAt);
         }
@@ -351,7 +357,8 @@ public class LocationDashboardTimeRangeService {
                 assignedGraphsById,
                 assignedGraphsById,
                 persistedSamples,
-                correctiveActions
+                correctiveActions,
+                strategy.spreadsheetIdentityPattern()
             );
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData rangedHistoricalData =
             HistoricalDerivedDataTimeRangeProjector.project(historicalData, monthRange, anchorDate);
@@ -370,14 +377,24 @@ public class LocationDashboardTimeRangeService {
             if (monthRange == null || monthRange.isAllTime()) {
                 GraphRelationalPayloadMapper.syncGraphData(
                     graph,
-                    LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, rangedHistoricalData)
+                    LocationDashboardDerivedGraphSupport.buildPayload(
+                        derivedGraphDefinition,
+                        graph,
+                        rangedHistoricalData,
+                        strategy.spreadsheetIdentityPattern()
+                    )
                 );
                 graph.setUpdatedAt(refreshedAt);
                 continue;
             }
             payloadsByGraphId.put(
                 graph.getId(),
-                LocationDashboardDerivedGraphSupport.buildPayload(derivedGraphDefinition, graph, rangedHistoricalData)
+                LocationDashboardDerivedGraphSupport.buildPayload(
+                    derivedGraphDefinition,
+                    graph,
+                    rangedHistoricalData,
+                    strategy.spreadsheetIdentityPattern()
+                )
             );
         }
         return payloadsByGraphId;

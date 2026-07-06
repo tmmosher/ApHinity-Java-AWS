@@ -33,6 +33,7 @@ Frontend (Node / npm workspaces)
 - solid-motionone
 - solid-toast
 - solid-turnstile
+- tabulator-tables
 - theme-change
 - xlsx
 - zod

@@ -59,9 +59,17 @@ final class HistoricalDerivedDataTimeRangeProjector {
                     && !nonConformance.observedDate().isBefore(windowStart))
                 .toList();
 
+        List<LocationDashboardDerivedGraphSupport.HistoricalRawSample> filteredRawSamples =
+            historicalData.rawSamples().stream()
+                .filter(sample -> sample != null
+                    && sample.observedDate() != null
+                    && !sample.observedDate().isBefore(windowStart))
+                .toList();
+
         return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
             filteredSamplesByDate,
-            filteredNonConformances
+            filteredNonConformances,
+            filteredRawSamples
         );
     }
 }

@@ -127,6 +127,9 @@ final class LocationDashboardGraphMetadataSupport {
         );
         importMeta.put("metricKey", derivedMetricKey(derivedGraphDefinition.derivedType()));
         importMeta.put("unit", derivedGraphUnit(derivedGraphDefinition.derivedType()));
+        if (derivedGraphDefinition.derivedType() == LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS) {
+            importMeta.put("renderer", "tabulator");
+        }
         importMeta.put("locationName", strategyLocationName);
         meta.put(IMPORT_LAYOUT_META_KEY, importMeta);
         meta.put(GRAPH_SIZE_LAYOUT_META_KEY, graphSizeForType(derivedGraphDefinition.graphType()));
@@ -154,6 +157,8 @@ final class LocationDashboardGraphMetadataSupport {
                 )
             ));
             style.put("height", 320);
+        } else if ("table".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
+            style.put("height", 640);
         }
         return style;
     }
@@ -203,6 +208,7 @@ final class LocationDashboardGraphMetadataSupport {
         }
         return switch (derivedGraphType) {
             case ACTIVE_NON_CONFORMANCE_PERCENT, PERCENT_CONFORMANCE, PERCENT_RESOLVED -> "percent";
+            case RECENT_SAMPLE_MEASUREMENTS -> "samples";
             default -> "count";
         };
     }

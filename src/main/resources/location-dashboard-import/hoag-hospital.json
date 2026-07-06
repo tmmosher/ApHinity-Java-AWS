@@ -365,6 +365,12 @@
       "title": "By Facility",
       "derivedType": "non_conformance_status_by_facility",
       "graphType": "bar"
+    },
+    {
+      "id": "recent-sample-measurements",
+      "name": "Recent Sample Measurements",
+      "derivedType": "recent_sample_measurements",
+      "graphType": "table"
     }
   ],
   "systemTypeAliases": [

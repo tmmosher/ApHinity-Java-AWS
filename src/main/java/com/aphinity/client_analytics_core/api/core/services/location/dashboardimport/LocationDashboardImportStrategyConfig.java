@@ -207,7 +207,8 @@ public record LocationDashboardImportStrategyConfig(
         NON_CONFORMANCES_BY_SYSTEM_TYPE("non_conformances_by_system_type"),
         NON_CONFORMANCES_BY_CATEGORY("non_conformances_by_category"),
         NON_CONFORMANCE_STATUS_BY_FACILITY("non_conformance_status_by_facility"),
-        NON_CONFORMANCE_TURNAROUND_TIME("non_conformance_turnaround_time");
+        NON_CONFORMANCE_TURNAROUND_TIME("non_conformance_turnaround_time"),
+        RECENT_SAMPLE_MEASUREMENTS("recent_sample_measurements");
 
         private final String value;
 
