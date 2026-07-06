@@ -1,4 +1,3 @@
-import {A} from "@solidjs/router";
 import GraphCreateModal from "../../../../components/graph-editor/GraphCreateModal";
 import GraphEditorModal from "../../../../components/graph-editor/GraphEditorModal";
 import LocationDashboardLayoutModal from "../../../../components/location/LocationDashboardLayoutModal";
@@ -113,54 +112,48 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
         </div>
       </section>
 
-      <Show
-        when={!graphsError()}
-        fallback={
-          <div class="space-y-3">
-            <p class="text-error">Unable to load location graphs.</p>
-            <div class="flex gap-2">
-              <button type="button" class="btn btn-outline" onClick={dashboard.retryAll}>
-                Retry
-              </button>
-              <A href="/dashboard/locations" class="btn btn-ghost">
-                Back to locations
-              </A>
-            </div>
+      <Show when={graphsError()}>
+        <section class="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-content">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p>Some graph payloads could not be loaded. The dashboard layout is still available below.</p>
+            <button type="button" class="btn btn-sm btn-outline" onClick={dashboard.retryAll}>
+              Retry Graphs
+            </button>
           </div>
+        </section>
+      </Show>
+
+      <Show
+        when={graphs() || graphsError()}
+        fallback={
+          <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
+            <p class="text-base-content/70">Loading location graphs...</p>
+          </section>
         }
       >
         <Show
-          when={graphs()}
+          when={orderedSections().length > 0}
           fallback={
             <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-              <p class="text-base-content/70">Loading location graphs...</p>
+              <p class="text-base-content/70">No dashboard sections are configured for this location.</p>
             </section>
           }
         >
-          <Show
-            when={orderedSections().length > 0}
-            fallback={
-              <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-                <p class="text-base-content/70">No dashboard sections are configured for this location.</p>
-              </section>
-            }
-          >
-            <div class="flex flex-row flex-wrap items-start gap-4">
-              <For each={orderedSections()}>
-                {(section) => (
-                  <LocationDashboardSection
-                    section={section}
-                    graphs={displayedSectionGraphs(section)}
-                    missingGraphIds={missingGraphIds(section)}
-                    canEditGraphs={canEditGraphs()}
-                    isGraphMutationBusy={dashboard.isGraphMutationBusy()}
-                    plotlyModule={plotlyModule}
-                    onOpenGraphEditor={dashboard.openGraphEditor}
-                  />
-                )}
-              </For>
-            </div>
-          </Show>
+          <div class="flex flex-row flex-wrap items-start gap-4">
+            <For each={orderedSections()}>
+              {(section) => (
+                <LocationDashboardSection
+                  section={section}
+                  graphs={displayedSectionGraphs(section)}
+                  missingGraphIds={missingGraphIds(section)}
+                  canEditGraphs={canEditGraphs()}
+                  isGraphMutationBusy={dashboard.isGraphMutationBusy()}
+                  plotlyModule={plotlyModule}
+                  onOpenGraphEditor={dashboard.openGraphEditor}
+                />
+              )}
+            </For>
+          </div>
         </Show>
       </Show>
 

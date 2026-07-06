@@ -1,5 +1,60 @@
 import {renderToString} from "solid-js/web";
-import {describe, expect, it, vi} from "vitest";
+import {beforeEach, describe, expect, it, vi} from "vitest";
+
+const locationDetailMock = vi.hoisted(() => {
+  const dashboardEdit = {
+    orderedSections: () => [] as Array<{section_id: number; graph_ids: number[]}>,
+    sectionGraphs: () => [],
+    missingGraphIds: () => [] as number[],
+    hasPendingDashboardChanges: () => false,
+    isGraphMutationBusy: () => false,
+    canCreateGraphs: () => true,
+    isCreatingGraph: () => false,
+    pendingDashboardMutationCount: () => 0,
+    updatedAtLabel: () => "-",
+    openCreateGraphModal: vi.fn(),
+    applyGraphChanges: vi.fn(),
+    openLayoutEditor: vi.fn(),
+    applySpreadsheetUploadPreview: vi.fn(),
+    undoLastDashboardEdit: vi.fn(),
+    retryAll: vi.fn(),
+    openGraphEditor: vi.fn(),
+    isCreateGraphModalOpen: () => false,
+    isLayoutEditorOpen: () => false,
+    editingGraphId: () => null,
+    editingGraphForTimeRange: () => undefined,
+    isDeletingGraph: () => false,
+    isSavingGraphChanges: () => false,
+    hasPendingGraphChanges: () => false,
+    sectionOptions: () => [],
+    nextSectionId: () => 1,
+    workingSectionLayout: () => ({sections: []}),
+    workingGraphs: () => [],
+    createGraphFromModal: vi.fn(),
+    closeCreateGraphModal: vi.fn(),
+    closeGraphEditor: vi.fn(),
+    deleteGraphFromModal: vi.fn(),
+    renameGraphFromModal: vi.fn(),
+    applyLocalGraphEdit: vi.fn(),
+    applyLocalSectionLayoutEdit: vi.fn(),
+    closeLayoutEditor: vi.fn()
+  };
+
+  return {
+    location: () => undefined,
+    graphs: () => undefined,
+    graphsLoading: () => false,
+    graphsError: () => undefined as unknown,
+    graphTimeRange: () => "threeMonths",
+    setGraphTimeRange: vi.fn(),
+    dashboardEdit,
+    serviceCalendarStaging: {
+      stageImportedRequests: vi.fn()
+    },
+    refetchLocation: async () => undefined,
+    refetchGraphs: async () => undefined
+  };
+});
 
 vi.mock("@solidjs/router", () => ({
   A: (props: {children?: unknown}) => props.children ?? null
@@ -16,56 +71,7 @@ vi.mock("../context/ProfileContext", () => ({
 }));
 
 vi.mock("../context/LocationDetailContext", () => ({
-  useLocationDetail: () => ({
-    location: () => undefined,
-    graphs: () => undefined,
-    graphsLoading: () => false,
-    graphsError: () => undefined,
-    graphTimeRange: () => "threeMonths",
-    setGraphTimeRange: vi.fn(),
-    dashboardEdit: {
-      orderedSections: () => [],
-      sectionGraphs: () => [],
-      missingGraphIds: () => [],
-      hasPendingDashboardChanges: () => false,
-      isGraphMutationBusy: () => false,
-      canCreateGraphs: () => true,
-      isCreatingGraph: () => false,
-      pendingDashboardMutationCount: () => 0,
-      updatedAtLabel: () => "-",
-      openCreateGraphModal: vi.fn(),
-      applyGraphChanges: vi.fn(),
-      openLayoutEditor: vi.fn(),
-      applySpreadsheetUploadPreview: vi.fn(),
-      undoLastDashboardEdit: vi.fn(),
-      retryAll: vi.fn(),
-      openGraphEditor: vi.fn(),
-      isCreateGraphModalOpen: () => false,
-      isLayoutEditorOpen: () => false,
-      editingGraphId: () => null,
-      editingGraphForTimeRange: () => undefined,
-      isDeletingGraph: () => false,
-      isSavingGraphChanges: () => false,
-      hasPendingGraphChanges: () => false,
-      sectionOptions: () => [],
-      nextSectionId: () => 1,
-      workingSectionLayout: () => ({sections: []}),
-      workingGraphs: () => [],
-      createGraphFromModal: vi.fn(),
-      closeCreateGraphModal: vi.fn(),
-      closeGraphEditor: vi.fn(),
-      deleteGraphFromModal: vi.fn(),
-      renameGraphFromModal: vi.fn(),
-      applyLocalGraphEdit: vi.fn(),
-      applyLocalSectionLayoutEdit: vi.fn(),
-      closeLayoutEditor: vi.fn()
-    },
-    serviceCalendarStaging: {
-      stageImportedRequests: vi.fn()
-    },
-    refetchLocation: async () => undefined,
-    refetchGraphs: async () => undefined
-  })
+  useLocationDetail: () => locationDetailMock
 }));
 
 vi.mock("../components/Chart", () => ({
@@ -128,6 +134,14 @@ vi.mock("corvu/popover", () => {
 import {LocationDashboardPanel} from "../pages/authenticated/panels/location/LocationDashboardPanel";
 
 describe("LocationDashboardPanel", () => {
+  beforeEach(() => {
+    locationDetailMock.graphs = () => undefined;
+    locationDetailMock.graphsError = () => undefined;
+    locationDetailMock.dashboardEdit.orderedSections = () => [];
+    locationDetailMock.dashboardEdit.sectionGraphs = () => [];
+    locationDetailMock.dashboardEdit.missingGraphIds = () => [];
+  });
+
   it("renders the dashboard toolbar with the updated title and overflow actions", () => {
     const html = renderToString(() => <LocationDashboardPanel locationId="42" />);
 
@@ -148,5 +162,19 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("aria-label=\"Dashboard date range selector\"");
     expect(html).toContain("accept=\".xlsx\"");
     expect(html).toMatch(/style="[^"]*width:2rem[^"]*height:2rem/);
+  });
+
+  it("keeps dashboard sections visible when graph payload loading fails", () => {
+    locationDetailMock.graphsError = () => new Error("missing graph");
+    locationDetailMock.dashboardEdit.orderedSections = () => [{section_id: 1, graph_ids: [999]}];
+    locationDetailMock.dashboardEdit.missingGraphIds = () => [999];
+
+    const html = renderToString(() => <LocationDashboardPanel locationId="42" />);
+
+    expect(html).toContain("Some graph payloads could not be loaded");
+    expect(html).toContain("Retry Graphs");
+    expect(html).toContain("Missing graph IDs:");
+    expect(html).toContain("999");
+    expect(html).not.toContain("Unable to load location graphs");
   });
 });

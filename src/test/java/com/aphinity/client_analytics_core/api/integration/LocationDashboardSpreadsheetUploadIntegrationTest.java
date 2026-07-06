@@ -102,7 +102,8 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$.graphs[11].name").value("Recent Sample Measurements"))
             .andExpect(jsonPath("$.graphs[11].data[0].type").value("table"))
             .andExpect(jsonPath("$.graphs[11].data[0].meta.renderer").value("tabulator"))
-            .andExpect(jsonPath("$.graphs[11].data[0].customdata[0].followUps").isArray());
+            .andExpect(jsonPath("$.graphs[11].data[0].header.values[0]").value("Facility"))
+            .andExpect(jsonPath("$.graphs[11].data[0].customdata.length()").value(0));
 
         Graph persistedWaterQualityGraph = reloadGraph(graphs.waterQualityGraph().getId());
         Graph persistedSystemTypeGraph = reloadGraph(graphs.systemTypeGraph().getId());

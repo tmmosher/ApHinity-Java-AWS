@@ -234,12 +234,12 @@ public class LocationDashboardTimeRangeService {
         LocationDashboardImportStrategy strategy,
         Instant refreshedAt
     ) {
-        Map<String, Graph> matchedImportGraphsByDefinitionId = graphMatcher.matchImportGraphs(
+        Map<String, Graph> matchedImportGraphsByDefinitionId = graphMatcher.matchAvailableImportGraphs(
             strategy.graphDefinitions(),
             assignedGraphs,
             location.getName()
         );
-        Map<String, Graph> matchedDerivedGraphsByDefinitionId = graphMatcher.matchDerivedGraphs(
+        Map<String, Graph> matchedDerivedGraphsByDefinitionId = graphMatcher.matchAvailableDerivedGraphs(
             strategy.derivedGraphDefinitions(),
             assignedGraphs,
             location.getName()
@@ -292,7 +292,8 @@ public class LocationDashboardTimeRangeService {
                     derivedGraphDefinition,
                     graph,
                     allTimeHistoricalData,
-                    strategy.spreadsheetIdentityPattern()
+                    strategy.spreadsheetIdentityPattern(),
+                    LocalDate.now(clock)
                 )
             );
             graph.setUpdatedAt(refreshedAt);
@@ -329,12 +330,12 @@ public class LocationDashboardTimeRangeService {
         LocalDate anchorDate,
         Instant refreshedAt
     ) {
-        Map<String, Graph> matchedImportGraphsByDefinitionId = graphMatcher.matchImportGraphs(
+        Map<String, Graph> matchedImportGraphsByDefinitionId = graphMatcher.matchAvailableImportGraphs(
             strategy.graphDefinitions(),
             assignedGraphs,
             location.getName()
         );
-        Map<String, Graph> matchedDerivedGraphsByDefinitionId = graphMatcher.matchDerivedGraphs(
+        Map<String, Graph> matchedDerivedGraphsByDefinitionId = graphMatcher.matchAvailableDerivedGraphs(
             strategy.derivedGraphDefinitions(),
             assignedGraphs,
             location.getName()
@@ -381,7 +382,8 @@ public class LocationDashboardTimeRangeService {
                         derivedGraphDefinition,
                         graph,
                         rangedHistoricalData,
-                        strategy.spreadsheetIdentityPattern()
+                        strategy.spreadsheetIdentityPattern(),
+                        anchorDate
                     )
                 );
                 graph.setUpdatedAt(refreshedAt);
@@ -393,7 +395,8 @@ public class LocationDashboardTimeRangeService {
                     derivedGraphDefinition,
                     graph,
                     rangedHistoricalData,
-                    strategy.spreadsheetIdentityPattern()
+                    strategy.spreadsheetIdentityPattern(),
+                    anchorDate
                 )
             );
         }

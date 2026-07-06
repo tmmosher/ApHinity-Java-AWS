@@ -36,7 +36,24 @@ final class LocationDashboardGraphMatcher {
                 .toList(),
             assignedGraphs,
             locationName,
-            this::matchesImportGraphMetadata
+            this::matchesImportGraphMetadata,
+            true
+        );
+    }
+
+    Map<String, Graph> matchAvailableImportGraphs(
+        List<GraphConfig> graphDefinitions,
+        List<Graph> assignedGraphs,
+        String locationName
+    ) {
+        return matchGraphs(
+            graphDefinitions.stream()
+                .map(graphDefinition -> new GraphIdentity(graphDefinition.id(), graphDefinition.name(), graphDefinition.title()))
+                .toList(),
+            assignedGraphs,
+            locationName,
+            this::matchesImportGraphMetadata,
+            false
         );
     }
 
@@ -59,7 +76,24 @@ final class LocationDashboardGraphMatcher {
                 .toList(),
             assignedGraphs,
             locationName,
-            this::matchesDerivedGraphMetadata
+            this::matchesDerivedGraphMetadata,
+            true
+        );
+    }
+
+    Map<String, Graph> matchAvailableDerivedGraphs(
+        List<DerivedGraphConfig> graphDefinitions,
+        List<Graph> assignedGraphs,
+        String locationName
+    ) {
+        return matchGraphs(
+            graphDefinitions.stream()
+                .map(graphDefinition -> new GraphIdentity(graphDefinition.id(), graphDefinition.name(), graphDefinition.title()))
+                .toList(),
+            assignedGraphs,
+            locationName,
+            this::matchesDerivedGraphMetadata,
+            false
         );
     }
 
@@ -67,7 +101,8 @@ final class LocationDashboardGraphMatcher {
         List<GraphIdentity> graphDefinitions,
         List<Graph> assignedGraphs,
         String locationName,
-        BiPredicate<Graph, GraphIdentity> metadataMatcher
+        BiPredicate<Graph, GraphIdentity> metadataMatcher,
+        boolean requireAll
     ) {
         Map<String, Graph> matchedGraphsByDefinitionId = new LinkedHashMap<>();
         Set<Long> reservedGraphIds = new LinkedHashSet<>();
@@ -115,6 +150,9 @@ final class LocationDashboardGraphMatcher {
             }
 
             if (normalizedDefinitionTitle != null) {
+                if (!requireAll) {
+                    continue;
+                }
                 throw new ApiClientException(
                     HttpStatus.BAD_REQUEST,
                     "location_dashboard_graph_not_found",
@@ -138,6 +176,9 @@ final class LocationDashboardGraphMatcher {
                 );
             }
             if (nameMatches.isEmpty()) {
+                if (!requireAll) {
+                    continue;
+                }
                 throw new ApiClientException(
                     HttpStatus.BAD_REQUEST,
                     "location_dashboard_graph_not_found",

@@ -8,6 +8,7 @@ import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,6 +32,7 @@ final class LocationDashboardDerivedGraphSupport {
     private static final String UNKNOWN_SYSTEM_TYPE_LABEL = "Unknown System Type";
     private static final String UNKNOWN_CATEGORY_LABEL = "Unknown Category";
     private static final List<String> TURNAROUND_BUCKETS = List.of("< 3 days", "< 1 week", "< 1 month", "< 3 months");
+    private static final ZoneId DASHBOARD_TIME_ZONE = ZoneId.of("America/Phoenix");
 
     private LocationDashboardDerivedGraphSupport() {
     }
@@ -44,6 +46,22 @@ final class LocationDashboardDerivedGraphSupport {
         Graph graph,
         HistoricalDerivedData historicalData,
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        return buildPayload(
+            derivedGraphDefinition,
+            graph,
+            historicalData,
+            identityPattern,
+            LocalDate.now(DASHBOARD_TIME_ZONE)
+        );
+    }
+
+    static List<Map<String, Object>> buildPayload(
+        LocationDashboardImportStrategyConfig.DerivedGraphConfig derivedGraphDefinition,
+        Graph graph,
+        HistoricalDerivedData historicalData,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern,
+        LocalDate anchorDate
     ) {
         LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType = derivedGraphDefinition.derivedType();
         List<HistoricalSamplePoint> waterQualitySamplePoints = historicalData.allSamplePoints().stream()
@@ -133,19 +151,25 @@ final class LocationDashboardDerivedGraphSupport {
             ));
             case RECENT_SAMPLE_MEASUREMENTS -> List.of(buildRecentSampleMeasurementsTrace(
                 historicalData.recentRawSamples(),
-                identityPattern
+                identityPattern,
+                anchorDate
             ));
         };
     }
 
     private static Map<String, Object> buildRecentSampleMeasurementsTrace(
         List<HistoricalRawSample> rawSamples,
-        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern,
+        LocalDate anchorDate
     ) {
         List<IdentityColumnDefinition> identityColumns = identityColumns(identityPattern);
+        LocalDate windowStart = recentSampleWindowStart(anchorDate);
         Map<String, RecentSampleRow> rowsByIdentifier = new LinkedHashMap<>();
         for (HistoricalRawSample sample : rawSamples == null ? List.<HistoricalRawSample>of() : rawSamples) {
             if (sample == null || sample.observedDate() == null || sample.measurementName() == null) {
+                continue;
+            }
+            if (windowStart != null && sample.observedDate().isBefore(windowStart)) {
                 continue;
             }
             String rowIdentifier = sample.rowIdentifier();
@@ -216,6 +240,11 @@ final class LocationDashboardDerivedGraphSupport {
             "rowKey", "rowIdentifier"
         ));
         return trace;
+    }
+
+    private static LocalDate recentSampleWindowStart(LocalDate anchorDate) {
+        LocalDate effectiveAnchorDate = anchorDate == null ? LocalDate.now(DASHBOARD_TIME_ZONE) : anchorDate;
+        return effectiveAnchorDate.minusMonths(1).withDayOfMonth(1);
     }
 
     private static List<IdentityColumnDefinition> identityColumns(
@@ -863,6 +892,7 @@ final class LocationDashboardDerivedGraphSupport {
         private final LocalDate observedDate;
         private final String measurementName;
         private final String rawValue;
+        private final boolean compliant;
         private final boolean resolved;
         private final List<Map<String, Object>> followUps = new ArrayList<>();
 
@@ -872,6 +902,7 @@ final class LocationDashboardDerivedGraphSupport {
             LocalDate observedDate,
             String measurementName,
             String rawValue,
+            boolean compliant,
             boolean resolved
         ) {
             this.rowIdentifier = rowIdentifier;
@@ -879,6 +910,7 @@ final class LocationDashboardDerivedGraphSupport {
             this.observedDate = observedDate;
             this.measurementName = measurementName;
             this.rawValue = rawValue;
+            this.compliant = compliant;
             this.resolved = resolved;
         }
 
@@ -889,6 +921,7 @@ final class LocationDashboardDerivedGraphSupport {
                 sample.observedDate(),
                 sample.measurementName(),
                 displayValue(sample.rawValue()),
+                sample.compliant(),
                 sample.resolved()
             );
         }
@@ -930,6 +963,9 @@ final class LocationDashboardDerivedGraphSupport {
         }
 
         String caStatus() {
+            if (compliant) {
+                return "No CA Required";
+            }
             return resolved ? "Resolved" : "Active";
         }
 
@@ -952,7 +988,7 @@ final class LocationDashboardDerivedGraphSupport {
                 identityValues,
                 measurementName,
                 rawValue,
-                true,
+                compliant,
                 resolved
             );
         }
