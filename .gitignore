@@ -67,3 +67,6 @@ src/main/resources/static/
 
 # Test resources
 /src/test/resources/sheets/
+
+# logs
+/logs
