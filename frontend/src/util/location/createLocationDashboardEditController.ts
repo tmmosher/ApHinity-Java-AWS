@@ -546,7 +546,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     try {
       await saveLocationGraphsById(props.host, saveLocationId, graphUpdates, sectionLayoutUpdate, updateMonthRange);
       if (spreadsheetFile) {
-        await uploadLocationDashboardSpreadsheetById(props.host, saveLocationId, spreadsheetFile, true);
+        await uploadLocationDashboardSpreadsheetById(props.host, saveLocationId, spreadsheetFile, true, -1);
       }
       if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
         return;

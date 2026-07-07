@@ -10,6 +10,7 @@ type LocationDashboardToolbarProps = {
   isCreatingGraph: boolean;
   hasPendingGraphChanges: boolean;
   isGraphMutationBusy: boolean;
+  monthRange: number;
   pendingGraphMutationCount: number;
   updatedAtLabel: string;
   createGraphDisabledReason?: string;
@@ -39,6 +40,7 @@ export const LocationDashboardToolbar = (props: LocationDashboardToolbarProps) =
         isCreatingGraph={props.isCreatingGraph}
         hasPendingGraphChanges={props.hasPendingGraphChanges}
         isGraphMutationBusy={props.isGraphMutationBusy}
+        monthRange={props.monthRange}
         pendingGraphMutationCount={props.pendingGraphMutationCount}
         createGraphDisabledReason={props.createGraphDisabledReason}
         onAddGraph={props.onAddGraph}

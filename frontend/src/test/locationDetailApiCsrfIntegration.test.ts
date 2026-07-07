@@ -141,7 +141,7 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://example.test/api/core/locations/42/dashboard/spreadsheet-upload");
+    expect(url).toBe("https://example.test/api/core/locations/42/dashboard/spreadsheet-upload?monthRange=-1");
     expect(init?.method).toBe("POST");
     expect(init?.body).toBeInstanceOf(FormData);
     expect((init?.headers as Headers).get("X-XSRF-TOKEN")).toBe("token-fresh");
@@ -159,12 +159,13 @@ describe("locationDetailApi + apiFetch CSRF integration", () => {
       "https://example.test",
       "42",
       file,
-      true
+      true,
+      3
     )).resolves.toMatchObject({graphs: [], correctiveActions: []});
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
-      "https://example.test/api/core/locations/42/dashboard/spreadsheet-upload?persistSamples=true"
+      "https://example.test/api/core/locations/42/dashboard/spreadsheet-upload?monthRange=3&persistSamples=true"
     );
   });
 

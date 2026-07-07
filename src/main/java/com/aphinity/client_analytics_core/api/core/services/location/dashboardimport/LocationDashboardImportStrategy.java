@@ -83,7 +83,8 @@ public interface LocationDashboardImportStrategy {
         String description,
         String facilityName,
         String systemTypeName,
-        String measurementName
+        String measurementName,
+        boolean resolved
     ) {
     }
 

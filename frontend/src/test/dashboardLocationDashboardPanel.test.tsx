@@ -149,6 +149,7 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Dashboard");
     expect(html).toContain("Work Order Email");
     expect(html).toContain("Upload Spreadsheet");
+    expect(html).toContain("Dashboard spreadsheets can only be uploaded from All Data.");
     expect(html).toContain("Add New Graph");
     expect(html).toContain("Edit Layout");
     expect(html).toContain("Apply");

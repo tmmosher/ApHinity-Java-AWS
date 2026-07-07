@@ -345,6 +345,7 @@ export const deleteLocationGraphById = async (
  * @param host API host base URL.
  * @param locationId Location id from route params.
  * @param file Excel workbook to upload.
+ * @param monthRange Active dashboard month range, or all-time when non-positive.
  * @returns Updated graph payloads returned by the backend import.
  * @throws {Error} When ids are invalid or the request fails.
  */
@@ -352,10 +353,12 @@ export const uploadLocationDashboardSpreadsheetById = async (
   host: string,
   locationId: string,
   file: File,
-  persistSamples = false
+  persistSamples = false,
+  monthRange = -1
 ): Promise<LocationDashboardSpreadsheetUploadResult> => {
   const parsedLocationId = parseRouteLocationId(locationId);
   const query = new URLSearchParams();
+  query.set("monthRange", String(monthRange));
   if (persistSamples) {
     query.set("persistSamples", "true");
   }

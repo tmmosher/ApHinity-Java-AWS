@@ -340,13 +340,14 @@ class LocationControllerTest {
             )),
             List.of()
         );
-        when(locationService.uploadLocationDashboardSpreadsheet(42L, 8L, file, false)).thenReturn(expected);
+        when(locationService.uploadLocationDashboardSpreadsheet(42L, 8L, file, false, 12)).thenReturn(expected);
 
-        LocationDashboardSpreadsheetUploadResponse actual = locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file, false);
+        LocationDashboardSpreadsheetUploadResponse actual =
+            locationController.uploadLocationDashboardSpreadsheet(jwt, 8L, file, false, 12);
 
         assertSame(expected, actual);
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
-        verify(locationService).uploadLocationDashboardSpreadsheet(42L, 8L, file, false);
+        verify(locationService).uploadLocationDashboardSpreadsheet(42L, 8L, file, false, 12);
     }
 
     @Test

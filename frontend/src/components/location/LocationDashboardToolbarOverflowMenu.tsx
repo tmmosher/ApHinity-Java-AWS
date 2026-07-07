@@ -25,6 +25,7 @@ type LocationDashboardToolbarOverflowMenuProps = {
   locationId: string;
   isCreatingGraph: boolean;
   isGraphMutationBusy: boolean;
+  monthRange: number;
   createGraphDisabledReason?: string;
   onAddGraph: () => void;
   onEditLayout: () => void;
@@ -36,9 +37,11 @@ export const LocationDashboardToolbarOverflowMenu = (
 ) => {
   const [isUploadingSpreadsheet, setIsUploadingSpreadsheet] = createSignal(false);
   let spreadsheetUploadInputRef: HTMLInputElement | undefined;
+  const spreadsheetUploadDisabledReason = "Dashboard spreadsheets can only be uploaded from All Data.";
+  const isSpreadsheetUploadDisabled = () => props.monthRange > 0;
 
   const openSpreadsheetUploadDialog = () => {
-    if (props.isGraphMutationBusy || isUploadingSpreadsheet()) {
+    if (props.isGraphMutationBusy || isUploadingSpreadsheet() || isSpreadsheetUploadDisabled()) {
       return;
     }
     spreadsheetUploadInputRef?.click();
@@ -53,7 +56,7 @@ export const LocationDashboardToolbarOverflowMenu = (
       return;
     }
 
-    if (props.isGraphMutationBusy || isUploadingSpreadsheet()) {
+    if (props.isGraphMutationBusy || isUploadingSpreadsheet() || isSpreadsheetUploadDisabled()) {
       return;
     }
 
@@ -64,7 +67,13 @@ export const LocationDashboardToolbarOverflowMenu = (
 
     setIsUploadingSpreadsheet(true);
     try {
-      const uploadedGraphs = await uploadLocationDashboardSpreadsheetById(props.apiHost, props.locationId, file);
+      const uploadedGraphs = await uploadLocationDashboardSpreadsheetById(
+        props.apiHost,
+        props.locationId,
+        file,
+        false,
+        props.monthRange
+      );
       await props.onUploadSpreadsheetSuccess?.(uploadedGraphs, file);
       toast.success("Spreadsheet uploaded");
     } catch (error) {
@@ -91,6 +100,8 @@ export const LocationDashboardToolbarOverflowMenu = (
               <Show when={props.canEditGraphs}>
                 <LocationDashboardToolbarOverflowMenuUploadSpreadsheetAction
                   isUploadingSpreadsheet={isUploadingSpreadsheet()}
+                  isUploadDisabled={isSpreadsheetUploadDisabled()}
+                  uploadDisabledReason={spreadsheetUploadDisabledReason}
                   onUploadSpreadsheet={openSpreadsheetUploadDialog}
                 />
                 <LocationDashboardToolbarOverflowMenuAddGraphAction
@@ -118,7 +129,7 @@ export const LocationDashboardToolbarOverflowMenu = (
           accept=".xlsx"
           aria-label="Upload dashboard spreadsheet"
           data-dashboard-spreadsheet-upload-input=""
-          disabled={props.isGraphMutationBusy || isUploadingSpreadsheet()}
+          disabled={props.isGraphMutationBusy || isUploadingSpreadsheet() || isSpreadsheetUploadDisabled()}
           onChange={handleSpreadsheetUploadChange}
         />
       </Show>

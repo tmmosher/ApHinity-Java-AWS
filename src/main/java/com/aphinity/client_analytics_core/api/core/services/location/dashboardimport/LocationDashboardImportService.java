@@ -226,6 +226,7 @@ public class LocationDashboardImportService {
         List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions =
             correctiveActionService.buildPreviewCorrectiveActions(location.getId(), computation.correctiveActions());
         if (persistSamples) {
+            correctiveActionService.completeResolvedPersistedCorrectiveActions(location, computation.correctiveActions());
             samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
         }
 

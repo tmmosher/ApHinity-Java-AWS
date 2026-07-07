@@ -922,7 +922,7 @@ public class LocationService {
         Long locationId,
         MultipartFile file
     ) {
-        return uploadLocationDashboardSpreadsheet(userId, locationId, file, false);
+        return uploadLocationDashboardSpreadsheet(userId, locationId, file, false, null);
     }
 
     @Transactional
@@ -932,8 +932,29 @@ public class LocationService {
         MultipartFile file,
         boolean persistSamples
     ) {
+        return uploadLocationDashboardSpreadsheet(userId, locationId, file, persistSamples, null);
+    }
+
+    @Transactional
+    public LocationDashboardSpreadsheetUploadResponse uploadLocationDashboardSpreadsheet(
+        Long userId,
+        Long locationId,
+        MultipartFile file,
+        boolean persistSamples,
+        Integer monthRange
+    ) {
         AppUser user = requireUser(userId);
         requirePartnerOrAdmin(user);
+        DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
+        if (!resolvedMonthRange.isAllTime()) {
+            log.warn(
+                "Rejected finite-range dashboard spreadsheet upload actorUserId={} locationId={} monthRange={}",
+                userId,
+                locationId,
+                monthRange
+            );
+            throw finiteRangeDashboardSpreadsheetUploadNotAllowed();
+        }
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
         return locationDashboardImportService.importLocationDashboard(location, file, persistSamples);
     }
@@ -1607,6 +1628,10 @@ public class LocationService {
 
     private ResponseStatusException finiteRangeGraphDataUpdateNotAllowed() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph data can only be edited from All Data");
+    }
+
+    private ResponseStatusException finiteRangeDashboardSpreadsheetUploadNotAllowed() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dashboard spreadsheets can only be uploaded from All Data");
     }
 
     private ResponseStatusException invalidGraphName() {

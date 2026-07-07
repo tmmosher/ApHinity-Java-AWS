@@ -118,6 +118,7 @@ describe("LocationDashboardPanel upload refresh", () => {
     renderToString(() => <LocationDashboardPanel locationId="42" />);
 
     expect(capturedToolbarProps).toHaveLength(1);
+    expect(capturedToolbarProps[0].monthRange).toBe(3);
     const onUploadSpreadsheetSuccess = capturedToolbarProps[0].onUploadSpreadsheetSuccess;
     expect(typeof onUploadSpreadsheetSuccess).toBe("function");
 

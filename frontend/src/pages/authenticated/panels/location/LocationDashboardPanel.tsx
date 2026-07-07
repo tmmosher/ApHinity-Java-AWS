@@ -117,6 +117,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
         isCreatingGraph={dashboard.isCreatingGraph()}
         hasPendingGraphChanges={dashboard.hasPendingDashboardChanges()}
         isGraphMutationBusy={dashboard.isGraphMutationBusy()}
+        monthRange={monthRangeForDashboardTimeRange(selectedTimeRange())}
         pendingGraphMutationCount={dashboard.pendingDashboardMutationCount()}
         updatedAtLabel={dashboard.updatedAtLabel()}
         createGraphDisabledReason={createGraphDisabledReason()}

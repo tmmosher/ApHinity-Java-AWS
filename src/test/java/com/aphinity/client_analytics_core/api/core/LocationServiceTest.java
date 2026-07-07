@@ -1909,6 +1909,30 @@ class LocationServiceTest {
     }
 
     @Test
+    void uploadLocationDashboardSpreadsheetRejectsFiniteMonthRange() {
+        AppUser user = verifiedUser(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "dashboard.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[] {1, 2, 3}
+        );
+
+        ResponseStatusException ex = assertThrows(
+            ResponseStatusException.class,
+            () -> locationService.uploadLocationDashboardSpreadsheet(7L, 9L, file, false, 3)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Dashboard spreadsheets can only be uploaded from All Data", ex.getReason());
+        verify(locationRepository, never()).findById(any());
+        verifyNoInteractions(locationDashboardImportService);
+    }
+
+    @Test
     void getAccessibleLocationThumbnailReturnsStoredWebpForAuthorizedUser() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
