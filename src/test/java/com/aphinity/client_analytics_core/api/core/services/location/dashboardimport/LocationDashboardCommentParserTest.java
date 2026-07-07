@@ -74,4 +74,40 @@ class LocationDashboardCommentParserTest {
         assertEquals("General note", parsed.notes().getFirst());
         assertEquals(2, parsed.allSamples().size());
     }
+
+    @Test
+    void parseWorkbookCommentRecognizesOrdinalResampleFollowUps() {
+        LocationDashboardCommentParser parser = new LocationDashboardCommentParser(List.of(
+            new LocationDashboardImportStrategyConfig.MeasurementUnitConfig(
+                "CFU.mL",
+                List.of("CFU.ml")
+            )
+        ));
+
+        LocationDashboardCommentParser.ParsedComment parsed = parser.parse("""
+            Resample Date: 6/15/26
+            Resample Results Date: 6/19/26
+            Resample Result: 140 CFU.mL
+            Corrective Action and Date:  Repeat DI loop sterilization procedure with increased dwell time at POU.  6/20/26
+            2nd Resample Date: 6/24/26
+            2nd Resample Results Date: 6/29/26
+            2nd Resample Results: <1 CFU.mL
+            """);
+
+        assertEquals(2, parsed.allSamples().size());
+        assertEquals(LocalDate.parse("2026-06-15"), parsed.primarySample().sampledOn());
+        assertEquals(LocalDate.parse("2026-06-19"), parsed.primarySample().resultReceivedOn());
+        assertEquals("140", parsed.primarySample().resultRaw());
+        assertEquals(new BigDecimal("140"), parsed.primarySample().resultValue());
+        assertEquals("CFU.mL", parsed.primarySample().resultUnit());
+        assertEquals(1, parsed.primarySample().correctiveActions().size());
+
+        assertEquals(1, parsed.followUpSamples().size());
+        LocationDashboardCommentParser.ParsedCommentSample secondResample = parsed.followUpSamples().getFirst();
+        assertEquals(LocalDate.parse("2026-06-24"), secondResample.sampledOn());
+        assertEquals(LocalDate.parse("2026-06-29"), secondResample.resultReceivedOn());
+        assertEquals("1", secondResample.resultRaw());
+        assertEquals(new BigDecimal("1"), secondResample.resultValue());
+        assertEquals("CFU.mL", secondResample.resultUnit());
+    }
 }

@@ -21,6 +21,9 @@ final class LocationDashboardCommentParser {
     private static final Pattern DATE_TOKEN_PATTERN = Pattern.compile("\\b(\\d{1,2}/\\d{1,2}/\\d{2,4})\\b");
     private static final Pattern BARE_DATE_LINE_PATTERN = Pattern.compile("(?i)^\\d{1,2}/\\d{1,2}/\\d{2,4}[\\p{Punct}]?$");
     private static final Pattern YEAR_TOKEN_PATTERN = Pattern.compile("^(\\d{1,2}/\\d{1,2}/)(\\d{3,4})$");
+    private static final Pattern RESAMPLE_ORDINAL_PREFIX_PATTERN = Pattern.compile(
+        "^(?:\\d+(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\\s+(?=(?:re-?sample|retest)\\b)"
+    );
     private static final Pattern LABELED_TEST_NOTE_PATTERN = Pattern.compile(
         "(?i)^(first|second|third|fourth|fifth)\\s+test\\s*:\\s*(.+)$"
     );
@@ -604,7 +607,7 @@ final class LocationDashboardCommentParser {
     }
 
     private boolean isSampleStartLine(String line) {
-        String normalized = normalizeKey(line);
+        String normalized = normalizeResampleLabelKey(line);
         return normalized.startsWith("sampled ")
             || normalized.startsWith("sample date")
             || normalized.startsWith("date of sampling")
@@ -622,7 +625,7 @@ final class LocationDashboardCommentParser {
     }
 
     private boolean isExplicitRetestSampleStartLine(String line) {
-        String normalized = normalizeKey(line);
+        String normalized = normalizeResampleLabelKey(line);
         return normalized.startsWith("retest sample date")
             || normalized.startsWith("retest sample taken on")
             || normalized.startsWith("retest sampled")
@@ -636,7 +639,7 @@ final class LocationDashboardCommentParser {
     }
 
     private boolean isResultDateLine(String line) {
-        String normalized = normalizeKey(line);
+        String normalized = normalizeResampleLabelKey(line);
         return normalized.startsWith("result date")
             || normalized.startsWith("results date")
             || normalized.startsWith("results received")
@@ -648,14 +651,20 @@ final class LocationDashboardCommentParser {
     }
 
     private boolean isResultLine(String line) {
-        String normalized = normalizeKey(line);
+        String normalized = normalizeResampleLabelKey(line);
         if (normalized.startsWith("result date") /* this seems to hit 'date' values too? */
+            || normalized.startsWith("results date")
+            || normalized.startsWith("re-sample results date")
+            || normalized.startsWith("resample results date")
+            || normalized.startsWith("retest result date")
             || normalized.startsWith("results received")
             || normalized.startsWith("result received")
             || normalized.startsWith("date of results")) /* this seems to hit 'date' values too? */  {
             return false;
         }
         if (normalized.startsWith("result")
+            || normalized.startsWith("re-sample result")
+            || normalized.startsWith("resample result")
             || normalized.startsWith("retest result")
             || normalized.startsWith("first sample result")
             || normalized.startsWith("second test")) {
@@ -680,12 +689,16 @@ final class LocationDashboardCommentParser {
         LocalDate actionDate = parseDateToken(value);
         if (actionDate != null) {
             Matcher matcher = DATE_TOKEN_PATTERN.matcher(value);
-            String remainder = matcher.find() ? value.substring(matcher.end()).strip() : value;
-            remainder = blankToNull(trimTrailingPunctuation(remainder));
-            if (remainder != null) {
-                return new ParsedAction(actionDate, remainder);
+            if (matcher.find()) {
+                String beforeDate = blankToNull(trimTrailingPunctuation(value.substring(0, matcher.start()).strip()));
+                String afterDate = blankToNull(trimTrailingPunctuation(value.substring(matcher.end()).strip()));
+                String actionText = beforeDate == null ? afterDate : beforeDate;
+                if (afterDate != null && beforeDate != null) {
+                    actionText = beforeDate + " " + afterDate;
+                }
+                return new ParsedAction(actionDate, actionText);
             }
-            return new ParsedAction(actionDate, null);
+            return new ParsedAction(actionDate, blankToNull(trimTrailingPunctuation(value)));
         }
 
         LocalDate inlineDate = parseDateToken(normalized);
@@ -838,6 +851,11 @@ final class LocationDashboardCommentParser {
             return "";
         }
         return value.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+    }
+
+    private String normalizeResampleLabelKey(String value) {
+        String normalized = normalizeKey(value);
+        return RESAMPLE_ORDINAL_PREFIX_PATTERN.matcher(normalized).replaceFirst("");
     }
 
     private String blankToNull(String value) {
