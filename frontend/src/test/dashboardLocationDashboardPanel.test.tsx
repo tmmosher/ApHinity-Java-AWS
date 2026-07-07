@@ -1,5 +1,6 @@
 import {renderToString} from "solid-js/web";
 import {beforeEach, describe, expect, it, vi} from "vitest";
+import type {LocationGraph} from "../types/Types";
 
 const locationDetailMock = vi.hoisted(() => {
   const dashboardEdit = {
@@ -175,6 +176,51 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("Retry Graphs");
     expect(html).toContain("Missing graph IDs:");
     expect(html).toContain("999");
+    expect(html).toContain("grid gap-4 xl:grid-cols-2");
     expect(html).not.toContain("Unable to load location graphs");
+  });
+
+  it("renders normal sections in left-to-right column stacks around full-width table breaks", () => {
+    const standardGraph: LocationGraph = {
+      id: 101,
+      name: "Compliance",
+      data: [{type: "bar", x: ["A"], y: [1]}],
+      layout: {},
+      config: {},
+      style: {height: 320},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+    const tableGraph: LocationGraph = {
+      id: 202,
+      name: "Recent Sample Measurements",
+      data: [{
+        type: "table",
+        header: {values: ["Facility", "Follow-ups"]},
+        cells: {values: [["Newport Beach"], [1]]},
+        meta: {renderer: "tabulator"}
+      }],
+      layout: {},
+      config: {},
+      style: {height: 640},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+    locationDetailMock.graphs = () => [standardGraph, tableGraph];
+    locationDetailMock.dashboardEdit.orderedSections = () => [
+      {section_id: 1, graph_ids: [101]},
+      {section_id: 2, graph_ids: [202]},
+      {section_id: 3, graph_ids: [101]}
+    ];
+    locationDetailMock.dashboardEdit.sectionGraphs = (section: {section_id: number}) =>
+      section.section_id === 2 ? [tableGraph] : [standardGraph];
+
+    const html = renderToString(() => <LocationDashboardPanel locationId="42" />);
+
+    expect(html).toContain("space-y-4");
+    expect(html).toContain("grid gap-4 xl:grid-cols-2");
+    expect(html).toMatch(/data-section-id="1"[\s\S]*data-section-id="2"[\s\S]*data-section-id="3"/);
+    expect(html).toMatch(/class="w-full rounded-xl[^"]*break-inside-avoid" data-section-id="1"/);
+    expect(html).toMatch(/class="w-full rounded-xl[^"]*shadow-sm " data-section-id="2"/);
   });
 });

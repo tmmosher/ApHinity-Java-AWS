@@ -13,8 +13,8 @@ type TabulatorGraphProps = {
   class?: string;
 };
 
-const DEFAULT_PAGE_SIZE = 10;
-const PAGE_SIZE_SELECTOR = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 19;
+const PAGE_SIZE_SELECTOR = [19, 30, 50, 100];
 
 const buildFollowUpPopup = (row: TabulatorGraphRow): HTMLElement => {
   const root = document.createElement("div");

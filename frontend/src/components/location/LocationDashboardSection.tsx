@@ -16,11 +16,16 @@ type LocationDashboardSectionProps = {
   canEditGraphs: boolean;
   isGraphMutationBusy: boolean;
   plotlyModule: Resource<unknown>;
+  flowItem?: boolean;
   onOpenGraphEditor: (graphId: number) => void;
 };
 
 export const LocationDashboardSection = (props: LocationDashboardSectionProps) => (
-  <section class="mb-4 inline-block w-full break-inside-avoid rounded-xl border border-base-300 bg-base-100 p-5 align-top shadow-sm" data-section-id={props.section.section_id}>
+  <section
+    class={"w-full rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm "
+      + (props.flowItem ? "break-inside-avoid" : "")}
+    data-section-id={props.section.section_id}
+  >
     <Show
       when={props.graphs.length > 0}
       fallback={

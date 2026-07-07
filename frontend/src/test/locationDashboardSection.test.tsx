@@ -133,7 +133,7 @@ describe("LocationDashboardSection", () => {
     };
     const plotlyModule = Object.assign(() => ({}), {error: undefined});
 
-    renderToString(() => (
+    const html = renderToString(() => (
       <LocationDashboardSection
         section={section}
         graphs={[graph]}
@@ -151,5 +151,31 @@ describe("LocationDashboardSection", () => {
     expect(capturedChartProps).toHaveLength(0);
     expect(capturedTabulatorProps).toHaveLength(1);
     expect(capturedTabulatorProps[0]).toMatchObject({graph});
+    expect(html).not.toContain("xl:col-span-2");
+  });
+
+  it("marks flow items as column-safe masonry sections", () => {
+    const section: LocationSectionLayout = {
+      section_id: 7,
+      graph_ids: []
+    };
+
+    const html = renderToString(() => (
+      <LocationDashboardSection
+        section={section}
+        graphs={[]}
+        missingGraphIds={[]}
+        apiHost="https://example.test"
+        locationId="42"
+        monthRange={3}
+        canEditGraphs={false}
+        isGraphMutationBusy={false}
+        plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
+        flowItem
+        onOpenGraphEditor={() => undefined}
+      />
+    ));
+
+    expect(html).toContain("break-inside-avoid");
   });
 });

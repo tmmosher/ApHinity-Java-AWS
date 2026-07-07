@@ -46,6 +46,10 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   const sectionGraphs = dashboard.sectionGraphs;
   const missingGraphIds = dashboard.missingGraphIds;
   const selectedTimeRange = () => graphTimeRange() as DashboardTimeRange;
+  type DashboardSection = ReturnType<typeof orderedSections>[number];
+  type DashboardSectionGroup =
+    | {type: "flow"; sections: DashboardSection[]}
+    | {type: "full"; section: DashboardSection};
 
   createEffect(on(
     () => props.locationId,
@@ -56,6 +60,33 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
 
   const displayedSectionGraphs = (section: ReturnType<typeof orderedSections>[number]) =>
     sectionGraphs(section);
+
+  const sectionLayoutGroups = createMemo<DashboardSectionGroup[]>(() => {
+    const groups: DashboardSectionGroup[] = [];
+    let flowSections: DashboardSection[] = [];
+    const flushFlowSections = () => {
+      if (flowSections.length > 0) {
+        groups.push({type: "flow", sections: flowSections});
+        flowSections = [];
+      }
+    };
+
+    for (const section of orderedSections()) {
+      if (displayedSectionGraphs(section).some(isTabulatorGraph)) {
+        flushFlowSections();
+        groups.push({type: "full", section});
+        continue;
+      }
+      flowSections.push(section);
+    }
+    flushFlowSections();
+    return groups;
+  });
+
+  const flowSectionColumns = (sections: DashboardSection[]): [DashboardSection[], DashboardSection[]] => [
+    sections.filter((_, index) => index % 2 === 0),
+    sections.filter((_, index) => index % 2 === 1)
+  ];
 
   const applySpreadsheetUploadResult = (result: LocationDashboardSpreadsheetUploadResult, file: File): void => {
     dashboard.applySpreadsheetUploadPreview(result.graphs, file);
@@ -140,13 +171,13 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
             </section>
           }
         >
-          <div class="gap-4 [column-width:42rem]">
-            <For each={orderedSections()}>
-              {(section) => (
+          <div class="space-y-4">
+            <For each={sectionLayoutGroups()}>
+              {(group) => group.type === "full" ? (
                 <LocationDashboardSection
-                  section={section}
-                  graphs={displayedSectionGraphs(section)}
-                  missingGraphIds={missingGraphIds(section)}
+                  section={group.section}
+                  graphs={displayedSectionGraphs(group.section)}
+                  missingGraphIds={missingGraphIds(group.section)}
                   apiHost={host}
                   locationId={props.locationId}
                   monthRange={monthRangeForDashboardTimeRange(selectedTimeRange())}
@@ -155,6 +186,32 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
                   plotlyModule={plotlyModule}
                   onOpenGraphEditor={dashboard.openGraphEditor}
                 />
+              ) : (
+                <div class="grid gap-4 xl:grid-cols-2">
+                  <For each={flowSectionColumns(group.sections)}>
+                    {(columnSections) => (
+                      <div class="space-y-4">
+                        <For each={columnSections}>
+                          {(section) => (
+                            <LocationDashboardSection
+                              section={section}
+                              graphs={displayedSectionGraphs(section)}
+                              missingGraphIds={missingGraphIds(section)}
+                              apiHost={host}
+                              locationId={props.locationId}
+                              monthRange={monthRangeForDashboardTimeRange(selectedTimeRange())}
+                              canEditGraphs={canEditGraphs()}
+                              isGraphMutationBusy={dashboard.isGraphMutationBusy()}
+                              plotlyModule={plotlyModule}
+                              flowItem
+                              onOpenGraphEditor={dashboard.openGraphEditor}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    )}
+                  </For>
+                </div>
               )}
             </For>
           </div>
