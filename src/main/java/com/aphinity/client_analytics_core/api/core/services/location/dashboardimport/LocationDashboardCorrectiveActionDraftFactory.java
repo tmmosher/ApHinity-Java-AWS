@@ -24,18 +24,31 @@ final class LocationDashboardCorrectiveActionDraftFactory {
         List<CorrectiveActionDraft> drafts = new ArrayList<>();
         for (LocationDashboardAnalyzedSample analyzedSample : analyzedSamples) {
             if (analyzedSample == null || analyzedSample.sample() == null) continue;
-            drafts.addAll(buildCommentCorrectiveActionDrafts(analyzedSample.sample(), analyzedSample.resolved()));
+            LocalDate resolvedDate = resolvedDate(analyzedSample);
+            drafts.addAll(buildCommentCorrectiveActionDrafts(analyzedSample.sample(), analyzedSample.resolved(), resolvedDate));
             if (analyzedSample.sample() instanceof LocationDashboardWorksheetSample worksheetSample) {
                 if (!analyzedSample.compliant())
-                    buildSyntheticCorrectiveActionDraft(worksheetSample, analyzedSample.resolved()).ifPresent(drafts::add);
+                    buildSyntheticCorrectiveActionDraft(worksheetSample, analyzedSample.resolved(), resolvedDate).ifPresent(drafts::add);
             }
         }
         return deduplicate(drafts);
     }
 
+    private LocalDate resolvedDate(LocationDashboardAnalyzedSample analyzedSample) {
+        if (analyzedSample == null
+            || !analyzedSample.resolved()
+            || analyzedSample.sample() == null
+            || analyzedSample.sample().observedDate() == null
+            || analyzedSample.turnaroundDays() == null) {
+            return null;
+        }
+        return analyzedSample.sample().observedDate().plusDays(Math.max(0L, analyzedSample.turnaroundDays()));
+    }
+
     private Optional<CorrectiveActionDraft> buildSyntheticCorrectiveActionDraft(
         LocationDashboardWorksheetSample sample,
-        boolean resolved
+        boolean resolved,
+        LocalDate resolvedDate
     ) {
         if (sample == null || sample.measurementName() == null) {
             return Optional.empty();
@@ -63,26 +76,29 @@ final class LocationDashboardCorrectiveActionDraftFactory {
             sample.facilityName(),
             sample.systemTypeName(),
             sample.measurementName(),
-            resolved
+            resolved,
+            resolvedDate
         ));
     }
 
     private List<CorrectiveActionDraft> buildCommentCorrectiveActionDrafts(
         LocationDashboardImportedSample sample,
-        boolean resolved
+        boolean resolved,
+        LocalDate resolvedDate
     ) {
         if (sample instanceof LocationDashboardWorksheetSample worksheetSample) {
-            return buildWorksheetCommentCorrectiveActionDrafts(worksheetSample, resolved);
+            return buildWorksheetCommentCorrectiveActionDrafts(worksheetSample, resolved, resolvedDate);
         }
         if (sample instanceof LocationDashboardCommentSample commentSample) {
-            return buildCommentSampleCorrectiveActionDrafts(commentSample, resolved);
+            return buildCommentSampleCorrectiveActionDrafts(commentSample, resolved, resolvedDate);
         }
         return List.of();
     }
 
     private List<CorrectiveActionDraft> buildWorksheetCommentCorrectiveActionDrafts(
         LocationDashboardWorksheetSample sample,
-        boolean resolved
+        boolean resolved,
+        LocalDate resolvedDate
     ) {
         LocationDashboardCommentParser.ParsedComment parsedComment = sample.parsedComment();
         if (parsedComment == null) {
@@ -91,7 +107,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
 
         List<CorrectiveActionDraft> drafts = new ArrayList<>();
         for (LocationDashboardCommentParser.ParsedCommentCorrectiveAction action : parsedComment.correctiveActions()) {
-            buildCommentCorrectiveActionDraft(sample, action, "Comment", resolved).ifPresent(drafts::add);
+            buildCommentCorrectiveActionDraft(sample, action, "Comment", resolved, resolvedDate).ifPresent(drafts::add);
         }
 
         LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
@@ -100,7 +116,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
             && sample.observedDate() != null
             && primarySample.sampledOn().equals(sample.observedDate())) {
             for (LocationDashboardCommentParser.ParsedCommentCorrectiveAction action : primarySample.correctiveActions()) {
-                buildCommentCorrectiveActionDraft(sample, action, "Primary Sample", resolved).ifPresent(drafts::add);
+                buildCommentCorrectiveActionDraft(sample, action, "Primary Sample", resolved, resolvedDate).ifPresent(drafts::add);
             }
         }
         return List.copyOf(drafts);
@@ -108,7 +124,8 @@ final class LocationDashboardCorrectiveActionDraftFactory {
 
     private List<CorrectiveActionDraft> buildCommentSampleCorrectiveActionDrafts(
         LocationDashboardCommentSample sample,
-        boolean resolved
+        boolean resolved,
+        LocalDate resolvedDate
     ) {
         LocationDashboardCommentParser.ParsedCommentSample parsedSample = sample.parsedSample();
         if (parsedSample == null) {
@@ -119,11 +136,11 @@ final class LocationDashboardCorrectiveActionDraftFactory {
         if (sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY
             && sample.parsedComment() != null) {
             for (LocationDashboardCommentParser.ParsedCommentCorrectiveAction action : sample.parsedComment().correctiveActions()) {
-                buildCommentCorrectiveActionDraft(sample, action, "Comment", resolved).ifPresent(drafts::add);
+                buildCommentCorrectiveActionDraft(sample, action, "Comment", resolved, resolvedDate).ifPresent(drafts::add);
             }
         }
         for (LocationDashboardCommentParser.ParsedCommentCorrectiveAction action : parsedSample.correctiveActions()) {
-            buildCommentCorrectiveActionDraft(sample, action, sample.sampleLabel(), resolved).ifPresent(drafts::add);
+            buildCommentCorrectiveActionDraft(sample, action, sample.sampleLabel(), resolved, resolvedDate).ifPresent(drafts::add);
         }
         return List.copyOf(drafts);
     }
@@ -132,7 +149,8 @@ final class LocationDashboardCorrectiveActionDraftFactory {
         LocationDashboardImportedSample sample,
         LocationDashboardCommentParser.ParsedCommentCorrectiveAction action,
         String sourceLabel,
-        boolean resolved
+        boolean resolved,
+        LocalDate resolvedDate
     ) {
         if (sample == null
             || action == null
@@ -181,7 +199,8 @@ final class LocationDashboardCorrectiveActionDraftFactory {
             sample.facilityName(),
             sample.systemTypeName(),
             sample.measurementName(),
-            resolved
+            resolved,
+            resolvedDate
         ));
     }
 

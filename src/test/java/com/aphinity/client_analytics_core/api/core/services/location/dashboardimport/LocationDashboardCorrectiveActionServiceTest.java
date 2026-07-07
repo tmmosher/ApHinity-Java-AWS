@@ -41,6 +41,7 @@ class LocationDashboardCorrectiveActionServiceTest {
         );
 
         assertEquals(ServiceEventStatus.COMPLETED, previewEvents.getFirst().getStatus());
+        assertEquals(LocalDate.parse("2025-08-09"), previewEvents.getFirst().getEndEventDate());
     }
 
     @Test
@@ -61,6 +62,7 @@ class LocationDashboardCorrectiveActionServiceTest {
         );
 
         assertEquals(ServiceEventStatus.COMPLETED, previewEvents.getFirst().getStatus());
+        assertEquals(LocalDate.parse("2025-08-09"), previewEvents.getFirst().getEndEventDate());
     }
 
     @Test
@@ -80,6 +82,7 @@ class LocationDashboardCorrectiveActionServiceTest {
         List<ServiceEvent> events = service.persistCorrectiveActions(location, List.of(draft));
 
         assertEquals(ServiceEventStatus.COMPLETED, events.getFirst().getStatus());
+        assertEquals(LocalDate.parse("2025-08-09"), events.getFirst().getEndEventDate());
         verify(serviceEventRepository).saveAllAndFlush(List.of(persisted));
     }
 
@@ -111,8 +114,53 @@ class LocationDashboardCorrectiveActionServiceTest {
         service.completeResolvedPersistedCorrectiveActions(location, List.of(resolvedDraft));
 
         assertEquals(ServiceEventStatus.COMPLETED, matchingPersisted.getStatus());
+        assertEquals(LocalDate.parse("2025-08-09"), matchingPersisted.getEndEventDate());
         assertEquals(ServiceEventStatus.OVERDUE, unmatchedPersisted.getStatus());
         verify(serviceEventRepository).saveAllAndFlush(List.of(matchingPersisted));
+    }
+
+    @Test
+    void completeResolvedPersistedCorrectiveActionsRepairsCompletedEventResolutionDate() {
+        LocationDashboardCorrectiveActionService service = new LocationDashboardCorrectiveActionService(
+            serviceEventRepository,
+            Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC)
+        );
+        Location location = new Location();
+        location.setId(9L);
+        LocationDashboardImportStrategy.CorrectiveActionDraft resolvedDraft = draft(true);
+        ServiceEvent matchingPersisted = serviceEvent(resolvedDraft);
+        matchingPersisted.setStatus(ServiceEventStatus.COMPLETED);
+        matchingPersisted.setEndEventDate(LocalDate.parse("2025-08-01"));
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(matchingPersisted));
+
+        service.completeResolvedPersistedCorrectiveActions(location, List.of(resolvedDraft));
+
+        assertEquals(ServiceEventStatus.COMPLETED, matchingPersisted.getStatus());
+        assertEquals(LocalDate.parse("2025-08-09"), matchingPersisted.getEndEventDate());
+        verify(serviceEventRepository).saveAllAndFlush(List.of(matchingPersisted));
+    }
+
+    @Test
+    void buildPreviewCorrectiveActionsMatchesLegacyPersistedEventWithoutSampleIdentity() {
+        LocationDashboardCorrectiveActionService service = new LocationDashboardCorrectiveActionService(
+            serviceEventRepository,
+            Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC)
+        );
+        LocationDashboardImportStrategy.CorrectiveActionDraft draft = draftWithSampleIdentity(true);
+        ServiceEvent persisted = serviceEvent(draft(false));
+        persisted.setStatus(ServiceEventStatus.OVERDUE);
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(persisted));
+
+        List<ServiceEvent> previewEvents = service.buildPreviewCorrectiveActions(
+            9L,
+            List.of(draft)
+        );
+
+        assertEquals(1, previewEvents.size());
+        assertEquals(1L, previewEvents.getFirst().getId());
+        assertEquals(ServiceEventStatus.COMPLETED, previewEvents.getFirst().getStatus());
     }
 
     @Test
@@ -158,7 +206,27 @@ class LocationDashboardCorrectiveActionServiceTest {
             "Newport Beach",
             "Cooling Towers",
             "HPC",
-            resolved
+            resolved,
+            resolved ? LocalDate.parse("2025-08-09") : null
+        );
+    }
+
+    private LocationDashboardImportStrategy.CorrectiveActionDraft draftWithSampleIdentity(boolean resolved) {
+        return new LocationDashboardImportStrategy.CorrectiveActionDraft(
+            LocalDate.parse("2025-08-01"),
+            "CA: HPC 2025-08-01",
+            String.join("\n", List.of(
+                LocationDashboardCorrectiveActionMetadataSupport.measurementLine("HPC"),
+                LocationDashboardCorrectiveActionMetadataSupport.observedAtLine(LocalDate.parse("2025-08-01")),
+                LocationDashboardCorrectiveActionMetadataSupport.sublocationLine("Newport Beach"),
+                LocationDashboardCorrectiveActionMetadataSupport.systemLine("Cooling Towers"),
+                LocationDashboardCorrectiveActionMetadataSupport.sampleIdentityLine("primary-sample|2025-08-01|2025-08-09|140")
+            )),
+            "Newport Beach",
+            "Cooling Towers",
+            "HPC",
+            resolved,
+            resolved ? LocalDate.parse("2025-08-09") : null
         );
     }
 

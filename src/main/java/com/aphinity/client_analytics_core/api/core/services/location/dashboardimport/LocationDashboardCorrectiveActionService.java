@@ -11,9 +11,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Owns corrective-action preview rules and historical corrective-action reconstruction.
@@ -63,21 +65,26 @@ final class LocationDashboardCorrectiveActionService {
         for (int index = 0; index < persistedCorrectiveActions.size(); index += 1) {
             ServiceEvent existingCorrectiveAction = persistedCorrectiveActions.get(index);
             previewCorrectiveActions.add(copyServiceEvent(existingCorrectiveAction));
-            persistedIndexesByTitle.putIfAbsent(
-                correctiveActionIdentity(existingCorrectiveAction.getTitle(), existingCorrectiveAction.getDescription()),
-                index
-            );
+            for (String identity : correctiveActionIdentities(
+                existingCorrectiveAction.getTitle(),
+                existingCorrectiveAction.getDescription()
+            )) {
+                persistedIndexesByTitle.putIfAbsent(identity, index);
+            }
         }
 
         for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
-            String correctiveActionIdentity = correctiveActionIdentity(draft.title(), draft.description());
+            String correctiveActionIdentity = firstMatchingIdentity(
+                correctiveActionIdentities(draft.title(), draft.description()),
+                persistedIndexesByTitle
+            );
             Integer existingIndex = persistedIndexesByTitle.get(correctiveActionIdentity);
             if (existingIndex != null) {
                 ServiceEvent previewEvent = previewCorrectiveActions.get(existingIndex);
                 previewEvent.setTitle(draft.title());
                 previewEvent.setDescription(draft.description());
                 if (draft.resolved()) {
-                    previewEvent.setStatus(ServiceEventStatus.COMPLETED);
+                    completeServiceEvent(previewEvent, draft);
                 }
                 continue;
             }
@@ -111,23 +118,23 @@ final class LocationDashboardCorrectiveActionService {
 
         Map<String, ServiceEvent> persistedByIdentity = new LinkedHashMap<>();
         for (ServiceEvent persistedCorrectiveAction : persistedCorrectiveActions) {
-            persistedByIdentity.putIfAbsent(
-                correctiveActionIdentity(
-                    persistedCorrectiveAction.getTitle(),
-                    persistedCorrectiveAction.getDescription()
-                ),
-                persistedCorrectiveAction
-            );
+            for (String identity : correctiveActionIdentities(
+                persistedCorrectiveAction.getTitle(),
+                persistedCorrectiveAction.getDescription()
+            )) {
+                persistedByIdentity.putIfAbsent(identity, persistedCorrectiveAction);
+            }
         }
 
         List<ServiceEvent> correctiveActionsToSave = new ArrayList<>();
         List<ServiceEvent> effectiveCorrectiveActions = new ArrayList<>(persistedCorrectiveActions);
         for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
-            String correctiveActionIdentity = correctiveActionIdentity(draft.title(), draft.description());
+            Set<String> correctiveActionIdentities = correctiveActionIdentities(draft.title(), draft.description());
+            String correctiveActionIdentity = firstMatchingIdentity(correctiveActionIdentities, persistedByIdentity);
             ServiceEvent existingCorrectiveAction = persistedByIdentity.get(correctiveActionIdentity);
             if (existingCorrectiveAction != null) {
-                if (draft.resolved() && existingCorrectiveAction.getStatus() != ServiceEventStatus.COMPLETED) {
-                    existingCorrectiveAction.setStatus(ServiceEventStatus.COMPLETED);
+                if (needsCompletionUpdate(existingCorrectiveAction, draft)) {
+                    completeServiceEvent(existingCorrectiveAction, draft);
                     correctiveActionsToSave.add(existingCorrectiveAction);
                 }
                 continue;
@@ -137,7 +144,9 @@ final class LocationDashboardCorrectiveActionService {
             correctiveAction.setLocation(location);
             correctiveActionsToSave.add(correctiveAction);
             effectiveCorrectiveActions.add(correctiveAction);
-            persistedByIdentity.put(correctiveActionIdentity, correctiveAction);
+            for (String identity : correctiveActionIdentities) {
+                persistedByIdentity.putIfAbsent(identity, correctiveAction);
+            }
         }
 
         if (!correctiveActionsToSave.isEmpty()) {
@@ -157,10 +166,9 @@ final class LocationDashboardCorrectiveActionService {
         Map<String, LocationDashboardImportStrategy.CorrectiveActionDraft> resolvedDraftsByIdentity = new LinkedHashMap<>();
         for (LocationDashboardImportStrategy.CorrectiveActionDraft draft : correctiveActions) {
             if (draft != null && draft.resolved()) {
-                resolvedDraftsByIdentity.putIfAbsent(
-                    correctiveActionIdentity(draft.title(), draft.description()),
-                    draft
-                );
+                for (String identity : correctiveActionIdentities(draft.title(), draft.description())) {
+                    resolvedDraftsByIdentity.putIfAbsent(identity, draft);
+                }
             }
         }
         if (resolvedDraftsByIdentity.isEmpty()) {
@@ -170,15 +178,16 @@ final class LocationDashboardCorrectiveActionService {
         List<ServiceEvent> eventsToSave = new ArrayList<>();
         for (ServiceEvent persistedCorrectiveAction :
             serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(location.getId())) {
-            if (persistedCorrectiveAction == null || persistedCorrectiveAction.getStatus() == ServiceEventStatus.COMPLETED) {
+            if (persistedCorrectiveAction == null) {
                 continue;
             }
-            String identity = correctiveActionIdentity(
+            String identity = firstMatchingIdentity(correctiveActionIdentities(
                 persistedCorrectiveAction.getTitle(),
                 persistedCorrectiveAction.getDescription()
-            );
-            if (resolvedDraftsByIdentity.containsKey(identity)) {
-                persistedCorrectiveAction.setStatus(ServiceEventStatus.COMPLETED);
+            ), resolvedDraftsByIdentity);
+            LocationDashboardImportStrategy.CorrectiveActionDraft draft = resolvedDraftsByIdentity.get(identity);
+            if (needsCompletionUpdate(persistedCorrectiveAction, draft)) {
+                completeServiceEvent(persistedCorrectiveAction, draft);
                 eventsToSave.add(persistedCorrectiveAction);
             }
         }
@@ -238,6 +247,34 @@ final class LocationDashboardCorrectiveActionService {
         return LocationDashboardCorrectiveActionMetadataSupport.identityKey(title, description);
     }
 
+    private Set<String> correctiveActionIdentities(String title, String description) {
+        Set<String> identities = new LinkedHashSet<>();
+        String primaryIdentity = correctiveActionIdentity(title, description);
+        if (primaryIdentity != null) {
+            identities.add(primaryIdentity);
+        }
+        String legacyIdentity = LocationDashboardCorrectiveActionMetadataSupport.identityKeyIgnoringSampleIdentity(
+            title,
+            description
+        );
+        if (legacyIdentity != null) {
+            identities.add(legacyIdentity);
+        }
+        return identities;
+    }
+
+    private <T> String firstMatchingIdentity(Set<String> candidates, Map<String, T> valuesByIdentity) {
+        if (candidates == null || valuesByIdentity == null) {
+            return null;
+        }
+        for (String candidate : candidates) {
+            if (valuesByIdentity.containsKey(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
     private ServiceEventStatus resolveImportedCorrectiveActionStatus(LocalDate observedDate) {
         LocalDate today = LocalDate.now(clock);
         if (observedDate.isBefore(today)) {
@@ -257,12 +294,41 @@ final class LocationDashboardCorrectiveActionService {
         serviceEvent.setResponsibility(ServiceEventResponsibility.PARTNER);
         serviceEvent.setEventDate(draft.observedDate());
         serviceEvent.setEventTime(ALL_DAY_START_TIME);
-        serviceEvent.setEndEventDate(draft.observedDate());
+        serviceEvent.setEndEventDate(draft.resolved() && draft.resolvedDate() != null
+            ? draft.resolvedDate()
+            : draft.observedDate());
         serviceEvent.setEndEventTime(ALL_DAY_END_TIME);
         serviceEvent.setStatus(draft.resolved()
             ? ServiceEventStatus.COMPLETED
             : resolveImportedCorrectiveActionStatus(draft.observedDate()));
         return serviceEvent;
+    }
+
+    private void completeServiceEvent(
+        ServiceEvent serviceEvent,
+        LocationDashboardImportStrategy.CorrectiveActionDraft draft
+    ) {
+        if (serviceEvent == null || draft == null) {
+            return;
+        }
+        serviceEvent.setStatus(ServiceEventStatus.COMPLETED);
+        if (draft.resolvedDate() != null) {
+            serviceEvent.setEndEventDate(draft.resolvedDate());
+            serviceEvent.setEndEventTime(ALL_DAY_END_TIME);
+        }
+    }
+
+    private boolean needsCompletionUpdate(
+        ServiceEvent serviceEvent,
+        LocationDashboardImportStrategy.CorrectiveActionDraft draft
+    ) {
+        if (serviceEvent == null || draft == null || !draft.resolved()) {
+            return false;
+        }
+        if (serviceEvent.getStatus() != ServiceEventStatus.COMPLETED) {
+            return true;
+        }
+        return draft.resolvedDate() != null && !Objects.equals(serviceEvent.getEndEventDate(), draft.resolvedDate());
     }
 
     private ServiceEvent copyServiceEvent(ServiceEvent source) {

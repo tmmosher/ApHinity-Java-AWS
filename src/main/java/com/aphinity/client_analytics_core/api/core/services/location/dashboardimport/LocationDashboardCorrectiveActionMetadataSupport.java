@@ -112,6 +112,24 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
         return identity != null ? identity : LocationDashboardGraphMetadataSupport.normalizeKey(title);
     }
 
+    static String identityKeyIgnoringSampleIdentity(String title, String description) {
+        Map<String, String> metadata = parseStructuredMetadata(description);
+        String identity = identityKey(
+            metadata.get("measurement"),
+            LocationDashboardGraphMetadataSupport.parseLocalDate(metadata.get("observed at")),
+            LocationDashboardGraphMetadataSupport.firstNonBlank(
+                metadata.get("sublocation"),
+                metadata.get("facility")
+            ),
+            metadata.get("building"),
+            metadata.get("system"),
+            metadata.get("point of use"),
+            metadata.get("basis"),
+            null
+        );
+        return identity != null ? identity : LocationDashboardGraphMetadataSupport.normalizeKey(title);
+    }
+
     static String identityKey(
         String measurementName,
         LocalDate observedAt,
