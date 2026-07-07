@@ -33,6 +33,8 @@ export const DashboardLocationsPanel = () => {
 
   const canCreateLocations = () => profileContext.profile()?.role === "admin";
 
+  const splashText = canEditLocations() ? "" : "Check the 'Invites' tab to see if your managing partner has granted you permission to access new locations.";
+
   createEffect(() => {
     const profile = profileContext.profile();
     if (!profile?.verified) {
@@ -96,8 +98,8 @@ export const DashboardLocationsPanel = () => {
   return (
     <div class="space-y-6">
       <header class="space-y-1">
-        <h1 class="text-3xl font-semibold tracking-tight">All Locations</h1>
-        <p class="text-base-content/70">Favorite a location for faster access.</p>
+        <h1 class="text-3xl font-semibold tracking-tight">Locations</h1>
+        <p class="text-base-content/70">Listed here are the locations you have access to. {splashText}</p>
       </header>
 
       <Show when={canCreateLocations()}>
@@ -125,7 +127,7 @@ export const DashboardLocationsPanel = () => {
       </Show>
 
       <LocationOverviewGrid
-        title="All locations"
+        title="List"
         description="Favorite a location for faster access."
         apiHost={host}
         locations={locations}
