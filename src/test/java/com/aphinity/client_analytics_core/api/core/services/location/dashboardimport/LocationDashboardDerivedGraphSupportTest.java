@@ -17,9 +17,9 @@ class LocationDashboardDerivedGraphSupportTest {
                 Map.of(),
                 List.of(),
                 List.of(
-                    rawSample(LocalDate.parse("2026-05-31"), "row-hpc", "HPC", "21", false),
-                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "12", false),
-                    rawSample(LocalDate.parse("2026-06-05"), "row-hpc", "HPC", "8", false),
+                    rawSample(LocalDate.parse("2026-05-31"), "row-hpc", "HPC", "21", "CFU.mL", false),
+                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "12", "CFU.mL", false),
+                    rawSample(LocalDate.parse("2026-06-05"), "row-hpc", "HPC", "8", "CFU.mL", false),
                     rawSample(LocalDate.parse("2026-06-10"), "row-copper", "Copper", "0", true, false),
                     rawSample(LocalDate.parse("2026-06-15"), "row-legionella", "Legionella", "3", true)
                 )
@@ -57,7 +57,7 @@ class LocationDashboardDerivedGraphSupportTest {
                 List.of("Sink 1", "Sink 1", "Sink 1"),
                 List.of("Legionella", "Copper", "HPC"),
                 List.of("2026-06-15", "2026-06-10", "2026-06-01"),
-                List.of("3", "0", "12"),
+                List.of("3", "0", "12 CFU.mL"),
                 List.of("", "", 1)
             ),
             cells.get("values")
@@ -68,7 +68,7 @@ class LocationDashboardDerivedGraphSupportTest {
         assertEquals("Resolved", customData.getFirst().get("caStatus"));
         assertEquals(List.of(), customData.getFirst().get("followUps"));
         assertEquals("No CA Required", customData.get(1).get("caStatus"));
-        assertEquals(List.of(Map.of("date", "2026-06-05", "value", "8")), customData.get(2).get("followUps"));
+        assertEquals(List.of(Map.of("date", "2026-06-05", "value", "8 CFU.mL")), customData.get(2).get("followUps"));
     }
 
     private LocationDashboardDerivedGraphSupport.HistoricalRawSample rawSample(
@@ -86,6 +86,29 @@ class LocationDashboardDerivedGraphSupportTest {
         String rowIdentifier,
         String measurementName,
         String rawValue,
+        String units,
+        boolean resolved
+    ) {
+        return rawSample(observedDate, rowIdentifier, measurementName, rawValue, units, false, resolved);
+    }
+
+    private LocationDashboardDerivedGraphSupport.HistoricalRawSample rawSample(
+        LocalDate observedDate,
+        String rowIdentifier,
+        String measurementName,
+        String rawValue,
+        boolean compliant,
+        boolean resolved
+    ) {
+        return rawSample(observedDate, rowIdentifier, measurementName, rawValue, null, compliant, resolved);
+    }
+
+    private LocationDashboardDerivedGraphSupport.HistoricalRawSample rawSample(
+        LocalDate observedDate,
+        String rowIdentifier,
+        String measurementName,
+        String rawValue,
+        String units,
         boolean compliant,
         boolean resolved
     ) {
@@ -98,6 +121,7 @@ class LocationDashboardDerivedGraphSupportTest {
             ),
             measurementName,
             rawValue,
+            units,
             compliant,
             resolved
         );

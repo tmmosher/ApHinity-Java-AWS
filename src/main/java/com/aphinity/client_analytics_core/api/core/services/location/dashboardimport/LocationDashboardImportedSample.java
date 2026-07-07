@@ -63,6 +63,10 @@ interface LocationDashboardImportedSample {
 
     String rawValue();
 
+    default String units() {
+        return null;
+    }
+
     default String sampleIdentity() {
         return null;
     }
@@ -103,6 +107,7 @@ record LocationDashboardWorksheetSample(
     String pointOfUse,
     String basis,
     String rawValue,
+    String units,
     String cellReference,
     LocationDashboardCommentParser.ParsedComment parsedComment
 ) implements LocationDashboardImportedSample {
@@ -133,6 +138,7 @@ record LocationDashboardWorksheetSample(
             pointOfUse,
             basis,
             null,
+            null,
             cellReference,
             null
         );
@@ -151,6 +157,7 @@ record LocationDashboardWorksheetSample(
         String pointOfUse,
         String basis,
         String rawValue,
+        String units,
         String cellReference
     ) {
         this(
@@ -166,6 +173,7 @@ record LocationDashboardWorksheetSample(
             pointOfUse,
             basis,
             rawValue,
+            units,
             cellReference,
             null
         );
@@ -191,6 +199,7 @@ record LocationDashboardCommentSample(
     String pointOfUse,
     String basis,
     String rawValue,
+    String units,
     String cellReference,
     LocationDashboardCommentParser.ParsedComment parsedComment,
     LocationDashboardCommentParser.ParsedCommentSample parsedSample,
@@ -229,6 +238,7 @@ record LocationDashboardCommentSample(
             resolvedSystem,
             pointOfUse,
             basis,
+            null,
             null,
             cellReference,
             parsedComment,
@@ -282,6 +292,7 @@ record LocationDashboardAnalyzedSample(
             sample.pointOfUse(),
             sample.basis(),
             sample.rawValue(),
+            sample.units(),
             sample.sampleIdentity(),
             compliant,
             resolved,

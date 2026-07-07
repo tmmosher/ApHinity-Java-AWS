@@ -6,6 +6,11 @@ declare module "tabulator-tables" {
     getElement: () => HTMLElement;
   };
 
+  export type TabulatorRowComponent = {
+    getData: () => Record<string, unknown>;
+    getElement: () => HTMLElement;
+  };
+
   export type TabulatorColumnDefinition = {
     title: string;
     field: string;
@@ -30,6 +35,7 @@ declare module "tabulator-tables" {
     paginationSize?: number;
     paginationSizeSelector?: number[];
     paginationCounter?: "rows" | "pages";
+    rowFormatter?: (row: TabulatorRowComponent) => void;
     ajaxURL?: string;
     ajaxRequestFunc?: (
       url: string,

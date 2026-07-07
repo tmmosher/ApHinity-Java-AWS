@@ -104,6 +104,7 @@ public interface LocationDashboardImportStrategy {
         String pointOfUse,
         String basis,
         String rawValue,
+        String units,
         String sampleIdentity,
         boolean compliant,
         boolean resolved,
@@ -134,6 +135,42 @@ public interface LocationDashboardImportStrategy {
                 measurementName,
                 pointOfUse,
                 basis,
+                null,
+                null,
+                sampleIdentity,
+                compliant,
+                resolved,
+                turnaroundDays,
+                origin
+            );
+        }
+
+        public AnalyzedSamplePoint(
+            LocalDate observedDate,
+            String facilityName,
+            String buildingName,
+            String systemName,
+            String systemTypeName,
+            String measurementName,
+            String pointOfUse,
+            String basis,
+            String rawValue,
+            String sampleIdentity,
+            boolean compliant,
+            boolean resolved,
+            Long turnaroundDays,
+            SampleOrigin origin
+        ) {
+            this(
+                observedDate,
+                facilityName,
+                buildingName,
+                systemName,
+                systemTypeName,
+                measurementName,
+                pointOfUse,
+                basis,
+                rawValue,
                 null,
                 sampleIdentity,
                 compliant,

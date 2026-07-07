@@ -191,10 +191,11 @@ final class LocationDashboardSampleImportPipeline {
             || rowContext.facilityName() == null) {
             return null;
         }
+        String measurementName = resolveMeasurementName(cell.metricName(), measurementBound);
         return new LocationDashboardWorksheetSample(
             effectiveWorksheetObservedDate(cell, parsedComment),
             cell.numericValue(),
-            resolveMeasurementName(cell.metricName(), measurementBound),
+            measurementName,
             rowContext.facilityName(),
             rowContext.sublocation(),
             rowContext.systemType(),
@@ -204,6 +205,7 @@ final class LocationDashboardSampleImportPipeline {
             row == null ? null : row.pointOfUse(),
             row == null ? null : row.basis(),
             cell.rawValue(),
+            commentParser.unitForMeasurementName(measurementName),
             cell.cellReference(),
             parsedComment
         );
@@ -242,6 +244,7 @@ final class LocationDashboardSampleImportPipeline {
         }
 
         String measurementName = resolveMeasurementName(primaryCell.metricName(), measurementBound);
+        String units = commentParser.unitForMeasurementName(measurementName);
         List<LocationDashboardImportedSample> samples = new ArrayList<>();
         LocationDashboardCommentParser.ParsedCommentSample primarySample = parsedComment.primarySample();
         if (primarySample != null
@@ -262,6 +265,7 @@ final class LocationDashboardSampleImportPipeline {
                 row == null ? null : row.pointOfUse(),
                 row == null ? null : row.basis(),
                 primarySample.resultRaw(),
+                units,
                 primaryCell.cellReference(),
                 parsedComment,
                 primarySample,
@@ -297,6 +301,7 @@ final class LocationDashboardSampleImportPipeline {
                 row == null ? null : row.pointOfUse(),
                 row == null ? null : row.basis(),
                 sample.resultRaw(),
+                units,
                 primaryCell.cellReference(),
                 parsedComment,
                 sample,

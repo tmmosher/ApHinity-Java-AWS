@@ -52,6 +52,9 @@ public class LocationDashboardSample {
     @Column(name = "raw_value", columnDefinition = "text")
     private String rawValue;
 
+    @Column(name = "units", length = 64)
+    private String units;
+
     @Column(name = "sample_identity", nullable = false, length = 1024)
     private String sampleIdentity;
 
@@ -131,6 +134,14 @@ public class LocationDashboardSample {
 
     public void setRawValue(String rawValue) {
         this.rawValue = rawValue;
+    }
+
+    public String getUnits() {
+        return units;
+    }
+
+    public void setUnits(String units) {
+        this.units = units;
     }
 
     public String getSampleIdentity() {

@@ -405,11 +405,45 @@
   ],
   "measurementUnits": [
     {
-      "value": "CFU.mL",
+      "value": "CFU/mL",
       "aliases": [
         "CFU.ml",
         "CFU/mL",
         "CFU per mL"
+      ],
+      "for_measurement_names": [
+        "HPC",
+        "Endotoxin",
+        "Legionella"
+      ]
+    },
+    {
+      "value": "",
+      "aliases": [
+      ],
+      "for_measurement_names": [
+        "pH"
+      ]
+    },
+    {
+      "value": "μ mhos",
+      "aliases": [
+        "umhos",
+        "Umhos"
+      ],
+      "for_measurement_names": [
+        "Conductivity"
+      ]
+    },
+    {
+      "value": "ppm",
+      "aliases": [
+        "Parts per million",
+        "Ppm"
+      ],
+      "for_measurement_names": [
+        "Alkalinity",
+        "Hardness"
       ]
     }
   ]

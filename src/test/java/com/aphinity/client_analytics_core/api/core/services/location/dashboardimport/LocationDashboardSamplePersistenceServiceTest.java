@@ -87,6 +87,20 @@ class LocationDashboardSamplePersistenceServiceTest {
     }
 
     @Test
+    void persistsAnalyzedSampleUnits() {
+        Location location = new Location();
+        location.setId(10L);
+
+        List<LocationDashboardSample> persistedSamples = service.toPersistedSamples(location, List.of(
+            analyzedSample("HPC", "sample-1", "12", "CFU.mL", false, LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY)
+        ));
+
+        assertEquals(1, persistedSamples.size());
+        assertEquals("CFU.mL", persistedSamples.getFirst().getUnits());
+        assertEquals("CFU.mL", service.toAnalyzedSamplePoint(persistedSamples.getFirst()).units());
+    }
+
+    @Test
     @SuppressWarnings({"unchecked", "rawtypes"})
     void persistsCorrectiveActionFallbackSampleIdentityAsGeneratedForHistoricalMatching() {
         LocationDashboardSampleRepository repository = mock(LocationDashboardSampleRepository.class);
@@ -164,6 +178,17 @@ class LocationDashboardSamplePersistenceServiceTest {
         boolean compliant,
         LocationDashboardImportStrategy.SampleOrigin origin
     ) {
+        return analyzedSample(measurementName, sampleIdentity, rawValue, null, compliant, origin);
+    }
+
+    private LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample(
+        String measurementName,
+        String sampleIdentity,
+        String rawValue,
+        String units,
+        boolean compliant,
+        LocationDashboardImportStrategy.SampleOrigin origin
+    ) {
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             LocalDate.parse("2025-01-01"),
             "Irvine",
@@ -174,6 +199,7 @@ class LocationDashboardSamplePersistenceServiceTest {
             "POU 1",
             "Range",
             rawValue,
+            units,
             sampleIdentity,
             compliant,
             false,

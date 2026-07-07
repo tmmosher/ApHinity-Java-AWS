@@ -15,7 +15,7 @@ const graph: LocationGraph = {
         ["Sink 1"],
         ["HPC"],
         ["2026-06-15"],
-        ["12"],
+        ["12 CFU.mL"],
         [2]
       ]
     },
@@ -23,8 +23,8 @@ const graph: LocationGraph = {
       rowIdentifier: "newport|sink-1",
       caStatus: "Active",
       followUps: [
-        {date: "2026-06-20", value: "4"},
-        {date: "2026-06-25", value: "1"}
+        {date: "2026-06-20", value: "4 CFU.mL"},
+        {date: "2026-06-25", value: "1 CFU.mL"}
       ]
     }],
     meta: {renderer: "tabulator"}
@@ -57,9 +57,10 @@ describe("tabulatorGraph helpers", () => {
       facility: "Newport Beach",
       point_of_use: "Sink 1",
       measurement: "HPC",
+      value: "12 CFU.mL",
       followUps: [
-        {date: "2026-06-20", value: "4"},
-        {date: "2026-06-25", value: "1"}
+        {date: "2026-06-20", value: "4 CFU.mL"},
+        {date: "2026-06-25", value: "1 CFU.mL"}
       ]
     })]);
   });

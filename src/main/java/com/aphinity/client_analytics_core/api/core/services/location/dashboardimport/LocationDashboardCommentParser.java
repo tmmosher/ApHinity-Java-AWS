@@ -10,10 +10,8 @@ import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,14 +43,18 @@ final class LocationDashboardCommentParser {
             .toFormatter(Locale.US)
             .withResolverStyle(ResolverStyle.STRICT)
     );
-    private final MeasurementUnitDictionary measurementUnits;
+    private final LocationDashboardMeasurementUnitNormalizer measurementUnits;
 
     LocationDashboardCommentParser() {
         this(List.of());
     }
 
     LocationDashboardCommentParser(List<LocationDashboardImportStrategyConfig.MeasurementUnitConfig> measurementUnits) {
-        this.measurementUnits = new MeasurementUnitDictionary(measurementUnits);
+        this.measurementUnits = new LocationDashboardMeasurementUnitNormalizer(measurementUnits);
+    }
+
+    String unitForMeasurementName(String measurementName) {
+        return measurementUnits.forMeasurementName(measurementName);
     }
 
     /**
@@ -490,7 +492,7 @@ final class LocationDashboardCommentParser {
         if (rawUnit == null) {
             return null;
         }
-        return measurementUnits.resolve(rawUnit);
+        return rawUnit == null || rawUnit.isBlank() ? null : rawUnit.strip();
     }
 
     private String normalizeNumericPortion(String numericPortion) {
@@ -889,42 +891,6 @@ final class LocationDashboardCommentParser {
         String ordinal,
         ParsedMeasurement measurement
     ) {
-    }
-
-    private static final class MeasurementUnitDictionary {
-        private final Map<String, String> unitsByKey;
-
-        private MeasurementUnitDictionary(
-            List<LocationDashboardImportStrategyConfig.MeasurementUnitConfig> configuredUnits
-        ) {
-            Map<String, String> units = new LinkedHashMap<>();
-            for (LocationDashboardImportStrategyConfig.MeasurementUnitConfig configuredUnit
-                : configuredUnits == null ? List.<LocationDashboardImportStrategyConfig.MeasurementUnitConfig>of() : configuredUnits) {
-                if (configuredUnit == null || configuredUnit.value() == null || configuredUnit.value().isBlank()) {
-                    continue;
-                }
-                String canonicalUnit = configuredUnit.value().strip();
-                units.put(normalizeUnitKey(canonicalUnit), canonicalUnit);
-                for (String alias : configuredUnit.aliases()) {
-                    if (alias != null && !alias.isBlank()) {
-                        units.put(normalizeUnitKey(alias), canonicalUnit);
-                    }
-                }
-            }
-            this.unitsByKey = Map.copyOf(units);
-        }
-
-        private String resolve(String rawUnit) {
-            String normalized = rawUnit == null ? null : rawUnit.strip().replaceAll("[\\s\\p{Punct}]+$", "");
-            if (normalized == null || normalized.isBlank()) {
-                return null;
-            }
-            return unitsByKey.get(normalizeUnitKey(normalized));
-        }
-
-        private static String normalizeUnitKey(String value) {
-            return value == null ? "" : value.strip().toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Punct}]+", "");
-        }
     }
 
     private static final class MutableSample {

@@ -54,7 +54,7 @@ class LocationDashboardCommentParserTest {
         assertEquals(LocalDate.parse("2025-08-05"), parsed.primarySample().resultReceivedOn());
         assertEquals("10", parsed.primarySample().resultRaw());
         assertEquals(new BigDecimal("10"), parsed.primarySample().resultValue());
-        assertEquals("CFU.mL", parsed.primarySample().resultUnit());
+        assertEquals("CFU.ml", parsed.primarySample().resultUnit());
         assertEquals("Primary sample note", parsed.primarySample().notes().getFirst());
         assertEquals("Primary sample action", parsed.primarySample().correctiveActions().getFirst().text());
         assertEquals(1, parsed.followUpSamples().size());

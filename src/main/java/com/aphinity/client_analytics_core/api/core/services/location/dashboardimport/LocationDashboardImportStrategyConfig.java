@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.math.BigDecimal;
@@ -59,10 +60,17 @@ public record LocationDashboardImportStrategyConfig(
 
     public record MeasurementUnitConfig(
         String value,
-        List<String> aliases
+        List<String> aliases,
+        @JsonProperty("for_measurement_names")
+        List<String> forMeasurementNames
     ) {
         public MeasurementUnitConfig {
             aliases = aliases == null ? List.of() : List.copyOf(aliases);
+            forMeasurementNames = forMeasurementNames == null ? List.of() : List.copyOf(forMeasurementNames);
+        }
+
+        public MeasurementUnitConfig(String value, List<String> aliases) {
+            this(value, aliases, List.of());
         }
     }
 

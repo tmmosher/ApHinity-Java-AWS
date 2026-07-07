@@ -121,6 +121,7 @@ final class LocationDashboardHistoricalDataAssembler {
                 identityValues,
                 analyzedSample.measurementName(),
                 analyzedSample.rawValue(),
+                analyzedSample.units(),
                 analyzedSample.compliant(),
                 analyzedSample.resolved()
             ));

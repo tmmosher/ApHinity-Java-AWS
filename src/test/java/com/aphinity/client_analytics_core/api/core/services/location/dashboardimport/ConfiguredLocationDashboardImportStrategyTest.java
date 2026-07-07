@@ -1107,6 +1107,22 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportAssignsUnitsFromMeasurementConfig() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbookWithCommentAndPrimaryValue("Routine note only", new BigDecimal("8"), "8", "F5"),
+            measurementBounds()
+        );
+
+        assertEquals("CFU/mL", result.analyzedSamples().stream()
+            .filter(sample -> "HPC".equals(sample.measurementName()))
+            .findFirst()
+            .orElseThrow()
+            .units());
+    }
+
+    @Test
     void computeImportResolvesHoagWorkbookBuildingAliasesAndDirectSystems() {
         ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
             new LocationDashboardImportStrategyConfig(
@@ -1880,7 +1896,13 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     )
                 ),
                 List.of(),
-                List.of()
+                List.of(),
+                List.of(),
+                List.of(new LocationDashboardImportStrategyConfig.MeasurementUnitConfig(
+                    "CFU/mL",
+                    List.of(),
+                    List.of("HPC", "Endotoxin")
+                ))
             )
         );
     }

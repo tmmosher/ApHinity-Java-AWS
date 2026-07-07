@@ -60,6 +60,18 @@ const withInteractiveColumns = (columns: TabulatorColumnDefinition[]): Tabulator
     };
   });
 
+const formatStatusRows = (row: {getData: () => Record<string, unknown>; getElement: () => HTMLElement}) => {
+  const status = String(row.getData().caStatus ?? "");
+  const element = row.getElement();
+  element.classList.remove("aphinity-ca-active-row", "aphinity-ca-resolved-row");
+  if (status === "Active") {
+    element.classList.add("aphinity-ca-active-row");
+  }
+  if (status === "Resolved") {
+    element.classList.add("aphinity-ca-resolved-row");
+  }
+};
+
 const toPositiveInteger = (value: unknown, fallback: number): number => {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return fallback;
@@ -129,6 +141,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
         paginationSize: DEFAULT_PAGE_SIZE,
         paginationSizeSelector: PAGE_SIZE_SELECTOR,
         paginationCounter: "rows",
+        rowFormatter: formatStatusRows,
         ajaxURL: canUseRemotePagination() ? "dashboard-table-page" : undefined,
         ajaxRequestFunc: async (_url, _config, params) => {
           const page = await loadPage(
@@ -167,7 +180,12 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
     table = null;
   });
 
-  return <div ref={host} class={props.class} />;
+  return (
+    <div
+      ref={host}
+      class={"[&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content " + (props.class ?? "")}
+    />
+  );
 };
 
 export default TabulatorGraph;

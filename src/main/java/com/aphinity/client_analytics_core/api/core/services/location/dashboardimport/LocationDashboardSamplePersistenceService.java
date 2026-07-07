@@ -156,6 +156,7 @@ public class LocationDashboardSamplePersistenceService {
             persistedSample.setSystemTypeName(truncate(analyzedSample.systemTypeName(), 256));
             persistedSample.setMeasurementName(truncate(analyzedSample.measurementName(), 256));
             persistedSample.setRawValue(truncate(analyzedSample.rawValue(), MAX_TEXT_LENGTH));
+            persistedSample.setUnits(truncate(analyzedSample.units(), 64));
             persistedSample.setSampleIdentity(truncate(sampleIdentity, MAX_TEXT_LENGTH));
             persistedSample.setCompliant(analyzedSample.compliant());
             persistedSample.setResolved(analyzedSample.resolved());
@@ -481,6 +482,7 @@ public class LocationDashboardSamplePersistenceService {
             identity.pointOfUse(),
             identity.basis(),
             sample.getRawValue(),
+            sample.getUnits(),
             rehydratedSampleIdentity(sample.getSampleIdentity()),
             sample.isCompliant(),
             sample.isResolved(),

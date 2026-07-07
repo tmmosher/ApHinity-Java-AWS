@@ -780,6 +780,7 @@ final class LocationDashboardDerivedGraphSupport {
         Map<String, String> identityValues,
         String measurementName,
         String rawValue,
+        String units,
         boolean compliant,
         boolean resolved
     ) {
@@ -941,7 +942,9 @@ final class LocationDashboardDerivedGraphSupport {
         private final Map<String, String> identityValues;
         private final LocalDate observedDate;
         private final String measurementName;
+        private final String sourceRawValue;
         private final String rawValue;
+        private final String units;
         private final boolean compliant;
         private final boolean resolved;
         private final List<Map<String, Object>> followUps = new ArrayList<>();
@@ -951,7 +954,9 @@ final class LocationDashboardDerivedGraphSupport {
             Map<String, String> identityValues,
             LocalDate observedDate,
             String measurementName,
+            String sourceRawValue,
             String rawValue,
+            String units,
             boolean compliant,
             boolean resolved
         ) {
@@ -959,7 +964,9 @@ final class LocationDashboardDerivedGraphSupport {
             this.identityValues = identityValues == null ? Map.of() : Map.copyOf(identityValues);
             this.observedDate = observedDate;
             this.measurementName = measurementName;
+            this.sourceRawValue = sourceRawValue;
             this.rawValue = rawValue;
+            this.units = units;
             this.compliant = compliant;
             this.resolved = resolved;
         }
@@ -970,7 +977,9 @@ final class LocationDashboardDerivedGraphSupport {
                 sample.identityValues(),
                 sample.observedDate(),
                 sample.measurementName(),
-                displayValue(sample.rawValue()),
+                sample.rawValue(),
+                displayValue(sample.rawValue(), sample.units()),
+                sample.units(),
                 sample.compliant(),
                 sample.resolved()
             );
@@ -982,7 +991,7 @@ final class LocationDashboardDerivedGraphSupport {
             }
             addFollowUp(Map.of(
                 "date", String.valueOf(sample.observedDate()),
-                "value", displayValue(sample.rawValue())
+                "value", displayValue(sample.rawValue(), sample.units())
             ));
         }
 
@@ -1012,6 +1021,10 @@ final class LocationDashboardDerivedGraphSupport {
             return rawValue;
         }
 
+        String units() {
+            return units == null ? "" : units;
+        }
+
         String caStatus() {
             if (compliant) {
                 return "No CA Required";
@@ -1037,14 +1050,20 @@ final class LocationDashboardDerivedGraphSupport {
                 rowIdentifier,
                 identityValues,
                 measurementName,
-                rawValue,
+                sourceRawValue,
+                units,
                 compliant,
                 resolved
             );
         }
 
-        private static String displayValue(String rawValue) {
-            return rawValue == null || rawValue.isBlank() ? "" : rawValue.strip();
+        private static String displayValue(String rawValue, String units) {
+            String value = rawValue == null || rawValue.isBlank() ? "" : rawValue.strip();
+            String normalizedUnits = units == null || units.isBlank() ? "" : units.strip();
+            if (value.isBlank()) {
+                return normalizedUnits;
+            }
+            return normalizedUnits.isBlank() ? value : value + " " + normalizedUnits;
         }
     }
 }
