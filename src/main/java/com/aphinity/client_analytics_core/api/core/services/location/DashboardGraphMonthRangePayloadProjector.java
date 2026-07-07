@@ -74,7 +74,8 @@ public final class DashboardGraphMonthRangePayloadProjector {
             return layout;
         }
         LocalDate displayStart = monthRange.displayWindowStartInclusive(anchorDate);
-        if (displayStart == null) {
+        LocalDate displayEnd = monthRange.displayWindowEndInclusive(anchorDate);
+        if (displayStart == null || displayEnd == null) {
             return layout;
         }
 
@@ -83,7 +84,7 @@ public final class DashboardGraphMonthRangePayloadProjector {
         Map<String, Object> xAxis = rawXAxis instanceof Map<?, ?> rawMap
             ? copyMap(rawMap)
             : new LinkedHashMap<>();
-        xAxis.put("range", List.of(displayStart.toString(), anchorDate.toString()));
+        xAxis.put("range", List.of(displayStart.toString(), displayEnd.toString()));
         xAxis.putIfAbsent("type", "date");
         xAxis.putIfAbsent("automargin", true);
         projectedLayout.put("xaxis", xAxis);

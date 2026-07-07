@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 class DashboardGraphMonthRangePayloadProjectorTest {
     private static final LocalDate ANCHOR_DATE = LocalDate.of(2026, 6, 23);
+    private static final LocalDate MID_MONTH_ANCHOR_DATE = LocalDate.of(2026, 6, 15);
 
     @Test
     void projectFiltersDateBackedTimeSeriesTracesToMonthWindow() {
@@ -27,8 +28,8 @@ class DashboardGraphMonthRangePayloadProjectorTest {
             ANCHOR_DATE
         );
 
-        assertEquals(List.of("2026-05-01", "2026-06-20"), projectedPayload.getFirst().get("x"));
-        assertEquals(List.of(90, 95), projectedPayload.getFirst().get("y"));
+        assertEquals(List.of("2026-04-30", "2026-05-01", "2026-06-20"), projectedPayload.getFirst().get("x"));
+        assertEquals(List.of(80, 90, 95), projectedPayload.getFirst().get("y"));
     }
 
     @Test
@@ -56,12 +57,12 @@ class DashboardGraphMonthRangePayloadProjectorTest {
         );
 
         assertEquals(
-            List.of("2026-05-01T00:00:00Z", "2026-06-20T12:30:00Z"),
+            List.of("2026-04-30T00:00:00Z", "2026-05-01T00:00:00Z", "2026-06-20T12:30:00Z"),
             projectedPayload.getFirst().get("x")
         );
-        assertEquals(List.of(90, 95), projectedPayload.getFirst().get("y"));
+        assertEquals(List.of(80, 90, 95), projectedPayload.getFirst().get("y"));
         assertEquals(
-            List.of(Map.of("sampleCount", 2), Map.of("sampleCount", 3)),
+            List.of(Map.of("sampleCount", 1), Map.of("sampleCount", 2), Map.of("sampleCount", 3)),
             projectedPayload.getFirst().get("customdata")
         );
     }
@@ -71,17 +72,17 @@ class DashboardGraphMonthRangePayloadProjectorTest {
         Map<String, Object> trace = Map.of(
             "type", "scatter",
             "name", "Compliance",
-            "x", List.of("2026-03-31", "2026-04-01", "2026-05-01", "2026-06-20"),
-            "y", List.of(70, 80, 90, 95)
+            "x", List.of("2026-01-31", "2026-02-01", "2026-03-01", "2026-05-01", "2026-06-20"),
+            "y", List.of(60, 70, 80, 90, 95)
         );
 
         List<Map<String, Object>> projectedPayload = DashboardGraphMonthRangePayloadProjector.project(
             List.of(trace),
             new DashboardGraphMonthRange(3),
-            ANCHOR_DATE
+            MID_MONTH_ANCHOR_DATE
         );
 
-        assertEquals(List.of("2026-03-31", "2026-04-01", "2026-05-01", "2026-06-20"), projectedPayload.getFirst().get("x"));
+        assertEquals(List.of("2026-02-01", "2026-03-01", "2026-05-01", "2026-06-20"), projectedPayload.getFirst().get("x"));
         assertEquals(List.of(70, 80, 90, 95), projectedPayload.getFirst().get("y"));
     }
 
@@ -96,14 +97,14 @@ class DashboardGraphMonthRangePayloadProjectorTest {
         Map<String, Object> projectedLayout = DashboardGraphMonthRangePayloadProjector.projectLayout(
             Map.of("xaxis", Map.of("title", "Observed At")),
             new DashboardGraphMonthRange(3),
-            ANCHOR_DATE,
+            MID_MONTH_ANCHOR_DATE,
             projectedPayload
         );
 
         assertEquals(
             Map.of(
                 "title", "Observed At",
-                "range", List.of("2026-04-01", "2026-06-23"),
+                "range", List.of("2026-02-24", "2026-06-15"),
                 "type", "date",
                 "automargin", true
             ),
