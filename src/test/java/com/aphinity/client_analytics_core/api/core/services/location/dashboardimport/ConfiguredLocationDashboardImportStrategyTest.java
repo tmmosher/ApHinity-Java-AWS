@@ -112,6 +112,79 @@ class ConfiguredLocationDashboardImportStrategyTest {
     }
 
     @Test
+    void computeImportScopesCommentSampleIdentitiesToTheirSourceRow() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+
+        String workbookComment = workbookComment(new LocationDashboardCommentFixtures.WorkbookCommentSpec(
+            "Cooling Tower Sample Port",
+            sample(
+                LocalDate.parse("2025-08-15"),
+                LocalDate.parse("2025-08-20"),
+                "33 CFU.mL",
+                new BigDecimal("33"),
+                "CFU.mL"
+            ),
+            List.of(),
+            List.of(),
+            List.of()
+        ));
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        5,
+                        "Newport Beach",
+                        "Hospital",
+                        "Cooling Towers",
+                        "Recirc Line",
+                        "CTI/514P",
+                        List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "HPC",
+                            LocalDate.parse("2025-08-01"),
+                            "8",
+                            new BigDecimal("8"),
+                            workbookComment,
+                            "F5"
+                        ))
+                    ),
+                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                        6,
+                        null,
+                        null,
+                        "Cooling Towers",
+                        "Basin",
+                        "CTI/514P",
+                        List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                            "HPC",
+                            LocalDate.parse("2025-08-01"),
+                            "7",
+                            new BigDecimal("7"),
+                            workbookComment,
+                            "F6"
+                        ))
+                    )
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        List<String> commentPrimaryIdentities = result.analyzedSamples().stream()
+            .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY)
+            .map(LocationDashboardImportStrategy.AnalyzedSamplePoint::sampleIdentity)
+            .toList();
+
+        assertEquals(2, commentPrimaryIdentities.size());
+        assertEquals(2L, commentPrimaryIdentities.stream().distinct().count());
+        assertTrue(commentPrimaryIdentities.stream().anyMatch(identity -> identity.contains("|F5|")));
+        assertTrue(commentPrimaryIdentities.stream().anyMatch(identity -> identity.contains("|F6|")));
+    }
+
+    @Test
     void computeImportCreatesCorrectiveActionsForOutOfSpecWorkbookCommentSamples() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
 

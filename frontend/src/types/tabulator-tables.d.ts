@@ -25,6 +25,10 @@ declare module "tabulator-tables" {
     reactiveData?: boolean;
     placeholder?: string;
     index?: string;
+    pagination?: boolean | "local" | "remote";
+    paginationSize?: number;
+    paginationSizeSelector?: number[];
+    paginationCounter?: "rows" | "pages";
   };
 
   export class TabulatorFull {

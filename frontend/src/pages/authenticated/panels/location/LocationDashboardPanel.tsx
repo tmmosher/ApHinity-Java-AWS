@@ -139,7 +139,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
             </section>
           }
         >
-          <div class="flex flex-row flex-wrap items-start gap-4">
+          <div class="gap-4 [column-width:42rem]">
             <For each={orderedSections()}>
               {(section) => (
                 <LocationDashboardSection

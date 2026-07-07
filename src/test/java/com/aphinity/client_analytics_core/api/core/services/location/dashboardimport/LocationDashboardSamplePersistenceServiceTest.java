@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -46,7 +45,7 @@ class LocationDashboardSamplePersistenceServiceTest {
         assertEquals(2, rehydratedSamples.stream().filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET).count());
         assertTrue(rehydratedSamples.stream()
             .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET)
-            .allMatch(sample -> sample.sampleIdentity() == null));
+            .allMatch(sample -> sample.sampleIdentity() != null));
         assertEquals("comment-sample-1", rehydratedSamples.stream()
             .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY)
             .findFirst()
@@ -55,20 +54,22 @@ class LocationDashboardSamplePersistenceServiceTest {
     }
 
     @Test
-    void rehydratesGeneratedIdentityAsNullForAnalysisMatching() {
+    void rehydratesGeneratedIdentityFieldsFromSampleIdentity() {
         LocationDashboardSample sample = new LocationDashboardSample();
         sample.setObservedDate(LocalDate.parse("2025-01-01"));
-        sample.setFacilityName("Irvine");
-        sample.setSystemName("Critical SPD");
         sample.setMeasurementName("HPC");
         sample.setRawValue("<1");
-        sample.setSampleIdentity("__generated__|2025-01-01|irvine||||hpc|||WORKSHEET|1");
+        sample.setSampleIdentity("__generated__|2025-01-01|Irvine||Critical SPD|Critical SPD|HPC|POU 1|Range|WORKSHEET|1");
         sample.setCompliant(false);
         sample.setOrigin(LocationDashboardImportStrategy.SampleOrigin.WORKSHEET.name());
 
         LocationDashboardImportStrategy.AnalyzedSamplePoint rehydratedSample = service.toAnalyzedSamplePoint(sample);
 
-        assertNull(rehydratedSample.sampleIdentity());
+        assertEquals("__generated__|2025-01-01|Irvine||Critical SPD|Critical SPD|HPC|POU 1|Range|WORKSHEET|1", rehydratedSample.sampleIdentity());
+        assertEquals("Irvine", rehydratedSample.facilityName());
+        assertEquals("Critical SPD", rehydratedSample.systemName());
+        assertEquals("POU 1", rehydratedSample.pointOfUse());
+        assertEquals("Range", rehydratedSample.basis());
         assertEquals("<1", rehydratedSample.rawValue());
     }
 
@@ -127,29 +128,10 @@ class LocationDashboardSamplePersistenceServiceTest {
             .startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX));
         LocationDashboardImportStrategy.AnalyzedSamplePoint rehydratedSample =
             persistenceService.toAnalyzedSamplePoint(correctiveActionSample);
-        assertNull(rehydratedSample.sampleIdentity());
-        assertEquals(
-            LocationDashboardCorrectiveActionMetadataSupport.identityKey(
-                "HPC",
-                LocalDate.parse("2025-01-01"),
-                "Irvine",
-                null,
-                "Critical SPD",
-                null,
-                null,
-                null
-            ),
-            LocationDashboardCorrectiveActionMetadataSupport.identityKey(
-                rehydratedSample.measurementName(),
-                rehydratedSample.observedDate(),
-                rehydratedSample.facilityName(),
-                rehydratedSample.buildingName(),
-                rehydratedSample.systemName(),
-                rehydratedSample.pointOfUse(),
-                rehydratedSample.basis(),
-                rehydratedSample.sampleIdentity()
-            )
-        );
+        assertTrue(rehydratedSample.sampleIdentity()
+            .startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX));
+        assertEquals("HPC", rehydratedSample.measurementName());
+        assertEquals(LocalDate.parse("2025-01-01"), rehydratedSample.observedDate());
     }
 
     private LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample(

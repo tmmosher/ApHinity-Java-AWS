@@ -132,17 +132,7 @@ final class LocationDashboardHistoricalDataAssembler {
         AnalyzedSamplePoint sample,
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
     ) {
-        Map<String, String> sampleIdentityValues = identityValuesFromSampleIdentity(sample, identityPattern);
-        if (!sampleIdentityValues.isEmpty()) {
-            return sampleIdentityValues;
-        }
-        Map<String, String> values = new LinkedHashMap<>();
-        putIfPresent(values, "facility", sample.facilityName());
-        putIfPresent(values, "building", sample.buildingName());
-        putIfPresent(values, "system", sample.systemName());
-        putIfPresent(values, "pointOfUse", sample.pointOfUse());
-        putIfPresent(values, "basis", sample.basis());
-        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+        return identityValuesFromSampleIdentity(sample, identityPattern);
     }
 
     private Map<String, String> identityValuesFromSampleIdentity(
@@ -153,11 +143,7 @@ final class LocationDashboardHistoricalDataAssembler {
             return Map.of();
         }
         List<String> tokens = List.of(sample.sampleIdentity().split("\\|", -1));
-        Map<String, Integer> tokenIndexesByIdentityColumn = sample.sampleIdentity().startsWith(
-            LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX
-        )
-            ? generatedSampleIdentityIndexes()
-            : worksheetSampleIdentityIndexes();
+        Map<String, Integer> tokenIndexesByIdentityColumn = sampleIdentityIndexes(sample.sampleIdentity());
         Map<String, String> values = new LinkedHashMap<>();
         for (LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn : effectiveIdentityPattern(identityPattern)) {
             if (identityColumn == null || identityColumn.column() == null || identityColumn.column().isBlank()) {
@@ -170,6 +156,23 @@ final class LocationDashboardHistoricalDataAssembler {
             putIfPresent(values, identityColumn.column(), tokens.get(tokenIndex));
         }
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+    }
+
+    private Map<String, Integer> sampleIdentityIndexes(String sampleIdentity) {
+        if (sampleIdentity == null) {
+            return Map.of();
+        }
+        if (sampleIdentity.startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX)) {
+            return generatedSampleIdentityIndexes();
+        }
+        if (sampleIdentity.startsWith("primary-sample|")
+            || sampleIdentity.startsWith("supplemental-sample-")) {
+            return commentSampleIdentityIndexes();
+        }
+        if (sampleIdentity.startsWith("observation|")) {
+            return observationSampleIdentityIndexes();
+        }
+        return worksheetSampleIdentityIndexes();
     }
 
     private List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> effectiveIdentityPattern(
@@ -203,6 +206,22 @@ final class LocationDashboardHistoricalDataAssembler {
             "system", 4,
             "pointOfUse", 7,
             "basis", 8
+        );
+    }
+
+    private Map<String, Integer> commentSampleIdentityIndexes() {
+        return Map.of(
+            "facility", 1,
+            "building", 2,
+            "system", 3,
+            "pointOfUse", 5,
+            "basis", 6
+        );
+    }
+
+    private Map<String, Integer> observationSampleIdentityIndexes() {
+        return Map.of(
+            "facility", 2
         );
     }
 

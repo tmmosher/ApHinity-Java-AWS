@@ -43,26 +43,11 @@ public class LocationDashboardSample {
     @Column(name = "observed_date", nullable = false)
     private LocalDate observedDate;
 
-    @Column(name = "facility_name", length = 256)
-    private String facilityName;
-
-    @Column(name = "building_name", length = 256)
-    private String buildingName;
-
-    @Column(name = "system_name", length = 256)
-    private String systemName;
-
     @Column(name = "system_type_name", length = 256)
     private String systemTypeName;
 
     @Column(name = "measurement_name", nullable = false, length = 256)
     private String measurementName;
-
-    @Column(name = "point_of_use", length = 512)
-    private String pointOfUse;
-
-    @Column(name = "basis", length = 1024)
-    private String basis;
 
     @Column(name = "raw_value", columnDefinition = "text")
     private String rawValue;
@@ -124,30 +109,6 @@ public class LocationDashboardSample {
         this.observedDate = observedDate;
     }
 
-    public String getFacilityName() {
-        return facilityName;
-    }
-
-    public void setFacilityName(String facilityName) {
-        this.facilityName = facilityName;
-    }
-
-    public String getBuildingName() {
-        return buildingName;
-    }
-
-    public void setBuildingName(String buildingName) {
-        this.buildingName = buildingName;
-    }
-
-    public String getSystemName() {
-        return systemName;
-    }
-
-    public void setSystemName(String systemName) {
-        this.systemName = systemName;
-    }
-
     public String getSystemTypeName() {
         return systemTypeName;
     }
@@ -162,22 +123,6 @@ public class LocationDashboardSample {
 
     public void setMeasurementName(String measurementName) {
         this.measurementName = measurementName;
-    }
-
-    public String getPointOfUse() {
-        return pointOfUse;
-    }
-
-    public void setPointOfUse(String pointOfUse) {
-        this.pointOfUse = pointOfUse;
-    }
-
-    public String getBasis() {
-        return basis;
-    }
-
-    public void setBasis(String basis) {
-        this.basis = basis;
     }
 
     public String getRawValue() {

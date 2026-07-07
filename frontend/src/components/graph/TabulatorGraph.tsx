@@ -73,7 +73,11 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
         layout: "fitDataStretch",
         height: "100%",
         placeholder: "No recent sample measurements",
-        index: "rowIdentifier"
+        index: "rowIdentifier",
+        pagination: "local",
+        paginationSize: 10,
+        paginationSizeSelector: [10, 25, 50, 100],
+        paginationCounter: "rows"
       });
     });
   });

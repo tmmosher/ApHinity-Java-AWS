@@ -266,7 +266,14 @@ final class LocationDashboardSampleImportPipeline {
                 parsedComment,
                 primarySample,
                 "Primary Sample",
-                buildCommentSampleIdentity("primary-sample", primarySample)
+                buildCommentSampleIdentity(
+                    "primary-sample",
+                    primarySample,
+                    primaryCell,
+                    row,
+                    rowContext,
+                    measurementName
+                )
             ));
         }
 
@@ -294,7 +301,14 @@ final class LocationDashboardSampleImportPipeline {
                 parsedComment,
                 sample,
                 "Supplemental Sample " + sampleIndex,
-                buildCommentSampleIdentity("supplemental-sample-" + sampleIndex, sample)
+                buildCommentSampleIdentity(
+                    "supplemental-sample-" + sampleIndex,
+                    sample,
+                    primaryCell,
+                    row,
+                    rowContext,
+                    measurementName
+                )
             ));
             sampleIndex += 1;
         }
@@ -430,10 +444,21 @@ final class LocationDashboardSampleImportPipeline {
 
     private String buildCommentSampleIdentity(
         String sampleKind,
-        LocationDashboardCommentParser.ParsedCommentSample sample
+        LocationDashboardCommentParser.ParsedCommentSample sample,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
+        LocationDashboardImportContextResolver.RowImportContext rowContext,
+        String measurementName
     ) {
         return String.join("|", List.of(
             nullSafe(sampleKind),
+            nullSafe(rowContext == null ? null : rowContext.facilityName()),
+            nullSafe(rowContext == null ? null : rowContext.resolvedBuilding()),
+            nullSafe(rowContext == null ? null : rowContext.resolvedSystem()),
+            nullSafe(measurementName),
+            nullSafe(row == null ? null : row.pointOfUse()),
+            nullSafe(row == null ? null : row.basis()),
+            nullSafe(primaryCell == null ? null : primaryCell.cellReference()),
             nullSafe(String.valueOf(sample == null ? null : sample.sampledOn())),
             nullSafe(String.valueOf(sample == null ? null : sample.resultReceivedOn())),
             nullSafe(sample == null ? null : sample.resultRaw())
