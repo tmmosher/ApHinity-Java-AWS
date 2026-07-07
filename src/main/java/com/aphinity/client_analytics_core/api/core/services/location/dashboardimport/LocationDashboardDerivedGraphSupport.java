@@ -31,7 +31,7 @@ final class LocationDashboardDerivedGraphSupport {
     private static final String UNKNOWN_FACILITY_LABEL = "Unknown Facility";
     private static final String UNKNOWN_SYSTEM_TYPE_LABEL = "Unknown System Type";
     private static final String UNKNOWN_CATEGORY_LABEL = "Unknown Category";
-    private static final List<String> TURNAROUND_BUCKETS = List.of("< 3 days", "< 1 week", "< 1 month", "< 3 months");
+    private static final List<String> TURNAROUND_BUCKETS = List.of("< 1 week", "< 2 weeks", "< 1 month", "< 3 months");
     private static final ZoneId DASHBOARD_TIME_ZONE = ZoneId.of("America/Phoenix");
 
     private LocationDashboardDerivedGraphSupport() {
@@ -443,11 +443,11 @@ final class LocationDashboardDerivedGraphSupport {
             return null;
         }
         long turnaroundDays = Math.max(0L, nonConformance.turnaroundDays());
-        if (turnaroundDays < 3L) {
-            return "< 3 days";
-        }
         if (turnaroundDays < 7L) {
             return "< 1 week";
+        }
+        if (turnaroundDays < 14L) {
+            return "< 2 weeks";
         }
         if (turnaroundDays < 31L) {
             return "< 1 month";

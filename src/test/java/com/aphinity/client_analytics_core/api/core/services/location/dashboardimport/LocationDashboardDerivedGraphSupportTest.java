@@ -11,6 +11,43 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LocationDashboardDerivedGraphSupportTest {
     @Test
+    void buildsTurnaroundTimeGraphWithTwoWeekBucket() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                    LocalDate.parse("2026-06-01"),
+                    "Newport Beach",
+                    null,
+                    null,
+                    "HPC",
+                    "Sink 1",
+                    null,
+                    "row-hpc",
+                    true,
+                    10L
+                )),
+                List.of()
+            );
+
+        List<Map<String, Object>> payload = LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "non-conformance-status-by-turnaround-time",
+                "Non-Conformance Status",
+                "Turnaround Time",
+                LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME,
+                "bar"
+            ),
+            new Graph(),
+            historicalData,
+            List.of()
+        );
+
+        assertEquals(List.of(1L), payload.getFirst().get("x"));
+        assertEquals(List.of("< 2 weeks"), payload.getFirst().get("y"));
+    }
+
+    @Test
     void buildsRecentSampleMeasurementsTableFromIdentityPatternAndLatestMonthlySamples() {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
