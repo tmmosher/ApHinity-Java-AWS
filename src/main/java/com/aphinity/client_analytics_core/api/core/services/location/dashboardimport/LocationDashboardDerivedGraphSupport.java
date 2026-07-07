@@ -222,17 +222,19 @@ final class LocationDashboardDerivedGraphSupport {
                 continue;
             }
             RecentSampleRow current = rowsByIdentifier.get(rowIdentifier);
-            if (current == null || sample.observedDate().isAfter(current.observedDate())) {
-                RecentSampleRow next = RecentSampleRow.from(sample);
-                if (current != null && sameMonth(sample.observedDate(), current.observedDate())) {
-                    next.addMonthlyMeasurement(current.toHistoricalRawSample());
-                    current.followUps().forEach(next::addFollowUp);
-                }
-                rowsByIdentifier.put(rowIdentifier, next);
+            if (current == null) {
+                rowsByIdentifier.put(rowIdentifier, RecentSampleRow.from(sample));
                 continue;
             }
             if (sameMonth(sample.observedDate(), current.observedDate())) {
-                current.addMonthlyMeasurement(sample);
+                if (sample.observedDate().isAfter(current.observedDate())) {
+                    current.addMonthlyMeasurement(sample);
+                    continue;
+                }
+                RecentSampleRow next = RecentSampleRow.from(sample);
+                next.addMonthlyMeasurement(current.toHistoricalRawSample());
+                current.followUps().forEach(next::addFollowUp);
+                rowsByIdentifier.put(rowIdentifier, next);
             }
         }
 
@@ -246,7 +248,6 @@ final class LocationDashboardDerivedGraphSupport {
         headers.add("Measurement");
         headers.add("Observed");
         headers.add("Value");
-        headers.add("CA Status");
         headers.add("Follow-ups");
 
         List<String> fields = headers.stream()
@@ -263,7 +264,6 @@ final class LocationDashboardDerivedGraphSupport {
             tableRow.put(fields.get(fieldIndex++), row.measurementName());
             tableRow.put(fields.get(fieldIndex++), String.valueOf(row.observedDate()));
             tableRow.put(fields.get(fieldIndex++), row.rawValue());
-            tableRow.put(fields.get(fieldIndex++), row.caStatus());
             tableRow.put(fields.get(fieldIndex), row.followUps().isEmpty() ? "" : row.followUps().size());
             tableRow.put("rowIdentifier", row.rowIdentifier());
             tableRow.put("caStatus", row.caStatus());

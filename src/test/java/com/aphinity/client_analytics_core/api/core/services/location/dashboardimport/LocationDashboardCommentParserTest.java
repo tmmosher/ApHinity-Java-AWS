@@ -15,7 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class LocationDashboardCommentParserTest {
     @Test
     void parseWorkbookCommentPromotesPrimarySampleAndPreservesSupplementalSamples() {
-        LocationDashboardCommentParser parser = new LocationDashboardCommentParser();
+        LocationDashboardCommentParser parser = new LocationDashboardCommentParser(List.of(
+            new LocationDashboardImportStrategyConfig.MeasurementUnitConfig(
+                "CFU.mL",
+                List.of("CFU.ml")
+            )
+        ));
 
         LocationDashboardCommentParser.ParsedComment parsed = parser.parse(workbookComment(
             new LocationDashboardCommentFixtures.WorkbookCommentSpec(
@@ -23,9 +28,9 @@ class LocationDashboardCommentParserTest {
                 sample(
                     LocalDate.parse("2025-08-01"),
                     LocalDate.parse("2025-08-05"),
-                    "10 CFU.mL",
+                    "10 CFU.ml",
                     new BigDecimal("10"),
-                    "CFU.mL",
+                    "CFU.ml",
                     List.of("Primary sample note"),
                     List.of(correctiveAction("Primary sample action"))
                 ),
@@ -47,6 +52,7 @@ class LocationDashboardCommentParserTest {
         assertEquals("Cooling Tower Sample Port", parsed.sampleLocation());
         assertEquals(LocalDate.parse("2025-08-01"), parsed.primarySample().sampledOn());
         assertEquals(LocalDate.parse("2025-08-05"), parsed.primarySample().resultReceivedOn());
+        assertEquals("10", parsed.primarySample().resultRaw());
         assertEquals(new BigDecimal("10"), parsed.primarySample().resultValue());
         assertEquals("CFU.mL", parsed.primarySample().resultUnit());
         assertEquals("Primary sample note", parsed.primarySample().notes().getFirst());
@@ -54,6 +60,7 @@ class LocationDashboardCommentParserTest {
         assertEquals(1, parsed.followUpSamples().size());
         assertEquals(LocalDate.parse("2025-08-15"), parsed.followUpSamples().getFirst().sampledOn());
         assertEquals(LocalDate.parse("2025-08-20"), parsed.followUpSamples().getFirst().resultReceivedOn());
+        assertEquals("5", parsed.followUpSamples().getFirst().resultRaw());
         assertEquals(new BigDecimal("5"), parsed.followUpSamples().getFirst().resultValue());
         assertEquals("CFU.mL", parsed.followUpSamples().getFirst().resultUnit());
         assertEquals("Follow-up sample note", parsed.followUpSamples().getFirst().notes().getFirst());

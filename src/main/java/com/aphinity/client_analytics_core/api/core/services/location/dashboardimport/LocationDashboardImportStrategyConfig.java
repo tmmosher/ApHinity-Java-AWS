@@ -17,10 +17,24 @@ public record LocationDashboardImportStrategyConfig(
     List<GraphConfig> graphs,
     List<DerivedGraphConfig> derivedGraphs,
     List<SystemTypeAliasConfig> systemTypeAliases,
-    List<SpreadsheetIdentityColumn> identityPattern
+    List<SpreadsheetIdentityColumn> identityPattern,
+    List<MeasurementUnitConfig> measurementUnits
 ) {
     public LocationDashboardImportStrategyConfig {
         identityPattern = identityPattern == null ? List.of() : List.copyOf(identityPattern);
+        measurementUnits = measurementUnits == null ? List.of() : List.copyOf(measurementUnits);
+    }
+
+    public LocationDashboardImportStrategyConfig(
+        String locationName,
+        List<SublocationConfig> sublocations,
+        List<SystemTypeConfig> systems,
+        List<GraphConfig> graphs,
+        List<DerivedGraphConfig> derivedGraphs,
+        List<SystemTypeAliasConfig> systemTypeAliases,
+        List<SpreadsheetIdentityColumn> identityPattern
+    ) {
+        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases, identityPattern, List.of());
     }
 
     public LocationDashboardImportStrategyConfig(
@@ -31,7 +45,7 @@ public record LocationDashboardImportStrategyConfig(
         List<DerivedGraphConfig> derivedGraphs,
         List<SystemTypeAliasConfig> systemTypeAliases
     ) {
-        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases, List.of());
+        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases, List.of(), List.of());
     }
 
     public record SpreadsheetIdentityColumn(
@@ -39,6 +53,15 @@ public record LocationDashboardImportStrategyConfig(
         List<String> aliases
     ) {
         public SpreadsheetIdentityColumn {
+            aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        }
+    }
+
+    public record MeasurementUnitConfig(
+        String value,
+        List<String> aliases
+    ) {
+        public MeasurementUnitConfig {
             aliases = aliases == null ? List.of() : List.copyOf(aliases);
         }
     }

@@ -10,8 +10,10 @@ import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +42,15 @@ final class LocationDashboardCommentParser {
             .toFormatter(Locale.US)
             .withResolverStyle(ResolverStyle.STRICT)
     );
+    private final MeasurementUnitDictionary measurementUnits;
+
+    LocationDashboardCommentParser() {
+        this(List.of());
+    }
+
+    LocationDashboardCommentParser(List<LocationDashboardImportStrategyConfig.MeasurementUnitConfig> measurementUnits) {
+        this.measurementUnits = new MeasurementUnitDictionary(measurementUnits);
+    }
 
     /**
      * Entry point for workbook comment text. This method normalizes the raw text, strips an optional
@@ -374,7 +385,7 @@ final class LocationDashboardCommentParser {
         try {
             BigDecimal numericValue = new BigDecimal(normalizeNumericPortion(numericPortion));
             String unit = normalizeUnit(matcher.group(2));
-            String normalizedRaw = numericValue.toPlainString() + (unit == null ? "" : " " + unit);
+            String normalizedRaw = numericValue.toPlainString();
             return new ParsedMeasurement(numericValue, unit, normalizedRaw);
         } catch (NumberFormatException ex) {
             return null;
@@ -453,20 +464,10 @@ final class LocationDashboardCommentParser {
         }
         try {
             BigDecimal numericValue = new BigDecimal(normalizeStaticNumericPortion(numericPortion));
-            String unit = normalizeStaticUnit(matcher.group(2));
-            String normalizedRaw = numericValue.toPlainString() + (unit == null ? "" : " " + unit);
-            return new ParsedMeasurement(numericValue, unit, normalizedRaw);
+            return new ParsedMeasurement(numericValue, null, numericValue.toPlainString());
         } catch (NumberFormatException ex) {
             return null;
         }
-    }
-
-    private static String normalizeStaticUnit(String rawUnit) {
-        if (rawUnit == null) {
-            return null;
-        }
-        String normalized = rawUnit.strip().replaceAll("[\\s\\p{Punct}]+$", "");
-        return normalized.isBlank() ? null : normalized;
     }
 
     private static String normalizeStaticNumericPortion(String numericPortion) {
@@ -486,8 +487,7 @@ final class LocationDashboardCommentParser {
         if (rawUnit == null) {
             return null;
         }
-        String normalized = rawUnit.strip().replaceAll("[\\s\\p{Punct}]+$", "");
-        return normalized.isBlank() ? null : normalized;
+        return measurementUnits.resolve(rawUnit);
     }
 
     private String normalizeNumericPortion(String numericPortion) {
@@ -871,6 +871,42 @@ final class LocationDashboardCommentParser {
         String ordinal,
         ParsedMeasurement measurement
     ) {
+    }
+
+    private static final class MeasurementUnitDictionary {
+        private final Map<String, String> unitsByKey;
+
+        private MeasurementUnitDictionary(
+            List<LocationDashboardImportStrategyConfig.MeasurementUnitConfig> configuredUnits
+        ) {
+            Map<String, String> units = new LinkedHashMap<>();
+            for (LocationDashboardImportStrategyConfig.MeasurementUnitConfig configuredUnit
+                : configuredUnits == null ? List.<LocationDashboardImportStrategyConfig.MeasurementUnitConfig>of() : configuredUnits) {
+                if (configuredUnit == null || configuredUnit.value() == null || configuredUnit.value().isBlank()) {
+                    continue;
+                }
+                String canonicalUnit = configuredUnit.value().strip();
+                units.put(normalizeUnitKey(canonicalUnit), canonicalUnit);
+                for (String alias : configuredUnit.aliases()) {
+                    if (alias != null && !alias.isBlank()) {
+                        units.put(normalizeUnitKey(alias), canonicalUnit);
+                    }
+                }
+            }
+            this.unitsByKey = Map.copyOf(units);
+        }
+
+        private String resolve(String rawUnit) {
+            String normalized = rawUnit == null ? null : rawUnit.strip().replaceAll("[\\s\\p{Punct}]+$", "");
+            if (normalized == null || normalized.isBlank()) {
+                return null;
+            }
+            return unitsByKey.get(normalizeUnitKey(normalized));
+        }
+
+        private static String normalizeUnitKey(String value) {
+            return value == null ? "" : value.strip().toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Punct}]+", "");
+        }
     }
 
     private static final class MutableSample {

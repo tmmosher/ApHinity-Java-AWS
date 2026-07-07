@@ -45,7 +45,7 @@ class LocationDashboardDerivedGraphSupportTest {
         Map<String, Object> trace = payload.getFirst();
         assertEquals("table", trace.get("type"));
         assertEquals(Map.of(
-            "values", List.of("Facility", "Point Of Use", "Measurement", "Observed", "Value", "CA Status", "Follow-ups"),
+            "values", List.of("Facility", "Point Of Use", "Measurement", "Observed", "Value", "Follow-ups"),
             "align", "left"
         ), trace.get("header"));
 
@@ -56,9 +56,8 @@ class LocationDashboardDerivedGraphSupportTest {
                 List.of("Newport Beach", "Newport Beach", "Newport Beach"),
                 List.of("Sink 1", "Sink 1", "Sink 1"),
                 List.of("Legionella", "Copper", "HPC"),
-                List.of("2026-06-15", "2026-06-10", "2026-06-05"),
-                List.of("3", "0", "8"),
-                List.of("Resolved", "No CA Required", "Active"),
+                List.of("2026-06-15", "2026-06-10", "2026-06-01"),
+                List.of("3", "0", "12"),
                 List.of("", "", 1)
             ),
             cells.get("values")
@@ -69,7 +68,7 @@ class LocationDashboardDerivedGraphSupportTest {
         assertEquals("Resolved", customData.getFirst().get("caStatus"));
         assertEquals(List.of(), customData.getFirst().get("followUps"));
         assertEquals("No CA Required", customData.get(1).get("caStatus"));
-        assertEquals(List.of(Map.of("date", "2026-06-01", "value", "12")), customData.get(2).get("followUps"));
+        assertEquals(List.of(Map.of("date", "2026-06-05", "value", "8")), customData.get(2).get("followUps"));
     }
 
     private LocationDashboardDerivedGraphSupport.HistoricalRawSample rawSample(

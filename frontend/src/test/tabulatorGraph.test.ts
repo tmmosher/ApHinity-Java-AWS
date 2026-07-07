@@ -8,7 +8,7 @@ const graph: LocationGraph = {
   data: [{
     type: "table",
     name: "Recent Sample Measurements",
-    header: {values: ["Facility", "Point Of Use", "Measurement", "Observed", "Value", "CA Status", "Follow-ups"]},
+    header: {values: ["Facility", "Point Of Use", "Measurement", "Observed", "Value", "Follow-ups"]},
     cells: {
       values: [
         ["Newport Beach"],
@@ -16,7 +16,6 @@ const graph: LocationGraph = {
         ["HPC"],
         ["2026-06-15"],
         ["12"],
-        ["Active"],
         [2]
       ]
     },
@@ -51,7 +50,6 @@ describe("tabulatorGraph helpers", () => {
       "measurement",
       "observed",
       "value",
-      "ca_status",
       "follow_ups"
     ]);
     expect(model.rows).toEqual([expect.objectContaining({
@@ -59,7 +57,6 @@ describe("tabulatorGraph helpers", () => {
       facility: "Newport Beach",
       point_of_use: "Sink 1",
       measurement: "HPC",
-      ca_status: "Active",
       followUps: [
         {date: "2026-06-20", value: "4"},
         {date: "2026-06-25", value: "1"}

@@ -69,7 +69,10 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
                   >
                     <Suspense fallback={
                       <div class="w-full overflow-hidden rounded-lg">
-                        <GraphLoadingPlaceholder graphName={graph.name} />
+                        <GraphLoadingPlaceholder
+                          graphName={graph.name}
+                          height={resolveGraphHeight(graph.style, graph.layout)}
+                        />
                       </div>
                     }>
                       <Show when={props.plotlyModule()}>

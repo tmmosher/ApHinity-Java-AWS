@@ -50,7 +50,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         );
         this.sampleImportPipeline = new LocationDashboardSampleImportPipeline(
             this.contextResolver,
-            new LocationDashboardCommentParser()
+            new LocationDashboardCommentParser(this.config.measurementUnits())
         );
         this.observationAggregator = new LocationDashboardObservationAggregator(graphsBySublocationKey, this.config.graphs());
         this.correctiveActionDraftFactory = new LocationDashboardCorrectiveActionDraftFactory();
