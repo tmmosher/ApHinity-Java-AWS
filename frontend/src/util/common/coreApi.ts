@@ -236,6 +236,7 @@ export const parseLocationGraph = (value: unknown): LocationGraph => {
   return {
     id: value.id,
     name: value.name,
+    description: typeof value.description === "string" ? value.description : null,
     ...parseLocationGraphColumns(value),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt

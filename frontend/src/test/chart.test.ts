@@ -33,6 +33,7 @@ describe("Chart helpers", () => {
       responsive: true
     });
     expect(layout).toMatchObject({
+      autosize: true,
       margin: {l: 40, r: 20, t: 20, b: 40},
       font: {size: 20}
     });
@@ -57,6 +58,7 @@ describe("Chart helpers", () => {
     expect(calledElement).toBe(element);
     expect(calledData).toEqual(data);
     expect(calledLayout).toMatchObject({
+      autosize: true,
       margin: {l: 40, r: 20, t: 20, b: 40},
       font: {size: 16}
     });

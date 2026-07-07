@@ -35,6 +35,7 @@ export const buildPlotlyLayout = (
     layout?: PlotlyLayout,
     themePreference: ThemePreference = getDocumentThemePreference()
 ): PlotlyLayout => ({
+    autosize: true,
     margin: { l: 40, r: 20, t: 20, b: 40 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",

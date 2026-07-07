@@ -157,19 +157,33 @@ describe("graphTheme", () => {
     });
   });
 
-  it("forces date x-axis tick labels to stay horizontal", () => {
+  it("angles date x-axis tick labels and enables axis auto-margin", () => {
     const themedLayout = resolveThemedGraphLayout({
       xaxis: {
         type: "date",
-        tickformat: "%b %Y",
-        tickangle: -45
+        tickformat: "%b %Y"
       }
     }, {}, "light");
 
     expect(themedLayout.xaxis).toMatchObject({
       type: "date",
       tickformat: "%b %Y",
-      tickangle: 0
+      tickangle: -35,
+      automargin: true
+    });
+  });
+
+  it("preserves explicit date x-axis tick angles", () => {
+    const themedLayout = resolveThemedGraphLayout({
+      xaxis: {
+        type: "date",
+        tickangle: -60
+      }
+    }, {}, "light");
+
+    expect(themedLayout.xaxis).toMatchObject({
+      tickangle: -60,
+      automargin: true
     });
   });
 

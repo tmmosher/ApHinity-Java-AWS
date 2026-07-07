@@ -154,6 +154,43 @@ describe("LocationDashboardSection", () => {
     expect(html).not.toContain("xl:col-span-2");
   });
 
+  it("renders graph information beside the graph title when description exists", () => {
+    const section: LocationSectionLayout = {
+      section_id: 7,
+      graph_ids: [101]
+    };
+    const graph: LocationGraph = {
+      id: 101,
+      name: "Water Quality Compliance",
+      description: "Explains why this graph matters.\nSecond line.",
+      data: [{type: "bar", x: ["A"], y: [1]}],
+      layout: {title: {text: "Newport Beach"}},
+      config: {},
+      style: {height: 320},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z"
+    };
+
+    const html = renderToString(() => (
+      <LocationDashboardSection
+        section={section}
+        graphs={[graph]}
+        missingGraphIds={[]}
+        apiHost="https://example.test"
+        locationId="42"
+        monthRange={3}
+        canEditGraphs={false}
+        isGraphMutationBusy={false}
+        plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
+        onOpenGraphEditor={() => undefined}
+      />
+    ));
+
+    expect(html).toContain("data-graph-description-trigger");
+    expect(html).toContain("data-graph-description-tooltip");
+    expect(html).toContain("Explains why this graph matters.\nSecond line.");
+  });
+
   it("marks flow items as column-safe masonry sections", () => {
     const section: LocationSectionLayout = {
       section_id: 7,

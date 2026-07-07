@@ -435,6 +435,7 @@ public class LocationDashboardImportService {
         Graph copy = new Graph();
         copy.setId(source.getId());
         copy.setName(source.getName());
+        copy.setDescription(source.getDescription());
         copy.setGraphType(source.getGraphType());
         copy.setCreatedAt(source.getCreatedAt());
         copy.setUpdatedAt(source.getUpdatedAt());

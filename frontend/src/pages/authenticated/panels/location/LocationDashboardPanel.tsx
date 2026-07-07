@@ -236,7 +236,9 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           canUndo={dashboard.hasPendingGraphChanges() && !dashboard.isGraphMutationBusy()}
           isDeleting={dashboard.isDeletingGraph()}
           isSaving={dashboard.isSavingGraphChanges()}
-          onApply={(graphId, payload) => dashboard.applyLocalGraphEdit(graphId, payload, selectedTimeRange())}
+          onApply={(graphId, payload, description) =>
+            dashboard.applyLocalGraphEdit(graphId, payload, description, selectedTimeRange())
+          }
           onDeleteGraph={dashboard.deleteGraphFromModal}
           onRenameGraph={dashboard.renameGraphFromModal}
           onUndo={dashboard.undoLastDashboardEdit}

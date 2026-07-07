@@ -14,7 +14,9 @@ vi.mock("corvu/popover", () => {
   Popover.Portal = (props: {children: unknown}) => props.children;
   Popover.Content = (props: {children: unknown}) => props.children;
   Popover.Label = (props: {children: unknown}) => props.children;
-  Popover.Description = (props: {children: unknown}) => props.children;
+  Popover.Description = (props: {children: unknown; class?: string}) => (
+    <p class={props.class}>{props.children}</p>
+  );
   return {default: Popover};
 });
 
@@ -166,5 +168,22 @@ describe("ServiceEventEditPopover", () => {
     expect(html).toContain("data-service-event-edit");
     expect(html).toContain("class=\"min-w-0 flex-1\"");
     expect(html).toContain("class=\"flex shrink-0 items-center gap-2\"");
+  });
+
+  it("preserves structured corrective-action description line breaks", () => {
+    const html = renderToString(() => ServiceEventEditPopover({
+      event: {
+        ...baseEvent,
+        isCorrectiveAction: true,
+        description: "Measurement: HPC\nObserved At: 2026-06-15\n\nImported Corrective Action: Repeat DI loop sterilization"
+      },
+      canEdit: false,
+      canComplete: false,
+      role: "partner",
+      children: "Open"
+    }));
+
+    expect(html).toContain("whitespace-pre-line");
+    expect(html).toContain("Measurement: HPC\nObserved At: 2026-06-15");
   });
 });

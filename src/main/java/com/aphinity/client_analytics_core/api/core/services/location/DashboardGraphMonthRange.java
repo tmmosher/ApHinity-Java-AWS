@@ -38,15 +38,28 @@ public record DashboardGraphMonthRange(Integer months) {
     }
 
     /**
-     * Resolves the inclusive first day of the rolling window.
+     * Resolves the inclusive first day of the fetched data window. One month
+     * before the visible range is included so Plotly trendlines have enough
+     * context to enter the displayed window cleanly.
      *
      * @param anchorDate date used as the end of the requested window
      * @return first included month, or null for all-time ranges
      */
     public LocalDate windowStartInclusive(LocalDate anchorDate) {
+        return dataWindowStartInclusive(anchorDate);
+    }
+
+    public LocalDate dataWindowStartInclusive(LocalDate anchorDate) {
         if (isAllTime() || anchorDate == null) {
             return null;
         }
-        return anchorDate.minusMonths(months).withDayOfMonth(1);
+        return displayWindowStartInclusive(anchorDate).minusMonths(1);
+    }
+
+    public LocalDate displayWindowStartInclusive(LocalDate anchorDate) {
+        if (isAllTime() || anchorDate == null) {
+            return null;
+        }
+        return anchorDate.minusMonths((long) months - 1L).withDayOfMonth(1);
     }
 }

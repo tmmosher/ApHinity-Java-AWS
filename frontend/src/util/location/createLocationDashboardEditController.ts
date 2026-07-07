@@ -261,13 +261,14 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
   const applyLocalGraphEdit = (
     graphId: number,
     payload: EditableGraphPayload,
+    description?: string | null,
     timeRange: LocationGraphTimeRange = "allTime"
   ) => {
     if (isGraphMutationBusy() || !props.canEditGraphs()) {
       return;
     }
 
-    const result = applyGraphPayloadEdit(workingGraphs(), [], graphId, payload, timeRange);
+    const result = applyGraphPayloadEdit(workingGraphs(), [], graphId, payload, description, timeRange);
     if (!result.changed) {
       return;
     }

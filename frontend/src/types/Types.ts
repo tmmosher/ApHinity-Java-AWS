@@ -67,6 +67,7 @@ export interface LocationMembershipWithStatus {
 export interface LocationGraph {
     id: number;
     name: string;
+    description?: string | null;
     data: Record<string, unknown>[];
     layout?: Record<string, unknown> | null;
     config?: Record<string, unknown> | null;
@@ -92,6 +93,7 @@ export type LocationGraphTimeRange = "threeMonths" | "twelveMonths" | "allTime";
 
 export interface LocationGraphUpdate {
     graphId: number;
+    description?: string | null;
     data?: Record<string, unknown>[];
     layout?: Record<string, unknown> | null;
     config?: Record<string, unknown> | null;

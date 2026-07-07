@@ -67,6 +67,51 @@ class DashboardGraphMonthRangePayloadProjectorTest {
     }
 
     @Test
+    void projectIncludesOneMonthBeforeVisibleWindowForTrendContinuity() {
+        Map<String, Object> trace = Map.of(
+            "type", "scatter",
+            "name", "Compliance",
+            "x", List.of("2026-03-31", "2026-04-01", "2026-05-01", "2026-06-20"),
+            "y", List.of(70, 80, 90, 95)
+        );
+
+        List<Map<String, Object>> projectedPayload = DashboardGraphMonthRangePayloadProjector.project(
+            List.of(trace),
+            new DashboardGraphMonthRange(3),
+            ANCHOR_DATE
+        );
+
+        assertEquals(List.of("2026-03-31", "2026-04-01", "2026-05-01", "2026-06-20"), projectedPayload.getFirst().get("x"));
+        assertEquals(List.of(70, 80, 90, 95), projectedPayload.getFirst().get("y"));
+    }
+
+    @Test
+    void projectLayoutCapsVisibleDateAxisToRequestedWindow() {
+        List<Map<String, Object>> projectedPayload = List.of(Map.of(
+            "type", "scatter",
+            "x", List.of("2026-03-31", "2026-04-01", "2026-06-20"),
+            "y", List.of(70, 80, 95)
+        ));
+
+        Map<String, Object> projectedLayout = DashboardGraphMonthRangePayloadProjector.projectLayout(
+            Map.of("xaxis", Map.of("title", "Observed At")),
+            new DashboardGraphMonthRange(3),
+            ANCHOR_DATE,
+            projectedPayload
+        );
+
+        assertEquals(
+            Map.of(
+                "title", "Observed At",
+                "range", List.of("2026-04-01", "2026-06-23"),
+                "type", "date",
+                "automargin", true
+            ),
+            projectedLayout.get("xaxis")
+        );
+    }
+
+    @Test
     void projectLeavesCategoricalScatterTracesUnchanged() {
         Map<String, Object> trace = Map.of(
             "type", "scatter",

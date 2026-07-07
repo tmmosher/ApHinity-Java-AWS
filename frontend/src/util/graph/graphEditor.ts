@@ -53,6 +53,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const cloneJson = <T>(value: T): T =>
   JSON.parse(JSON.stringify(value)) as T;
 
+export const normalizeGraphDescription = (value: string | null | undefined): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+};
+
 const parseGraphDataEntries = (value: unknown): Record<string, unknown>[] => {
   if (!Array.isArray(value) || value.some((entry) => !isRecord(entry))) {
     throw new Error("Graph payload field \"data\" must be an array of objects.");
@@ -138,6 +146,7 @@ const buildGraphUpdatePayload = (graph: LocationGraph, includeData = true): Loca
   const payload = createEditableGraphPayload(graph);
   return {
     graphId: graph.id,
+    description: graph.description ?? null,
     ...(includeData ? {data: payload.data} : {}),
     layout: payload.layout,
     config: payload.config,
@@ -152,7 +161,8 @@ const graphPersistenceSignature = (graph: LocationGraph): string =>
       layout: graph.layout ?? null,
       config: graph.config ?? null,
       style: graph.style ?? null
-    })
+    }),
+    description: graph.description ?? null
   });
 
 const buildGraphBaselineEntry = (graph: LocationGraph): GraphBaselineEntry => ({
@@ -191,6 +201,7 @@ const isGraphDirty = (
 function graphStateSignature(graph: LocationGraph): string {
   return JSON.stringify({
     name: graph.name,
+    description: graph.description ?? null,
     payload: normalizeGraphPayload({
       data: graph.data,
       layout: graph.layout ?? null,
@@ -509,6 +520,7 @@ export const applyGraphPayloadEdit = (
   undoStack: LocationGraph[][],
   graphId: number,
   nextPayload: EditableGraphPayload,
+  nextDescription?: string | null,
   timeRange: LocationGraphTimeRange = "allTime"
 ): GraphEditResult => {
   const normalizedNextPayload = normalizeGraphPayload(nextPayload);
@@ -522,7 +534,11 @@ export const applyGraphPayloadEdit = (
   }
 
   const currentEditableGraph = createEditableGraphForTimeRange(currentGraph, timeRange);
-  if (graphPayloadSignature(createEditableGraphPayload(currentEditableGraph)) === graphPayloadSignature(normalizedNextPayload)) {
+  const normalizedNextDescription = normalizeGraphDescription(nextDescription ?? currentGraph.description ?? null);
+  if (
+    graphPayloadSignature(createEditableGraphPayload(currentEditableGraph)) === graphPayloadSignature(normalizedNextPayload)
+    && normalizeGraphDescription(currentGraph.description) === normalizedNextDescription
+  ) {
     return {
       nextGraphs: currentGraphs,
       nextUndoStack: undoStack,
@@ -535,6 +551,7 @@ export const applyGraphPayloadEdit = (
       ? {
           ...graph,
           data: cloneJson(normalizedNextPayload.data),
+          description: normalizedNextDescription,
           layout: cloneJson(normalizedNextPayload.layout ?? null),
           config: cloneJson(normalizedNextPayload.config ?? null),
           style: cloneJson(normalizedNextPayload.style ?? null)

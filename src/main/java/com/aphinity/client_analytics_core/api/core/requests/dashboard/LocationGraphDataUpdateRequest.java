@@ -9,6 +9,7 @@ import java.util.Map;
  * Request payload for updating a single graph's trace data and graph-table metadata.
  *
  * @param graphId graph identifier associated with the target location
+ * @param description optional graph context displayed beside the dashboard title
  * @param data optional raw Plotly trace array/object payload
  * @param layout optional Plotly layout payload
  * @param config optional Plotly config payload
@@ -19,6 +20,7 @@ public record LocationGraphDataUpdateRequest(
     @NotNull
     @Positive
     Long graphId,
+    String description,
     Object data,
     Map<String, Object> layout,
     Map<String, Object> config,
@@ -26,16 +28,28 @@ public record LocationGraphDataUpdateRequest(
     String expectedUpdatedAt
 ) {
     public LocationGraphDataUpdateRequest(Long graphId, Object data) {
-        this(graphId, data, null, null, null, null);
+        this(graphId, null, data, null, null, null, null);
     }
 
     public LocationGraphDataUpdateRequest(Long graphId, Object data, Object layout) {
         this(graphId, data, layout, null);
     }
 
+    public LocationGraphDataUpdateRequest(
+        Long graphId,
+        Object data,
+        Map<String, Object> layout,
+        Map<String, Object> config,
+        Map<String, Object> style,
+        String expectedUpdatedAt
+    ) {
+        this(graphId, null, data, layout, config, style, expectedUpdatedAt);
+    }
+
     public LocationGraphDataUpdateRequest(Long graphId, Object data, Object layout, String expectedUpdatedAt) {
         this(
             graphId,
+            null,
             data,
             layout instanceof Map<?, ?> layoutMap ? copyMap(layoutMap) : null,
             null,

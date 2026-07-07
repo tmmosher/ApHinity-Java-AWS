@@ -28,6 +28,7 @@ import com.aphinity.client_analytics_core.api.core.services.location.LocationGra
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService.MonthRangeGraphProjection;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
 import jakarta.persistence.EntityManager;
@@ -195,12 +196,17 @@ public class LocationService {
         }
 
         DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
-        Map<Long, List<Map<String, Object>>> rangePayloadsByGraphId = resolvedMonthRange.isAllTime()
+        Map<Long, MonthRangeGraphProjection> rangeProjectionsByGraphId = resolvedMonthRange.isAllTime()
             ? Map.of()
-            : locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(locationId, resolvedMonthRange);
+            : locationDashboardTimeRangeService.resolveLocationMonthRangeProjections(locationId, resolvedMonthRange);
         return locationGraphRepository.findByLocationIdWithGraphDetails(locationId).stream()
             .map(LocationGraph::getGraph)
-            .map(graph -> graphResponseMapper.toResponse(graph, rangePayloadsByGraphId.get(graph.getId())))
+            .map(graph -> {
+                MonthRangeGraphProjection projection = rangeProjectionsByGraphId.get(graph.getId());
+                return projection == null
+                    ? graphResponseMapper.toResponse(graph)
+                    : graphResponseMapper.toResponse(graph, projection.data(), projection.layout());
+            })
             .toList();
     }
 
@@ -553,6 +559,7 @@ public class LocationService {
             for (Graph graph : graphs) {
                 LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
                 ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
+                graph.setDescription(update.description());
                 if (update.data() != null) {
                     if (validatedPayload == null) {
                         throw new IllegalStateException("Validated graph payload was missing");

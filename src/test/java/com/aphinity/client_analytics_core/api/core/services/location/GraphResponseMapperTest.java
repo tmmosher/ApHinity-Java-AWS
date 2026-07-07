@@ -66,4 +66,25 @@ class GraphResponseMapperTest {
         assertEquals(Map.of("displayModeBar", false), response.config());
         assertEquals(Map.of("height", 260), response.style());
     }
+
+    @Test
+    void usesSuppliedRangeLayoutWithSuppliedRangePayload() {
+        Graph graph = new Graph();
+        graph.setId(12L);
+        graph.setName("Water Quality Compliance");
+        graph.setCreatedAt(Instant.parse("2026-03-20T00:00:00Z"));
+        graph.setUpdatedAt(Instant.parse("2026-03-21T00:00:00Z"));
+        graph.setLayout(Map.of("title", "All samples"));
+        graph.setData(List.of(Map.of("type", "scatter", "x", List.of("2026-03-10"), "y", List.of(9))));
+        List<Map<String, Object>> rangeData = List.of(Map.of("type", "scatter", "x", List.of("2026-03-10"), "y", List.of(9)));
+        Map<String, Object> rangeLayout = Map.of(
+            "title", "All samples",
+            "xaxis", Map.of("range", List.of("2026-01-01", "2026-03-20"))
+        );
+
+        GraphResponse response = new GraphResponseMapper().toResponse(graph, rangeData, rangeLayout);
+
+        assertEquals(rangeData, response.data());
+        assertEquals(rangeLayout, response.layout());
+    }
 }

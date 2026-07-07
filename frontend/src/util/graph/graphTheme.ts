@@ -104,7 +104,12 @@ const applyAxisTheme = (axis: unknown, textColor: string, gridColor: string, axi
 
   return {
     ...axis,
-    ...(axisName === "x" && axis.type === "date" ? {tickangle: 0} : {}),
+    ...(axisName === "x" && axis.type === "date"
+      ? {
+          tickangle: axis.tickangle ?? -35,
+          automargin: axis.automargin ?? true
+        }
+      : {}),
     color: textColor,
     title: applyTitleTheme(axis.title, textColor),
     tickfont: {

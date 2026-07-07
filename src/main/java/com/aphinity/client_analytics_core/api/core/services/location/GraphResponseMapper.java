@@ -41,12 +41,17 @@ public class GraphResponseMapper {
      * @return normalized graph response
      */
     public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data) {
+        return toResponse(graph, data, null);
+    }
+
+    public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data, Map<String, Object> layout) {
         if (data != null) {
             return new GraphResponse(
                 graph.getId(),
                 graph.getName(),
+                graph.getDescription(),
                 data,
-                graph.getLayout(),
+                layout == null ? graph.getLayout() : layout,
                 graph.getConfig(),
                 graph.getStyle(),
                 graph.getCreatedAt(),
@@ -65,6 +70,7 @@ public class GraphResponseMapper {
         return new GraphResponse(
             graph.getId(),
             graph.getName(),
+            graph.getDescription(),
             data,
             payload.layout(),
             payload.config(),

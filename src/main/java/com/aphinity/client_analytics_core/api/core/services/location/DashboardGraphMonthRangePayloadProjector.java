@@ -61,6 +61,35 @@ public final class DashboardGraphMonthRangePayloadProjector {
         return List.copyOf(projectedPayload);
     }
 
+    public static Map<String, Object> projectLayout(
+        Map<String, Object> layout,
+        DashboardGraphMonthRange monthRange,
+        LocalDate anchorDate,
+        List<Map<String, Object>> projectedPayload
+    ) {
+        if (monthRange == null || monthRange.isAllTime() || anchorDate == null) {
+            return layout;
+        }
+        if (projectedPayload == null || projectedPayload.stream().noneMatch(DashboardGraphMonthRangePayloadProjector::isTimeSeriesTrace)) {
+            return layout;
+        }
+        LocalDate displayStart = monthRange.displayWindowStartInclusive(anchorDate);
+        if (displayStart == null) {
+            return layout;
+        }
+
+        Map<String, Object> projectedLayout = layout == null ? new LinkedHashMap<>() : new LinkedHashMap<>(layout);
+        Object rawXAxis = projectedLayout.get("xaxis");
+        Map<String, Object> xAxis = rawXAxis instanceof Map<?, ?> rawMap
+            ? copyMap(rawMap)
+            : new LinkedHashMap<>();
+        xAxis.put("range", List.of(displayStart.toString(), anchorDate.toString()));
+        xAxis.putIfAbsent("type", "date");
+        xAxis.putIfAbsent("automargin", true);
+        projectedLayout.put("xaxis", xAxis);
+        return Map.copyOf(projectedLayout);
+    }
+
     /**
      * Identifies scatter traces whose x-axis values can all be parsed as dates.
      *
@@ -125,6 +154,16 @@ public final class DashboardGraphMonthRangePayloadProjector {
 
     private static List<?> asList(Object value) {
         return value instanceof List<?> listValue ? listValue : List.of();
+    }
+
+    private static Map<String, Object> copyMap(Map<?, ?> rawMap) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() instanceof String key) {
+                copy.put(key, entry.getValue());
+            }
+        }
+        return copy;
     }
 
     private static LocalDate parseLocalDate(Object value) {

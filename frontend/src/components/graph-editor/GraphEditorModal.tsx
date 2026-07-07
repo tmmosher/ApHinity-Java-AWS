@@ -75,7 +75,7 @@ type GraphEditorModalProps = {
   canUndo: boolean;
   isDeleting: boolean;
   isSaving: boolean;
-  onApply: (graphId: number, payload: EditableGraphPayload) => void;
+  onApply: (graphId: number, payload: EditableGraphPayload, description: string | null) => void;
   onDeleteGraph: (graphId: number) => Promise<void>;
   onRenameGraph: (graphId: number, name: string) => Promise<void>;
   onUndo: () => void;
@@ -96,6 +96,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const [selectedTraceIndex, setSelectedTraceIndex] = createSignal(0);
   const [traceNameDraft, setTraceNameDraft] = createSignal("");
   const [graphNameDraft, setGraphNameDraft] = createSignal(props.graph?.name ?? "");
+  const [graphDescriptionDraft, setGraphDescriptionDraft] = createSignal(props.graph?.description ?? "");
   const [operationError, setOperationError] = createSignal("");
   const [renameError, setRenameError] = createSignal("");
   const [deleteError, setDeleteError] = createSignal("");
@@ -165,6 +166,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       setSelectedTraceIndex(0);
       setTraceNameDraft("");
       setGraphNameDraft("");
+      setGraphDescriptionDraft("");
       setOperationError("");
       setRenameError("");
       setDeleteError("");
@@ -190,6 +192,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     batch(() => {
       setEditablePayload(createEditableGraphPayload(graph));
       setGraphNameDraft(graph.name);
+      setGraphDescriptionDraft(graph.description ?? "");
       setSelectedTraceIndex(0);
       setTraceNameDraft("");
       setOperationError("");
@@ -742,7 +745,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     }
 
     try {
-      props.onApply(graph.id, editablePayload());
+      props.onApply(graph.id, editablePayload(), graphDescriptionDraft().trim() || null);
       setOperationError("");
       props.onClose();
     } catch (error) {
@@ -932,21 +935,40 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
 
           <div class="space-y-4 overflow-y-auto">
             <section class="rounded-lg border border-base-300 bg-base-200/30 p-3">
-              <label class="form-control w-full">
-                <span class="label-text text-sm font-medium">Graph title</span>
-                <span class="label-text-alt text-xs text-base-content/70">
-                  This updates the chart title inside the graph layout.
-                </span>
-                <input
-                  type="text"
-                  class="input input-bordered input-sm mt-2 w-full"
-                  data-graph-edit-field="layout"
-                  value={graphTitleDraft()}
-                  disabled={isBusy()}
-                  placeholder="Optional graph title"
-                  onInput={(event) => updateGraphTitle(event.currentTarget.value)}
-                />
-              </label>
+              <div class="space-y-4">
+                <label class="form-control w-full">
+                  <span class="label-text text-sm font-medium">Graph title</span>
+                  <span class="label-text-alt text-xs text-base-content/70">
+                    This updates the chart title inside the graph layout.
+                  </span>
+                  <input
+                    type="text"
+                    class="input input-bordered input-sm mt-2 w-full"
+                    data-graph-edit-field="layout"
+                    value={graphTitleDraft()}
+                    disabled={isBusy()}
+                    placeholder="Optional graph title"
+                    onInput={(event) => updateGraphTitle(event.currentTarget.value)}
+                  />
+                </label>
+                <label class="form-control w-full">
+                  <span class="label-text text-sm font-medium">Graph information</span>
+                  <span class="label-text-alt text-xs text-base-content/70">
+                    This appears beside the dashboard graph title.
+                  </span>
+                  <textarea
+                    class="textarea textarea-bordered mt-2 min-h-24 w-full text-sm"
+                    data-graph-edit-field="description"
+                    value={graphDescriptionDraft()}
+                    disabled={isBusy()}
+                    placeholder="Optional context for dashboard viewers"
+                    onInput={(event) => {
+                      setGraphDescriptionDraft(event.currentTarget.value);
+                      setOperationError("");
+                    }}
+                  />
+                </label>
+              </div>
             </section>
 
             <Show when={!isSingleTraceGraph()}>

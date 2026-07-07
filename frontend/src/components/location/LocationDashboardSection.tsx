@@ -20,6 +20,26 @@ type LocationDashboardSectionProps = {
   onOpenGraphEditor: (graphId: number) => void;
 };
 
+const GraphDescriptionPopover = (props: {description: string}) => (
+  <span class="group relative inline-flex shrink-0">
+    <button
+      type="button"
+      class="btn btn-circle btn-ghost btn-xs min-h-0 h-5 w-5 text-xs"
+      aria-label="Show graph information"
+      data-graph-description-trigger=""
+    >
+      ?
+    </button>
+    <span
+      role="tooltip"
+      class="pointer-events-none absolute bottom-full left-1/2 z-[70] mb-2 hidden w-72 -translate-x-1/2 whitespace-pre-line break-words rounded-lg border border-base-300 bg-base-100 p-3 text-left text-xs font-normal leading-5 text-base-content/80 shadow-xl group-focus-within:block group-hover:block"
+      data-graph-description-tooltip=""
+    >
+      {props.description}
+    </span>
+  </span>
+);
+
 export const LocationDashboardSection = (props: LocationDashboardSectionProps) => (
   <section
     class={"w-full rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm "
@@ -39,7 +59,12 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
           {(graph) => (
             <article class={"rounded-lg border border-base-200 bg-base-200/40 p-3 " + resolveGraphGridClass(graph.layout)}>
               <div class="mb-2 flex items-start justify-between gap-2">
-                <h4 class="text-sm font-medium">{graph.name}</h4>
+                <div class="flex min-w-0 items-center gap-1.5">
+                  <h4 class="min-w-0 truncate text-sm font-medium">{graph.name}</h4>
+                  <Show when={graph.description}>
+                    {(description) => <GraphDescriptionPopover description={description()} />}
+                  </Show>
+                </div>
                 <Show when={props.canEditGraphs}>
                   <button
                     type="button"

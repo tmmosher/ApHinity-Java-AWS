@@ -54,6 +54,12 @@ public class LocationDashboardTimeRangeService {
     private final LocationDashboardGraphMatcher graphMatcher = new LocationDashboardGraphMatcher();
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
 
+    public record MonthRangeGraphProjection(
+        List<Map<String, Object>> data,
+        Map<String, Object> layout
+    ) {
+    }
+
     @Autowired
     public LocationDashboardTimeRangeService(
         LocationRepository locationRepository,
@@ -161,6 +167,20 @@ public class LocationDashboardTimeRangeService {
         Long locationId,
         DashboardGraphMonthRange monthRange
     ) {
+        return resolveLocationMonthRangeProjections(locationId, monthRange).entrySet().stream()
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                entry -> entry.getValue().data(),
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+    }
+
+    @Transactional
+    public Map<Long, MonthRangeGraphProjection> resolveLocationMonthRangeProjections(
+        Long locationId,
+        DashboardGraphMonthRange monthRange
+    ) {
         RefreshContext refreshContext = loadRefreshContext(locationId);
         if (refreshContext == null) {
             return Map.of();
@@ -178,30 +198,56 @@ public class LocationDashboardTimeRangeService {
             return Map.of();
         }
 
-        Map<Long, List<Map<String, Object>>> payloadsByGraphId = new LinkedHashMap<>();
+        Map<Long, MonthRangeGraphProjection> projectionsByGraphId = new LinkedHashMap<>();
         for (Graph graph : refreshContext.assignedGraphs()) {
             if (graph == null || graph.getId() == null || isDerivedGraph(graph)) {
                 continue;
             }
             List<Map<String, Object>> allTimePayload =
                 GraphRelationalPayloadMapper.normalize(graph).data();
-            payloadsByGraphId.put(
-                graph.getId(),
-                graphContainsTimeSeries(graph)
+            List<Map<String, Object>> projectedPayload = graphContainsTimeSeries(graph)
                     ? DashboardGraphMonthRangePayloadProjector.project(allTimePayload, normalizedRange, refreshContext.anchorDate())
-                    : allTimePayload
+                    : allTimePayload;
+            projectionsByGraphId.put(
+                graph.getId(),
+                new MonthRangeGraphProjection(
+                    projectedPayload,
+                    DashboardGraphMonthRangePayloadProjector.projectLayout(
+                        graph.getLayout(),
+                        normalizedRange,
+                        refreshContext.anchorDate(),
+                        projectedPayload
+                    )
+                )
             );
         }
 
-        payloadsByGraphId.putAll(refreshDerivedGraphsForResponse(
+        refreshDerivedGraphsForResponse(
             locationId,
             refreshContext.location(),
             refreshContext.assignedGraphs(),
             normalizedRange,
             refreshContext.anchorDate(),
             refreshContext.refreshedAt()
-        ));
-        return Map.copyOf(payloadsByGraphId);
+        ).forEach((graphId, payload) -> {
+            Graph graph = refreshContext.assignedGraphs().stream()
+                .filter(candidate -> candidate != null && Objects.equals(candidate.getId(), graphId))
+                .findFirst()
+                .orElse(null);
+            projectionsByGraphId.put(
+                graphId,
+                new MonthRangeGraphProjection(
+                    payload,
+                    DashboardGraphMonthRangePayloadProjector.projectLayout(
+                        graph == null ? null : graph.getLayout(),
+                        normalizedRange,
+                        refreshContext.anchorDate(),
+                        payload
+                    )
+                )
+            );
+        });
+        return Map.copyOf(projectionsByGraphId);
     }
 
     @Transactional(readOnly = true)

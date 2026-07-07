@@ -160,7 +160,7 @@ const ServiceEventPopoverContent = (props: ServiceEventPopoverContentProps) => (
       <p class="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
         Description
       </p>
-      <Popover.Description class="text-sm leading-6 text-base-content/80">
+      <Popover.Description class="whitespace-pre-line break-words text-sm leading-6 text-base-content/80">
         {props.event.description ?? "No description provided."}
       </Popover.Description>
     </div>
