@@ -71,6 +71,19 @@ describe("ServiceScheduleCalendar", () => {
           status: "upcoming",
           createdAt: "2026-03-25T00:00:00Z",
           updatedAt: "2026-03-25T00:00:00Z"
+        },
+        {
+          id: 11,
+          title: "Follow-up review",
+          responsibility: "partner",
+          date: "2026-04-07",
+          time: "16:30:00",
+          endDate: "2026-04-07",
+          endTime: "17:00:00",
+          description: "End-of-day review",
+          status: "upcoming",
+          createdAt: "2026-03-25T00:00:00Z",
+          updatedAt: "2026-03-25T00:00:00Z"
         }
       ]
     }));
@@ -88,13 +101,13 @@ describe("ServiceScheduleCalendar", () => {
     expect((html.match(/data-service-calendar-day-trigger/g) ?? [])).toHaveLength(42);
     expect((html.match(/data-service-event-create-popover/g) ?? [])).toHaveLength(0);
     expect((html.match(/data-service-calendar-week-row/g) ?? [])).toHaveLength(6);
-    expect((html.match(/data-service-event-bar/g) ?? [])).toHaveLength(2);
+    expect((html.match(/data-service-event-bar/g) ?? [])).toHaveLength(3);
     expect((html.match(/data-service-event-overflow-trigger/g) ?? [])).toHaveLength(1);
     expect((html.match(/data-service-event-corrective-action-icon/g) ?? []).length).toBeGreaterThan(0);
     expect(html).toContain("Client kickoff");
     expect(html).toContain("Partner inspection");
     expect(html).toContain("grid-column:3 / 5");
-    expect(html).toContain("grid-rows-[1.35rem_1.05rem_1.05rem_1.05rem]");
+    expect(html).toContain("grid-rows-[1.7rem_1.3rem_1.3rem_1.3rem_1.3rem]");
     expect(html).toContain("...");
     expect(html).toContain("bg-[#f59e0b]/18");
     expect(html).toContain("bg-[#dcfce7]");

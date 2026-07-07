@@ -92,14 +92,14 @@ type ServiceCalendarWeekRowProps = {
   onDeleteEvent?: (event: LocationServiceEvent) => Promise<void>;
 };
 
-const MAX_VISIBLE_WEEK_EVENT_LANES = 2;
+const MAX_VISIBLE_WEEK_EVENT_LANES = 3;
 const EVENT_GRID_ROW_OFFSET = 2;
 const OVERFLOW_GRID_ROW = MAX_VISIBLE_WEEK_EVENT_LANES + EVENT_GRID_ROW_OFFSET;
 const WEEK_GRID_END_LINE = OVERFLOW_GRID_ROW + 1;
 
 const WEEK_ROW_GRID_CLASS =
-  "relative isolate grid grid-cols-7 grid-rows-[1.35rem_1.05rem_1.05rem_1.05rem] gap-px bg-base-300/70 " +
-  "md:grid-rows-[1.45rem_1.125rem_1.125rem_1.125rem] lg:grid-rows-[1.55rem_1.125rem_1.125rem_1.125rem]";
+  "relative isolate grid grid-cols-7 grid-rows-[1.7rem_1.3rem_1.3rem_1.3rem_1.3rem] gap-px bg-base-300/70 " +
+  "md:grid-rows-[1.85rem_1.4rem_1.4rem_1.4rem_1.4rem] lg:grid-rows-[2rem_1.45rem_1.45rem_1.45rem_1.45rem]";
 
 const CALENDAR_POPOVER_PROPS = {
   placement: "bottom-start" as const,
