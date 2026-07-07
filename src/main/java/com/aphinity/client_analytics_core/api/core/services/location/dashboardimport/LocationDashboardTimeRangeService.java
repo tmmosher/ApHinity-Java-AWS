@@ -357,7 +357,8 @@ public class LocationDashboardTimeRangeService {
             graph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
                 graph.getLayout(),
                 derivedGraphDefinition,
-                strategy.locationName()
+                strategy.locationName(),
+                LocationDashboardGraphMetadataSupport.currentTraceList(graph)
             ));
             graph.setStyle(LocationDashboardGraphMetadataSupport.withDerivedImportStyle(
                 graph.getStyle(),

@@ -108,6 +108,15 @@ final class LocationDashboardGraphMetadataSupport {
         DerivedGraphConfig derivedGraphDefinition,
         String strategyLocationName
     ) {
+        return withDerivedImportMetadata(existingLayout, derivedGraphDefinition, strategyLocationName, List.of());
+    }
+
+    static Map<String, Object> withDerivedImportMetadata(
+        Map<String, Object> existingLayout,
+        DerivedGraphConfig derivedGraphDefinition,
+        String strategyLocationName,
+        List<Map<String, Object>> traces
+    ) {
         Map<String, Object> layout = copyMutableMap(existingLayout);
         if (derivedGraphDefinition.title() != null
             && readLayoutTitleText(layout.get("title")) == null) {
@@ -135,7 +144,7 @@ final class LocationDashboardGraphMetadataSupport {
         meta.put(GRAPH_SIZE_LAYOUT_META_KEY, graphSizeForType(derivedGraphDefinition.graphType()));
         layout.put("meta", meta);
         if ("bar".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
-            applyDerivedBarLayoutDefaults(layout, derivedGraphDefinition);
+            applyDerivedBarLayoutDefaults(layout, derivedGraphDefinition, traces);
         }
         return layout;
     }
@@ -173,10 +182,10 @@ final class LocationDashboardGraphMetadataSupport {
 
     private static void applyDerivedBarLayoutDefaults(
         Map<String, Object> layout,
-        DerivedGraphConfig derivedGraphDefinition
+        DerivedGraphConfig derivedGraphDefinition,
+        List<Map<String, Object>> traces
     ) {
-        boolean horizontal = derivedGraphDefinition.derivedType()
-            != LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY;
+        boolean horizontal = resolveDerivedBarHorizontal(derivedGraphDefinition, traces);
         Map<String, Object> xAxis = copyMutableMap(asMap(layout.get("xaxis")));
         Map<String, Object> yAxis = copyMutableMap(asMap(layout.get("yaxis")));
         if (horizontal) {
@@ -196,6 +205,26 @@ final class LocationDashboardGraphMetadataSupport {
         if (horizontal) {
             layout.put("showlegend", false);
         }
+    }
+
+    private static boolean resolveDerivedBarHorizontal(
+        DerivedGraphConfig derivedGraphDefinition,
+        List<Map<String, Object>> traces
+    ) {
+        String configuredOrientation = traces == null ? null : traces.stream()
+            .filter(trace -> trace != null && "bar".equals(normalizeGraphType(String.valueOf(trace.get("type")))))
+            .map(trace -> trace.get("orientation"))
+            .filter(String.class::isInstance)
+            .map(String.class::cast)
+            .map(value -> value.strip().toLowerCase(Locale.ROOT))
+            .filter(value -> "h".equals(value) || "v".equals(value))
+            .findFirst()
+            .orElse(null);
+        if (configuredOrientation != null) {
+            return "h".equals(configuredOrientation);
+        }
+        return derivedGraphDefinition.derivedType()
+            != LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY;
     }
 
     private static String derivedMetricKey(LocationDashboardImportStrategyConfig.DerivedGraphType derivedGraphType) {

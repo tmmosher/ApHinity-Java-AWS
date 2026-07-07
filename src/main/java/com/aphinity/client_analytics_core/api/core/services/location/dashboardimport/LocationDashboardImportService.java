@@ -374,7 +374,8 @@ public class LocationDashboardImportService {
             previewGraph.setLayout(LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
                 previewGraph.getLayout(),
                 derivedGraphDefinition,
-                strategy.locationName()
+                strategy.locationName(),
+                LocationDashboardGraphMetadataSupport.currentTraceList(previewGraph)
             ));
             previewGraph.setStyle(LocationDashboardGraphMetadataSupport.withDerivedImportStyle(
                 previewGraph.getStyle(),
