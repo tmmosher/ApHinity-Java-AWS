@@ -26,14 +26,26 @@ declare module "tabulator-tables" {
     placeholder?: string;
     index?: string;
     pagination?: boolean | "local" | "remote";
+    paginationMode?: "local" | "remote";
     paginationSize?: number;
     paginationSizeSelector?: number[];
     paginationCounter?: "rows" | "pages";
+    ajaxURL?: string;
+    ajaxRequestFunc?: (
+      url: string,
+      config: Record<string, unknown>,
+      params: Record<string, unknown>
+    ) => Promise<unknown>;
+    ajaxResponse?: (
+      url: string,
+      params: Record<string, unknown>,
+      response: unknown
+    ) => unknown;
   };
 
   export class TabulatorFull {
     constructor(element: HTMLElement, options: TabulatorOptions);
-    setData(data: Record<string, unknown>[]): Promise<unknown>;
+    setData(data?: Record<string, unknown>[] | string): Promise<unknown>;
     setColumns(columns: TabulatorColumnDefinition[]): void;
     destroy(): void;
   }

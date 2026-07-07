@@ -80,6 +80,14 @@ export interface LocationDashboardSpreadsheetUploadResult {
     correctiveActions: CreateLocationServiceEventRequest[];
 }
 
+export interface LocationDashboardTablePage {
+    data: Record<string, unknown>[];
+    last_page: number;
+    total: number;
+    page: number;
+    size: number;
+}
+
 export type LocationGraphTimeRange = "threeMonths" | "twelveMonths" | "allTime";
 
 export interface LocationGraphUpdate {

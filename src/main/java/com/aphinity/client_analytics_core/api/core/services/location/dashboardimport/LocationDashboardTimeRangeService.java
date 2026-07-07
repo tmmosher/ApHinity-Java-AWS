@@ -9,13 +9,16 @@ import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayload
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardTablePageResponse;
 import com.aphinity.client_analytics_core.api.core.services.location.DashboardGraphMonthRange;
 import com.aphinity.client_analytics_core.api.core.services.location.DashboardGraphMonthRangePayloadProjector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -199,6 +202,35 @@ public class LocationDashboardTimeRangeService {
             refreshContext.refreshedAt()
         ));
         return Map.copyOf(payloadsByGraphId);
+    }
+
+    @Transactional(readOnly = true)
+    public LocationDashboardTablePageResponse resolveRecentSampleMeasurementsPage(
+        Long locationId,
+        Long graphId,
+        Integer monthRange,
+        Integer page,
+        Integer size
+    ) {
+        RefreshContext refreshContext = loadRefreshContext(locationId);
+        if (refreshContext == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Location dashboard table not found");
+        }
+        int normalizedSize = Math.max(1, Math.min(size == null ? 10 : size, 100));
+        int requestedPage = Math.max(1, page == null ? 1 : page);
+        DashboardGraphMonthRange normalizedRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
+
+        return strategyRegistry.resolve(refreshContext.location().getName())
+            .map(strategy -> buildRecentSampleMeasurementsPage(
+                locationId,
+                graphId,
+                refreshContext,
+                strategy,
+                normalizedRange,
+                requestedPage,
+                normalizedSize
+            ))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location dashboard table not found"));
     }
 
     private RefreshContext loadRefreshContext(Long locationId) {
@@ -401,6 +433,79 @@ public class LocationDashboardTimeRangeService {
             );
         }
         return payloadsByGraphId;
+    }
+
+    private LocationDashboardTablePageResponse buildRecentSampleMeasurementsPage(
+        Long locationId,
+        Long graphId,
+        RefreshContext refreshContext,
+        LocationDashboardImportStrategy strategy,
+        DashboardGraphMonthRange monthRange,
+        int requestedPage,
+        int pageSize
+    ) {
+        Map<String, Graph> matchedImportGraphsByDefinitionId = graphMatcher.matchAvailableImportGraphs(
+            strategy.graphDefinitions(),
+            refreshContext.assignedGraphs(),
+            refreshContext.location().getName()
+        );
+        Map<String, Graph> matchedDerivedGraphsByDefinitionId = graphMatcher.matchAvailableDerivedGraphs(
+            strategy.derivedGraphDefinitions(),
+            refreshContext.assignedGraphs(),
+            refreshContext.location().getName()
+        );
+
+        DerivedGraphConfig tableGraphDefinition = strategy.derivedGraphDefinitions().stream()
+            .filter(Objects::nonNull)
+            .filter(definition -> definition.derivedType()
+                == LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS)
+            .findFirst()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Location dashboard table not found"));
+        Graph tableGraph = matchedDerivedGraphsByDefinitionId.get(
+            LocationDashboardGraphMetadataSupport.normalizeKey(tableGraphDefinition.id())
+        );
+        if (tableGraph == null || tableGraph.getId() == null || !Objects.equals(tableGraph.getId(), graphId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Location dashboard table not found");
+        }
+
+        Map<Long, Graph> assignedGraphsById = refreshContext.assignedGraphs().stream()
+            .filter(graph -> graph != null && graph.getId() != null)
+            .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
+        List<ServiceEvent> correctiveActions =
+            serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
+        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> persistedSamples =
+            samplePersistenceService.loadLocationSamples(locationId);
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            historicalDataAssembler.buildHistoricalDerivedData(
+                strategy.graphDefinitions(),
+                matchedImportGraphsByDefinitionId,
+                assignedGraphsById,
+                assignedGraphsById,
+                persistedSamples,
+                correctiveActions,
+                strategy.spreadsheetIdentityPattern()
+            );
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData rangedHistoricalData =
+            HistoricalDerivedDataTimeRangeProjector.project(historicalData, monthRange, refreshContext.anchorDate());
+        LocationDashboardDerivedGraphSupport.RecentSampleMeasurementsTable table =
+            LocationDashboardDerivedGraphSupport.buildRecentSampleMeasurementsTable(
+                rangedHistoricalData.recentRawSamples(),
+                strategy.spreadsheetIdentityPattern(),
+                refreshContext.anchorDate()
+            );
+
+        long total = table.rows().size();
+        int lastPage = Math.max(1, (int) Math.ceil(total / (double) pageSize));
+        int responsePage = Math.min(requestedPage, lastPage);
+        int fromIndex = Math.min((responsePage - 1) * pageSize, table.rows().size());
+        int toIndex = Math.min(fromIndex + pageSize, table.rows().size());
+        return new LocationDashboardTablePageResponse(
+            table.rows().subList(fromIndex, toIndex),
+            lastPage,
+            total,
+            responsePage,
+            pageSize
+        );
     }
 
     private boolean graphContainsTimeSeries(Graph graph) {

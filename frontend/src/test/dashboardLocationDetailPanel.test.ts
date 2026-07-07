@@ -4,6 +4,7 @@ import {
   createLocationGraphById,
   deleteLocationGraphById,
   fetchLocationById,
+  fetchLocationGraphTablePageById,
   fetchLocationGraphsById,
   renameLocationGraphById,
   parseRouteLocationId,
@@ -127,6 +128,38 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     expect(graphs[0].layout).toEqual({title: "Sessions"});
     expect(graphs[0].config).toEqual({displayModeBar: false});
     expect(graphs[0].style).toEqual({height: 320});
+  });
+
+  it("requests and parses a paged dashboard table graph", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      data: [{
+        rowIdentifier: "newport|sink-1",
+        facility: "Newport",
+        followUps: [{date: "2026-06-20", value: "4"}]
+      }],
+      last_page: 4,
+      total: 37,
+      page: 2,
+      size: 10
+    }));
+
+    const page = await fetchLocationGraphTablePageById(host, "55", 99, 2, 10, 3);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      host + "/api/core/locations/55/graphs/99/table-page?monthRange=3&page=2&size=10",
+      {method: "GET"}
+    );
+    expect(page).toEqual({
+      data: [{
+        rowIdentifier: "newport|sink-1",
+        facility: "Newport",
+        followUps: [{date: "2026-06-20", value: "4"}]
+      }],
+      last_page: 4,
+      total: 37,
+      page: 2,
+      size: 10
+    });
   });
 
   it("normalizes legacy nested graph payloads", async () => {

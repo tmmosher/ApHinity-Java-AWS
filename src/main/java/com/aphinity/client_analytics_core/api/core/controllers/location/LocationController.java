@@ -8,6 +8,7 @@ import com.aphinity.client_analytics_core.api.core.requests.location.LocationWor
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardTablePageResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
@@ -103,6 +104,26 @@ public class LocationController {
     ) {
         Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
         return locationService.getAccessibleLocationGraphs(userId, locationId, monthRange);
+    }
+
+    @GetMapping("/locations/{locationId}/graphs/{graphId}/table-page")
+    public LocationDashboardTablePageResponse locationGraphTablePage(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @PathVariable Long graphId,
+        @RequestParam(required = false) Integer monthRange,
+        @RequestParam(required = false) Integer page,
+        @RequestParam(required = false) Integer size
+    ) {
+        Long userId = authenticatedUserService.resolveAuthenticatedUserId(jwt);
+        return locationService.getAccessibleLocationGraphTablePage(
+            userId,
+            locationId,
+            graphId,
+            monthRange,
+            page,
+            size
+        );
     }
 
     /**

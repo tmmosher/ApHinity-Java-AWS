@@ -4,6 +4,7 @@ import {parseApiErrorPayload, throwAuthenticationOrSecurityError} from "../commo
 import {parsePositiveRouteId, parseRouteLocationId} from "../common/routeParams";
 import {
   LocationDashboardSpreadsheetUploadResult,
+  LocationDashboardTablePage,
   LocationGraph,
   LocationGraphRenameResult,
   LocationGraphType,
@@ -145,6 +146,59 @@ export const fetchLocationGraphsById = async (
     throw new Error("Unable to load location graphs");
   }
   return parseLocationGraphList(await response.json());
+};
+
+const parseLocationDashboardTablePage = (value: unknown): LocationDashboardTablePage => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid dashboard table page response");
+  }
+  const record = value as Record<string, unknown>;
+  const data = Array.isArray(record.data)
+    ? record.data.filter((row): row is Record<string, unknown> =>
+      row !== null && typeof row === "object" && !Array.isArray(row)
+    )
+    : [];
+  return {
+    data,
+    last_page: typeof record.last_page === "number" && Number.isFinite(record.last_page)
+      ? Math.max(1, Math.trunc(record.last_page))
+      : 1,
+    total: typeof record.total === "number" && Number.isFinite(record.total)
+      ? Math.max(0, Math.trunc(record.total))
+      : data.length,
+    page: typeof record.page === "number" && Number.isFinite(record.page)
+      ? Math.max(1, Math.trunc(record.page))
+      : 1,
+    size: typeof record.size === "number" && Number.isFinite(record.size)
+      ? Math.max(1, Math.trunc(record.size))
+      : data.length
+  };
+};
+
+export const fetchLocationGraphTablePageById = async (
+  host: string,
+  locationId: string,
+  graphId: number,
+  page: number,
+  size: number,
+  monthRange = -1
+): Promise<LocationDashboardTablePage> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedGraphId = parseGraphId(graphId);
+  const query = new URLSearchParams({
+    monthRange: String(Number.isInteger(monthRange) ? monthRange : -1),
+    page: String(Math.max(1, Math.trunc(page))),
+    size: String(Math.max(1, Math.trunc(size)))
+  });
+
+  const response = await apiFetch(
+    host + "/api/core/locations/" + parsedLocationId + "/graphs/" + parsedGraphId + "/table-page?" + query.toString(),
+    {method: "GET"}
+  );
+  if (!response.ok) {
+    throw new Error("Unable to load dashboard table page");
+  }
+  return parseLocationDashboardTablePage(await response.json());
 };
 
 /**

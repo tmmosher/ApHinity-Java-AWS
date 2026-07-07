@@ -10,6 +10,9 @@ type LocationDashboardSectionProps = {
   section: LocationSectionLayout;
   graphs: LocationGraph[];
   missingGraphIds: number[];
+  apiHost: string;
+  locationId: string;
+  monthRange: number;
   canEditGraphs: boolean;
   isGraphMutationBusy: boolean;
   plotlyModule: Resource<unknown>;
@@ -46,7 +49,15 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
               <div class="w-full" style={{height: resolveGraphHeight(graph.style, graph.layout)}}>
                 <Show
                   when={!isTabulatorGraph(graph)}
-                  fallback={<TabulatorGraph graph={graph} class="h-full w-full" />}
+                  fallback={
+                    <TabulatorGraph
+                      graph={graph}
+                      apiHost={props.apiHost}
+                      locationId={props.locationId}
+                      monthRange={props.monthRange}
+                      class="h-full w-full"
+                    />
+                  }
                 >
                   <Show
                     when={!props.plotlyModule.error}

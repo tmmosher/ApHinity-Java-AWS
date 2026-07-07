@@ -162,6 +162,51 @@ final class LocationDashboardDerivedGraphSupport {
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern,
         LocalDate anchorDate
     ) {
+        RecentSampleMeasurementsTable table = buildRecentSampleMeasurementsTable(
+            rawSamples,
+            identityPattern,
+            anchorDate
+        );
+
+        List<List<Object>> columns = table.headers().stream()
+            .map(ignored -> new ArrayList<>())
+            .collect(Collectors.toCollection(ArrayList::new));
+        List<Map<String, Object>> customData = new ArrayList<>();
+        for (Map<String, Object> row : table.rows()) {
+            for (int index = 0; index < table.fields().size(); index += 1) {
+                columns.get(index).add(row.getOrDefault(table.fields().get(index), ""));
+            }
+            customData.add(Map.of(
+                "rowIdentifier", row.getOrDefault("rowIdentifier", ""),
+                "caStatus", row.getOrDefault("caStatus", ""),
+                "followUps", row.getOrDefault("followUps", List.of())
+            ));
+        }
+
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("type", "table");
+        trace.put("name", "Recent Sample Measurements");
+        trace.put("header", Map.of(
+            "values", table.headers(),
+            "align", "left"
+        ));
+        trace.put("cells", Map.of(
+            "values", columns.stream().map(List::copyOf).toList(),
+            "align", "left"
+        ));
+        trace.put("customdata", List.copyOf(customData));
+        trace.put("meta", Map.of(
+            "renderer", "tabulator",
+            "rowKey", "rowIdentifier"
+        ));
+        return trace;
+    }
+
+    static RecentSampleMeasurementsTable buildRecentSampleMeasurementsTable(
+        List<HistoricalRawSample> rawSamples,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern,
+        LocalDate anchorDate
+    ) {
         List<IdentityColumnDefinition> identityColumns = identityColumns(identityPattern);
         LocalDate windowStart = recentSampleWindowStart(anchorDate);
         Map<String, RecentSampleRow> rowsByIdentifier = new LinkedHashMap<>();
@@ -204,42 +249,35 @@ final class LocationDashboardDerivedGraphSupport {
         headers.add("CA Status");
         headers.add("Follow-ups");
 
-        List<List<Object>> columns = new ArrayList<>();
-        for (int index = 0; index < headers.size(); index += 1) {
-            columns.add(new ArrayList<>());
-        }
-        List<Map<String, Object>> customData = new ArrayList<>();
+        List<String> fields = headers.stream()
+            .map(LocationDashboardDerivedGraphSupport::slugField)
+            .toList();
+        List<Map<String, Object>> tableRows = new ArrayList<>();
         for (RecentSampleRow row : rows) {
-            int columnIndex = 0;
+            Map<String, Object> tableRow = new LinkedHashMap<>();
+            int fieldIndex = 0;
             for (IdentityColumnDefinition identityColumn : identityColumns) {
-                columns.get(columnIndex).add(row.identityValues().getOrDefault(identityColumn.key(), ""));
-                columnIndex += 1;
+                tableRow.put(fields.get(fieldIndex), row.identityValues().getOrDefault(identityColumn.key(), ""));
+                fieldIndex += 1;
             }
-            columns.get(columnIndex++).add(row.measurementName());
-            columns.get(columnIndex++).add(String.valueOf(row.observedDate()));
-            columns.get(columnIndex++).add(row.rawValue());
-            columns.get(columnIndex++).add(row.caStatus());
-            columns.get(columnIndex).add(row.followUps().isEmpty() ? "" : row.followUps().size());
-            customData.add(row.customData());
+            tableRow.put(fields.get(fieldIndex++), row.measurementName());
+            tableRow.put(fields.get(fieldIndex++), String.valueOf(row.observedDate()));
+            tableRow.put(fields.get(fieldIndex++), row.rawValue());
+            tableRow.put(fields.get(fieldIndex++), row.caStatus());
+            tableRow.put(fields.get(fieldIndex), row.followUps().isEmpty() ? "" : row.followUps().size());
+            tableRow.put("rowIdentifier", row.rowIdentifier());
+            tableRow.put("caStatus", row.caStatus());
+            tableRow.put("followUps", row.followUps());
+            tableRows.add(Map.copyOf(tableRow));
         }
+        return new RecentSampleMeasurementsTable(headers, fields, tableRows);
+    }
 
-        Map<String, Object> trace = new LinkedHashMap<>();
-        trace.put("type", "table");
-        trace.put("name", "Recent Sample Measurements");
-        trace.put("header", Map.of(
-            "values", List.copyOf(headers),
-            "align", "left"
-        ));
-        trace.put("cells", Map.of(
-            "values", columns.stream().map(List::copyOf).toList(),
-            "align", "left"
-        ));
-        trace.put("customdata", List.copyOf(customData));
-        trace.put("meta", Map.of(
-            "renderer", "tabulator",
-            "rowKey", "rowIdentifier"
-        ));
-        return trace;
+    private static String slugField(String header) {
+        String normalized = header == null ? "" : header.strip().toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9]+", "_")
+            .replaceAll("^_+|_+$", "");
+        return normalized.isBlank() ? "column" : normalized;
     }
 
     private static LocalDate recentSampleWindowStart(LocalDate anchorDate) {
@@ -721,6 +759,18 @@ final class LocationDashboardDerivedGraphSupport {
     ) {
         long nonConformingCount() {
             return Math.max(0L, sampleCount - compliantCount);
+        }
+    }
+
+    record RecentSampleMeasurementsTable(
+        List<String> headers,
+        List<String> fields,
+        List<Map<String, Object>> rows
+    ) {
+        RecentSampleMeasurementsTable {
+            headers = headers == null ? List.of() : List.copyOf(headers);
+            fields = fields == null ? List.of() : List.copyOf(fields);
+            rows = rows == null ? List.of() : List.copyOf(rows);
         }
     }
 

@@ -20,6 +20,7 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRol
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardTablePageResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -201,6 +202,34 @@ public class LocationService {
             .map(LocationGraph::getGraph)
             .map(graph -> graphResponseMapper.toResponse(graph, rangePayloadsByGraphId.get(graph.getId())))
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public LocationDashboardTablePageResponse getAccessibleLocationGraphTablePage(
+        Long userId,
+        Long locationId,
+        Long graphId,
+        Integer monthRange,
+        Integer page,
+        Integer size
+    ) {
+        AppUser user = requireUser(userId);
+        if (!locationRepository.existsById(locationId)) {
+            throw locationNotFound();
+        }
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+        if (!locationGraphRepository.existsByIdLocationIdAndIdGraphId(locationId, graphId)) {
+            throw locationGraphNotFound();
+        }
+        return locationDashboardTimeRangeService.resolveRecentSampleMeasurementsPage(
+            locationId,
+            graphId,
+            monthRange,
+            page,
+            size
+        );
     }
 
     /**

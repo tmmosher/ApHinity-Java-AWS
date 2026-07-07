@@ -13,6 +13,7 @@ import LocationDashboardTimeRangeSelector from "../../../../components/location/
 import {loadPlotlyModule} from "../../../../components/common/Chart";
 import type {LocationDashboardSpreadsheetUploadResult} from "../../../../types/Types";
 import {isTabulatorGraph} from "../../../../util/graph/tabulatorGraph";
+import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
 
 type LocationDashboardPanelProps = {
   locationId: string;
@@ -146,6 +147,9 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
                   section={section}
                   graphs={displayedSectionGraphs(section)}
                   missingGraphIds={missingGraphIds(section)}
+                  apiHost={host}
+                  locationId={props.locationId}
+                  monthRange={monthRangeForDashboardTimeRange(selectedTimeRange())}
                   canEditGraphs={canEditGraphs()}
                   isGraphMutationBusy={dashboard.isGraphMutationBusy()}
                   plotlyModule={plotlyModule}
