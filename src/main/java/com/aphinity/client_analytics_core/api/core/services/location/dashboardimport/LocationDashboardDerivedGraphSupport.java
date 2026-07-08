@@ -231,9 +231,22 @@ final class LocationDashboardDerivedGraphSupport {
                     current.addMonthlyMeasurement(sample);
                     continue;
                 }
+                if (sample.observedDate().isEqual(current.observedDate())) {
+                    if (current.compliant && !sample.compliant()) {
+                        RecentSampleRow next = RecentSampleRow.from(sample);
+                        next.addMonthlyMeasurement(current.toHistoricalRawSample());
+                        current.followUps().forEach(next::addFollowUp);
+                        next.inheritPresentationResolution(current);
+                        rowsByIdentifier.put(rowIdentifier, next);
+                        continue;
+                    }
+                    current.addMonthlyMeasurement(sample);
+                    continue;
+                }
                 RecentSampleRow next = RecentSampleRow.from(sample);
                 next.addMonthlyMeasurement(current.toHistoricalRawSample());
                 current.followUps().forEach(next::addFollowUp);
+                next.inheritPresentationResolution(current);
                 rowsByIdentifier.put(rowIdentifier, next);
             }
         }
@@ -947,6 +960,7 @@ final class LocationDashboardDerivedGraphSupport {
         private final String units;
         private final boolean compliant;
         private final boolean resolved;
+        private final RecentSampleResolutionChain resolutionChain = new RecentSampleResolutionChain();
         private final List<Map<String, Object>> followUps = new ArrayList<>();
 
         private RecentSampleRow(
@@ -989,6 +1003,9 @@ final class LocationDashboardDerivedGraphSupport {
             if (sample == null) {
                 return;
             }
+            // Table presentation tracks physical resolution of the follow-up chain.
+            // Turnaround-time resolution remains encoded on the sample itself and may be true for a still-failing follow-up.
+            resolutionChain.recordFollowUp(observedDate, sample);
             addFollowUp(Map.of(
                 "date", String.valueOf(sample.observedDate()),
                 "value", displayValue(sample.rawValue(), sample.units())
@@ -998,6 +1015,12 @@ final class LocationDashboardDerivedGraphSupport {
         void addFollowUp(Map<String, Object> followUp) {
             if (followUp != null) {
                 followUps.add(followUp);
+            }
+        }
+
+        void inheritPresentationResolution(RecentSampleRow previousRoot) {
+            if (previousRoot != null) {
+                resolutionChain.inherit(previousRoot.resolutionChain);
             }
         }
 
@@ -1029,7 +1052,7 @@ final class LocationDashboardDerivedGraphSupport {
             if (compliant) {
                 return "No CA Required";
             }
-            return resolved ? "Resolved" : "Active";
+            return resolutionChain.resolved() ? "Resolved" : "Active";
         }
 
         List<Map<String, Object>> followUps() {
@@ -1064,6 +1087,30 @@ final class LocationDashboardDerivedGraphSupport {
                 return normalizedUnits;
             }
             return normalizedUnits.isBlank() ? value : value + " " + normalizedUnits;
+        }
+    }
+
+    private static final class RecentSampleResolutionChain {
+        private boolean hasCompliantFollowUp;
+
+        void recordFollowUp(LocalDate rootObservedDate, HistoricalRawSample sample) {
+            if (sample != null
+                && sample.compliant()
+                && sample.observedDate() != null
+                && rootObservedDate != null
+                && sample.observedDate().isAfter(rootObservedDate)) {
+                hasCompliantFollowUp = true;
+            }
+        }
+
+        void inherit(RecentSampleResolutionChain previousRootChain) {
+            if (previousRootChain != null && previousRootChain.hasCompliantFollowUp) {
+                hasCompliantFollowUp = true;
+            }
+        }
+
+        boolean resolved() {
+            return hasCompliantFollowUp;
         }
     }
 }

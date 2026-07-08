@@ -102,10 +102,163 @@ class LocationDashboardDerivedGraphSupportTest {
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> customData = (List<Map<String, Object>>) trace.get("customdata");
-        assertEquals("Resolved", customData.getFirst().get("caStatus"));
+        assertEquals("Active", customData.getFirst().get("caStatus"));
         assertEquals(List.of(), customData.getFirst().get("followUps"));
         assertEquals("No CA Required", customData.get(1).get("caStatus"));
+        assertEquals("Active", customData.get(2).get("caStatus"));
         assertEquals(List.of(Map.of("date", "2026-06-05", "value", "8 CFU.mL")), customData.get(2).get("followUps"));
+    }
+
+    @Test
+    void resolvesRecentSampleTableRowWhenFollowUpChainEventuallyBecomesCompliant() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(),
+                List.of(
+                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "12", "CFU.mL", false, false),
+                    rawSample(LocalDate.parse("2026-06-05"), "row-hpc", "HPC", "9", "CFU.mL", false, true),
+                    rawSample(LocalDate.parse("2026-06-10"), "row-hpc", "HPC", "2", "CFU.mL", true, false)
+                )
+            );
+
+        List<Map<String, Object>> payload = LocationDashboardDerivedGraphSupport.buildPayload(
+            recentSampleMeasurementsDefinition(),
+            new Graph(),
+            historicalData,
+            List.of(),
+            LocalDate.parse("2026-07-20")
+        );
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) payload.getFirst().get("customdata");
+        assertEquals("Resolved", customData.getFirst().get("caStatus"));
+        assertEquals(
+            List.of(
+                Map.of("date", "2026-06-05", "value", "9 CFU.mL"),
+                Map.of("date", "2026-06-10", "value", "2 CFU.mL")
+            ),
+            customData.getFirst().get("followUps")
+        );
+    }
+
+    @Test
+    void keepsRecentSampleTableRowActiveWhenFollowUpsRemainNonCompliant() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                    LocalDate.parse("2026-06-01"),
+                    "Newport Beach",
+                    null,
+                    null,
+                    "HPC",
+                    "Sink 1",
+                    null,
+                    "row-hpc",
+                    true,
+                    4L
+                )),
+                List.of(
+                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "12", "CFU.mL", false, true),
+                    rawSample(LocalDate.parse("2026-06-05"), "row-hpc", "HPC", "9", "CFU.mL", false, false)
+                )
+            );
+
+        List<Map<String, Object>> tablePayload = LocationDashboardDerivedGraphSupport.buildPayload(
+            recentSampleMeasurementsDefinition(),
+            new Graph(),
+            historicalData,
+            List.of(),
+            LocalDate.parse("2026-07-20")
+        );
+        List<Map<String, Object>> turnaroundPayload = LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "non-conformance-status-by-turnaround-time",
+                "Non-Conformance Status",
+                "Turnaround Time",
+                LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME,
+                "bar"
+            ),
+            new Graph(),
+            historicalData,
+            List.of()
+        );
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) tablePayload.getFirst().get("customdata");
+        assertEquals("Active", customData.getFirst().get("caStatus"));
+        assertEquals(List.of(1L), turnaroundPayload.getFirst().get("x"));
+        assertEquals(List.of("< 1 week"), turnaroundPayload.getFirst().get("y"));
+    }
+
+    @Test
+    void keepsRecentSampleTableRowActiveForSameDayCompliantSample() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(),
+                List.of(
+                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "12", "CFU.mL", false, false),
+                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "2", "CFU.mL", true, false)
+                )
+            );
+
+        List<Map<String, Object>> payload = LocationDashboardDerivedGraphSupport.buildPayload(
+            recentSampleMeasurementsDefinition(),
+            new Graph(),
+            historicalData,
+            List.of(),
+            LocalDate.parse("2026-07-20")
+        );
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) payload.getFirst().get("customdata");
+        assertEquals("Active", customData.getFirst().get("caStatus"));
+        assertEquals(List.of(Map.of("date", "2026-06-01", "value", "2 CFU.mL")), customData.getFirst().get("followUps"));
+    }
+
+    @Test
+    void resolvesRecentSampleTableRowFromCompliantFollowUpWhenInputIsUnordered() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(),
+                List.of(
+                    rawSample(LocalDate.parse("2026-06-10"), "row-hpc", "HPC", "2", "CFU.mL", true, false),
+                    rawSample(LocalDate.parse("2026-06-01"), "row-hpc", "HPC", "12", "CFU.mL", false, false),
+                    rawSample(LocalDate.parse("2026-06-05"), "row-hpc", "HPC", "9", "CFU.mL", false, true)
+                )
+            );
+
+        List<Map<String, Object>> payload = LocationDashboardDerivedGraphSupport.buildPayload(
+            recentSampleMeasurementsDefinition(),
+            new Graph(),
+            historicalData,
+            List.of(),
+            LocalDate.parse("2026-07-20")
+        );
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> customData = (List<Map<String, Object>>) payload.getFirst().get("customdata");
+        assertEquals("Resolved", customData.getFirst().get("caStatus"));
+        assertEquals(
+            List.of(
+                Map.of("date", "2026-06-05", "value", "9 CFU.mL"),
+                Map.of("date", "2026-06-10", "value", "2 CFU.mL")
+            ),
+            customData.getFirst().get("followUps")
+        );
+    }
+
+    private LocationDashboardImportStrategyConfig.DerivedGraphConfig recentSampleMeasurementsDefinition() {
+        return new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+            "recent-sample-measurements",
+            "Recent Sample Measurements",
+            null,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS,
+            "table"
+        );
     }
 
     private LocationDashboardDerivedGraphSupport.HistoricalRawSample rawSample(
