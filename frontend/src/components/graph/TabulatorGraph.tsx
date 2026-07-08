@@ -1,6 +1,9 @@
-import {createEffect, onCleanup, onMount} from "solid-js";
+import {Show, createEffect, createSignal, onCleanup, onMount} from "solid-js";
+import {toast} from "solid-toast";
 import type {LocationDashboardTablePage, LocationGraph} from "../../types/Types";
 import {createTabulatorGraphModel, type TabulatorGraphRow} from "../../util/graph/tabulatorGraph";
+import {registerTabulatorLoadHandlers} from "../../util/graph/tabulatorGraphLoading";
+import GraphLoadingPlaceholder from "./GraphLoadingPlaceholder";
 import "tabulator-tables/dist/css/tabulator_simple.min.css";
 import type {TabulatorColumnDefinition} from "tabulator-tables";
 import {fetchLocationGraphTablePageById} from "../../util/graph/locationDetailApi";
@@ -81,9 +84,10 @@ const toPositiveInteger = (value: unknown, fallback: number): number => {
 
 const TabulatorGraph = (props: TabulatorGraphProps) => {
   let host!: HTMLDivElement;
-  let table: {setData: (rows?: Record<string, unknown>[] | string) => Promise<unknown>; setColumns: (columns: TabulatorColumnDefinition[]) => void; destroy: () => void} | null = null;
+  let table: {on: (event: string, callback: (...args: unknown[]) => void) => void; setData: (rows?: Record<string, unknown>[] | string) => Promise<unknown>; setColumns: (columns: TabulatorColumnDefinition[]) => void; destroy: () => void} | null = null;
   let disposed = false;
   const pageCache = new Map<string, Promise<LocationDashboardTablePage>>();
+  const [isLoading, setIsLoading] = createSignal(true);
 
   const model = () => createTabulatorGraphModel(props.graph);
   const canUseRemotePagination = () =>
@@ -153,8 +157,14 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
         },
         ajaxResponse: (_url, _params, response) => response
       });
+      registerTabulatorLoadHandlers(table, {
+        setLoading: setIsLoading,
+        notifyError: toast.error
+      });
       if (canUseRemotePagination()) {
         void table.setData();
+      } else {
+        setIsLoading(false);
       }
     });
   });
@@ -181,10 +191,17 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   });
 
   return (
-    <div
-      ref={host}
-      class={"[&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content " + (props.class ?? "")}
-    />
+    <div class={"relative " + (props.class ?? "")}>
+      <div
+        ref={host}
+        class="h-full w-full [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content"
+      />
+      <Show when={isLoading()}>
+        <div class="absolute inset-0 z-10 bg-base-100" data-tabulator-loading-placeholder="">
+          <GraphLoadingPlaceholder graphName={props.graph.name} />
+        </div>
+      </Show>
+    </div>
   );
 };
 

@@ -1,0 +1,59 @@
+{
+  "locationName": "Apple Inc",
+  "identityPattern": [
+    {
+      "column": "",
+      "aliases": []
+    }
+  ],
+  "sublocations": [
+    {
+      "key": "",
+      "displayName": "",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    }
+  ],
+  "systems": [
+    {
+      "key": "",
+      "displayName": "",
+      "rangeProfile": "",
+      "aliases": []
+    }
+  ],
+  "graphs": [
+    {
+      "id": "",
+      "name": "",
+      "title": "",
+      "importType": "",
+      "sublocationKey": "",
+      "traceOrder": [],
+      "traceColors": {},
+      "graphType": ""
+    }
+  ],
+  "derivedGraphs": [
+    {
+      "id": "",
+      "name": "",
+      "title": "",
+      "derivedType": "",
+      "graphType": ""
+    }
+  ],
+  "systemTypeAliases": [
+    {
+      "": []
+    }
+  ],
+  "measurementUnits": [
+    {
+      "value": "",
+      "aliases": [],
+      "for_measurement_names": []
+    }
+  ]
+}

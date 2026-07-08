@@ -51,6 +51,7 @@ declare module "tabulator-tables" {
 
   export class TabulatorFull {
     constructor(element: HTMLElement, options: TabulatorOptions);
+    on(event: string, callback: (...args: unknown[]) => void): void;
     setData(data?: Record<string, unknown>[] | string): Promise<unknown>;
     setColumns(columns: TabulatorColumnDefinition[]): void;
     destroy(): void;
