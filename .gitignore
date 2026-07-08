@@ -68,5 +68,8 @@ src/main/resources/static/
 # Test resources
 /src/test/resources/sheets/
 
+# import template
+src/main/resources/location-dashboard-import/basic-import-template.json
+
 # logs
 /logs
