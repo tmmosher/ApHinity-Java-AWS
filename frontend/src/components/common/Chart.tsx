@@ -361,7 +361,16 @@ export const attachPlotlyResizeListener = (
     plotly: PlotlyResizeTarget,
     el: HTMLDivElement
 ) => {
-    const onResize = () => plotly.Plots.resize(el);
+    const onResize = () => {
+        if (!el.isConnected) {
+            return;
+        }
+        try {
+            plotly.Plots.resize(el);
+        } catch {
+            // Plotly can race with Solid teardown; resize should not surface as a panel error.
+        }
+    };
     eventTarget.addEventListener("resize", onResize);
     return () => eventTarget.removeEventListener("resize", onResize);
 };
@@ -437,7 +446,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         renderQueue = renderQueue
             .catch(() => undefined)
             .then(async () => {
-                if (disposed) {
+                if (disposed || !el.isConnected) {
                     return;
                 }
 
@@ -451,12 +460,13 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
                         activeTheme
                     );
                 } catch (error) {
-                    purgePlotlyChart(module, el);
+                    if (!disposed) {
+                        purgePlotlyChart(module, el);
+                    }
                     console.error(`Failed to render graph "${props.name}"`, error);
                     return;
                 }
                 if (disposed) {
-                    purgePlotlyChart(module, el);
                     return;
                 }
                 if (!cleanupResize) {
@@ -469,7 +479,10 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         disposed = true;
         cleanupResize?.();
         disconnectThemeObserver?.();
-        purgePlotlyChart(plotlyModule(), el);
+        const module = plotlyModule();
+        void renderQueue
+            .catch(() => undefined)
+            .then(() => purgePlotlyChart(module, el));
     });
 
     return <div ref={el} class={props.class} />;

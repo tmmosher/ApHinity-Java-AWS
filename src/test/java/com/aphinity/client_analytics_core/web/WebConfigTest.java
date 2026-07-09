@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
@@ -23,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         classes = AccessTokenRefreshFilter.class
     )
 )
-@Import(WebConfig.class)
+@Import({WebConfig.class, StaticResourceExceptionHandler.class})
 @AutoConfigureMockMvc(addFilters = false)
 class WebConfigTest {
     @Autowired
@@ -48,6 +50,15 @@ class WebConfigTest {
         mockMvc.perform(get("/api/unknown"))
             .andExpect(status().isNotFound())
             .andExpect(forwardedUrl(null));
+    }
+
+    @Test
+    void missingAssetChunkReturnsPlainNotFoundInsteadOfJson() throws Exception {
+        mockMvc.perform(get("/assets/DashboardLocationsPanel-stale.js"))
+            .andExpect(status().isNotFound())
+            .andExpect(content().string(""))
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(header().doesNotExist("Content-Type"));
     }
 
     @RestController

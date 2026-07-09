@@ -1,9 +1,10 @@
-import {createEffect, onCleanup, onMount} from "solid-js";
+import {createEffect, createSignal, onCleanup, onMount} from "solid-js";
 import type {LocationDashboardTablePage, LocationGraph} from "../../types/Types";
 import {createTabulatorGraphModel, type TabulatorGraphRow} from "../../util/graph/tabulatorGraph";
 import "tabulator-tables/dist/css/tabulator_simple.min.css";
 import type {TabulatorColumnDefinition} from "tabulator-tables";
 import {fetchLocationGraphTablePageById} from "../../util/graph/locationDetailApi";
+import {getDocumentThemePreference, type ThemePreference} from "../../util/common/themePreference";
 
 type TabulatorGraphProps = {
   graph: LocationGraph;
@@ -83,6 +84,8 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   let host!: HTMLDivElement;
   let table: {setData: (rows?: Record<string, unknown>[] | string) => Promise<unknown>; setColumns: (columns: TabulatorColumnDefinition[]) => void; destroy: () => void} | null = null;
   let disposed = false;
+  let disconnectThemeObserver: (() => void) | undefined;
+  const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
   const pageCache = new Map<string, Promise<LocationDashboardTablePage>>();
 
   const model = () => createTabulatorGraphModel(props.graph);
@@ -123,6 +126,17 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   };
 
   onMount(() => {
+    setThemePreference(getDocumentThemePreference());
+
+    const observer = new MutationObserver(() => {
+      setThemePreference(getDocumentThemePreference());
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"]
+    });
+    disconnectThemeObserver = () => observer.disconnect();
+
     void import("tabulator-tables").then(({TabulatorFull}) => {
       if (disposed) {
         return;
@@ -176,6 +190,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
 
   onCleanup(() => {
     disposed = true;
+    disconnectThemeObserver?.();
     table?.destroy();
     table = null;
   });
@@ -183,7 +198,8 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   return (
     <div
       ref={host}
-      class={"[&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content " + (props.class ?? "")}
+      class={"aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content " + (props.class ?? "")}
+      classList={{"aphinity-tabulator-dark": themePreference() === "dark"}}
     />
   );
 };
