@@ -2,10 +2,12 @@ import { onMount, type ParentProps } from "solid-js";
 import { Toaster } from "solid-toast";
 import {ApiHostProvider} from "./context/ApiHostContext";
 import {initializeThemePreference} from "./util/common/themePreference";
+import {preloadTurnstileScript} from "./components/common/TurnstileWidget";
 
 export default function App(props: ParentProps) {
   onMount(() => {
     initializeThemePreference();
+    preloadTurnstileScript();
   });
 
   return (

@@ -1,7 +1,8 @@
 import {createEffect, createSignal, onCleanup, onMount} from "solid-js";
 import type {LocationDashboardTablePage, LocationGraph} from "../../types/Types";
 import {createTabulatorGraphModel, type TabulatorGraphRow} from "../../util/graph/tabulatorGraph";
-import "tabulator-tables/dist/css/tabulator_simple.min.css";
+import tabulatorSimpleThemeUrl from "tabulator-tables/dist/css/tabulator_simple.min.css?url";
+import tabulatorMidnightThemeUrl from "tabulator-tables/dist/css/tabulator_midnight.min.css?url";
 import type {TabulatorColumnDefinition} from "tabulator-tables";
 import {fetchLocationGraphTablePageById} from "../../util/graph/locationDetailApi";
 import {getDocumentThemePreference, type ThemePreference} from "../../util/common/themePreference";
@@ -16,6 +17,28 @@ type TabulatorGraphProps = {
 
 const DEFAULT_PAGE_SIZE = 19;
 const PAGE_SIZE_SELECTOR = [19, 30, 50, 100];
+const TABULATOR_THEME_LINK_ID = "aphinity-tabulator-theme";
+
+const getTabulatorThemeUrl = (themePreference: ThemePreference): string =>
+  themePreference === "dark" ? tabulatorMidnightThemeUrl : tabulatorSimpleThemeUrl;
+
+const applyTabulatorThemeStylesheet = (themePreference: ThemePreference): void => {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const themeUrl = getTabulatorThemeUrl(themePreference);
+  let link = document.getElementById(TABULATOR_THEME_LINK_ID) as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.id = TABULATOR_THEME_LINK_ID;
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+  if (link.getAttribute("href") !== themeUrl) {
+    link.href = themeUrl;
+  }
+};
 
 const buildFollowUpPopup = (row: TabulatorGraphRow): HTMLElement => {
   const root = document.createElement("div");
@@ -127,6 +150,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
 
   onMount(() => {
     setThemePreference(getDocumentThemePreference());
+    applyTabulatorThemeStylesheet(getDocumentThemePreference());
 
     const observer = new MutationObserver(() => {
       setThemePreference(getDocumentThemePreference());
@@ -146,7 +170,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
       table = new TabulatorFull(host, {
         data: canUseRemotePagination() ? undefined : currentModel.rows,
         columns: withInteractiveColumns(currentModel.columns),
-        layout: "fitDataStretch",
+        layout: "fitColumns",
         height: "100%",
         placeholder: "No recent sample measurements",
         index: "rowIdentifier",
@@ -174,6 +198,10 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   });
 
   createEffect(() => {
+    applyTabulatorThemeStylesheet(themePreference());
+  });
+
+  createEffect(() => {
     const currentTable = table;
     if (!currentTable) {
       return;
@@ -198,8 +226,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   return (
     <div
       ref={host}
-      class={"aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content " + (props.class ?? "")}
-      classList={{"aphinity-tabulator-dark": themePreference() === "dark"}}
+      class={"aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-base-content dark:[&_.aphinity-ca-active-row_.tabulator-cell]:!text-slate-100 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-base-content dark:[&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-slate-100 " + (props.class ?? "")}
     />
   );
 };

@@ -83,7 +83,6 @@ export const createTabulatorGraphModel = (graph: LocationGraph): TabulatorGraphM
   const columns: TabulatorColumnDefinition[] = headers.map((headerValue, index) => ({
     title: toStringValue(headerValue),
     field: fields[index],
-    minWidth: index < fields.length - 1 ? 140 : 110,
     widthGrow: index < fields.length - 1 ? 2 : 1,
     headerSort: true
   }));
