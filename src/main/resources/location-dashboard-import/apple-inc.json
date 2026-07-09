@@ -1,15 +1,37 @@
 {
-  "locationName": "Apple Inc",
+  "locationName": "Apple Inc.",
   "identityPattern": [
     {
-      "column": "",
-      "aliases": []
+      "column": "Type",
+      "aliases": [
+        "Cooling Water Analysis",
+        "Closed Loop Analysis",
+        "TRC Analysis",
+        "3. Cooling Water Analysis",
+        "4. Closed Loop Analysis",
+        "5. TRC Analysis"
+      ]
+    },
+    {
+      "column": "Site",
+      "aliases": [
+        "Towers",
+        "Closed Loops",
+        "Locations"
+      ]
     }
   ],
   "sublocations": [
     {
-      "key": "",
-      "displayName": "",
+      "key": "city-water",
+      "displayName": "City Water",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "plant-a",
+      "displayName": "Plant A",
       "facilityAliases": [],
       "buildingAliases": [],
       "defaultForFacility": false
