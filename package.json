@@ -11,12 +11,10 @@
   },
   "dependencies": {
     "@ark-ui/solid": "^5.37.1",
-    "@nerimity/solid-turnstile": "^1.1.0",
     "@types/node": "^25.6.0",
     "corvu": "^0.7.2",
     "plotly.js-dist-min": "^3.4.0",
     "solid-toast": "^0.5.0",
-    "solid-turnstile": "^0.0.2",
     "theme-change": "^2.5.0"
   },
   "devDependencies": {

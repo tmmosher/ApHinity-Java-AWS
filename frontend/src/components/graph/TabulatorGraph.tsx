@@ -2,11 +2,14 @@ import {Show, createEffect, createSignal, onCleanup, onMount} from "solid-js";
 import {toast} from "solid-toast";
 import type {LocationDashboardTablePage, LocationGraph} from "../../types/Types";
 import {createTabulatorGraphModel, type TabulatorGraphRow} from "../../util/graph/tabulatorGraph";
+import tabulatorSimpleThemeUrl from "tabulator-tables/dist/css/tabulator_simple.min.css?url";
+import tabulatorMidnightThemeUrl from "tabulator-tables/dist/css/tabulator_midnight.min.css?url";
 import {registerTabulatorLoadHandlers} from "../../util/graph/tabulatorGraphLoading";
 import GraphLoadingPlaceholder from "./GraphLoadingPlaceholder";
 import "tabulator-tables/dist/css/tabulator_simple.min.css";
 import type {TabulatorColumnDefinition} from "tabulator-tables";
 import {fetchLocationGraphTablePageById} from "../../util/graph/locationDetailApi";
+import {getDocumentThemePreference, type ThemePreference} from "../../util/common/themePreference";
 
 type TabulatorGraphProps = {
   graph: LocationGraph;
@@ -18,6 +21,28 @@ type TabulatorGraphProps = {
 
 const DEFAULT_PAGE_SIZE = 19;
 const PAGE_SIZE_SELECTOR = [19, 30, 50, 100];
+const TABULATOR_THEME_LINK_ID = "aphinity-tabulator-theme";
+
+const getTabulatorThemeUrl = (themePreference: ThemePreference): string =>
+  themePreference === "dark" ? tabulatorMidnightThemeUrl : tabulatorSimpleThemeUrl;
+
+const applyTabulatorThemeStylesheet = (themePreference: ThemePreference): void => {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const themeUrl = getTabulatorThemeUrl(themePreference);
+  let link = document.getElementById(TABULATOR_THEME_LINK_ID) as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.id = TABULATOR_THEME_LINK_ID;
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+  if (link.getAttribute("href") !== themeUrl) {
+    link.href = themeUrl;
+  }
+};
 
 const buildFollowUpPopup = (row: TabulatorGraphRow): HTMLElement => {
   const root = document.createElement("div");
@@ -86,6 +111,8 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   let host!: HTMLDivElement;
   let table: {on: (event: string, callback: (...args: unknown[]) => void) => void; setData: (rows?: Record<string, unknown>[] | string) => Promise<unknown>; setColumns: (columns: TabulatorColumnDefinition[]) => void; destroy: () => void} | null = null;
   let disposed = false;
+  let disconnectThemeObserver: (() => void) | undefined;
+  const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
   const pageCache = new Map<string, Promise<LocationDashboardTablePage>>();
   const [isLoading, setIsLoading] = createSignal(true);
 
@@ -127,6 +154,18 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   };
 
   onMount(() => {
+    setThemePreference(getDocumentThemePreference());
+    applyTabulatorThemeStylesheet(getDocumentThemePreference());
+
+    const observer = new MutationObserver(() => {
+      setThemePreference(getDocumentThemePreference());
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"]
+    });
+    disconnectThemeObserver = () => observer.disconnect();
+
     void import("tabulator-tables").then(({TabulatorFull}) => {
       if (disposed) {
         return;
@@ -170,6 +209,10 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   });
 
   createEffect(() => {
+    applyTabulatorThemeStylesheet(themePreference());
+  });
+
+  createEffect(() => {
     const currentTable = table;
     if (!currentTable) {
       return;
@@ -186,6 +229,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
 
   onCleanup(() => {
     disposed = true;
+    disconnectThemeObserver?.();
     table?.destroy();
     table = null;
   });
@@ -194,7 +238,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
     <div class={"relative " + (props.class ?? "")}>
       <div
         ref={host}
-        class="h-full w-full [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-error-content [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-success-content"
+        class={"h-full w-full aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-base-content dark:[&_.aphinity-ca-active-row_.tabulator-cell]:!text-slate-100 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-base-content dark:[&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-slate-100 " + (props.class ?? "")}
       />
       <Show when={isLoading()}>
         <div class="absolute inset-0 z-10 bg-base-100" data-tabulator-loading-placeholder="">
