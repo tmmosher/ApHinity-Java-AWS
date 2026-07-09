@@ -18,6 +18,7 @@ type TurnstileApi = {
       "expired-callback": () => void;
       "timeout-callback": () => void;
       theme: "auto";
+      size: "flexible" | "compact";
     }
   ) => string;
   remove: (widgetId: string) => void;
@@ -88,6 +89,7 @@ const TurnstileWidget = () => {
   let container!: HTMLDivElement;
   let responseInput!: HTMLInputElement;
   let widgetId: string | null = null;
+  let renderFrame: number | null = null;
   let disposed = false;
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 
@@ -112,30 +114,44 @@ const TurnstileWidget = () => {
           throw new Error("Turnstile API unavailable after script load");
         }
 
-        widgetId = window.turnstile.render(container, {
-          sitekey: siteKey,
-          theme: "auto",
-          callback: (token) => {
-            responseInput.value = token;
-            setErrorMessage(null);
-            console.info("[Turnstile] Client verification token received.");
-          },
-          "error-callback": (errorCode) => {
-            responseInput.value = "";
-            const detail = errorCode ? ` (${errorCode})` : "";
-            console.error("[Turnstile] Widget error", {errorCode});
-            setErrorMessage(`Captcha failed to load${detail}. Refresh and try again.`);
-            toast.error("Turnstile failed to load. Refresh and try again");
-          },
-          "expired-callback": () => {
-            responseInput.value = "";
-            if (widgetId && window.turnstile) {
-              window.turnstile.reset(widgetId);
-            }
-          },
-          "timeout-callback": () => {
-            responseInput.value = "";
+        renderFrame = window.requestAnimationFrame(() => {
+          if (disposed || !window.turnstile) {
+            return;
           }
+
+          const containerWidth = container.getBoundingClientRect().width;
+          const size = containerWidth > 0 && containerWidth < 300 ? "compact" : "flexible";
+          console.info("[Turnstile] Container measured before render", {
+            width: containerWidth,
+            size
+          });
+
+          widgetId = window.turnstile.render(container, {
+            sitekey: siteKey,
+            theme: "auto",
+            size,
+            callback: (token) => {
+              responseInput.value = token;
+              setErrorMessage(null);
+              console.info("[Turnstile] Client verification token received.");
+            },
+            "error-callback": (errorCode) => {
+              responseInput.value = "";
+              const detail = errorCode ? ` (${errorCode})` : "";
+              console.error("[Turnstile] Widget error", {errorCode});
+              setErrorMessage(`Captcha failed to load${detail}. Refresh and try again.`);
+              toast.error("Turnstile failed to load. Refresh and try again");
+            },
+            "expired-callback": () => {
+              responseInput.value = "";
+              if (widgetId && window.turnstile) {
+                window.turnstile.reset(widgetId);
+              }
+            },
+            "timeout-callback": () => {
+              responseInput.value = "";
+            }
+          });
         });
       })
       .catch((error) => {
@@ -147,15 +163,18 @@ const TurnstileWidget = () => {
 
   onCleanup(() => {
     disposed = true;
+    if (renderFrame != null) {
+      window.cancelAnimationFrame(renderFrame);
+    }
     if (widgetId && window.turnstile) {
       window.turnstile.remove(widgetId);
     }
   });
 
   return (
-    <div class="space-y-2">
+    <div class="w-full min-w-0 space-y-2">
       <input ref={responseInput} type="hidden" name={TURNSTILE_RESPONSE_FIELD} value="" />
-      <div ref={container} />
+      <div ref={container} class="min-h-[65px] w-full min-w-0" />
       {errorMessage() && (
         <p class="text-xs text-error" role="alert">
           {errorMessage()}
