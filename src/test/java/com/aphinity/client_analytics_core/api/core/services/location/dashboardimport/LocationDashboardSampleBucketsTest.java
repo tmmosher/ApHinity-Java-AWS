@@ -369,7 +369,7 @@ class LocationDashboardSampleBucketsTest {
                 true
             ),
             systemType(resolvedSystem),
-            measurementBound(measurementName),
+            measurementBound(measurementName, rangeProfile(resolvedSystem)),
             resolvedBuilding,
             resolvedSystem,
             pointOfUse,
@@ -404,7 +404,7 @@ class LocationDashboardSampleBucketsTest {
                 true
             ),
             systemType(resolvedSystem),
-            measurementBound(measurementName),
+            measurementBound(measurementName, rangeProfile(resolvedSystem)),
             resolvedBuilding,
             resolvedSystem,
             pointOfUse,
@@ -453,7 +453,7 @@ class LocationDashboardSampleBucketsTest {
                 LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
                 List.of("Utility Water", "Utility Water SPD", "Utility HLD")
             ),
-            measurementBound(measurementName),
+            measurementBound(measurementName, LocationDashboardImportStrategyConfig.RangeProfile.UTILITY),
             resolvedBuilding,
             resolvedSystem,
             pointOfUse,
@@ -462,12 +462,16 @@ class LocationDashboardSampleBucketsTest {
         );
     }
 
-    private MeasurementBound measurementBound(String measurementName) {
+    private MeasurementBound measurementBound(
+        String measurementName,
+        LocationDashboardImportStrategyConfig.RangeProfile rangeProfile
+    ) {
         MeasurementBound measurementBound = new MeasurementBound();
         measurementBound.setMeasurementName(measurementName);
-        measurementBound.setTowersRangeMax(new BigDecimal("10"));
-        measurementBound.setUtilityRangeMax(new BigDecimal("500"));
-        measurementBound.setCriticalRangeMax(new BigDecimal("10"));
+        measurementBound.setType(rangeProfile.value());
+        measurementBound.setMax(LocationDashboardImportStrategyConfig.RangeProfile.UTILITY.equals(rangeProfile)
+            ? new BigDecimal("500")
+            : new BigDecimal("10"));
         return measurementBound;
     }
 

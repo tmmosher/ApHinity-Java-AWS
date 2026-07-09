@@ -8,6 +8,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -274,25 +275,31 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     }
 
     private List<MeasurementBound> hoagMeasurementBounds() {
-        return List.of(
-            hoagMeasurementBound(1L, "HPC"),
-            hoagMeasurementBound(2L, "Endotoxin"),
-            hoagMeasurementBound(3L, "Legionella"),
-            hoagMeasurementBound(4L, "pH"),
-            hoagMeasurementBound(5L, "Conductivity"),
-            hoagMeasurementBound(6L, "Alkalinity"),
-            hoagMeasurementBound(7L, "Hardness")
-        );
+        List<MeasurementBound> measurementBounds = new ArrayList<>();
+        long id = 1L;
+        for (String measurementName : List.of(
+            "HPC",
+            "Endotoxin",
+            "Legionella",
+            "pH",
+            "Conductivity",
+            "Alkalinity",
+            "Hardness"
+        )) {
+            for (String type : List.of("critical", "utility", "towers")) {
+                measurementBounds.add(hoagMeasurementBound(id, measurementName, type));
+                id += 1;
+            }
+        }
+        return measurementBounds;
     }
 
-    private MeasurementBound hoagMeasurementBound(Long id, String measurementName) {
+    private MeasurementBound hoagMeasurementBound(Long id, String measurementName, String type) {
         MeasurementBound measurementBound = new MeasurementBound();
         measurementBound.setId(id);
         measurementBound.setMeasurementName(measurementName);
-        measurementBound.setCriticalRangeMax(new BigDecimal("100"));
-        measurementBound.setUtilityRangeMax(new BigDecimal("100"));
-        measurementBound.setPotableRangeMax(new BigDecimal("100"));
-        measurementBound.setTowersRangeMax(new BigDecimal("100"));
+        measurementBound.setType(type);
+        measurementBound.setMax(new BigDecimal("100"));
         return measurementBound;
     }
 

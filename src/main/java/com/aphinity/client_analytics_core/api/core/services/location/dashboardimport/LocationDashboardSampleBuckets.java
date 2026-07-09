@@ -20,7 +20,7 @@ final class LocationDashboardSampleBuckets {
 
         LocationDashboardAnalyzedSample analyzedSample = new LocationDashboardAnalyzedSample(
             sample,
-            sample.systemType().rangeProfile().isCompliant(sample.numericValue(), sample.measurementBound())
+            sample.measurementBound().isCompliant(sample.numericValue())
         );
         int analyzedSampleIndex = analyzedSamples.size();
         analyzedSamples.add(analyzedSample);

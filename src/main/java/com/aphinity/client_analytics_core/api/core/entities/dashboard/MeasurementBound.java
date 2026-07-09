@@ -19,29 +19,16 @@ public class MeasurementBound {
     @Column(name = "measurement_name", nullable = false)
     private String measurementName;
 
-    @Column(name = "critical_range_min")
-    private BigDecimal criticalRangeMin;
+    @Size(max = 255)
+    @NotNull
+    @Column(name = "type", nullable = false)
+    private String type;
 
-    @Column(name = "critical_range_max")
-    private BigDecimal criticalRangeMax;
+    @Column(name = "min")
+    private BigDecimal min;
 
-    @Column(name = "utility_range_min")
-    private BigDecimal utilityRangeMin;
-
-    @Column(name = "utility_range_max")
-    private BigDecimal utilityRangeMax;
-
-    @Column(name = "potable_range_min")
-    private BigDecimal potableRangeMin;
-
-    @Column(name = "potable_range_max")
-    private BigDecimal potableRangeMax;
-
-    @Column(name = "towers_range_min")
-    private BigDecimal towersRangeMin;
-
-    @Column(name = "towers_range_max")
-    private BigDecimal towersRangeMax;
+    @Column(name = "max")
+    private BigDecimal max;
 
     public Long getId() {
         return id;
@@ -59,68 +46,43 @@ public class MeasurementBound {
         this.measurementName = measurementName;
     }
 
-    public BigDecimal getCriticalRangeMin() {
-        return criticalRangeMin;
+    public String getType() {
+        return type;
     }
 
-    public void setCriticalRangeMin(BigDecimal criticalRangeMin) {
-        this.criticalRangeMin = criticalRangeMin;
+    public void setType(String type) {
+        this.type = type;
     }
 
-    public BigDecimal getCriticalRangeMax() {
-        return criticalRangeMax;
+    public BigDecimal getMin() {
+        return min;
     }
 
-    public void setCriticalRangeMax(BigDecimal criticalRangeMax) {
-        this.criticalRangeMax = criticalRangeMax;
+    public void setMin(BigDecimal min) {
+        this.min = min;
     }
 
-    public BigDecimal getUtilityRangeMin() {
-        return utilityRangeMin;
+    public BigDecimal getMax() {
+        return max;
     }
 
-    public void setUtilityRangeMin(BigDecimal utilityRangeMin) {
-        this.utilityRangeMin = utilityRangeMin;
+    public void setMax(BigDecimal max) {
+        this.max = max;
     }
 
-    public BigDecimal getUtilityRangeMax() {
-        return utilityRangeMax;
+    public boolean isCompliant(BigDecimal numericValue) {
+        if (numericValue == null) {
+            return false;
+        }
+        if (min == null && max == null) {
+            return true;
+        }
+        if (min != null && numericValue.compareTo(min) < 0) {
+            return false;
+        }
+        if (max != null && numericValue.compareTo(max) > 0) {
+            return false;
+        }
+        return true;
     }
-
-    public void setUtilityRangeMax(BigDecimal utilityRangeMax) {
-        this.utilityRangeMax = utilityRangeMax;
-    }
-
-    public BigDecimal getPotableRangeMin() {
-        return potableRangeMin;
-    }
-
-    public void setPotableRangeMin(BigDecimal potableRangeMin) {
-        this.potableRangeMin = potableRangeMin;
-    }
-
-    public BigDecimal getPotableRangeMax() {
-        return potableRangeMax;
-    }
-
-    public void setPotableRangeMax(BigDecimal potableRangeMax) {
-        this.potableRangeMax = potableRangeMax;
-    }
-
-    public BigDecimal getTowersRangeMin() {
-        return towersRangeMin;
-    }
-
-    public void setTowersRangeMin(BigDecimal towersRangeMin) {
-        this.towersRangeMin = towersRangeMin;
-    }
-
-    public BigDecimal getTowersRangeMax() {
-        return towersRangeMax;
-    }
-
-    public void setTowersRangeMax(BigDecimal towersRangeMax) {
-        this.towersRangeMax = towersRangeMax;
-    }
-
 }

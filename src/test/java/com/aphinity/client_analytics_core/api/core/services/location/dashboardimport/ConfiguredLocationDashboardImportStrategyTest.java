@@ -864,8 +864,8 @@ class ConfiguredLocationDashboardImportStrategyTest {
         MeasurementBound measurementBound =
             measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("10"));
 
-        assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("9.9"), measurementBound));
-        assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("10"), measurementBound));
+        assertTrue(measurementBound.isCompliant(new BigDecimal("9.9")));
+        assertTrue(measurementBound.isCompliant(new BigDecimal("10")));
     }
 
     @Test
@@ -873,8 +873,8 @@ class ConfiguredLocationDashboardImportStrategyTest {
         MeasurementBound measurementBound =
             measurementBound(1L, "Legionella", null, null, null, null, null, null, null, BigDecimal.ZERO);
 
-        assertTrue(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(BigDecimal.ZERO, measurementBound));
-        assertFalse(LocationDashboardImportStrategyConfig.RangeProfile.TOWERS.isCompliant(new BigDecimal("0.1"), measurementBound));
+        assertTrue(measurementBound.isCompliant(BigDecimal.ZERO));
+        assertFalse(measurementBound.isCompliant(new BigDecimal("0.1")));
     }
 
     @Test
@@ -2172,14 +2172,23 @@ class ConfiguredLocationDashboardImportStrategyTest {
         MeasurementBound measurementBound = new MeasurementBound();
         measurementBound.setId(id);
         measurementBound.setMeasurementName(name);
-        measurementBound.setCriticalRangeMin(criticalMin);
-        measurementBound.setCriticalRangeMax(criticalMax);
-        measurementBound.setUtilityRangeMin(utilityMin);
-        measurementBound.setUtilityRangeMax(utilityMax);
-        measurementBound.setPotableRangeMin(potableMin);
-        measurementBound.setPotableRangeMax(potableMax);
-        measurementBound.setTowersRangeMin(towersMin);
-        measurementBound.setTowersRangeMax(towersMax);
+        if (criticalMin != null || criticalMax != null) {
+            measurementBound.setType("critical");
+            measurementBound.setMin(criticalMin);
+            measurementBound.setMax(criticalMax);
+        } else if (utilityMin != null || utilityMax != null) {
+            measurementBound.setType("utility");
+            measurementBound.setMin(utilityMin);
+            measurementBound.setMax(utilityMax);
+        } else if (potableMin != null || potableMax != null) {
+            measurementBound.setType("potable");
+            measurementBound.setMin(potableMin);
+            measurementBound.setMax(potableMax);
+        } else {
+            measurementBound.setType("towers");
+            measurementBound.setMin(towersMin);
+            measurementBound.setMax(towersMax);
+        }
         return measurementBound;
     }
 }

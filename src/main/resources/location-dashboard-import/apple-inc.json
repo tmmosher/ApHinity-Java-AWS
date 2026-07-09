@@ -39,38 +39,32 @@
   ],
   "systems": [
     {
-      "key": "",
-      "displayName": "",
-      "rangeProfile": "",
+      "key": "example",
+      "displayName": "Example",
+      "rangeProfile": "example",
+      "aliases": []
+    },
+    {
+      "key": "example-2",
+      "displayName": "Example 2",
+      "rangeProfile": "example",
       "aliases": []
     }
   ],
   "graphs": [
     {
-      "id": "",
-      "name": "",
-      "title": "",
-      "importType": "",
-      "sublocationKey": "",
+      "id": "apple-example-water-quality",
+      "name": "Water Quality Conformance",
+      "title": "Apple Inc.",
+      "importType": "water_quality_compliance",
+      "sublocationKey": "city-water",
       "traceOrder": [],
       "traceColors": {},
       "graphType": ""
     }
   ],
-  "derivedGraphs": [
-    {
-      "id": "",
-      "name": "",
-      "title": "",
-      "derivedType": "",
-      "graphType": ""
-    }
-  ],
-  "systemTypeAliases": [
-    {
-      "": []
-    }
-  ],
+  "derivedGraphs": [],
+  "systemTypeAliases": [],
   "measurementUnits": [
     {
       "value": "",

@@ -1350,14 +1350,23 @@ class LocationDashboardImportServiceTest {
         MeasurementBound measurementBound = new MeasurementBound();
         measurementBound.setId(id);
         measurementBound.setMeasurementName(name);
-        measurementBound.setCriticalRangeMin(criticalMin);
-        measurementBound.setCriticalRangeMax(criticalMax);
-        measurementBound.setUtilityRangeMin(utilityMin);
-        measurementBound.setUtilityRangeMax(utilityMax);
-        measurementBound.setPotableRangeMin(potableMin);
-        measurementBound.setPotableRangeMax(potableMax);
-        measurementBound.setTowersRangeMin(towersMin);
-        measurementBound.setTowersRangeMax(towersMax);
+        if (criticalMin != null || criticalMax != null) {
+            measurementBound.setType("critical");
+            measurementBound.setMin(criticalMin);
+            measurementBound.setMax(criticalMax);
+        } else if (utilityMin != null || utilityMax != null) {
+            measurementBound.setType("utility");
+            measurementBound.setMin(utilityMin);
+            measurementBound.setMax(utilityMax);
+        } else if (potableMin != null || potableMax != null) {
+            measurementBound.setType("potable");
+            measurementBound.setMin(potableMin);
+            measurementBound.setMax(potableMax);
+        } else {
+            measurementBound.setType("towers");
+            measurementBound.setMin(towersMin);
+            measurementBound.setMax(towersMax);
+        }
         return measurementBound;
     }
 }

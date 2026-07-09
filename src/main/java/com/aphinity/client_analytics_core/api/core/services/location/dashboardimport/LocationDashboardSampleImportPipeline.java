@@ -29,10 +29,10 @@ final class LocationDashboardSampleImportPipeline {
 
     SampleImportResult importSamples(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
-        Map<String, MeasurementBound> measurementBoundsByName
+        Map<String, MeasurementBound> measurementBoundsByNameAndType
     ) {
         LocationDashboardSampleBuckets sampleBuckets = new LocationDashboardSampleBuckets();
-        List<PreparedCellImport> preparedCells = prepareCellImports(workbook, measurementBoundsByName);
+        List<PreparedCellImport> preparedCells = prepareCellImports(workbook, measurementBoundsByNameAndType);
         Set<String> deduplicatedWorksheetCells = detectFollowUpWorksheetDuplicates(preparedCells);
 
         for (PreparedCellImport preparedCell : preparedCells) {
@@ -70,7 +70,7 @@ final class LocationDashboardSampleImportPipeline {
 
     private List<PreparedCellImport> prepareCellImports(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
-        Map<String, MeasurementBound> measurementBoundsByName
+        Map<String, MeasurementBound> measurementBoundsByNameAndType
     ) {
         List<PreparedCellImport> preparedCells = new ArrayList<>();
         LocationDashboardImportContextResolver.ActiveImportContext activeContext = contextResolver.emptyContext();
@@ -81,7 +81,12 @@ final class LocationDashboardSampleImportPipeline {
                 contextResolver.resolveRowContext(row, activeContext);
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
-                MeasurementBound measurementBound = measurementBoundsByName.get(normalizeKey(cell.metricName()));
+                MeasurementBound measurementBound = measurementBoundsByNameAndType.get(
+                    ConfiguredLocationDashboardImportStrategy.measurementBoundLookupKey(
+                        cell.metricName(),
+                        rowContext.systemType() == null ? null : rowContext.systemType().rangeProfile()
+                    )
+                );
                 LocationDashboardCommentParser.ParsedComment parsedComment = null;
                 if (hasUsableCommentPayload(cell.commentText()) && rowContext.systemType() != null) {
                     parsedComment = parseComment(cell, row);
@@ -508,10 +513,6 @@ final class LocationDashboardSampleImportPipeline {
             "location_dashboard_file_invalid",
             message
         );
-    }
-
-    private static String normalizeKey(String value) {
-        return LocationDashboardGraphMetadataSupport.normalizeKey(value);
     }
 
     record SampleImportResult(

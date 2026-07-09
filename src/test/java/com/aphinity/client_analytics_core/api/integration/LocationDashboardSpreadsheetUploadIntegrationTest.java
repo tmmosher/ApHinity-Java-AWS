@@ -624,26 +624,35 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         BigDecimal potableRangeMax,
         BigDecimal towersRangeMax
     ) {
+        seedMeasurementBound(location, measurementName, "critical", criticalRangeMax);
+        seedMeasurementBound(location, measurementName, "utility", utilityRangeMax);
+        seedMeasurementBound(location, measurementName, "potable", potableRangeMax);
+        seedMeasurementBound(location, measurementName, "towers", towersRangeMax);
+    }
+
+    private void seedMeasurementBound(
+        Location location,
+        String measurementName,
+        String type,
+        BigDecimal max
+    ) {
         jdbcTemplate.update(
             """
                 insert into measurement_bounds (
                     measurement_name,
-                    critical_range_max,
-                    utility_range_max,
-                    potable_range_max,
-                    towers_range_max
-                ) values (?, ?, ?, ?, ?)
+                    type,
+                    max
+                ) values (?, ?, ?)
                 """,
             measurementName,
-            criticalRangeMax,
-            utilityRangeMax,
-            potableRangeMax,
-            towersRangeMax
+            type,
+            max
         );
         Long measurementId = jdbcTemplate.queryForObject(
-            "select id from measurement_bounds where measurement_name = ?",
+            "select id from measurement_bounds where measurement_name = ? and type = ?",
             Long.class,
-            measurementName
+            measurementName,
+            type
         );
         jdbcTemplate.update(
             "insert into location_measurements (location_id, measurement_id) values (?, ?)",

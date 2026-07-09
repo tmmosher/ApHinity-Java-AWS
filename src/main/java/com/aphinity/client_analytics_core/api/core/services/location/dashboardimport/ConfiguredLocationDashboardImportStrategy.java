@@ -81,16 +81,20 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
         List<MeasurementBound> measurementBounds
     ) {
-        Map<String, MeasurementBound> measurementBoundsByName = new LinkedHashMap<>();
+        Map<String, MeasurementBound> measurementBoundsByNameAndType = new LinkedHashMap<>();
         for (MeasurementBound measurementBound : measurementBounds) {
-            if (measurementBound.getMeasurementName() == null) {
+            String key = measurementBoundLookupKey(
+                measurementBound.getMeasurementName(),
+                measurementBound.getType()
+            );
+            if (key == null) {
                 continue;
             }
-            measurementBoundsByName.put(normalizeKey(measurementBound.getMeasurementName()), measurementBound);
+            measurementBoundsByNameAndType.put(key, measurementBound);
         }
 
         SampleImportResult sampleImportResult =
-            sampleImportPipeline.importSamples(workbook, measurementBoundsByName);
+            sampleImportPipeline.importSamples(workbook, measurementBoundsByNameAndType);
         List<LocationDashboardAnalyzedSample> analyzedSamples = sampleImportResult.sampleBuckets().analyzedSamples();
         LocationDashboardObservationAggregator.ObservationAggregationResult aggregationResult =
             observationAggregator.aggregate(analyzedSamples);
@@ -395,6 +399,22 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
 
     private static String normalizeKey(String value) {
         return LocationDashboardGraphMetadataSupport.normalizeKey(value);
+    }
+
+    static String measurementBoundLookupKey(
+        String measurementName,
+        LocationDashboardImportStrategyConfig.RangeProfile rangeProfile
+    ) {
+        return measurementBoundLookupKey(measurementName, rangeProfile == null ? null : rangeProfile.value());
+    }
+
+    static String measurementBoundLookupKey(String measurementName, String rangeProfile) {
+        String normalizedMeasurementName = normalizeKey(measurementName);
+        String normalizedRangeProfile = normalizeKey(rangeProfile);
+        if (normalizedMeasurementName == null || normalizedRangeProfile == null) {
+            return null;
+        }
+        return normalizedMeasurementName + "|" + normalizedRangeProfile;
     }
 
     private List<String> effectiveFacilityAliases(SublocationConfig sublocation) {

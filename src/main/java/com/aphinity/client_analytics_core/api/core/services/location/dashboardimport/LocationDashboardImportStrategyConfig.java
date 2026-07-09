@@ -1,11 +1,9 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
-import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -95,7 +93,7 @@ public record LocationDashboardImportStrategyConfig(
         String canonicalName,
         List<String> aliases
     ) {
-        @JsonCreator
+        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         public static SystemTypeAliasConfig fromValue(Map<String, List<String>> rawValue) {
             if (rawValue == null || rawValue.isEmpty()) {
                 return null;
@@ -160,21 +158,14 @@ public record LocationDashboardImportStrategyConfig(
         }
     }
 
-    public enum RangeProfile {
-        CRITICAL("critical"),
-        UTILITY("utility"),
-        POTABLE("potable"),
-        TOWERS("towers");
+    public record RangeProfile(String value) {
+        public static final RangeProfile CRITICAL = new RangeProfile("critical");
+        public static final RangeProfile UTILITY = new RangeProfile("utility");
+        public static final RangeProfile POTABLE = new RangeProfile("potable");
+        public static final RangeProfile TOWERS = new RangeProfile("towers");
 
-        private final String value;
-
-        RangeProfile(String value) {
-            this.value = value;
-        }
-
-        @JsonValue
-        public String value() {
-            return value;
+        public RangeProfile {
+            value = value == null ? null : value.strip().toLowerCase(Locale.ROOT);
         }
 
         @JsonCreator
@@ -182,48 +173,12 @@ public record LocationDashboardImportStrategyConfig(
             if (rawValue == null || rawValue.isBlank()) {
                 return null;
             }
-            String normalized = rawValue.strip().toLowerCase(Locale.ROOT);
-            return Arrays.stream(values())
-                .filter(rangeProfile ->
-                    rangeProfile.value.equals(normalized)
-                        || rangeProfile.name().equalsIgnoreCase(normalized)
-                )
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown measurement range profile: " + rawValue));
+            return new RangeProfile(rawValue);
         }
 
-        public boolean isCompliant(BigDecimal numericValue, MeasurementBound measurementBound) {
-            if (numericValue == null || measurementBound == null) {
-                return false;
-            }
-            BigDecimal min = switch (this) {
-                case CRITICAL -> measurementBound.getCriticalRangeMin();
-                case UTILITY -> measurementBound.getUtilityRangeMin();
-                case POTABLE -> measurementBound.getPotableRangeMin();
-                case TOWERS -> measurementBound.getTowersRangeMin();
-            };
-            BigDecimal max = switch (this) {
-                case CRITICAL -> measurementBound.getCriticalRangeMax();
-                case UTILITY -> measurementBound.getUtilityRangeMax();
-                case POTABLE -> measurementBound.getPotableRangeMax();
-                case TOWERS -> measurementBound.getTowersRangeMax();
-            };
-            // this only occurs when we have a measurement for something that isn't supposed to be measured.
-            // for a while, this happened with endotoxin readings and utility water. Utility water isn't supposed to be
-            // measured, but it was for about 6 months - and has no determined range for what is valid. For situations like
-            // this, it's better to just pretend it is compliant. Ideally it'd be ignored, but this returns a boolean
-            // and not an optional of a boolean or something, so that isn't really possible. The manual data entry
-            // folks classified it as compliant anyway so
-            if (min == null && max == null) {
-                return true;
-            }
-            if (min != null && numericValue.compareTo(min) < 0) {
-                return false;
-            }
-            if (max != null && numericValue.compareTo(max) > 0) {
-                return false;
-            }
-            return true;
+        @JsonValue
+        public String value() {
+            return value;
         }
     }
 
