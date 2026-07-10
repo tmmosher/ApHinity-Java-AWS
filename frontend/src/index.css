@@ -173,6 +173,10 @@
 }
 
 @layer components {
+  .aphinity-tabulator :is(.aphinity-ca-active-row, .aphinity-ca-resolved-row) .tabulator-cell {
+    color: var(--fallback-bc, oklch(var(--bc) / 1)) !important;
+  }
+
   .graph-color-picker-popover-content .graph-color-picker {
     @apply w-full min-w-0;
   }

@@ -238,7 +238,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
     <div class={"relative " + (props.class ?? "")}>
       <div
         ref={host}
-        class={"h-full w-full aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-active-row_.tabulator-cell]:!text-base-content dark:[&_.aphinity-ca-active-row_.tabulator-cell]:!text-slate-100 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-base-content dark:[&_.aphinity-ca-resolved-row_.tabulator-cell]:!text-slate-100 " + (props.class ?? "")}
+        class={"h-full w-full aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 " + (props.class ?? "")}
       />
       <Show when={isLoading()}>
         <div class="absolute inset-0 z-10 bg-base-100" data-tabulator-loading-placeholder="">
