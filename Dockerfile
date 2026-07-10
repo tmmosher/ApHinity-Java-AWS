@@ -15,9 +15,6 @@ COPY package.json package-lock.json ./
 COPY frontend ./frontend
 COPY --from=frontend-deps /app/node_modules ./node_modules
 
-ARG VITE_TURNSTILE_SITE_KEY=""
-ENV VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY}
-
 RUN npm run frontend:build
 
 FROM amazoncorretto:21-al2023 AS backend-build
