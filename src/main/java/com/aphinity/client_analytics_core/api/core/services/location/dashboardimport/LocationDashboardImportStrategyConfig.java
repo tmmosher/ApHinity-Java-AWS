@@ -17,11 +17,27 @@ public record LocationDashboardImportStrategyConfig(
     List<DerivedGraphConfig> derivedGraphs,
     List<SystemTypeAliasConfig> systemTypeAliases,
     List<SpreadsheetIdentityColumn> identityPattern,
-    List<MeasurementUnitConfig> measurementUnits
+    List<MeasurementUnitConfig> measurementUnits,
+    List<RangeProfileConfig> rangeProfiles
 ) {
     public LocationDashboardImportStrategyConfig {
         identityPattern = identityPattern == null ? List.of() : List.copyOf(identityPattern);
         measurementUnits = measurementUnits == null ? List.of() : List.copyOf(measurementUnits);
+        rangeProfiles = rangeProfiles == null ? List.of() : List.copyOf(rangeProfiles);
+    }
+
+    public LocationDashboardImportStrategyConfig(
+        String locationName,
+        List<SublocationConfig> sublocations,
+        List<SystemTypeConfig> systems,
+        List<GraphConfig> graphs,
+        List<DerivedGraphConfig> derivedGraphs,
+        List<SystemTypeAliasConfig> systemTypeAliases,
+        List<SpreadsheetIdentityColumn> identityPattern,
+        List<MeasurementUnitConfig> measurementUnits
+    ) {
+        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases,
+            identityPattern, measurementUnits, List.of());
     }
 
     public LocationDashboardImportStrategyConfig(
@@ -33,7 +49,8 @@ public record LocationDashboardImportStrategyConfig(
         List<SystemTypeAliasConfig> systemTypeAliases,
         List<SpreadsheetIdentityColumn> identityPattern
     ) {
-        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases, identityPattern, List.of());
+        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases,
+            identityPattern, List.of(), List.of());
     }
 
     public LocationDashboardImportStrategyConfig(
@@ -44,7 +61,8 @@ public record LocationDashboardImportStrategyConfig(
         List<DerivedGraphConfig> derivedGraphs,
         List<SystemTypeAliasConfig> systemTypeAliases
     ) {
-        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases, List.of(), List.of());
+        this(locationName, sublocations, systems, graphs, derivedGraphs, systemTypeAliases,
+            List.of(), List.of(), List.of());
     }
 
     public record SpreadsheetIdentityColumn(
@@ -87,6 +105,15 @@ public record LocationDashboardImportStrategyConfig(
         RangeProfile rangeProfile,
         List<String> aliases
     ) {
+    }
+
+    public record RangeProfileConfig(
+        String key,
+        Map<String, String> measurementTypes
+    ) {
+        public RangeProfileConfig {
+            measurementTypes = measurementTypes == null ? Map.of() : Map.copyOf(measurementTypes);
+        }
     }
 
     public record SystemTypeAliasConfig(
@@ -159,10 +186,6 @@ public record LocationDashboardImportStrategyConfig(
     }
 
     public record RangeProfile(String value) {
-        public static final RangeProfile CRITICAL = new RangeProfile("critical");
-        public static final RangeProfile UTILITY = new RangeProfile("utility");
-        public static final RangeProfile POTABLE = new RangeProfile("potable");
-        public static final RangeProfile TOWERS = new RangeProfile("towers");
 
         public RangeProfile {
             value = value == null ? null : value.strip().toLowerCase(Locale.ROOT);

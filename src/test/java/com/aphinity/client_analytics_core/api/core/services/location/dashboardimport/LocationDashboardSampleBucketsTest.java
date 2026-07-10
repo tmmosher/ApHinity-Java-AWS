@@ -450,10 +450,10 @@ class LocationDashboardSampleBucketsTest {
             new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                 "utility-spd",
                 "Utility SPD",
-                LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                new LocationDashboardImportStrategyConfig.RangeProfile("utility"),
                 List.of("Utility Water", "Utility Water SPD", "Utility HLD")
             ),
-            measurementBound(measurementName, LocationDashboardImportStrategyConfig.RangeProfile.UTILITY),
+            measurementBound(measurementName, new LocationDashboardImportStrategyConfig.RangeProfile("utility")),
             resolvedBuilding,
             resolvedSystem,
             pointOfUse,
@@ -469,7 +469,7 @@ class LocationDashboardSampleBucketsTest {
         MeasurementBound measurementBound = new MeasurementBound();
         measurementBound.setMeasurementName(measurementName);
         measurementBound.setType(rangeProfile.value());
-        measurementBound.setMax(LocationDashboardImportStrategyConfig.RangeProfile.UTILITY.equals(rangeProfile)
+        measurementBound.setMax(new LocationDashboardImportStrategyConfig.RangeProfile("utility").equals(rangeProfile)
             ? new BigDecimal("500")
             : new BigDecimal("10"));
         return measurementBound;
@@ -488,12 +488,12 @@ class LocationDashboardSampleBucketsTest {
     private LocationDashboardImportStrategyConfig.RangeProfile rangeProfile(String resolvedSystem) {
         String normalized = normalizeKey(resolvedSystem);
         if (normalized != null && normalized.contains("utility")) {
-            return LocationDashboardImportStrategyConfig.RangeProfile.UTILITY;
+            return new LocationDashboardImportStrategyConfig.RangeProfile("utility");
         }
         if (normalized != null && normalized.contains("critical")) {
-            return LocationDashboardImportStrategyConfig.RangeProfile.CRITICAL;
+            return new LocationDashboardImportStrategyConfig.RangeProfile("critical");
         }
-        return LocationDashboardImportStrategyConfig.RangeProfile.TOWERS;
+        return new LocationDashboardImportStrategyConfig.RangeProfile("towers");
     }
 
     private String normalizeKey(String value) {

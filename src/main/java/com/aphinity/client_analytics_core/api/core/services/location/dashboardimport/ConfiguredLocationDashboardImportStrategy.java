@@ -81,20 +81,9 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
         List<MeasurementBound> measurementBounds
     ) {
-        Map<String, MeasurementBound> measurementBoundsByNameAndType = new LinkedHashMap<>();
-        for (MeasurementBound measurementBound : measurementBounds) {
-            String key = measurementBoundLookupKey(
-                measurementBound.getMeasurementName(),
-                measurementBound.getType()
-            );
-            if (key == null) {
-                continue;
-            }
-            measurementBoundsByNameAndType.put(key, measurementBound);
-        }
-
-        SampleImportResult sampleImportResult =
-            sampleImportPipeline.importSamples(workbook, measurementBoundsByNameAndType);
+        LocationDashboardMeasurementBoundResolver measurementBoundResolver =
+            new LocationDashboardMeasurementBoundResolver(measurementBounds, config.rangeProfiles());
+        SampleImportResult sampleImportResult = sampleImportPipeline.importSamples(workbook, measurementBoundResolver);
         List<LocationDashboardAnalyzedSample> analyzedSamples = sampleImportResult.sampleBuckets().analyzedSamples();
         LocationDashboardObservationAggregator.ObservationAggregationResult aggregationResult =
             observationAggregator.aggregate(analyzedSamples);
@@ -143,6 +132,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
         }
 
+        Set<String> rangeProfileKeys = validateRangeProfiles(rawConfig.rangeProfiles());
         Set<String> systemKeys = new LinkedHashSet<>();
         Map<String, String> systemOwnersByAlias = new LinkedHashMap<>();
         for (SystemTypeConfig system : rawConfig.systems()) {
@@ -156,6 +146,13 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             if (system.rangeProfile() == null) {
                 throw new IllegalStateException(
                     "Dashboard import strategy systems must declare a range profile: " + system.key()
+                );
+            }
+            String normalizedRangeProfile = normalizeKey(system.rangeProfile().value());
+            if (!rangeProfileKeys.isEmpty() && !rangeProfileKeys.contains(normalizedRangeProfile)) {
+                throw new IllegalStateException(
+                    "Dashboard import strategy system references an unknown range profile: "
+                        + system.rangeProfile().value()
                 );
             }
             validateAliasOwnership(
@@ -268,6 +265,41 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
 
         return rawConfig;
+    }
+
+    private Set<String> validateRangeProfiles(
+        List<LocationDashboardImportStrategyConfig.RangeProfileConfig> rangeProfiles
+    ) {
+        Set<String> profileKeys = new LinkedHashSet<>();
+        for (LocationDashboardImportStrategyConfig.RangeProfileConfig profile
+            : rangeProfiles == null ? List.<LocationDashboardImportStrategyConfig.RangeProfileConfig>of() : rangeProfiles) {
+            String normalizedProfileKey = normalizeKey(profile.key());
+            if (normalizedProfileKey == null || !profileKeys.add(normalizedProfileKey)) {
+                throw new IllegalStateException("Dashboard import strategy range profile keys must be unique");
+            }
+            if (profile.measurementTypes().isEmpty()) {
+                throw new IllegalStateException(
+                    "Dashboard import strategy range profiles must declare measurement types: " + profile.key()
+                );
+            }
+
+            Set<String> measurementNames = new LinkedHashSet<>();
+            profile.measurementTypes().forEach((measurementName, type) -> {
+                String normalizedMeasurementName = normalizeKey(measurementName);
+                String normalizedType = normalizeKey(type);
+                if (normalizedMeasurementName == null || normalizedType == null) {
+                    throw new IllegalStateException(
+                        "Dashboard import strategy range profile measurements and types are required: " + profile.key()
+                    );
+                }
+                if (!measurementNames.add(normalizedMeasurementName)) {
+                    throw new IllegalStateException(
+                        "Dashboard import strategy range profile measurement names must be unique: " + measurementName
+                    );
+                }
+            });
+        }
+        return Set.copyOf(profileKeys);
     }
 
     private Map<String, SystemTypeConfig> buildSystemsByAlias(List<SystemTypeConfig> systems) {

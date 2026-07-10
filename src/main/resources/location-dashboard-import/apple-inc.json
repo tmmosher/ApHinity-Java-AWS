@@ -51,6 +51,14 @@
       "aliases": []
     }
   ],
+  "rangeProfiles": [
+    {
+      "key": "example",
+      "measurementTypes": {
+        "Example Measurement": "example"
+      }
+    }
+  ],
   "graphs": [
     {
       "id": "apple-example-water-quality",

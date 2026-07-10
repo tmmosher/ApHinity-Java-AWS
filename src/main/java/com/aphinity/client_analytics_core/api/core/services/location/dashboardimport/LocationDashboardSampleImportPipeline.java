@@ -9,7 +9,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -29,10 +28,10 @@ final class LocationDashboardSampleImportPipeline {
 
     SampleImportResult importSamples(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
-        Map<String, MeasurementBound> measurementBoundsByNameAndType
+        LocationDashboardMeasurementBoundResolver measurementBoundResolver
     ) {
         LocationDashboardSampleBuckets sampleBuckets = new LocationDashboardSampleBuckets();
-        List<PreparedCellImport> preparedCells = prepareCellImports(workbook, measurementBoundsByNameAndType);
+        List<PreparedCellImport> preparedCells = prepareCellImports(workbook, measurementBoundResolver);
         Set<String> deduplicatedWorksheetCells = detectFollowUpWorksheetDuplicates(preparedCells);
 
         for (PreparedCellImport preparedCell : preparedCells) {
@@ -70,7 +69,7 @@ final class LocationDashboardSampleImportPipeline {
 
     private List<PreparedCellImport> prepareCellImports(
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook,
-        Map<String, MeasurementBound> measurementBoundsByNameAndType
+        LocationDashboardMeasurementBoundResolver measurementBoundResolver
     ) {
         List<PreparedCellImport> preparedCells = new ArrayList<>();
         LocationDashboardImportContextResolver.ActiveImportContext activeContext = contextResolver.emptyContext();
@@ -81,11 +80,9 @@ final class LocationDashboardSampleImportPipeline {
                 contextResolver.resolveRowContext(row, activeContext);
 
             for (LocationDashboardSpreadsheetParser.ParsedDashboardCell cell : row.cells()) {
-                MeasurementBound measurementBound = measurementBoundsByNameAndType.get(
-                    ConfiguredLocationDashboardImportStrategy.measurementBoundLookupKey(
-                        cell.metricName(),
-                        rowContext.systemType() == null ? null : rowContext.systemType().rangeProfile()
-                    )
+                MeasurementBound measurementBound = measurementBoundResolver.resolve(
+                    cell.metricName(),
+                    rowContext.systemType() == null ? null : rowContext.systemType().rangeProfile()
                 );
                 LocationDashboardCommentParser.ParsedComment parsedComment = null;
                 if (hasUsableCommentPayload(cell.commentText()) && rowContext.systemType() != null) {

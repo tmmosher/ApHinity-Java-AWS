@@ -1147,19 +1147,19 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "utility-spd",
                         "Utility SPD",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("utility"),
                         List.of()
                     ),
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "utility-domestic-hot",
                         "Utility Domestic Hot",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("utility"),
                         List.of()
                     ),
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "steam",
                         "Steam",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("utility"),
                         List.of()
                     )
                 ),
@@ -1293,7 +1293,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "utility-spd",
                         "Utility SPD",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("utility"),
                         List.of()
                     )
                 ),
@@ -1373,7 +1373,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "cooling-towers",
                         "Cooling Towers",
-                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                         List.of("Cooling Towers")
                     )
                 ),
@@ -1464,7 +1464,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "utility-spd",
                         "Utility SPD",
-                        LocationDashboardImportStrategyConfig.RangeProfile.UTILITY,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("utility"),
                         List.of()
                     )
                 ),
@@ -1606,7 +1606,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "cooling-towers",
                         "Cooling Towers",
-                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                         List.of("Cooling Towers")
                     )
                 ),
@@ -1765,7 +1765,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "cooling-towers",
                         "Cooling Towers",
-                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                         List.of("Cooling Towers")
                     )),
                     List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
@@ -1804,7 +1804,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "cooling-towers",
                         "Cooling Towers",
-                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                         List.of("Cooling Towers")
                     )),
                     List.of(
@@ -1846,7 +1846,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                     List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                         "cooling-towers",
                         "Cooling Towers",
-                        LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                        new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                         List.of("Cooling Towers")
                     )),
                     List.of(validWaterQualityGraphConfig()),
@@ -1879,7 +1879,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                     "cooling-towers",
                     "Cooling Towers",
-                    LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                    new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                     List.of("Cooling Towers")
                 )),
                 List.of(
@@ -1921,7 +1921,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                     "critical-spd",
                     "Critical SPD",
-                    LocationDashboardImportStrategyConfig.RangeProfile.CRITICAL,
+                    new LocationDashboardImportStrategyConfig.RangeProfile("critical"),
                     List.of()
                 )),
                 List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
@@ -1957,7 +1957,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                     "cooling-towers",
                     "Cooling Towers",
-                    LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                    new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                     List.of("Cooling Towers")
                 )),
                 List.of(

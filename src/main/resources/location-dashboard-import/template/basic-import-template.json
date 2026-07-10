@@ -2,7 +2,22 @@
   "locationName": "",
   "identityPattern": [],
   "sublocations": [],
-  "systems": [],
+  "systems": [
+    {
+      "key": "example-system",
+      "displayName": "Example System",
+      "rangeProfile": "example-profile",
+      "aliases": []
+    }
+  ],
+  "rangeProfiles": [
+    {
+      "key": "example-profile",
+      "measurementTypes": {
+        "Example Measurement": "example-bound-type"
+      }
+    }
+  ],
   "graphs": [],
   "derivedGraphs": [],
   "systemTypeAliases": [],

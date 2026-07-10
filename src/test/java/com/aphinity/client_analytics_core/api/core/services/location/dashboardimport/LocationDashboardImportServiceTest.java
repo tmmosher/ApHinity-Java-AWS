@@ -512,7 +512,7 @@ class LocationDashboardImportServiceTest {
                 List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                     "cooling-towers",
                     "Cooling Towers",
-                    LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                    new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                     List.of("Cooling Towers")
                 )),
                 List.of(
@@ -923,7 +923,7 @@ class LocationDashboardImportServiceTest {
                 List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
                     "cooling-towers",
                     "Cooling Towers",
-                    LocationDashboardImportStrategyConfig.RangeProfile.TOWERS,
+                    new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
                     List.of("Cooling Towers")
                 )),
                 List.of(

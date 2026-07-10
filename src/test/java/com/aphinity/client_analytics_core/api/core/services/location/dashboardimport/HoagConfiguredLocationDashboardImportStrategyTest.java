@@ -286,7 +286,7 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
             "Alkalinity",
             "Hardness"
         )) {
-            for (String type : List.of("critical", "utility", "towers")) {
+            for (String type : List.of("potable", "critical", "utility", "towers")) {
                 measurementBounds.add(hoagMeasurementBound(id, measurementName, type));
                 id += 1;
             }
