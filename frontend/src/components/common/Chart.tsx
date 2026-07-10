@@ -188,17 +188,17 @@ const sortDateSeriesTrace = (trace: PlotlyData): PlotlyData => {
         return trace;
     }
 
-    const sortedPoints = [...datedPoints].sort((left, right) => {
-        if (left.sortable !== right.sortable) {
-            return left.sortable ? -1 : 1;
+    const sortedPoints = [...datedPoints].sort((left?, right?) => {
+        if (left?.sortable !== right?.sortable) {
+            return left?.sortable ? -1 : 1;
         }
-        if (!left.sortable) {
-            return left.index - right.index;
+        if (!left?.sortable) {
+            return left!.index - right!.index;
         }
-        return left.normalizedDate.localeCompare(right.normalizedDate) || left.index - right.index;
+        return left?.normalizedDate.localeCompare(right!.normalizedDate) || left?.index - right!.index;
     });
 
-    const alreadySorted = sortedPoints.every((point, index) => point.index === index);
+    const alreadySorted = sortedPoints.every((point, index) => point ? point.index === index : false);
     if (alreadySorted) {
         return trace;
     }
@@ -208,7 +208,7 @@ const sortDateSeriesTrace = (trace: PlotlyData): PlotlyData => {
         if (!Array.isArray(value) || value.length !== xValues.length) {
             continue;
         }
-        nextTrace[key] = sortedPoints.map((point) => value[point.index]);
+        nextTrace[key] = sortedPoints.map((point) => point ? value[point.index] : undefined);
     }
     return nextTrace as PlotlyData;
 };

@@ -131,6 +131,7 @@ describe("graphEditor", () => {
     ])).toEqual([
       {
         graphId: 10,
+        description: null,
         data: [{type: "bar", x: ["A"], y: [9]}],
         layout: {title: {text: "Newport Beach", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
@@ -138,6 +139,7 @@ describe("graphEditor", () => {
       },
       {
         graphId: 11,
+        description: null,
         data: [{type: "pie", labels: ["Open"], values: [3]}],
         layout: {showlegend: false},
         config: {displayModeBar: false},
@@ -157,6 +159,7 @@ describe("graphEditor", () => {
     expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphs)).toEqual([
       {
         graphId: 10,
+        description: null,
         data: [{type: "bar", x: ["A"], y: [15]}],
         layout: {title: {text: "Updated", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
@@ -181,6 +184,7 @@ describe("graphEditor", () => {
     expect(buildChangedLocationGraphUpdates(editedGraphs, baseGraphs, false)).toEqual([
       {
         graphId: 10,
+        description: null,
         layout: {title: {text: "Finite range title", x: 0.02, xanchor: "left"}},
         config: {displayModeBar: false},
         style: {height: 360},
@@ -388,6 +392,7 @@ describe("graphEditor", () => {
     expect(buildChangedLocationGraphUpdates(editedGraphs, baseline)).toEqual([
       {
         graphId: 11,
+        description: null,
         data: [{type: "pie", labels: ["Open"], values: [5]}],
         layout: {showlegend: true},
         config: {displayModeBar: false},

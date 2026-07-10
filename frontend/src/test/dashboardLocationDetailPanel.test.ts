@@ -46,6 +46,7 @@ const SCATTER_GRAPH_STYLE = {
 const buildScatterGraphResponse = () => ({
   id: 44,
   name: "New Plot Graph",
+  description: null,
   data: [{
     type: "scatter",
     name: "Trace 1",

@@ -294,7 +294,7 @@ describe("Chart helpers", () => {
       }
     };
 
-    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+    const element = {id: "chart-root", isConnected: true} as unknown as HTMLDivElement;
     const cleanup = attachPlotlyResizeListener(
       eventTarget as any,
       plotly as any,
