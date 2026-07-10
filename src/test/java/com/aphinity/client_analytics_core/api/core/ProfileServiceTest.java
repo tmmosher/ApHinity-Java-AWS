@@ -7,6 +7,7 @@ import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.ProfileService;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,9 @@ class ProfileServiceTest {
 
     @Mock
     private AuthService authService;
+
+    @Mock
+    private UserProfileCache userProfileCache;
 
     @InjectMocks
     private ProfileService profileService;
@@ -98,6 +102,22 @@ class ProfileServiceTest {
     }
 
     @Test
+    void getProfileUsesCachedResponseWithoutLoadingTheEntity() {
+        ProfileResponse cached = new ProfileResponse(
+            "Cached User",
+            "cached@example.com",
+            true,
+            AccountRole.CLIENT
+        );
+        when(userProfileCache.get(16L)).thenReturn(cached);
+
+        ProfileResponse response = profileService.getProfile(16L);
+
+        assertEquals(cached, response);
+        verify(appUserRepository, never()).findById(16L);
+    }
+
+    @Test
     void updateProfileUpdatesNameAndEmail() {
         AppUser user = new AppUser();
         user.setId(3L);
@@ -121,6 +141,7 @@ class ProfileServiceTest {
         assertEquals("updated@example.com", user.getEmail());
         assertEquals(null, user.getEmailVerifiedAt());
         verify(authService).issueAndSendVerificationCode(3L, "updated@example.com");
+        verify(userProfileCache).invalidate(3L);
     }
 
     @Test

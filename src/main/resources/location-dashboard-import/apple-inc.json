@@ -39,7 +39,7 @@
   ],
   "systems": [
     {
-      "key": "example",
+      "key": "towers",
       "displayName": "Example",
       "rangeProfile": "example",
       "aliases": []

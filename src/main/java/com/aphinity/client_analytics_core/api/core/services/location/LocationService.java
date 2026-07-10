@@ -333,6 +333,7 @@ public class LocationService {
             throw ex;
         }
 
+        locationDashboardTimeRangeService.invalidateLocationCache(locationId);
         return graphResponseMapper.toResponse(savedGraph);
     }
 
@@ -382,6 +383,7 @@ public class LocationService {
             throw ex;
         }
 
+        locationDashboardTimeRangeService.invalidateLocationCache(locationId);
         log.info(
             "Deleted location graph locationId={} graphId={} actorUserId={}",
             locationId,
@@ -616,6 +618,8 @@ public class LocationService {
                 throw ex;
             }
 
+            locationDashboardTimeRangeService.invalidateLocationCache(locationId);
+
             if (normalizedSectionLayout != null && hasGraphUpdates) {
                 log.info(
                     "Updated graph data payloads and section layout locationId={} graphCount={} actorUserId={} graphIds={}",
@@ -800,6 +804,7 @@ public class LocationService {
             Graph savedGraph = graphRepository.saveAndFlush(graph);
             savedGraph = refreshGraphFromStore(graphId, savedGraph);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
+            locationDashboardTimeRangeService.invalidateLocationCache(locationId);
             return new GraphNameUpdateResponse(
                 savedGraph.getId(),
                 savedGraph.getName(),
@@ -841,6 +846,7 @@ public class LocationService {
         }
 
         location = refreshLocationFromStore(location.getId(), location);
+        locationDashboardTimeRangeService.invalidateLocationCache(location.getId());
         return toLocationResponse(location, user);
     }
 
@@ -956,7 +962,10 @@ public class LocationService {
             throw finiteRangeDashboardSpreadsheetUploadNotAllowed();
         }
         Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
-        return locationDashboardImportService.importLocationDashboard(location, file, persistSamples);
+        LocationDashboardSpreadsheetUploadResponse response =
+            locationDashboardImportService.importLocationDashboard(location, file, persistSamples);
+        locationDashboardTimeRangeService.invalidateLocationCache(locationId);
+        return response;
     }
 
     /**

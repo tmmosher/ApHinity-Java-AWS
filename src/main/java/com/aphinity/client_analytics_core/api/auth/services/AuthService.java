@@ -10,6 +10,7 @@ import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,7 @@ public class AuthService {
     private final TurnstileValidationService turnstileValidationService;
     private final JdbcTemplate jdbcTemplate;
     private final MailOutboxCommandService mailOutboxCommandService;
+    private final UserProfileCache userProfileCache;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${app.recovery.token-ttl-seconds:3600}")
@@ -81,7 +83,8 @@ public class AuthService {
             LoginAttemptService loginAttemptService,
             TurnstileValidationService turnstileValidationService,
             JdbcTemplate jdbcTemplate,
-            MailOutboxCommandService mailOutboxCommandService)
+            MailOutboxCommandService mailOutboxCommandService,
+            UserProfileCache userProfileCache)
     {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
@@ -93,6 +96,7 @@ public class AuthService {
         this.turnstileValidationService = turnstileValidationService;
         this.jdbcTemplate = jdbcTemplate;
         this.mailOutboxCommandService = mailOutboxCommandService;
+        this.userProfileCache = userProfileCache;
     }
 
     /**
@@ -379,6 +383,7 @@ public class AuthService {
         if (user.getEmailVerifiedAt() == null) {
             user.setEmailVerifiedAt(now);
             appUserRepository.save(user);
+            userProfileCache.invalidate(user.getId());
         }
 
         String refreshToken = generateRefreshToken();

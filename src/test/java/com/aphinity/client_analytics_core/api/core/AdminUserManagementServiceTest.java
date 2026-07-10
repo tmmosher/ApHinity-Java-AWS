@@ -10,6 +10,7 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.AdminManag
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AdminManagedUserResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.AdminUserManagementService;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
 import com.aphinity.client_analytics_core.api.core.services.UserDeletionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +53,9 @@ class AdminUserManagementServiceTest {
 
     @Mock
     private UserDeletionService userDeletionService;
+
+    @Mock
+    private UserProfileCache userProfileCache;
 
     @InjectMocks
     private AdminUserManagementService adminUserManagementService;
@@ -138,6 +142,7 @@ class AdminUserManagementServiceTest {
         assertFalse(response.pendingDeletion());
         assertEquals(Set.of(partnerRole), target.getRoles());
         verify(appUserRepository).saveAndFlush(target);
+        verify(userProfileCache).invalidate(11L);
         verify(authSessionRepository).revokeAllActiveForUser(eq(11L), any());
         verify(userDeletionService, never()).restoreUser(11L);
     }

@@ -131,6 +131,7 @@ class LocationServiceTransactionTest {
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
         verify(locationRepository).touchUpdatedAt(eq(1L), org.mockito.ArgumentMatchers.any(Instant.class));
+        verify(locationDashboardTimeRangeService).invalidateLocationCache(1L);
     }
 
     private static AppUser verifiedUser(Long userId) {

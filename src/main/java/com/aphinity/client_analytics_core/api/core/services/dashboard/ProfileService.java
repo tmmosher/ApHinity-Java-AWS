@@ -26,19 +26,22 @@ public class ProfileService {
     private final AccountRoleService accountRoleService;
     private final PasswordPolicyValidator passwordPolicyValidator;
     private final AuthService authService;
+    private final UserProfileCache userProfileCache;
 
     public ProfileService(
         AppUserRepository appUserRepository,
         PasswordEncoder passwordEncoder,
         AccountRoleService accountRoleService,
         PasswordPolicyValidator passwordPolicyValidator,
-        AuthService authService
+        AuthService authService,
+        UserProfileCache userProfileCache
     ) {
         this.appUserRepository = appUserRepository;
         this.passwordEncoder = passwordEncoder;
         this.accountRoleService = accountRoleService;
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.authService = authService;
+        this.userProfileCache = userProfileCache;
     }
 
     /**
@@ -49,10 +52,17 @@ public class ProfileService {
      */
     @Transactional(readOnly = true)
     public ProfileResponse getProfile(Long userId) {
+        ProfileResponse cachedProfile = userProfileCache.get(userId);
+        if (cachedProfile != null) {
+            return cachedProfile;
+        }
+
         AppUser user = appUserRepository.findById(userId)
             .orElseThrow(this::invalidAuthenticatedUser);
 
-        return toProfileResponse(user);
+        ProfileResponse profile = toProfileResponse(user);
+        userProfileCache.put(userId, profile);
+        return profile;
     }
 
     /**
@@ -90,6 +100,7 @@ public class ProfileService {
             user.setEmailVerifiedAt(null);
         }
 
+        userProfileCache.invalidate(userId);
         try {
             appUserRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
@@ -100,7 +111,9 @@ public class ProfileService {
             authService.issueAndSendVerificationCode(user.getId(), normalizedEmail);
         }
 
-        return toProfileResponse(user);
+        ProfileResponse profile = toProfileResponse(user);
+        userProfileCache.put(userId, profile);
+        return profile;
     }
 
     /**

@@ -4,8 +4,10 @@ import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.auth.repositories.AuthSessionRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,6 +39,7 @@ public class UserDeletionService {
     private final AuthSessionRepository authSessionRepository;
     private final AccountRoleService accountRoleService;
     private final TransactionTemplate transactionTemplate;
+    private final UserProfileCache userProfileCache;
     private final ReentrantLock queueLock = new ReentrantLock();
     private final AtomicLong queueGeneration = new AtomicLong();
     private final LinkedHashMap<Long, PendingUserDeletion> pendingDeletions = new LinkedHashMap<>();
@@ -47,10 +50,28 @@ public class UserDeletionService {
         AccountRoleService accountRoleService,
         TransactionTemplate transactionTemplate
     ) {
+        this(
+            appUserRepository,
+            authSessionRepository,
+            accountRoleService,
+            transactionTemplate,
+            new UserProfileCache()
+        );
+    }
+
+    @Autowired
+    public UserDeletionService(
+        AppUserRepository appUserRepository,
+        AuthSessionRepository authSessionRepository,
+        AccountRoleService accountRoleService,
+        TransactionTemplate transactionTemplate,
+        UserProfileCache userProfileCache
+    ) {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
         this.accountRoleService = accountRoleService;
         this.transactionTemplate = transactionTemplate;
+        this.userProfileCache = userProfileCache;
     }
 
     /**
@@ -148,6 +169,7 @@ public class UserDeletionService {
                     authSessionRepository.deleteAllByUserIdIn(deletableIds);
                     appUserRepository.deleteAllByIdInBatch(deletableIds);
                     appUserRepository.flush();
+                    deletableIds.forEach(userProfileCache::invalidate);
                     log.info("Deleted queued users count={} userIds={}", deletableIds.size(), deletableIds);
                 }
             });

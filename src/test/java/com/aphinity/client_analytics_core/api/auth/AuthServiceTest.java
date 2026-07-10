@@ -11,6 +11,7 @@ import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
 import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
+import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
@@ -79,6 +80,9 @@ class AuthServiceTest {
 
     @Mock
     private MailOutboxCommandService mailOutboxService;
+
+    @Mock
+    private UserProfileCache userProfileCache;
 
     @Spy
     private PasswordPolicyValidator passwordPolicyValidator;
@@ -487,6 +491,7 @@ class AuthServiceTest {
         assertEquals(3600L, tokens.refreshExpiresIn());
         assertNotNull(user.getEmailVerifiedAt());
         verify(appUserRepository).save(user);
+        verify(userProfileCache).invalidate(42L);
     }
 
     @Test

@@ -38,19 +38,22 @@ public class AdminUserManagementService {
     private final RoleRepository roleRepository;
     private final AccountRoleService accountRoleService;
     private final UserDeletionService userDeletionService;
+    private final UserProfileCache userProfileCache;
 
     public AdminUserManagementService(
         AppUserRepository appUserRepository,
         AuthSessionRepository authSessionRepository,
         RoleRepository roleRepository,
         AccountRoleService accountRoleService,
-        UserDeletionService userDeletionService
+        UserDeletionService userDeletionService,
+        UserProfileCache userProfileCache
     ) {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
         this.roleRepository = roleRepository;
         this.accountRoleService = accountRoleService;
         this.userDeletionService = userDeletionService;
+        this.userProfileCache = userProfileCache;
     }
 
     /**
@@ -126,6 +129,7 @@ public class AdminUserManagementService {
 
         targetUser.setRoles(new HashSet<>(Set.of(targetRole)));
         AppUser savedUser = appUserRepository.saveAndFlush(targetUser);
+        userProfileCache.invalidate(targetUserId);
         authSessionRepository.revokeAllActiveForUser(targetUserId, Instant.now());
         if (accountRoleService.resolveAccountRole(savedUser) == AccountRole.ADMIN) {
             userDeletionService.restoreUser(savedUser.getId());

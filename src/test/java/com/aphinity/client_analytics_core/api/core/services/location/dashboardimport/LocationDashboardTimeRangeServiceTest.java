@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,11 +66,64 @@ class LocationDashboardTimeRangeServiceTest {
 
         when(locationRepository.findById(42L)).thenReturn(Optional.of(location));
         when(locationGraphRepository.findByLocationIdWithGraphDetails(42L)).thenReturn(List.of(locationGraph));
-        when(strategyRegistry.resolve("Hoag Hospital")).thenReturn(Optional.of(strategyWithMissingGraph()));
 
         assertDoesNotThrow(() ->
             service.resolveLocationMonthRangePayloads(42L, new DashboardGraphMonthRange(3))
         );
+    }
+
+    @Test
+    void finiteRangeProjectionReusesCachedGraphPayloadUntilInvalidated() {
+        LocationDashboardCache cache = new LocationDashboardCache();
+        LocationDashboardTimeRangeService service = new LocationDashboardTimeRangeService(
+            locationRepository,
+            locationGraphRepository,
+            serviceEventRepository,
+            strategyRegistry,
+            samplePersistenceService,
+            Clock.fixed(Instant.parse("2026-07-06T00:00:00Z"), ZoneOffset.UTC),
+            cache
+        );
+        Location location = new Location();
+        location.setId(42L);
+        location.setName("Hoag Hospital");
+        Graph graph = new Graph();
+        graph.setId(101L);
+        graph.setName("Water Quality Conformance");
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "orientation", "v",
+            "x", List.of("first"),
+            "y", List.of(1)
+        )));
+        LocationGraph locationGraph = new LocationGraph();
+        locationGraph.setId(new LocationGraphId(42L, 101L));
+        locationGraph.setGraph(graph);
+
+        when(locationRepository.findById(42L)).thenReturn(Optional.of(location));
+        when(locationGraphRepository.findByLocationIdWithGraphDetails(42L)).thenReturn(List.of(locationGraph));
+
+        Map<Long, LocationDashboardTimeRangeService.MonthRangeGraphProjection> first =
+            service.resolveLocationMonthRangeProjections(42L, new DashboardGraphMonthRange(3));
+        graph.setData(List.of(Map.of(
+            "type", "bar",
+            "orientation", "v",
+            "x", List.of("second"),
+            "y", List.of(2)
+        )));
+        Map<Long, LocationDashboardTimeRangeService.MonthRangeGraphProjection> second =
+            service.resolveLocationMonthRangeProjections(42L, new DashboardGraphMonthRange(3));
+
+        assertEquals(first.get(101L), second.get(101L));
+        assertEquals(1L, cache.graphProjectionEntryCount());
+
+        service.invalidateLocationCache(42L);
+
+        Map<Long, LocationDashboardTimeRangeService.MonthRangeGraphProjection> afterInvalidation =
+            service.resolveLocationMonthRangeProjections(42L, new DashboardGraphMonthRange(3));
+        assertEquals("second", ((Map<?, ?>) afterInvalidation.get(101L).data().getFirst()).get("x") instanceof List<?> x
+            ? x.getFirst()
+            : null);
     }
 
     private LocationDashboardImportStrategy strategyWithMissingGraph() {
