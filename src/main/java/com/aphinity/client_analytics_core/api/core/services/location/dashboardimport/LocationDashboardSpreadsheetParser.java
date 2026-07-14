@@ -141,15 +141,20 @@ public class LocationDashboardSpreadsheetParser {
             if (identityColumn == null) {
                 continue;
             }
-            String canonicalHeader = resolveCanonicalHeader(
-                normalizeHeader(identityColumn.column()),
-                DEFAULT_HEADER_ALIASES
-            );
+            String canonicalHeader = resolveIdentityField(identityColumn);
             if (canonicalHeader == null) {
                 throw new IllegalStateException("Unknown dashboard spreadsheet identity column: " + identityColumn.column());
             }
-            requiredHeaders.add(canonicalHeader);
-            headerAliases.put(normalizeHeader(identityColumn.column()), canonicalHeader);
+            if (!requiredHeaders.add(canonicalHeader)) {
+                throw new IllegalStateException(
+                    "Dashboard spreadsheet identity fields must be unique: " + identityColumn.identityKey()
+                );
+            }
+            String normalizedColumn = normalizeHeader(identityColumn.column());
+            if (normalizedColumn.isBlank()) {
+                throw new IllegalStateException("Dashboard spreadsheet identity column header is required.");
+            }
+            headerAliases.put(normalizedColumn, canonicalHeader);
             for (String rawAlias : identityColumn.aliases()) {
                 String normalizedAlias = normalizeHeader(rawAlias);
                 if (!normalizedAlias.isBlank()) {
@@ -158,6 +163,26 @@ public class LocationDashboardSpreadsheetParser {
             }
         }
         return new HeaderIdentityPattern(Map.copyOf(headerAliases), Set.copyOf(requiredHeaders));
+    }
+
+    private String resolveIdentityField(
+        LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn
+    ) {
+        if (identityColumn == null) {
+            return null;
+        }
+        String configuredField = normalizeHeader(identityColumn.identityKey());
+        if (configuredField.isBlank()) {
+            return null;
+        }
+        return switch (configuredField.replace(" ", "")) {
+            case "facility", "site" -> HEADER_FACILITY;
+            case "building", "bldg" -> HEADER_BUILDING;
+            case "system", "type" -> HEADER_SYSTEM;
+            case "pointofuse" -> HEADER_POINT_OF_USE;
+            case "basis" -> HEADER_BASIS;
+            default -> resolveCanonicalHeader(configuredField, DEFAULT_HEADER_ALIASES);
+        };
     }
 
     private List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> defaultIdentityPattern() {
@@ -283,6 +308,12 @@ public class LocationDashboardSpreadsheetParser {
         FormulaEvaluator evaluator
     ) {
         // Date rows are the strongest signal in the worksheet because they repeat across the metric columns.
+        // The compact Apple destination layout places identity labels and dates on
+        // the same row, so check the identity header row before scanning above it.
+        if (scoreDateRow(sheet.getRow(headerRowIndex), basisColumnIndex, formatter, evaluator) >= MIN_DATE_ROW_SCORE) {
+            return headerRowIndex;
+        }
+
         int bestRowIndex = -1;
         int bestScore = 0;
         for (int rowIndex = 0; rowIndex < headerRowIndex; rowIndex += 1) {

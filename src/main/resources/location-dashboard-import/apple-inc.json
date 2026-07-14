@@ -2,22 +2,17 @@
   "locationName": "Apple Inc.",
   "identityPattern": [
     {
-      "column": "Type",
+      "field": "system",
+      "column": "System",
       "aliases": [
-        "Cooling Water Analysis",
-        "Closed Loop Analysis",
-        "TRC Analysis",
-        "3. Cooling Water Analysis",
-        "4. Closed Loop Analysis",
-        "5. TRC Analysis"
+        "Type"
       ]
     },
     {
+      "field": "facility",
       "column": "Site",
       "aliases": [
-        "Towers",
-        "Closed Loops",
-        "Locations"
+        "Facility"
       ]
     }
   ],

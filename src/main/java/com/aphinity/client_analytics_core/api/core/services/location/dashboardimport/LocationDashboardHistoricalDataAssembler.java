@@ -147,14 +147,16 @@ final class LocationDashboardHistoricalDataAssembler {
         Map<String, Integer> tokenIndexesByIdentityColumn = sampleIdentityIndexes(sample.sampleIdentity());
         Map<String, String> values = new LinkedHashMap<>();
         for (LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn : effectiveIdentityPattern(identityPattern)) {
-            if (identityColumn == null || identityColumn.column() == null || identityColumn.column().isBlank()) {
+            if (identityColumn == null
+                || identityColumn.identityKey() == null
+                || identityColumn.identityKey().isBlank()) {
                 continue;
             }
-            Integer tokenIndex = tokenIndexesByIdentityColumn.get(identityColumn.column());
+            Integer tokenIndex = tokenIndexesByIdentityColumn.get(identityColumn.identityKey());
             if (tokenIndex == null || tokenIndex < 0 || tokenIndex >= tokens.size()) {
                 continue;
             }
-            putIfPresent(values, identityColumn.column(), tokens.get(tokenIndex));
+            putIfPresent(values, identityColumn.identityKey(), tokens.get(tokenIndex));
         }
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }

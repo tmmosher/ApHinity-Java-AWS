@@ -311,7 +311,7 @@ final class LocationDashboardDerivedGraphSupport {
                 : identityPattern;
         return effectivePattern.stream()
             .filter(Objects::nonNull)
-            .map(column -> new IdentityColumnDefinition(column.column(), identityColumnLabel(column.column())))
+            .map(column -> new IdentityColumnDefinition(column.identityKey(), identityColumnLabel(column.column())))
             .toList();
     }
 

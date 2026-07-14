@@ -66,11 +66,25 @@ public record LocationDashboardImportStrategyConfig(
     }
 
     public record SpreadsheetIdentityColumn(
+        @JsonProperty("field")
+        String field,
         String column,
         List<String> aliases
     ) {
+        public SpreadsheetIdentityColumn(String column, List<String> aliases) {
+            this(null, column, aliases);
+        }
+
         public SpreadsheetIdentityColumn {
             aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        }
+
+        /**
+         * Stable internal identity key used by imported samples and derived tables.
+         * Legacy configurations use their column name as the key.
+         */
+        public String identityKey() {
+            return field == null || field.isBlank() ? column : field;
         }
     }
 

@@ -40,4 +40,16 @@ class LocationDashboardImportStrategyRegistryTest {
                 .anyMatch(graph -> graph.importType() == LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE)
         );
     }
+
+    @Test
+    void resolveLoadsAppleIdentityFieldsSeparatelyFromDestinationHeaders() {
+        LocationDashboardImportStrategyRegistry registry = new LocationDashboardImportStrategyRegistry();
+
+        LocationDashboardImportStrategy strategy = registry.resolve("apple inc.").orElseThrow();
+
+        assertEquals("system", strategy.spreadsheetIdentityPattern().get(0).field());
+        assertEquals("System", strategy.spreadsheetIdentityPattern().get(0).column());
+        assertEquals("facility", strategy.spreadsheetIdentityPattern().get(1).field());
+        assertEquals("Site", strategy.spreadsheetIdentityPattern().get(1).column());
+    }
 }

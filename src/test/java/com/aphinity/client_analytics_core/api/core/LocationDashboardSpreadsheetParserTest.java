@@ -131,6 +131,36 @@ class LocationDashboardSpreadsheetParserTest {
     }
 
     @Test
+    void parseAcceptsConfiguredSystemAndSiteHeadersWithDatesOnIdentityRow() throws IOException {
+        MockMultipartFile file = createCompactAppleDestinationWorkbook();
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(
+            file,
+            List.of(
+                new com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
+                    "system", "System", List.of("Type")
+                ),
+                new com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
+                    "facility", "Site", List.of("Facility")
+                )
+            )
+        );
+
+        assertEquals("Apple Inc.", workbook.locationTitle());
+        assertEquals(1, workbook.rows().size());
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardRow row = workbook.rows().getFirst();
+        assertEquals("Towers", row.facility());
+        assertEquals("Cooling Water Analysis", row.system());
+        assertEquals(4, row.cells().size());
+        assertEquals("HPC", row.cells().getFirst().metricName());
+        assertEquals(LocalDate.parse("2026-07-10"), row.cells().getFirst().observedDate());
+        assertEquals(new BigDecimal("1"), row.cells().get(1).numericValue());
+        assertEquals("pH", row.cells().get(2).metricName());
+        assertEquals(LocalDate.parse("2026-07-10"), row.cells().get(2).observedDate());
+    }
+
+    @Test
     void parseCoercesNdToZeroAndSkipsNtCells() throws IOException {
         LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ndWorkbook = parser.parse(
             createSemanticValueWorkbook("ND")
@@ -515,6 +545,51 @@ class LocationDashboardSpreadsheetParserTest {
             return new MockMultipartFile(
                 "file",
                 "dashboard.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                outputStream.toByteArray()
+            );
+        }
+    }
+
+    private MockMultipartFile createCompactAppleDestinationWorkbook() throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Validation");
+
+            Row titleRow = sheet.createRow(2);
+            titleRow.createCell(0).setCellValue("Apple Inc.");
+            titleRow.createCell(2).setCellValue("HPC");
+            titleRow.createCell(4).setCellValue("pH");
+            sheet.addMergedRegion(new CellRangeAddress(2, 2, 2, 3));
+            sheet.addMergedRegion(new CellRangeAddress(2, 2, 4, 5));
+
+            Row headerRow = sheet.createRow(3);
+            headerRow.createCell(0).setCellValue("System");
+            headerRow.createCell(1).setCellValue("Site");
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("m/d/yyyy"));
+            writeDateCells(headerRow, 2, List.of(
+                LocalDate.parse("2026-07-10"),
+                LocalDate.parse("2026-07-10")
+            ), dateStyle);
+            writeDateCells(headerRow, 4, List.of(
+                LocalDate.parse("2026-07-10"),
+                LocalDate.parse("2026-07-10")
+            ), dateStyle);
+
+            Row dataRow = sheet.createRow(4);
+            dataRow.createCell(0).setCellValue("Cooling Water Analysis");
+            dataRow.createCell(1).setCellValue("Towers");
+            dataRow.createCell(2).setCellValue(12);
+            dataRow.createCell(3).setCellValue("<1");
+            dataRow.createCell(4).setCellValue(7);
+            dataRow.createCell(5).setCellValue(7.2);
+
+            workbook.write(outputStream);
+            return new MockMultipartFile(
+                "file",
+                "apple-generated.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 outputStream.toByteArray()
             );
