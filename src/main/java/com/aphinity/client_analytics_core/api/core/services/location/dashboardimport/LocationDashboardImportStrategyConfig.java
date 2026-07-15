@@ -117,10 +117,10 @@ public record LocationDashboardImportStrategyConfig(
 
     public record RangeProfileConfig(
         String key,
-        Map<String, String> measurementTypes
+        List<String> measurementTypes
     ) {
         public RangeProfileConfig {
-            measurementTypes = measurementTypes == null ? Map.of() : Map.copyOf(measurementTypes);
+            measurementTypes = measurementTypes == null ? List.of() : List.copyOf(measurementTypes);
         }
     }
 

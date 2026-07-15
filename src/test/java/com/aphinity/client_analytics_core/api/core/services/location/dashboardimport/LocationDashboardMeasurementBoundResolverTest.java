@@ -4,7 +4,6 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Measuremen
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -12,21 +11,21 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LocationDashboardMeasurementBoundResolverTest {
     @Test
-    void resolvesDifferentDatabaseTypesForMeasurementsInOneProfile() {
-        MeasurementBound criticalHpc = measurementBound(1L, "HPC", "critical");
-        MeasurementBound potableLegionella = measurementBound(2L, "Legionella", "potable");
+    void resolvesConfiguredMeasurementsUsingTheRangeProfileAsDatabaseType() {
+        MeasurementBound domesticHpc = measurementBound(1L, "HPC", "domestic-hot");
+        MeasurementBound domesticLegionella = measurementBound(2L, "Legionella", "domestic-hot");
         LocationDashboardMeasurementBoundResolver resolver = new LocationDashboardMeasurementBoundResolver(
-            List.of(criticalHpc, potableLegionella),
+            List.of(domesticHpc, domesticLegionella),
             List.of(new LocationDashboardImportStrategyConfig.RangeProfileConfig(
                 "domestic-hot",
-                Map.of("HPC", "critical", "Legionella", "potable")
+                List.of("HPC", "Legionella")
             ))
         );
         LocationDashboardImportStrategyConfig.RangeProfile profile =
             new LocationDashboardImportStrategyConfig.RangeProfile("domestic-hot");
 
-        assertEquals(criticalHpc, resolver.resolve(" hpc ", profile));
-        assertEquals(potableLegionella, resolver.resolve("LEGIONELLA", profile));
+        assertEquals(domesticHpc, resolver.resolve(" hpc ", profile));
+        assertEquals(domesticLegionella, resolver.resolve("LEGIONELLA", profile));
     }
 
     @Test
@@ -35,7 +34,7 @@ class LocationDashboardMeasurementBoundResolverTest {
             List.of(measurementBound(1L, "HPC", "domestic-hot")),
             List.of(new LocationDashboardImportStrategyConfig.RangeProfileConfig(
                 "domestic-hot",
-                Map.of("Legionella", "potable")
+                List.of("Legionella")
             ))
         );
 
@@ -70,7 +69,7 @@ class LocationDashboardMeasurementBoundResolverTest {
             List.of(),
             List.of(new LocationDashboardImportStrategyConfig.RangeProfileConfig(
                 "domestic-hot",
-                Map.of("HPC", "critical")
+                List.of("HPC")
             ))
         );
 
@@ -83,7 +82,7 @@ class LocationDashboardMeasurementBoundResolverTest {
         );
 
         assertEquals(
-            "No location measurement bound is configured for HPC and database type critical "
+            "No location measurement bound is configured for HPC and database type domestic-hot "
                 + "selected by range profile domestic-hot",
             error.getMessage()
         );

@@ -3,20 +3,22 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Resolves a configured system profile and measurement to a location-assigned database bound. */
 final class LocationDashboardMeasurementBoundResolver {
     private final Map<String, MeasurementBound> boundsByMeasurementAndType;
-    private final Map<String, Map<String, String>> measurementTypesByProfile;
+    private final Map<String, Set<String>> measurementNamesByProfile;
 
     LocationDashboardMeasurementBoundResolver(
         List<MeasurementBound> measurementBounds,
         List<LocationDashboardImportStrategyConfig.RangeProfileConfig> rangeProfiles
     ) {
         boundsByMeasurementAndType = indexBounds(measurementBounds);
-        measurementTypesByProfile = indexProfiles(rangeProfiles);
+        measurementNamesByProfile = indexProfiles(rangeProfiles);
     }
 
     MeasurementBound resolve(
@@ -28,27 +30,25 @@ final class LocationDashboardMeasurementBoundResolver {
             return null;
         }
 
-        String boundType = profileKey;
-        if (!measurementTypesByProfile.isEmpty()) {
-            Map<String, String> measurementTypes = measurementTypesByProfile.get(profileKey);
-            if (measurementTypes == null) {
+        if (!measurementNamesByProfile.isEmpty()) {
+            Set<String> measurementNames = measurementNamesByProfile.get(profileKey);
+            if (measurementNames == null) {
                 return null;
             }
-            boundType = measurementTypes.get(normalize(measurementName));
-            if (boundType == null) {
+            if (!measurementNames.contains(normalize(measurementName))) {
                 return null;
             }
         }
 
         String lookupKey = ConfiguredLocationDashboardImportStrategy.measurementBoundLookupKey(
             measurementName,
-            boundType
+            profileKey
         );
         MeasurementBound bound = lookupKey == null ? null : boundsByMeasurementAndType.get(lookupKey);
-        if (bound == null && !measurementTypesByProfile.isEmpty()) {
+        if (bound == null && !measurementNamesByProfile.isEmpty()) {
             throw new IllegalStateException(
                 "No location measurement bound is configured for " + measurementName
-                    + " and database type " + boundType
+                    + " and database type " + profileKey
                     + " selected by range profile " + profileReference.value()
             );
         }
@@ -75,17 +75,17 @@ final class LocationDashboardMeasurementBoundResolver {
         return Map.copyOf(indexedBounds);
     }
 
-    private Map<String, Map<String, String>> indexProfiles(
+    private Map<String, Set<String>> indexProfiles(
         List<LocationDashboardImportStrategyConfig.RangeProfileConfig> rangeProfiles
     ) {
-        Map<String, Map<String, String>> indexedProfiles = new LinkedHashMap<>();
+        Map<String, Set<String>> indexedProfiles = new LinkedHashMap<>();
         for (LocationDashboardImportStrategyConfig.RangeProfileConfig profile
             : rangeProfiles == null ? List.<LocationDashboardImportStrategyConfig.RangeProfileConfig>of() : rangeProfiles) {
-            Map<String, String> measurementTypes = new LinkedHashMap<>();
-            profile.measurementTypes().forEach((measurementName, type) ->
-                measurementTypes.put(normalize(measurementName), normalize(type))
-            );
-            indexedProfiles.put(normalize(profile.key()), Map.copyOf(measurementTypes));
+            Set<String> measurementNames = new LinkedHashSet<>();
+            profile.measurementTypes().stream()
+                .map(this::normalize)
+                .forEach(measurementNames::add);
+            indexedProfiles.put(normalize(profile.key()), Set.copyOf(measurementNames));
         }
         return Map.copyOf(indexedProfiles);
     }

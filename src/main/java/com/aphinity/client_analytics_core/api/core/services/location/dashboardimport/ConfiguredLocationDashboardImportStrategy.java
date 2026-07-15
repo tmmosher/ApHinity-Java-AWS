@@ -284,12 +284,11 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
 
             Set<String> measurementNames = new LinkedHashSet<>();
-            profile.measurementTypes().forEach((measurementName, type) -> {
+            profile.measurementTypes().forEach(measurementName -> {
                 String normalizedMeasurementName = normalizeKey(measurementName);
-                String normalizedType = normalizeKey(type);
-                if (normalizedMeasurementName == null || normalizedType == null) {
+                if (normalizedMeasurementName == null) {
                     throw new IllegalStateException(
-                        "Dashboard import strategy range profile measurements and types are required: " + profile.key()
+                        "Dashboard import strategy range profile measurement names are required: " + profile.key()
                     );
                 }
                 if (!measurementNames.add(normalizedMeasurementName)) {
