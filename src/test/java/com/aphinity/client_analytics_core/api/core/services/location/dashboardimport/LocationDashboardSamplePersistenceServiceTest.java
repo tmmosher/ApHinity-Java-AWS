@@ -10,15 +10,47 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.identityValues;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class LocationDashboardSamplePersistenceServiceTest {
     private final LocationDashboardSamplePersistenceService service = new LocationDashboardSamplePersistenceService(null);
+
+    @Test
+    void persistsAndRehydratesArbitraryIdentityKeys() {
+        Location location = new Location();
+        location.setId(10L);
+        Map<String, String> identities = new java.util.LinkedHashMap<>();
+        identities.put("water train", "Cooling Towers");
+        identities.put("sampling station", "City Water");
+        identities.put("asset tag", "CT-12");
+        LocationDashboardImportStrategy.AnalyzedSamplePoint sample =
+            new LocationDashboardImportStrategy.AnalyzedSamplePoint(
+                LocalDate.parse("2025-01-01"),
+                "City Water",
+                "Cooling Towers",
+                "Iron",
+                identities,
+                "3+",
+                "ppm",
+                null,
+                false,
+                false,
+                null,
+                LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
+            );
+
+        LocationDashboardSample persisted = service.toPersistedSamples(location, List.of(sample)).getFirst();
+        LocationDashboardImportStrategy.AnalyzedSamplePoint rehydrated = service.toAnalyzedSamplePoint(persisted);
+
+        assertEquals(identities, rehydrated.identityValues());
+    }
 
     @Test
     void persistsAnalyzedWorksheetSamplesWithoutSpreadsheetSampleIdentity() {
@@ -36,6 +68,9 @@ class LocationDashboardSamplePersistenceServiceTest {
         assertEquals(3, persistedSamples.size());
         assertEquals(3, persistedSamples.stream().map(LocationDashboardSample::getSampleIdentity).distinct().count());
         assertTrue(persistedSamples.stream().allMatch(sample -> sample.getSampleIdentity() != null));
+        assertTrue(persistedSamples.stream().allMatch(sample -> sample.getSampleIdentity().startsWith(
+            LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX + "v2|"
+        )));
 
         List<LocationDashboardImportStrategy.AnalyzedSamplePoint> rehydratedSamples = persistedSamples.stream()
             .map(service::toAnalyzedSamplePoint)
@@ -46,11 +81,12 @@ class LocationDashboardSamplePersistenceServiceTest {
         assertTrue(rehydratedSamples.stream()
             .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.WORKSHEET)
             .allMatch(sample -> sample.sampleIdentity() != null));
-        assertEquals("comment-sample-1", rehydratedSamples.stream()
+        LocationDashboardImportStrategy.AnalyzedSamplePoint rehydratedCommentSample = rehydratedSamples.stream()
             .filter(sample -> sample.origin() == LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY)
             .findFirst()
-            .orElseThrow()
-            .sampleIdentity());
+            .orElseThrow();
+        assertEquals("comment-sample-1", rehydratedCommentSample.sampleIdentity());
+        assertEquals("POU 1", rehydratedCommentSample.identityValues().get("pointOfUse"));
     }
 
     @Test
@@ -67,9 +103,9 @@ class LocationDashboardSamplePersistenceServiceTest {
 
         assertEquals("__generated__|2025-01-01|Irvine||Critical SPD|Critical SPD|HPC|POU 1|Range|WORKSHEET|1", rehydratedSample.sampleIdentity());
         assertEquals("Irvine", rehydratedSample.facilityName());
-        assertEquals("Critical SPD", rehydratedSample.systemName());
-        assertEquals("POU 1", rehydratedSample.pointOfUse());
-        assertEquals("Range", rehydratedSample.basis());
+        assertEquals("Critical SPD", rehydratedSample.identityValues().get("system"));
+        assertEquals("POU 1", rehydratedSample.identityValues().get("pointOfUse"));
+        assertEquals("Range", rehydratedSample.identityValues().get("basis"));
         assertEquals("<1", rehydratedSample.rawValue());
     }
 
@@ -157,12 +193,11 @@ class LocationDashboardSamplePersistenceServiceTest {
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             LocalDate.parse("2025-01-01"),
             "Irvine",
-            "Irvine",
-            "Critical SPD",
             "Critical SPD",
             measurementName,
-            "POU 1",
-            "Range",
+            identityValues("Irvine", "Irvine", "Critical SPD", "POU 1", "Range"),
+            null,
+            null,
             sampleIdentity,
             compliant,
             false,
@@ -192,12 +227,9 @@ class LocationDashboardSamplePersistenceServiceTest {
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             LocalDate.parse("2025-01-01"),
             "Irvine",
-            "Irvine",
-            "Critical SPD",
             "Critical SPD",
             measurementName,
-            "POU 1",
-            "Range",
+            identityValues("Irvine", "Irvine", "Critical SPD", "POU 1", "Range"),
             rawValue,
             units,
             sampleIdentity,

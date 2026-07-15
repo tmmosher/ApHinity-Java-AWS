@@ -303,11 +303,7 @@ final class LocationDashboardDerivedGraphSupport {
     ) {
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> effectivePattern =
             identityPattern == null || identityPattern.isEmpty()
-                ? List.of(
-                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of()),
-                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("building", List.of()),
-                    new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of())
-                )
+                ? List.of()
                 : identityPattern;
         return effectivePattern.stream()
             .filter(Objects::nonNull)
@@ -798,21 +794,22 @@ final class LocationDashboardDerivedGraphSupport {
         boolean resolved
     ) {
         HistoricalRawSample {
-            identityValues = identityValues == null ? Map.of() : Map.copyOf(identityValues);
+            identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
         }
     }
 
     record HistoricalCorrectiveAction(
         LocalDate observedDate,
         String facilityName,
-        String buildingName,
-        String systemName,
         String measurementName,
-        String pointOfUse,
-        String basis,
+        Map<String, String> identityValues,
         String sampleIdentity,
         ServiceEvent serviceEvent
     ) {
+        HistoricalCorrectiveAction {
+            identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
+        }
+
         boolean resolved() {
             return serviceEvent != null && serviceEvent.getStatus() == ServiceEventStatus.COMPLETED;
         }
@@ -833,11 +830,7 @@ final class LocationDashboardDerivedGraphSupport {
             return LocationDashboardCorrectiveActionMetadataSupport.identityKey(
                 measurementName,
                 observedDate,
-                facilityName,
-                buildingName,
-                systemName,
-                pointOfUse,
-                basis,
+                identityValues,
                 sampleIdentity
             );
         }
@@ -846,11 +839,8 @@ final class LocationDashboardDerivedGraphSupport {
             return new HistoricalNonConformance(
                 observedDate,
                 facilityName,
-                buildingName,
-                systemName,
                 measurementName,
-                pointOfUse,
-                basis,
+                identityValues,
                 sampleIdentity,
                 resolved(),
                 turnaroundDays()
@@ -861,15 +851,16 @@ final class LocationDashboardDerivedGraphSupport {
     record HistoricalNonConformance(
         LocalDate observedDate,
         String facilityName,
-        String buildingName,
-        String systemName,
         String measurementName,
-        String pointOfUse,
-        String basis,
+        Map<String, String> identityValues,
         String sampleIdentity,
         boolean resolved,
         Long turnaroundDays
     ) {
+        HistoricalNonConformance {
+            identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
+        }
+
         static HistoricalNonConformance merge(
             HistoricalNonConformance persisted,
             HistoricalNonConformance analyzed
@@ -887,11 +878,8 @@ final class LocationDashboardDerivedGraphSupport {
             return new HistoricalNonConformance(
                 analyzed.observedDate != null ? analyzed.observedDate : persisted.observedDate,
                 analyzed.facilityName != null ? analyzed.facilityName : persisted.facilityName,
-                analyzed.buildingName != null ? analyzed.buildingName : persisted.buildingName,
-                analyzed.systemName != null ? analyzed.systemName : persisted.systemName,
                 analyzed.measurementName != null ? analyzed.measurementName : persisted.measurementName,
-                analyzed.pointOfUse != null ? analyzed.pointOfUse : persisted.pointOfUse,
-                analyzed.basis != null ? analyzed.basis : persisted.basis,
+                !analyzed.identityValues.isEmpty() ? analyzed.identityValues : persisted.identityValues,
                 analyzed.sampleIdentity != null ? analyzed.sampleIdentity : persisted.sampleIdentity,
                 resolved,
                 turnaroundDays

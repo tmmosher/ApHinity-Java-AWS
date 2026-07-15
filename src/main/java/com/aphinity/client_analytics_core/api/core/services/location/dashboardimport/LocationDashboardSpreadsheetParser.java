@@ -25,6 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -36,31 +37,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses the dashboard workbook template into a row-oriented representation that keeps
- * cell ordering intact for stateful sublocation/system collation.
+ * Parses a configured dashboard workbook into rows with ordered, dynamic identity values.
  */
 @Service
 public class LocationDashboardSpreadsheetParser {
     private static final int MIN_DATE_ROW_SCORE = 1;
     private static final String VALIDATION_SHEET_NAME = "validation";
-    private static final String HEADER_FACILITY = "facility";
-    private static final String HEADER_BUILDING = "bldg (collated if unrecognized)";
-    private static final String HEADER_SYSTEM = "system (collated if unrecognized)";
-    private static final String HEADER_POINT_OF_USE = "point of use (ignored)";
-    private static final String HEADER_BASIS = "basis (ignored)";
-    private static final Map<String, String> DEFAULT_HEADER_ALIASES = Map.ofEntries(
-        Map.entry("facility", HEADER_FACILITY),
-        Map.entry("bldg", HEADER_BUILDING),
-        Map.entry("building", HEADER_BUILDING),
-        Map.entry(HEADER_BUILDING, HEADER_BUILDING),
-        Map.entry("system", HEADER_SYSTEM),
-        Map.entry(HEADER_SYSTEM, HEADER_SYSTEM),
-        Map.entry("pointofuse", HEADER_POINT_OF_USE),
-        Map.entry("point of use", HEADER_POINT_OF_USE),
-        Map.entry(HEADER_POINT_OF_USE, HEADER_POINT_OF_USE),
-        Map.entry("basis", HEADER_BASIS),
-        Map.entry(HEADER_BASIS, HEADER_BASIS)
-    );
     private static final Pattern NUMERIC_TEXT_PATTERN = Pattern.compile(
         "^[<>]=?\\s*([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))$|^([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))$"
     );
@@ -78,17 +60,6 @@ public class LocationDashboardSpreadsheetParser {
             .toFormatter(Locale.US)
             .withResolverStyle(ResolverStyle.STRICT)
     );
-
-    /**
-     * Parses a dashboard spreadsheet using the default facility/building/system
-     * identity columns.
-     *
-     * @param file uploaded .xlsx workbook
-     * @return parsed workbook rows and cells
-     */
-    public ParsedDashboardWorkbook parse(MultipartFile file) {
-        return parse(file, List.of());
-    }
 
     /**
      * Parses a dashboard spreadsheet using a strategy-specific identity column
@@ -130,67 +101,55 @@ public class LocationDashboardSpreadsheetParser {
     private HeaderIdentityPattern buildHeaderIdentityPattern(
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
     ) {
-        Map<String, String> headerAliases = new LinkedHashMap<>(DEFAULT_HEADER_ALIASES);
+        Map<String, String> headerAliases = new LinkedHashMap<>();
         Set<String> requiredHeaders = new LinkedHashSet<>();
+        Set<String> normalizedIdentityKeys = new LinkedHashSet<>();
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> effectiveIdentityPattern =
-            identityPattern == null || identityPattern.isEmpty()
-                ? defaultIdentityPattern()
-                : identityPattern;
+            identityPattern == null ? List.of() : identityPattern;
+
+        if (effectiveIdentityPattern.isEmpty()) {
+            throw new IllegalStateException("Dashboard spreadsheet identity columns are required.");
+        }
 
         for (LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn : effectiveIdentityPattern) {
             if (identityColumn == null) {
                 continue;
             }
-            String canonicalHeader = resolveIdentityField(identityColumn);
-            if (canonicalHeader == null) {
-                throw new IllegalStateException("Unknown dashboard spreadsheet identity column: " + identityColumn.column());
-            }
-            if (!requiredHeaders.add(canonicalHeader)) {
-                throw new IllegalStateException(
-                    "Dashboard spreadsheet identity fields must be unique: " + identityColumn.identityKey()
-                );
-            }
+            String identityKey = identityColumn.identityKey();
             String normalizedColumn = normalizeHeader(identityColumn.column());
-            if (normalizedColumn.isBlank()) {
+            if (identityKey == null || identityKey.isBlank() || normalizedColumn.isBlank()) {
                 throw new IllegalStateException("Dashboard spreadsheet identity column header is required.");
             }
-            headerAliases.put(normalizedColumn, canonicalHeader);
+            if (!normalizedIdentityKeys.add(normalizedColumn) || !requiredHeaders.add(identityKey)) {
+                throw new IllegalStateException(
+                    "Dashboard spreadsheet identity columns must be unique: " + identityKey
+                );
+            }
+            registerHeaderAlias(headerAliases, normalizedColumn, identityKey);
             for (String rawAlias : identityColumn.aliases()) {
                 String normalizedAlias = normalizeHeader(rawAlias);
                 if (!normalizedAlias.isBlank()) {
-                    headerAliases.put(normalizedAlias, canonicalHeader);
+                    registerHeaderAlias(headerAliases, normalizedAlias, identityKey);
                 }
             }
         }
-        return new HeaderIdentityPattern(Map.copyOf(headerAliases), Set.copyOf(requiredHeaders));
-    }
-
-    private String resolveIdentityField(
-        LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn
-    ) {
-        if (identityColumn == null) {
-            return null;
-        }
-        String configuredField = normalizeHeader(identityColumn.identityKey());
-        if (configuredField.isBlank()) {
-            return null;
-        }
-        return switch (configuredField.replace(" ", "")) {
-            case "facility", "site" -> HEADER_FACILITY;
-            case "building", "bldg" -> HEADER_BUILDING;
-            case "system", "type" -> HEADER_SYSTEM;
-            case "pointofuse" -> HEADER_POINT_OF_USE;
-            case "basis" -> HEADER_BASIS;
-            default -> resolveCanonicalHeader(configuredField, DEFAULT_HEADER_ALIASES);
-        };
-    }
-
-    private List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> defaultIdentityPattern() {
-        return List.of(
-            new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of()),
-            new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("building", List.of()),
-            new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of())
+        return new HeaderIdentityPattern(
+            Collections.unmodifiableMap(new LinkedHashMap<>(headerAliases)),
+            Collections.unmodifiableSet(new LinkedHashSet<>(requiredHeaders))
         );
+    }
+
+    private void registerHeaderAlias(
+        Map<String, String> headerAliases,
+        String normalizedHeader,
+        String identityKey
+    ) {
+        String existingIdentityKey = headerAliases.putIfAbsent(normalizedHeader, identityKey);
+        if (existingIdentityKey != null && !existingIdentityKey.equals(identityKey)) {
+            throw new IllegalStateException(
+                "Dashboard spreadsheet identity header aliases must be unique: " + normalizedHeader
+            );
+        }
     }
 
     private Sheet resolveValidationSheet(Workbook workbook) {
@@ -260,17 +219,17 @@ public class LocationDashboardSpreadsheetParser {
             int dateRowIndex = resolveDateRowIndex(sheet, headerRowIndex, identityEndColumnIndex, formatter, evaluator);
             int metricHeaderRowIndex = resolveMetricRowIndex(sheet, dateRowIndex, identityEndColumnIndex, formatter, evaluator);
             String locationTitle = firstNonBlankCellText(sheet.getRow(titleRowIndex), formatter, evaluator);
+            Map<String, Integer> orderedIdentityColumns = new LinkedHashMap<>();
+            for (String identityKey : headerPattern.requiredHeaders()) {
+                orderedIdentityColumns.put(identityKey, headers.get(identityKey));
+            }
 
             return new WorksheetLayout(
                 locationTitle == null ? null : locationTitle.strip(),
                 headerRowIndex,
                 metricHeaderRowIndex,
                 dateRowIndex,
-                headers.getOrDefault(HEADER_FACILITY, -1),
-                headers.getOrDefault(HEADER_BUILDING, -1),
-                headers.getOrDefault(HEADER_SYSTEM, -1),
-                headers.getOrDefault(HEADER_POINT_OF_USE, -1),
-                headers.getOrDefault(HEADER_BASIS, -1),
+                Collections.unmodifiableMap(orderedIdentityColumns),
                 identityEndColumnIndex,
                 headerRow == null ? 0 : headerRow.getLastCellNum()
             );
@@ -281,20 +240,20 @@ public class LocationDashboardSpreadsheetParser {
     private int resolveTitleRowIndex(
         Sheet sheet,
         int headerRowIndex,
-        int basisColumnIndex,
+        int identityEndColumnIndex,
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
         // Different spreadsheet generators insert a little extra vertical spacing.
         // Treat the title as the contiguous label block immediately above the header.
         int rowIndex = headerRowIndex - 1;
-        while (rowIndex >= 0 && !hasLeadingLabelText(sheet.getRow(rowIndex), basisColumnIndex, formatter, evaluator)) {
+        while (rowIndex >= 0 && !hasLeadingLabelText(sheet.getRow(rowIndex), identityEndColumnIndex, formatter, evaluator)) {
             rowIndex -= 1;
         }
         if (rowIndex < 0) {
             throw invalidSpreadsheet("Spreadsheet is missing the location title.");
         }
-        while (rowIndex - 1 >= 0 && hasLeadingLabelText(sheet.getRow(rowIndex - 1), basisColumnIndex, formatter, evaluator)) {
+        while (rowIndex - 1 >= 0 && hasLeadingLabelText(sheet.getRow(rowIndex - 1), identityEndColumnIndex, formatter, evaluator)) {
             rowIndex -= 1;
         }
         return rowIndex;
@@ -303,14 +262,14 @@ public class LocationDashboardSpreadsheetParser {
     private int resolveDateRowIndex(
         Sheet sheet,
         int headerRowIndex,
-        int basisColumnIndex,
+        int identityEndColumnIndex,
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
         // Date rows are the strongest signal in the worksheet because they repeat across the metric columns.
         // The compact Apple destination layout places identity labels and dates on
         // the same row, so check the identity header row before scanning above it.
-        if (scoreDateRow(sheet.getRow(headerRowIndex), basisColumnIndex, formatter, evaluator) >= MIN_DATE_ROW_SCORE) {
+        if (scoreDateRow(sheet.getRow(headerRowIndex), identityEndColumnIndex, formatter, evaluator) >= MIN_DATE_ROW_SCORE) {
             return headerRowIndex;
         }
 
@@ -318,7 +277,7 @@ public class LocationDashboardSpreadsheetParser {
         int bestScore = 0;
         for (int rowIndex = 0; rowIndex < headerRowIndex; rowIndex += 1) {
             Row row = sheet.getRow(rowIndex);
-            int score = scoreDateRow(row, basisColumnIndex, formatter, evaluator);
+            int score = scoreDateRow(row, identityEndColumnIndex, formatter, evaluator);
             if (score > bestScore) {
                 bestScore = score;
                 bestRowIndex = rowIndex;
@@ -333,7 +292,7 @@ public class LocationDashboardSpreadsheetParser {
     private int resolveMetricRowIndex(
         Sheet sheet,
         int dateRowIndex,
-        int basisColumnIndex,
+        int identityEndColumnIndex,
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
@@ -342,7 +301,7 @@ public class LocationDashboardSpreadsheetParser {
         int bestScore = 0;
         for (int rowIndex = 0; rowIndex < dateRowIndex; rowIndex += 1) {
             Row row = sheet.getRow(rowIndex);
-            int score = scoreMetricRow(sheet, row, basisColumnIndex, formatter, evaluator);
+            int score = scoreMetricRow(sheet, row, identityEndColumnIndex, formatter, evaluator);
             if (score > bestScore) {
                 bestScore = score;
                 bestRowIndex = rowIndex;
@@ -354,13 +313,13 @@ public class LocationDashboardSpreadsheetParser {
         return bestRowIndex;
     }
 
-    private int scoreDateRow(Row row, int basisColumnIndex, DataFormatter formatter, FormulaEvaluator evaluator) {
+    private int scoreDateRow(Row row, int identityEndColumnIndex, DataFormatter formatter, FormulaEvaluator evaluator) {
         if (row == null) {
             return 0;
         }
         int score = 0;
         short lastCellNumber = row.getLastCellNum();
-        for (int cellIndex = basisColumnIndex + 1; cellIndex < lastCellNumber; cellIndex += 1) {
+        for (int cellIndex = identityEndColumnIndex + 1; cellIndex < lastCellNumber; cellIndex += 1) {
             if (isDateLikeCell(row.getCell(cellIndex), formatter, evaluator)) {
                 score += 1;
             }
@@ -371,7 +330,7 @@ public class LocationDashboardSpreadsheetParser {
     private int scoreMetricRow(
         Sheet sheet,
         Row row,
-        int basisColumnIndex,
+        int identityEndColumnIndex,
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
@@ -381,7 +340,7 @@ public class LocationDashboardSpreadsheetParser {
 
         int score = 0;
         short lastCellNumber = row.getLastCellNum();
-        for (int cellIndex = basisColumnIndex + 1; cellIndex < lastCellNumber; cellIndex += 1) {
+        for (int cellIndex = identityEndColumnIndex + 1; cellIndex < lastCellNumber; cellIndex += 1) {
             if (!normalizeCellText(row.getCell(cellIndex), formatter, evaluator).isBlank()) {
                 score += 1;
             }
@@ -390,7 +349,7 @@ public class LocationDashboardSpreadsheetParser {
         for (CellRangeAddress mergedRegion : sheet.getMergedRegions()) {
             if (mergedRegion.getFirstRow() != row.getRowNum()
                 || mergedRegion.getLastRow() != row.getRowNum()
-                || mergedRegion.getFirstColumn() <= basisColumnIndex) {
+                || mergedRegion.getFirstColumn() <= identityEndColumnIndex) {
                 continue;
             }
             String metricName = normalizeCellText(row.getCell(mergedRegion.getFirstColumn()), formatter, evaluator);
@@ -403,7 +362,7 @@ public class LocationDashboardSpreadsheetParser {
 
     private boolean hasLeadingLabelText(
         Row row,
-        int basisColumnIndex,
+        int identityEndColumnIndex,
         DataFormatter formatter,
         FormulaEvaluator evaluator
     ) {
@@ -411,7 +370,7 @@ public class LocationDashboardSpreadsheetParser {
             return false;
         }
         short lastCellNumber = row.getLastCellNum();
-        for (int cellIndex = 0; cellIndex <= basisColumnIndex && cellIndex < lastCellNumber; cellIndex += 1) {
+        for (int cellIndex = 0; cellIndex <= identityEndColumnIndex && cellIndex < lastCellNumber; cellIndex += 1) {
             if (!normalizeCellText(row.getCell(cellIndex), formatter, evaluator).isBlank()) {
                 return true;
             }
@@ -564,11 +523,15 @@ public class LocationDashboardSpreadsheetParser {
                 continue;
             }
 
-            String facility = blankToNull(normalizeCellText(rowCell(row, layout.facilityColumnIndex()), formatter, evaluator));
-            String building = blankToNull(normalizeCellText(rowCell(row, layout.buildingColumnIndex()), formatter, evaluator));
-            String system = blankToNull(normalizeCellText(rowCell(row, layout.systemColumnIndex()), formatter, evaluator));
-            String pointOfUse = blankToNull(normalizeCellText(rowCell(row, layout.pointOfUseColumnIndex()), formatter, evaluator));
-            String basis = blankToNull(normalizeCellText(rowCell(row, layout.basisColumnIndex()), formatter, evaluator));
+            Map<String, String> identityValues = new LinkedHashMap<>();
+            layout.identityColumnIndexes().forEach((identityKey, columnIndex) -> {
+                String identityValue = blankToNull(
+                    normalizeCellText(rowCell(row, columnIndex), formatter, evaluator)
+                );
+                if (identityValue != null) {
+                    identityValues.put(identityKey, identityValue);
+                }
+            });
 
             List<ParsedDashboardCell> cells = new ArrayList<>();
             for (MetricColumn metricColumn : metricColumns) {
@@ -592,17 +555,13 @@ public class LocationDashboardSpreadsheetParser {
                 ));
             }
 
-            if (facility == null && building == null && system == null && pointOfUse == null && basis == null && cells.isEmpty()) {
+            if (identityValues.isEmpty() && cells.isEmpty()) {
                 continue;
             }
 
             rows.add(new ParsedDashboardRow(
                 rowIndex + 1,
-                facility,
-                building,
-                system,
-                pointOfUse,
-                basis,
+                identityValues,
                 List.copyOf(cells)
             ));
         }
@@ -802,11 +761,7 @@ public class LocationDashboardSpreadsheetParser {
         int headerRowIndex,
         int metricHeaderRowIndex,
         int dateRowIndex,
-        int facilityColumnIndex,
-        int buildingColumnIndex,
-        int systemColumnIndex,
-        int pointOfUseColumnIndex,
-        int basisColumnIndex,
+        Map<String, Integer> identityColumnIndexes,
         int identityEndColumnIndex,
         int lastCellNumber
     ) {
@@ -840,13 +795,15 @@ public class LocationDashboardSpreadsheetParser {
 
     public record ParsedDashboardRow(
         int rowNumber,
-        String facility,
-        String building,
-        String system,
-        String pointOfUse,
-        String basis,
+        Map<String, String> identityValues,
         List<ParsedDashboardCell> cells
     ) {
+        public ParsedDashboardRow {
+            identityValues = identityValues == null
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(identityValues));
+            cells = cells == null ? List.of() : List.copyOf(cells);
+        }
     }
 
     public record ParsedDashboardCell(

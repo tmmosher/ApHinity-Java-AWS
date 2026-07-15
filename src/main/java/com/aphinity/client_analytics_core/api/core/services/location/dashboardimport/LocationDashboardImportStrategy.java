@@ -3,6 +3,8 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -99,12 +101,9 @@ public interface LocationDashboardImportStrategy {
     record AnalyzedSamplePoint(
         LocalDate observedDate,
         String facilityName,
-        String buildingName,
-        String systemName,
         String systemTypeName,
         String measurementName,
-        String pointOfUse,
-        String basis,
+        Map<String, String> identityValues,
         String rawValue,
         String units,
         String sampleIdentity,
@@ -113,73 +112,10 @@ public interface LocationDashboardImportStrategy {
         Long turnaroundDays,
         SampleOrigin origin
     ) {
-        public AnalyzedSamplePoint(
-            LocalDate observedDate,
-            String facilityName,
-            String buildingName,
-            String systemName,
-            String systemTypeName,
-            String measurementName,
-            String pointOfUse,
-            String basis,
-            String sampleIdentity,
-            boolean compliant,
-            boolean resolved,
-            Long turnaroundDays,
-            SampleOrigin origin
-        ) {
-            this(
-                observedDate,
-                facilityName,
-                buildingName,
-                systemName,
-                systemTypeName,
-                measurementName,
-                pointOfUse,
-                basis,
-                null,
-                null,
-                sampleIdentity,
-                compliant,
-                resolved,
-                turnaroundDays,
-                origin
-            );
-        }
-
-        public AnalyzedSamplePoint(
-            LocalDate observedDate,
-            String facilityName,
-            String buildingName,
-            String systemName,
-            String systemTypeName,
-            String measurementName,
-            String pointOfUse,
-            String basis,
-            String rawValue,
-            String sampleIdentity,
-            boolean compliant,
-            boolean resolved,
-            Long turnaroundDays,
-            SampleOrigin origin
-        ) {
-            this(
-                observedDate,
-                facilityName,
-                buildingName,
-                systemName,
-                systemTypeName,
-                measurementName,
-                pointOfUse,
-                basis,
-                rawValue,
-                null,
-                sampleIdentity,
-                compliant,
-                resolved,
-                turnaroundDays,
-                origin
-            );
+        public AnalyzedSamplePoint {
+            identityValues = identityValues == null
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(identityValues));
         }
 
         boolean nonConforming() {

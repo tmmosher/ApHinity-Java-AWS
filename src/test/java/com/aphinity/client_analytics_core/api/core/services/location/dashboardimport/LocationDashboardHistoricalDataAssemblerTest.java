@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.identityValues;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocationDashboardHistoricalDataAssemblerTest {
@@ -40,10 +41,9 @@ class LocationDashboardHistoricalDataAssemblerTest {
             new LocationDashboardImportStrategy.AnalyzedSamplePoint(
                 LocalDate.parse("2025-01-01"),
                 "Irvine",
-                null,
-                "Critical SPD",
                 "Critical SPD",
                 "HPC",
+                identityValues("Irvine", null, "Critical SPD", null, null),
                 null,
                 null,
                 null,
@@ -56,10 +56,9 @@ class LocationDashboardHistoricalDataAssemblerTest {
             new LocationDashboardImportStrategy.AnalyzedSamplePoint(
                 LocalDate.parse("2025-01-01"),
                 "Irvine",
-                null,
-                "Critical SPD",
                 "Critical SPD",
                 "HPC",
+                identityValues("Irvine", null, "Critical SPD", null, null),
                 null,
                 null,
                 "divergent-persisted-sample-identity",
@@ -123,12 +122,11 @@ class LocationDashboardHistoricalDataAssemblerTest {
             new LocationDashboardImportStrategy.AnalyzedSamplePoint(
                 LocalDate.parse("2025-01-01"),
                 "Legacy Facility",
-                "Legacy Building",
-                "Legacy System",
                 "Legacy System Type",
                 "HPC",
-                "Legacy POU",
-                "Legacy Basis",
+                identityValues("Newport", "Tower A", "Critical SPD", "Sink 1", "Routine"),
+                null,
+                null,
                 "Newport|Tower A|Critical SPD|HPC|Sink 1|Routine",
                 true,
                 false,
@@ -176,13 +174,11 @@ class LocationDashboardHistoricalDataAssemblerTest {
             new LocationDashboardImportStrategy.AnalyzedSamplePoint(
                 LocalDate.parse("2026-06-15"),
                 "Newport",
-                "Tower A",
-                "Critical SPD",
                 "Critical SPD",
                 "HPC",
-                "Sink 1",
-                "Routine",
+                identityValues("Newport", "Tower A", "Critical SPD", "Sink 1", "Routine"),
                 "33 CFU.mL",
+                null,
                 "primary-sample|Newport|Tower A|Critical SPD|HPC|Sink 1|Routine|F5|2026-06-15|2026-06-19|33 CFU.mL",
                 false,
                 true,
@@ -222,12 +218,11 @@ class LocationDashboardHistoricalDataAssemblerTest {
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             LocalDate.parse("2025-01-01"),
             "Irvine",
-            null,
-            "Critical SPD",
             "Critical SPD",
             measurementName,
-            "POU 1",
-            "Range",
+            identityValues("Irvine", null, "Critical SPD", "POU 1", "Range"),
+            null,
+            null,
             null,
             false,
             false,

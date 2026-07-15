@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardSpreadsheetParser;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -21,29 +22,45 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocationDashboardSpreadsheetParserTest {
+    private static final List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> HOAG_IDENTITIES = List.of(
+        new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of("Facility")),
+        new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
+            "building", List.of("Bldg", "Bldg (Collated if unrecognized)")
+        ),
+        new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
+            "system", List.of("System", "System (Collated if unrecognized)")
+        ),
+        new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
+            "pointOfUse", List.of("Point of Use", "Point of Use (Ignored)")
+        ),
+        new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("basis", List.of("Basis", "Basis (ignored)"))
+    );
     private final LocationDashboardSpreadsheetParser parser = new LocationDashboardSpreadsheetParser();
 
     @Test
     void parseReadsMetricBlocksDatesAndCommentsFromDashboardWorkbook() throws IOException {
         MockMultipartFile file = createWorkbook();
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(file);
 
         assertEquals("Newport Beach", workbook.locationTitle());
         assertEquals(1, workbook.rows().size());
 
         LocationDashboardSpreadsheetParser.ParsedDashboardRow row = workbook.rows().getFirst();
-        assertEquals("Newport Beach", row.facility());
-        assertEquals("Hospital", row.building());
-        assertEquals("Cooling Towers", row.system());
-        assertEquals("Recirc Line", row.pointOfUse());
-        assertEquals("CTI/514P", row.basis());
+        assertEquals(Map.of(
+            "facility", "Newport Beach",
+            "building", "Hospital",
+            "system", "Cooling Towers",
+            "pointOfUse", "Recirc Line",
+            "basis", "CTI/514P"
+        ), row.identityValues());
         assertEquals(9, row.cells().size());
 
         LocationDashboardSpreadsheetParser.ParsedDashboardCell firstCell = row.cells().getFirst();
@@ -64,28 +81,28 @@ class LocationDashboardSpreadsheetParserTest {
     void parseReadsOnlyValidationWorksheetFromMultiSheetWorkbook() throws IOException {
         MockMultipartFile file = createWorkbookWithCoverSheet();
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(file);
 
         assertEquals("Newport Beach", workbook.locationTitle());
         assertEquals(1, workbook.rows().size());
-        assertEquals("Cooling Towers", workbook.rows().getFirst().system());
+        assertEquals("Cooling Towers", workbook.rows().getFirst().identityValues().get("system"));
     }
 
     @Test
     void parseAcceptsDashboardHeadersWithExtraSpacerRows() throws IOException {
         MockMultipartFile file = createShiftedWorkbook();
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(file);
 
         assertEquals("Newport Beach", workbook.locationTitle());
         assertEquals(1, workbook.rows().size());
 
         LocationDashboardSpreadsheetParser.ParsedDashboardRow row = workbook.rows().getFirst();
-        assertEquals("Newport Beach", row.facility());
-        assertEquals("Hospital", row.building());
-        assertEquals("Cooling Towers", row.system());
-        assertEquals("Recirc Line", row.pointOfUse());
-        assertEquals("CTI/514P", row.basis());
+        assertEquals("Newport Beach", row.identityValues().get("facility"));
+        assertEquals("Hospital", row.identityValues().get("building"));
+        assertEquals("Cooling Towers", row.identityValues().get("system"));
+        assertEquals("Recirc Line", row.identityValues().get("pointOfUse"));
+        assertEquals("CTI/514P", row.identityValues().get("basis"));
         assertEquals(9, row.cells().size());
         assertEquals("HPC", row.cells().getFirst().metricName());
         assertEquals(LocalDate.parse("2025-08-01"), row.cells().getFirst().observedDate());
@@ -95,17 +112,17 @@ class LocationDashboardSpreadsheetParserTest {
     void parseAcceptsShortDashboardHeadersBeyondInitialScanLimit() throws IOException {
         MockMultipartFile file = createShortHeaderWorkbook();
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(file);
 
         assertEquals("Newport Beach", workbook.locationTitle());
         assertEquals(1, workbook.rows().size());
 
         LocationDashboardSpreadsheetParser.ParsedDashboardRow row = workbook.rows().getFirst();
-        assertEquals("Newport Beach", row.facility());
-        assertEquals("Hospital", row.building());
-        assertEquals("Cooling Towers", row.system());
-        assertEquals("Recirc Line", row.pointOfUse());
-        assertEquals("CTI/514P", row.basis());
+        assertEquals("Newport Beach", row.identityValues().get("facility"));
+        assertEquals("Hospital", row.identityValues().get("building"));
+        assertEquals("Cooling Towers", row.identityValues().get("system"));
+        assertEquals("Recirc Line", row.identityValues().get("pointOfUse"));
+        assertEquals("CTI/514P", row.identityValues().get("basis"));
         assertEquals(9, row.cells().size());
         assertEquals("HPC", row.cells().getFirst().metricName());
         assertEquals(LocalDate.parse("2025-08-01"), row.cells().getFirst().observedDate());
@@ -115,7 +132,7 @@ class LocationDashboardSpreadsheetParserTest {
     void parseAcceptsThresholdValuesWithoutLeadingZero() throws IOException {
         MockMultipartFile file = createLeadingDecimalWorkbook();
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(file);
 
         assertEquals("Newport Beach", workbook.locationTitle());
         assertEquals(1, workbook.rows().size());
@@ -134,15 +151,11 @@ class LocationDashboardSpreadsheetParserTest {
     void parseAcceptsConfiguredSystemAndSiteHeadersWithDatesOnIdentityRow() throws IOException {
         MockMultipartFile file = createCompactAppleDestinationWorkbook();
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(
             file,
             List.of(
-                new com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
-                    "system", "System", List.of("Type")
-                ),
-                new com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn(
-                    "facility", "Site", List.of("Facility")
-                )
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("Site", List.of("Facility")),
+                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("System", List.of("Type"))
             )
         );
 
@@ -150,8 +163,9 @@ class LocationDashboardSpreadsheetParserTest {
         assertEquals(1, workbook.rows().size());
 
         LocationDashboardSpreadsheetParser.ParsedDashboardRow row = workbook.rows().getFirst();
-        assertEquals("Towers", row.facility());
-        assertEquals("Cooling Water Analysis", row.system());
+        assertEquals("Cooling Water Analysis", row.identityValues().get("System"));
+        assertEquals("Towers", row.identityValues().get("Site"));
+        assertEquals(List.of("Site", "System"), row.identityValues().keySet().stream().toList());
         assertEquals(4, row.cells().size());
         assertEquals("HPC", row.cells().getFirst().metricName());
         assertEquals(LocalDate.parse("2026-07-10"), row.cells().getFirst().observedDate());
@@ -162,14 +176,14 @@ class LocationDashboardSpreadsheetParserTest {
 
     @Test
     void parseCoercesNdToZeroAndSkipsNtCells() throws IOException {
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ndWorkbook = parser.parse(
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ndWorkbook = parse(
             createSemanticValueWorkbook("ND")
         );
         LocationDashboardSpreadsheetParser.ParsedDashboardCell ndCell = ndWorkbook.rows().getFirst().cells().getFirst();
         assertEquals("ND", ndCell.rawValue());
         assertEquals(new BigDecimal("0"), ndCell.numericValue());
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ntWorkbook = parser.parse(
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook ntWorkbook = parse(
             createSemanticValueWorkbook("NT")
         );
         assertTrue(ntWorkbook.rows().getFirst().cells().isEmpty());
@@ -184,7 +198,7 @@ class LocationDashboardSpreadsheetParserTest {
             readFixtureBytes("sheets/dashboard_upload_template_example_2.xlsx")
         );
 
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parser.parse(file);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(file);
 
         LocationDashboardSpreadsheetParser.ParsedDashboardCell commentCell = workbook.rows().stream()
             .flatMap(row -> row.cells().stream())
@@ -203,11 +217,22 @@ class LocationDashboardSpreadsheetParserTest {
         }
     }
 
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parse(MockMultipartFile file) {
+        return parser.parse(file, HOAG_IDENTITIES);
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parse(
+        MockMultipartFile file,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        return parser.parse(file, identityPattern);
+    }
+
     @Test
     void parseRejectsTemplateShellWithoutRealDates() throws IOException {
         MockMultipartFile file = createTemplateShellWorkbook();
 
-        ApiClientException error = assertThrows(ApiClientException.class, () -> parser.parse(file));
+        ApiClientException error = assertThrows(ApiClientException.class, () -> parse(file));
 
         assertEquals("Spreadsheet is missing the date row.", error.getMessage());
     }

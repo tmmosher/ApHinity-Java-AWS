@@ -115,51 +115,51 @@
   "rangeProfiles": [
     {
       "key": "potable",
-      "measurementTypes": {
-        "HPC": "potable",
-        "Endotoxin": "potable",
-        "Legionella": "potable",
-        "pH": "potable",
-        "Conductivity": "potable",
-        "Alkalinity": "potable",
-        "Hardness": "potable"
-      }
+      "measurementTypes": [
+        "HPC" ,
+        "Endotoxin" ,
+        "Legionella" ,
+        "pH",
+        "Conductivity" ,
+        "Alkalinity" ,
+        "Hardness"
+      ]
     },
     {
       "key": "critical",
-      "measurementTypes": {
-        "HPC": "critical",
-        "Endotoxin": "critical",
-        "Legionella": "critical",
-        "pH": "critical",
-        "Conductivity": "critical",
-        "Alkalinity": "critical",
-        "Hardness": "critical"
-      }
+      "measurementTypes": [
+        "HPC" ,
+        "Endotoxin" ,
+        "Legionella" ,
+        "pH",
+        "Conductivity" ,
+        "Alkalinity" ,
+        "Hardness"
+      ]
     },
     {
       "key": "utility",
-      "measurementTypes": {
-        "HPC": "utility",
-        "Endotoxin": "utility",
-        "Legionella": "utility",
-        "pH": "utility",
-        "Conductivity": "utility",
-        "Alkalinity": "utility",
-        "Hardness": "utility"
-      }
+      "measurementTypes": [
+        "HPC" ,
+        "Endotoxin" ,
+        "Legionella" ,
+        "pH",
+        "Conductivity" ,
+        "Alkalinity" ,
+        "Hardness"
+      ]
     },
     {
       "key": "towers",
-      "measurementTypes": {
-        "HPC": "towers",
-        "Endotoxin": "towers",
-        "Legionella": "towers",
-        "pH": "towers",
-        "Conductivity": "towers",
-        "Alkalinity": "towers",
-        "Hardness": "towers"
-      }
+      "measurementTypes": [
+        "HPC" ,
+        "Endotoxin" ,
+        "Legionella" ,
+        "pH",
+        "Conductivity" ,
+        "Alkalinity" ,
+        "Hardness"
+      ]
     }
   ],
   "graphs": [

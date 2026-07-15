@@ -9,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -117,7 +118,7 @@ final class LocationDashboardSampleImportPipeline {
             }
 
             String measurementName = resolveMeasurementName(sourceCell.cell().metricName(), sourceCell.measurementBound());
-            String streamIdentity = worksheetStreamIdentity(sourceCell.row(), sourceCell.rowContext(), measurementName);
+            String streamIdentity = worksheetStreamIdentity(sourceCell.rowContext(), measurementName);
             if (streamIdentity == null) {
                 continue;
             }
@@ -164,7 +165,6 @@ final class LocationDashboardSampleImportPipeline {
             if (!Objects.equals(
                 sourceStreamIdentity,
                 worksheetStreamIdentity(
-                    candidate.row(),
                     candidate.rowContext(),
                     resolveMeasurementName(candidate.cell().metricName(), candidate.measurementBound())
                 )
@@ -202,12 +202,10 @@ final class LocationDashboardSampleImportPipeline {
             rowContext.sublocation(),
             rowContext.systemType(),
             measurementBound,
-            rowContext.resolvedBuilding(),
-            rowContext.resolvedSystem(),
-            row == null ? null : row.pointOfUse(),
-            row == null ? null : row.basis(),
+            rowContext.identityValues(),
             cell.rawValue(),
             commentParser.unitForMeasurementName(measurementName),
+            buildWorksheetSampleIdentity(rowContext, cell, measurementName),
             cell.cellReference(),
             parsedComment
         );
@@ -262,10 +260,7 @@ final class LocationDashboardSampleImportPipeline {
                 rowContext.sublocation(),
                 rowContext.systemType(),
                 measurementBound,
-                rowContext.resolvedBuilding(),
-                rowContext.resolvedSystem(),
-                row == null ? null : row.pointOfUse(),
-                row == null ? null : row.basis(),
+                rowContext.identityValues(),
                 primarySample.resultRaw(),
                 units,
                 primaryCell.cellReference(),
@@ -276,7 +271,6 @@ final class LocationDashboardSampleImportPipeline {
                     "primary-sample",
                     primarySample,
                     primaryCell,
-                    row,
                     rowContext,
                     measurementName
                 )
@@ -298,10 +292,7 @@ final class LocationDashboardSampleImportPipeline {
                 rowContext.sublocation(),
                 rowContext.systemType(),
                 measurementBound,
-                rowContext.resolvedBuilding(),
-                rowContext.resolvedSystem(),
-                row == null ? null : row.pointOfUse(),
-                row == null ? null : row.basis(),
+                rowContext.identityValues(),
                 sample.resultRaw(),
                 units,
                 primaryCell.cellReference(),
@@ -312,7 +303,6 @@ final class LocationDashboardSampleImportPipeline {
                     "supplemental-sample-" + sampleIndex,
                     sample,
                     primaryCell,
-                    row,
                     rowContext,
                     measurementName
                 )
@@ -453,22 +443,35 @@ final class LocationDashboardSampleImportPipeline {
         String sampleKind,
         LocationDashboardCommentParser.ParsedCommentSample sample,
         LocationDashboardSpreadsheetParser.ParsedDashboardCell primaryCell,
-        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
         LocationDashboardImportContextResolver.RowImportContext rowContext,
         String measurementName
     ) {
         return String.join("|", List.of(
             nullSafe(sampleKind),
-            nullSafe(rowContext == null ? null : rowContext.facilityName()),
-            nullSafe(rowContext == null ? null : rowContext.resolvedBuilding()),
-            nullSafe(rowContext == null ? null : rowContext.resolvedSystem()),
+            nullSafe(LocationDashboardIdentitySupport.normalizedIdentity(
+                rowContext == null ? Map.of() : rowContext.identityValues()
+            )),
             nullSafe(measurementName),
-            nullSafe(row == null ? null : row.pointOfUse()),
-            nullSafe(row == null ? null : row.basis()),
             nullSafe(primaryCell == null ? null : primaryCell.cellReference()),
             nullSafe(String.valueOf(sample == null ? null : sample.sampledOn())),
             nullSafe(String.valueOf(sample == null ? null : sample.resultReceivedOn())),
             nullSafe(sample == null ? null : sample.resultRaw())
+        ));
+    }
+
+    private String buildWorksheetSampleIdentity(
+        LocationDashboardImportContextResolver.RowImportContext rowContext,
+        LocationDashboardSpreadsheetParser.ParsedDashboardCell cell,
+        String measurementName
+    ) {
+        return String.join("|", List.of(
+            "worksheet-sample",
+            LocationDashboardIdentitySupport.normalizedIdentity(
+                rowContext == null ? Map.of() : rowContext.identityValues()
+            ),
+            nullSafe(measurementName),
+            nullSafe(cell == null || cell.observedDate() == null ? null : cell.observedDate().toString()),
+            nullSafe(cell == null ? null : cell.cellReference())
         ));
     }
 
@@ -477,20 +480,18 @@ final class LocationDashboardSampleImportPipeline {
     }
 
     private String worksheetStreamIdentity(
-        LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
         LocationDashboardImportContextResolver.RowImportContext rowContext,
         String measurementName
     ) {
-        if (rowContext == null || rowContext.facilityName() == null || measurementName == null) {
+        String identity = rowContext == null
+            ? null
+            : LocationDashboardIdentitySupport.normalizedIdentity(rowContext.identityValues());
+        if (identity == null || identity.isBlank() || measurementName == null) {
             return null;
         }
         return String.join("|", List.of(
-            nullSafe(rowContext.facilityName()),
-            nullSafe(rowContext.resolvedBuilding()),
-            nullSafe(rowContext.resolvedSystem()),
-            nullSafe(measurementName),
-            nullSafe(row == null ? null : row.pointOfUse()),
-            nullSafe(row == null ? null : row.basis())
+            identity,
+            nullSafe(measurementName)
         ));
     }
 

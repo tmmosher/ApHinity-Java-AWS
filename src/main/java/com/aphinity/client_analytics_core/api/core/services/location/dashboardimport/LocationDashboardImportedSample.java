@@ -4,6 +4,9 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Measuremen
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Objects;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SublocationConfig;
@@ -18,29 +21,6 @@ interface LocationDashboardImportedSample {
         return observedDate();
     }
 
-    default String resolutionBuildingName() {
-        String resolvedBuilding = resolvedBuilding();
-        SublocationConfig sublocation = sublocation();
-        if (resolvedBuilding == null || sublocation == null || sublocation.displayName() == null) {
-            return resolvedBuilding;
-        }
-        String normalizedBuilding = normalizeKey(resolvedBuilding);
-        String normalizedDisplayName = normalizeKey(sublocation.displayName());
-        if (Objects.equals(normalizedBuilding, normalizedDisplayName)
-            || matchesAlias(normalizedBuilding, sublocation.buildingAliases())) {
-            return sublocation.displayName();
-        }
-        return resolvedBuilding;
-    }
-
-    default String resolutionSystemName() {
-        SystemTypeConfig systemType = systemType();
-        if (systemType != null && systemType.displayName() != null && !systemType.displayName().isBlank()) {
-            return systemType.displayName();
-        }
-        return resolvedSystem();
-    }
-
     BigDecimal numericValue();
 
     String measurementName();
@@ -53,13 +33,13 @@ interface LocationDashboardImportedSample {
 
     MeasurementBound measurementBound();
 
-    String resolvedBuilding();
+    Map<String, String> identityValues();
 
-    String resolvedSystem();
-
-    String pointOfUse();
-
-    String basis();
+    default Map<String, String> resolutionIdentityValues() {
+        Map<String, String> resolved = new LinkedHashMap<>();
+        identityValues().forEach((key, value) -> resolved.put(key, canonicalIdentityValue(value)));
+        return LocationDashboardIdentitySupport.immutableCopy(resolved);
+    }
 
     String rawValue();
 
@@ -77,21 +57,40 @@ interface LocationDashboardImportedSample {
         return systemType() == null ? null : systemType().displayName();
     }
 
-    private static boolean matchesAlias(String normalizedCandidate, java.util.List<String> aliases) {
-        if (normalizedCandidate == null || aliases == null || aliases.isEmpty()) {
-            return false;
+    private String canonicalIdentityValue(String value) {
+        String normalizedValue = LocationDashboardGraphMetadataSupport.normalizeKey(value);
+        SublocationConfig sublocation = sublocation();
+        if (sublocation != null
+            && (matches(normalizedValue, sublocation.key())
+                || matches(normalizedValue, sublocation.displayName())
+                || matchesAny(normalizedValue, sublocation.facilityAliases())
+                || matchesAny(normalizedValue, sublocation.buildingAliases()))) {
+            return sublocation.displayName();
         }
-        for (String alias : aliases) {
-            if (Objects.equals(normalizedCandidate, normalizeKey(alias))) {
-                return true;
-            }
+        SystemTypeConfig systemType = systemType();
+        if (systemType != null
+            && (matches(normalizedValue, systemType.key())
+                || matches(normalizedValue, systemType.displayName())
+                || matchesAny(normalizedValue, systemType.aliases()))) {
+            return systemType.displayName();
         }
-        return false;
+        return value;
     }
 
-    private static String normalizeKey(String value) {
-        return LocationDashboardGraphMetadataSupport.normalizeKey(value);
+    private boolean matchesAny(String normalizedValue, List<String> aliases) {
+        if (aliases == null) {
+            return false;
+        }
+        return aliases.stream().anyMatch(alias -> matches(normalizedValue, alias));
     }
+
+    private boolean matches(String normalizedValue, String candidate) {
+        return Objects.equals(
+            normalizedValue,
+            LocationDashboardGraphMetadataSupport.normalizeKey(candidate)
+        );
+    }
+
 }
 
 record LocationDashboardWorksheetSample(
@@ -102,81 +101,15 @@ record LocationDashboardWorksheetSample(
     SublocationConfig sublocation,
     SystemTypeConfig systemType,
     MeasurementBound measurementBound,
-    String resolvedBuilding,
-    String resolvedSystem,
-    String pointOfUse,
-    String basis,
+    Map<String, String> identityValues,
     String rawValue,
     String units,
+    String sampleIdentity,
     String cellReference,
     LocationDashboardCommentParser.ParsedComment parsedComment
 ) implements LocationDashboardImportedSample {
-    LocationDashboardWorksheetSample(
-        LocalDate observedDate,
-        BigDecimal numericValue,
-        String measurementName,
-        String facilityName,
-        SublocationConfig sublocation,
-        SystemTypeConfig systemType,
-        MeasurementBound measurementBound,
-        String resolvedBuilding,
-        String resolvedSystem,
-        String pointOfUse,
-        String basis,
-        String cellReference
-    ) {
-        this(
-            observedDate,
-            numericValue,
-            measurementName,
-            facilityName,
-            sublocation,
-            systemType,
-            measurementBound,
-            resolvedBuilding,
-            resolvedSystem,
-            pointOfUse,
-            basis,
-            null,
-            null,
-            cellReference,
-            null
-        );
-    }
-
-    LocationDashboardWorksheetSample(
-        LocalDate observedDate,
-        BigDecimal numericValue,
-        String measurementName,
-        String facilityName,
-        SublocationConfig sublocation,
-        SystemTypeConfig systemType,
-        MeasurementBound measurementBound,
-        String resolvedBuilding,
-        String resolvedSystem,
-        String pointOfUse,
-        String basis,
-        String rawValue,
-        String units,
-        String cellReference
-    ) {
-        this(
-            observedDate,
-            numericValue,
-            measurementName,
-            facilityName,
-            sublocation,
-            systemType,
-            measurementBound,
-            resolvedBuilding,
-            resolvedSystem,
-            pointOfUse,
-            basis,
-            rawValue,
-            units,
-            cellReference,
-            null
-        );
+    LocationDashboardWorksheetSample {
+        identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
     }
 
     @Override
@@ -194,10 +127,7 @@ record LocationDashboardCommentSample(
     SublocationConfig sublocation,
     SystemTypeConfig systemType,
     MeasurementBound measurementBound,
-    String resolvedBuilding,
-    String resolvedSystem,
-    String pointOfUse,
-    String basis,
+    Map<String, String> identityValues,
     String rawValue,
     String units,
     String cellReference,
@@ -206,46 +136,8 @@ record LocationDashboardCommentSample(
     String sampleLabel,
     String sampleIdentity
 ) implements LocationDashboardImportedSample {
-    LocationDashboardCommentSample(
-        LocationDashboardImportStrategy.SampleOrigin origin,
-        LocalDate observedDate,
-        BigDecimal numericValue,
-        String measurementName,
-        String facilityName,
-        SublocationConfig sublocation,
-        SystemTypeConfig systemType,
-        MeasurementBound measurementBound,
-        String resolvedBuilding,
-        String resolvedSystem,
-        String pointOfUse,
-        String basis,
-        String cellReference,
-        LocationDashboardCommentParser.ParsedComment parsedComment,
-        LocationDashboardCommentParser.ParsedCommentSample parsedSample,
-        String sampleLabel,
-        String sampleIdentity
-    ) {
-        this(
-            origin,
-            observedDate,
-            numericValue,
-            measurementName,
-            facilityName,
-            sublocation,
-            systemType,
-            measurementBound,
-            resolvedBuilding,
-            resolvedSystem,
-            pointOfUse,
-            basis,
-            null,
-            null,
-            cellReference,
-            parsedComment,
-            parsedSample,
-            sampleLabel,
-            sampleIdentity
-        );
+    LocationDashboardCommentSample {
+        identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
     }
 
     @Override
@@ -285,12 +177,9 @@ record LocationDashboardAnalyzedSample(
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             sample.observedDate(),
             sample.facilityName(),
-            sample.resolvedBuilding(),
-            sample.resolvedSystem(),
             sample.systemTypeName(),
             sample.measurementName(),
-            sample.pointOfUse(),
-            sample.basis(),
+            sample.identityValues(),
             sample.rawValue(),
             sample.units(),
             sample.sampleIdentity(),

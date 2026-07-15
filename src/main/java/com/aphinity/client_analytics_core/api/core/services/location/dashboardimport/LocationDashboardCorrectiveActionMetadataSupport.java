@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -60,6 +61,13 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
         return metadataLine(IMPORT_SAMPLE_IDENTITY_LABEL, sampleIdentity);
     }
 
+    static String identityLine(String identityKey, String identityValue) {
+        if (identityKey == null || identityKey.isBlank()) {
+            return null;
+        }
+        return metadataLine("Import Identity " + identityKey.strip(), identityValue);
+    }
+
     static Map<String, String> parseStructuredMetadata(String description) {
         if (description == null || description.isBlank()) {
             return Map.of();
@@ -86,16 +94,33 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
                 continue;
             }
 
+            if (label.startsWith("import identity ")) {
+                String identityKey = label.substring("import identity ".length()).strip();
+                if (!identityKey.isBlank()) {
+                    valuesByField.put("identity." + identityKey, value);
+                }
+                continue;
+            }
+
             String legacyField = legacyField(label);
             if (legacyField != null) {
                 valuesByField.putIfAbsent(legacyField, value);
             }
         }
-        return Map.copyOf(valuesByField);
+        return Collections.unmodifiableMap(new LinkedHashMap<>(valuesByField));
     }
 
     static String identityKey(String title, String description) {
         Map<String, String> metadata = parseStructuredMetadata(description);
+        String dynamicIdentity = identityKey(
+            metadata.get("measurement"),
+            LocationDashboardGraphMetadataSupport.parseLocalDate(metadata.get("observed at")),
+            identityValues(metadata),
+            metadata.get("sample identity")
+        );
+        if (dynamicIdentity != null) {
+            return dynamicIdentity;
+        }
         String identity = identityKey(
             metadata.get("measurement"),
             LocationDashboardGraphMetadataSupport.parseLocalDate(metadata.get("observed at")),
@@ -114,6 +139,15 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
 
     static String identityKeyIgnoringSampleIdentity(String title, String description) {
         Map<String, String> metadata = parseStructuredMetadata(description);
+        String dynamicIdentity = identityKey(
+            metadata.get("measurement"),
+            LocationDashboardGraphMetadataSupport.parseLocalDate(metadata.get("observed at")),
+            identityValues(metadata),
+            null
+        );
+        if (dynamicIdentity != null) {
+            return dynamicIdentity;
+        }
         String identity = identityKey(
             metadata.get("measurement"),
             LocationDashboardGraphMetadataSupport.parseLocalDate(metadata.get("observed at")),
@@ -133,6 +167,41 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
     static String identityKey(
         String measurementName,
         LocalDate observedAt,
+        Map<String, String> identityValues,
+        String sampleIdentity
+    ) {
+        String measurement = LocationDashboardGraphMetadataSupport.normalizeKey(measurementName);
+        String observedAtNormalized = observedAt == null ? null : observedAt.toString();
+        String dynamicIdentity = LocationDashboardIdentitySupport.normalizedIdentity(identityValues);
+        String normalizedSampleIdentity = normalizedExplicitSampleIdentity(sampleIdentity);
+        if (measurement == null || observedAtNormalized == null) {
+            return null;
+        }
+        if (!normalizedSampleIdentity.isBlank()) {
+            return String.join("|", List.of(measurement, observedAtNormalized, normalizedSampleIdentity));
+        }
+        if (!dynamicIdentity.isBlank()) {
+            return String.join("|", List.of(measurement, observedAtNormalized, dynamicIdentity));
+        }
+        return null;
+    }
+
+    static Map<String, String> identityValues(Map<String, String> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> values = new LinkedHashMap<>();
+        metadata.forEach((key, value) -> {
+            if (key != null && key.startsWith("identity.")) {
+                values.put(key.substring("identity.".length()), value);
+            }
+        });
+        return LocationDashboardIdentitySupport.immutableCopy(values);
+    }
+
+    static String identityKey(
+        String measurementName,
+        LocalDate observedAt,
         String facilityName,
         String buildingName,
         String systemName,
@@ -147,6 +216,13 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
         String building = nullSafeNormalized(buildingName);
         String system = LocationDashboardGraphMetadataSupport.normalizeKey(systemName);
         String normalizedSampleIdentity = normalizedExplicitSampleIdentity(sampleIdentity);
+        if (measurement != null && observedAtNormalized != null && !normalizedSampleIdentity.isBlank()) {
+            return String.join("|", List.of(
+                measurement,
+                observedAtNormalized,
+                normalizedSampleIdentity
+            ));
+        }
         if (measurement != null && observedAtNormalized != null && facility != null && system != null) {
             return String.join("|", List.of(
                 measurement,
@@ -205,7 +281,8 @@ final class LocationDashboardCorrectiveActionMetadataSupport {
 
     private static String normalizedExplicitSampleIdentity(String sampleIdentity) {
         if (sampleIdentity != null
-            && sampleIdentity.startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX)) {
+            && (sampleIdentity.startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX)
+                || sampleIdentity.startsWith("worksheet-sample|"))) {
             return "";
         }
         return nullSafeNormalized(sampleIdentity);

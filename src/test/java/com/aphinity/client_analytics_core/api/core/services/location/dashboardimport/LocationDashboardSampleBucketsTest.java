@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.identityValues;
 
 class LocationDashboardSampleBucketsTest {
     @Test
@@ -156,7 +157,7 @@ class LocationDashboardSampleBucketsTest {
     }
 
     @Test
-    void analyzedSamplesDoesNotResolveWhenRequiredIdentityIsIncomplete() {
+    void analyzedSamplesResolvesWhenTheAvailableDynamicIdentityValuesMatch() {
         LocationDashboardSampleBuckets buckets = new LocationDashboardSampleBuckets();
 
         buckets.add(sample(
@@ -182,8 +183,8 @@ class LocationDashboardSampleBucketsTest {
 
         List<LocationDashboardAnalyzedSample> analyzedSamples = buckets.analyzedSamples();
 
-        assertFalse(analyzedSamples.getFirst().resolved());
-        assertNull(analyzedSamples.getFirst().turnaroundDays());
+        assertTrue(analyzedSamples.getFirst().resolved());
+        assertEquals(4L, analyzedSamples.getFirst().turnaroundDays());
     }
 
     @Test
@@ -370,11 +371,12 @@ class LocationDashboardSampleBucketsTest {
             ),
             systemType(resolvedSystem),
             measurementBound(measurementName, rangeProfile(resolvedSystem)),
-            resolvedBuilding,
-            resolvedSystem,
-            pointOfUse,
-            basis,
-            "F5"
+            identityValues(facilityName, resolvedBuilding, resolvedSystem, pointOfUse, basis),
+            null,
+            null,
+            "worksheet|" + observedDate,
+            "F5",
+            null
         );
     }
 
@@ -405,10 +407,9 @@ class LocationDashboardSampleBucketsTest {
             ),
             systemType(resolvedSystem),
             measurementBound(measurementName, rangeProfile(resolvedSystem)),
-            resolvedBuilding,
-            resolvedSystem,
-            pointOfUse,
-            basis,
+            identityValues(facilityName, resolvedBuilding, resolvedSystem, pointOfUse, basis),
+            null,
+            null,
             "AB41",
             null,
             new LocationDashboardCommentParser.ParsedCommentSample(
@@ -454,11 +455,12 @@ class LocationDashboardSampleBucketsTest {
                 List.of("Utility Water", "Utility Water SPD", "Utility HLD")
             ),
             measurementBound(measurementName, new LocationDashboardImportStrategyConfig.RangeProfile("utility")),
-            resolvedBuilding,
-            resolvedSystem,
-            pointOfUse,
-            basis,
-            "K68"
+            identityValues(facilityName, resolvedBuilding, resolvedSystem, pointOfUse, basis),
+            null,
+            null,
+            "worksheet|" + observedDate,
+            "K68",
+            null
         );
     }
 

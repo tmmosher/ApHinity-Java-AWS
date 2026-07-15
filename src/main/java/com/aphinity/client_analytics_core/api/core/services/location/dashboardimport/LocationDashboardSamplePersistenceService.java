@@ -144,12 +144,9 @@ public class LocationDashboardSamplePersistenceService {
             if (!canPersist(analyzedSample)) {
                 continue;
             }
-            String sampleIdentity = analyzedSample.sampleIdentity();
-            if (!notBlank(sampleIdentity)) {
-                String baseIdentity = generatedAnalyzedSampleIdentity(analyzedSample);
-                int ordinal = ordinalsByBaseIdentity.merge(baseIdentity, 1, Integer::sum);
-                sampleIdentity = baseIdentity + "|" + ordinal;
-            }
+            String baseIdentity = generatedAnalyzedSampleIdentity(analyzedSample);
+            int ordinal = ordinalsByBaseIdentity.merge(baseIdentity, 1, Integer::sum);
+            String sampleIdentity = baseIdentity + "|" + ordinal;
             LocationDashboardSample persistedSample = new LocationDashboardSample();
             persistedSample.setLocation(location);
             persistedSample.setObservedDate(analyzedSample.observedDate());
@@ -234,28 +231,20 @@ public class LocationDashboardSamplePersistenceService {
                 metadata.get("sublocation"),
                 metadata.get("facility")
             );
-            String buildingName = metadata.get("building");
-            String systemName = metadata.get("system");
+            Map<String, String> identityValues = identityValues(metadata);
             String metadataSampleIdentity = metadata.get("sample identity");
             String sampleIdentity = correctiveActionSampleIdentity(
                 metadataSampleIdentity,
                 correctiveAction,
                 observedDate,
                 facilityName,
-                buildingName,
-                systemName,
                 measurementName,
-                metadata.get("point of use"),
-                metadata.get("basis")
+                identityValues
             );
             String identity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
                 measurementName,
                 observedDate,
-                facilityName,
-                buildingName,
-                systemName,
-                metadata.get("point of use"),
-                metadata.get("basis"),
+                identityValues,
                 metadataSampleIdentity
             );
             if (identity == null || analyzedIdentities.containsKey(identity) || measurementName == null || observedDate == null) {
@@ -282,29 +271,23 @@ public class LocationDashboardSamplePersistenceService {
         ServiceEvent correctiveAction,
         LocalDate observedDate,
         String facilityName,
-        String buildingName,
-        String systemName,
         String measurementName,
-        String pointOfUse,
-        String basis
+        Map<String, String> identityValues
     ) {
-        if (notBlank(metadataSampleIdentity)) {
-            return metadataSampleIdentity;
-        }
-        String correctiveActionIdentity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
-            correctiveAction.getTitle(),
-            correctiveAction.getDescription()
-        );
+        String correctiveActionIdentity = notBlank(metadataSampleIdentity)
+            ? metadataSampleIdentity
+            : LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+                correctiveAction.getTitle(),
+                correctiveAction.getDescription()
+            );
         String baseIdentity = generatedSampleIdentity(
             observedDate,
             facilityName,
-            buildingName,
-            systemName,
             null,
             measurementName,
-            pointOfUse,
-            basis,
-            LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT
+            LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT,
+            identityValues,
+            correctiveActionIdentity
         );
         return correctiveActionIdentity == null ? baseIdentity : baseIdentity + "|" + correctiveActionIdentity;
     }
@@ -351,11 +334,7 @@ public class LocationDashboardSamplePersistenceService {
         return LocationDashboardCorrectiveActionMetadataSupport.identityKey(
             analyzedSample.measurementName(),
             analyzedSample.observedDate(),
-            analyzedSample.facilityName(),
-            analyzedSample.buildingName(),
-            analyzedSample.systemName(),
-            analyzedSample.pointOfUse(),
-            analyzedSample.basis(),
+            analyzedSample.identityValues(),
             analyzedSample.sampleIdentity()
         );
     }
@@ -406,52 +385,32 @@ public class LocationDashboardSamplePersistenceService {
         return generatedSampleIdentity(
             analyzedSample.observedDate(),
             analyzedSample.facilityName(),
-            analyzedSample.buildingName(),
-            analyzedSample.systemName(),
             analyzedSample.systemTypeName(),
             analyzedSample.measurementName(),
-            analyzedSample.pointOfUse(),
-            analyzedSample.basis(),
-            analyzedSample.origin()
+            analyzedSample.origin(),
+            analyzedSample.identityValues(),
+            analyzedSample.sampleIdentity()
         );
     }
 
     private String generatedSampleIdentity(
         LocalDate observedDate,
         String facilityName,
-        String buildingName,
-        String systemName,
         String systemTypeName,
         String measurementName,
-        String pointOfUse,
-        String basis,
-        LocationDashboardImportStrategy.SampleOrigin origin
+        LocationDashboardImportStrategy.SampleOrigin origin,
+        Map<String, String> identityValues,
+        String sourceIdentity
     ) {
         return GENERATED_SAMPLE_IDENTITY_PREFIX
-            + observedDate
-            + "|"
-            + nullSafeIdentityToken(facilityName)
-            + "|"
-            + nullSafeIdentityToken(buildingName)
-            + "|"
-            + nullSafeIdentityToken(systemName)
-            + "|"
-            + nullSafeIdentityToken(systemTypeName)
-            + "|"
-            + nullSafeIdentityToken(measurementName)
-            + "|"
-            + nullSafeIdentityToken(pointOfUse)
-            + "|"
-            + nullSafeIdentityToken(basis)
-            + "|"
-            + (origin == null ? "" : origin.name());
-    }
-
-    private String nullSafeIdentityToken(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.strip();
+            + "v2|"
+            + (observedDate == null ? "" : observedDate)
+            + "|" + LocationDashboardIdentitySupport.encodeValue(facilityName)
+            + "|" + LocationDashboardIdentitySupport.encodeValue(systemTypeName)
+            + "|" + LocationDashboardIdentitySupport.encodeValue(measurementName)
+            + "|" + (origin == null ? "" : origin.name())
+            + "|" + LocationDashboardIdentitySupport.encode(identityValues)
+            + "|" + LocationDashboardIdentitySupport.encodeValue(sourceIdentity);
     }
 
     private String nullSafeNormalized(String value) {
@@ -475,15 +434,17 @@ public class LocationDashboardSamplePersistenceService {
         return new LocationDashboardImportStrategy.AnalyzedSamplePoint(
             sample.getObservedDate(),
             identity.facilityName(),
-            identity.buildingName(),
-            identity.systemName(),
             firstNonBlank(sample.getSystemTypeName(), identity.systemTypeName()),
             firstNonBlank(sample.getMeasurementName(), identity.measurementName()),
-            identity.pointOfUse(),
-            identity.basis(),
+            identity.identityValues(),
             sample.getRawValue(),
             sample.getUnits(),
-            rehydratedSampleIdentity(sample.getSampleIdentity()),
+            rehydratedSampleIdentity(
+                sample.getSampleIdentity(),
+                origin == LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT
+                    ? null
+                    : identity.sourceIdentity()
+            ),
             sample.isCompliant(),
             sample.isResolved(),
             sample.getTurnaroundDays(),
@@ -491,55 +452,56 @@ public class LocationDashboardSamplePersistenceService {
         );
     }
 
-    private String rehydratedSampleIdentity(String sampleIdentity) {
-        return sampleIdentity;
+    private String rehydratedSampleIdentity(String persistedIdentity, String sourceIdentity) {
+        return notBlank(sourceIdentity) ? sourceIdentity : persistedIdentity;
     }
 
     private record PersistedSampleIdentity(
         String facilityName,
-        String buildingName,
-        String systemName,
         String systemTypeName,
         String measurementName,
-        String pointOfUse,
-        String basis
+        Map<String, String> identityValues,
+        String sourceIdentity
     ) {
         static PersistedSampleIdentity parse(String sampleIdentity) {
             if (!notBlank(sampleIdentity)) {
                 return empty();
             }
             String[] tokens = sampleIdentity.split("\\|", -1);
+            if (sampleIdentity.startsWith(GENERATED_SAMPLE_IDENTITY_PREFIX + "v2|")) {
+                return new PersistedSampleIdentity(
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 3)),
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 4)),
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 5)),
+                    LocationDashboardIdentitySupport.decode(token(tokens, 7)),
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 8))
+                );
+            }
             if (sampleIdentity.startsWith(GENERATED_SAMPLE_IDENTITY_PREFIX)) {
                 return new PersistedSampleIdentity(
                     token(tokens, 2),
-                    token(tokens, 3),
-                    token(tokens, 4),
                     token(tokens, 5),
                     token(tokens, 6),
-                    token(tokens, 7),
-                    token(tokens, 8)
+                    legacyIdentityValues(tokens, 2, 3, 4, 7, 8),
+                    null
                 );
             }
             if (sampleIdentity.startsWith("primary-sample|")
                 || sampleIdentity.startsWith("supplemental-sample-")) {
                 return new PersistedSampleIdentity(
                     token(tokens, 1),
-                    token(tokens, 2),
-                    token(tokens, 3),
                     null,
                     token(tokens, 4),
-                    token(tokens, 5),
-                    token(tokens, 6)
+                    legacyIdentityValues(tokens, 1, 2, 3, 5, 6),
+                    sampleIdentity
                 );
             }
             if (sampleIdentity.startsWith("observation|")) {
                 return new PersistedSampleIdentity(
                     token(tokens, 2),
-                    null,
-                    null,
                     token(tokens, 3),
                     token(tokens, 4),
-                    null,
+                    legacyIdentityValues(tokens, 2, -1, -1, -1, -1),
                     null
                 );
             }
@@ -547,7 +509,30 @@ public class LocationDashboardSamplePersistenceService {
         }
 
         private static PersistedSampleIdentity empty() {
-            return new PersistedSampleIdentity(null, null, null, null, null, null, null);
+            return new PersistedSampleIdentity(null, null, null, Map.of(), null);
+        }
+
+        private static Map<String, String> legacyIdentityValues(
+            String[] tokens,
+            int facilityIndex,
+            int buildingIndex,
+            int systemIndex,
+            int pointOfUseIndex,
+            int basisIndex
+        ) {
+            Map<String, String> values = new LinkedHashMap<>();
+            putLegacy(values, "facility", token(tokens, facilityIndex));
+            putLegacy(values, "building", token(tokens, buildingIndex));
+            putLegacy(values, "system", token(tokens, systemIndex));
+            putLegacy(values, "pointOfUse", token(tokens, pointOfUseIndex));
+            putLegacy(values, "basis", token(tokens, basisIndex));
+            return LocationDashboardIdentitySupport.immutableCopy(values);
+        }
+
+        private static void putLegacy(Map<String, String> values, String key, String value) {
+            if (value != null && !value.isBlank()) {
+                values.put(key, value);
+            }
         }
 
         private static String token(String[] tokens, int index) {
@@ -556,6 +541,32 @@ public class LocationDashboardSamplePersistenceService {
             }
             String token = tokens[index];
             return token == null || token.isBlank() ? null : token.strip();
+        }
+    }
+
+    private Map<String, String> identityValues(Map<String, String> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> dynamicValues = LocationDashboardCorrectiveActionMetadataSupport.identityValues(metadata);
+        if (!dynamicValues.isEmpty()) {
+            return dynamicValues;
+        }
+
+        // Compatibility only: translate metadata written before dynamic identity
+        // maps into a map once, then use the same generic matching workflow.
+        Map<String, String> values = new LinkedHashMap<>();
+        putLegacyIdentityValue(values, "facility", firstNonBlank(metadata.get("sublocation"), metadata.get("facility")));
+        putLegacyIdentityValue(values, "building", metadata.get("building"));
+        putLegacyIdentityValue(values, "system", metadata.get("system"));
+        putLegacyIdentityValue(values, "pointOfUse", metadata.get("point of use"));
+        putLegacyIdentityValue(values, "basis", metadata.get("basis"));
+        return LocationDashboardIdentitySupport.immutableCopy(values);
+    }
+
+    private void putLegacyIdentityValue(Map<String, String> values, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            values.put(key, value.strip());
         }
     }
 }

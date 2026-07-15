@@ -33,6 +33,7 @@ import java.util.Optional;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.correctiveAction;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookComment;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.parsedRow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1021,7 +1022,7 @@ class LocationDashboardImportServiceTest {
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             locationTitle,
             List.of(
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     5,
                     "Newport Beach",
                     "Hospital",
@@ -1047,7 +1048,7 @@ class LocationDashboardImportServiceTest {
                         )
                     )
                 ),
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     6,
                     null,
                     null,
@@ -1086,7 +1087,7 @@ class LocationDashboardImportServiceTest {
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             locationTitle,
             List.of(
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     5,
                     "Newport Beach",
                     "Hospital",

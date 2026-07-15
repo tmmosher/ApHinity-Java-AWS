@@ -59,10 +59,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
             sample.observedDate(),
             sample.sublocation(),
             sample.facilityName(),
-            sample.resolvedBuilding(),
-            sample.resolvedSystem(),
-            sample.pointOfUse(),
-            sample.basis(),
+            sample.identityValues(),
             sample.sampleIdentity(),
             List.of()
         );
@@ -184,10 +181,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
             sample.observedDate(),
             sample.sublocation(),
             sample.facilityName(),
-            sample.resolvedBuilding(),
-            sample.resolvedSystem(),
-            sample.pointOfUse(),
-            sample.basis(),
+            sample.identityValues(),
             sample.sampleIdentity(),
             actionLines
         );
@@ -209,10 +203,7 @@ final class LocationDashboardCorrectiveActionDraftFactory {
         LocalDate observedDate,
         LocationDashboardImportStrategyConfig.SublocationConfig sublocation,
         String facilityName,
-        String resolvedBuilding,
-        String systemName,
-        String pointOfUse,
-        String basis,
+        Map<String, String> identityValues,
         String sampleIdentity,
         List<String> extraLines
     ) {
@@ -236,29 +227,11 @@ final class LocationDashboardCorrectiveActionDraftFactory {
                 LocationDashboardCorrectiveActionMetadataSupport.facilityLine(facilityName)
             );
         }
-        if (resolvedBuilding != null && !resolvedBuilding.isBlank()) {
-            addDescriptionLine(
+        if (identityValues != null) {
+            identityValues.forEach((identityKey, identityValue) -> addDescriptionLine(
                 descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.buildingLine(resolvedBuilding)
-            );
-        }
-        if (systemName != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.systemLine(systemName)
-            );
-        }
-        if (pointOfUse != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.pointOfUseLine(pointOfUse)
-            );
-        }
-        if (basis != null) {
-            addDescriptionLine(
-                descriptionLines,
-                LocationDashboardCorrectiveActionMetadataSupport.basisLine(basis)
-            );
+                LocationDashboardCorrectiveActionMetadataSupport.identityLine(identityKey, identityValue)
+            ));
         }
         if (sampleIdentity != null) {
             addDescriptionLine(

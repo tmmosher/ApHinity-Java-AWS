@@ -108,42 +108,26 @@ final class LocationDashboardSampleBuckets {
     }
 
     private record ResolutionBucketKey(
-        String facilityName,
-        String buildingName,
-        String systemName,
         String measurementName,
-        String pointOfUse,
-        String basis
+        String identity
     ) {
         private static ResolutionBucketKey maybeFrom(LocationDashboardImportedSample sample) {
-            String facilityName = requiredNormalized(sample == null ? null : sample.facilityName());
-            String buildingName = optionalNormalized(sample == null ? null : sample.resolutionBuildingName());
-            String systemName = requiredNormalized(sample == null ? null : sample.resolutionSystemName());
             String measurementName = requiredNormalized(sample == null ? null : sample.measurementName());
-            String pointOfUse = requiredNormalized(sample == null ? null : sample.pointOfUse());
-            String basis = requiredNormalized(sample == null ? null : sample.basis());
-            if (facilityName == null
-                || systemName == null
-                || measurementName == null
-                || pointOfUse == null
-                ) {
+            String identity = sample == null
+                ? null
+                : LocationDashboardIdentitySupport.normalizedIdentity(sample.resolutionIdentityValues());
+            if (measurementName == null
+                || identity == null
+                || identity.isBlank()) {
                 return null;
             }
             return new ResolutionBucketKey(
-                facilityName,
-                buildingName,
-                systemName,
                 measurementName,
-                pointOfUse,
-                basis
+                identity
             );
         }
 
         private static String requiredNormalized(String value) {
-            return LocationDashboardGraphMetadataSupport.normalizeKey(value);
-        }
-
-        private static String optionalNormalized(String value) {
             return LocationDashboardGraphMetadataSupport.normalizeKey(value);
         }
     }

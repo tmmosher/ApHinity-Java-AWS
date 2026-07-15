@@ -2,17 +2,15 @@
   "locationName": "Apple Inc.",
   "identityPattern": [
     {
-      "field": "system",
-      "column": "System",
+      "column": "system",
       "aliases": [
-        "Type"
+        "System"
       ]
     },
     {
-      "field": "facility",
-      "column": "Site",
+      "column": "site",
       "aliases": [
-        "Facility"
+        "Site"
       ]
     }
   ],
@@ -30,49 +28,240 @@
       "facilityAliases": [],
       "buildingAliases": [],
       "defaultForFacility": false
+    },
+    {
+      "key": "plant-b",
+      "displayName": "Plant B",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "ctw/pcw",
+      "displayName": "CTW / PCW",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "tes",
+      "displayName": "tes",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "main-chw",
+      "displayName": "Main CHW",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "hot",
+      "displayName": "Hot",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-1100",
+      "displayName": "Data Hall 1100",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-1500",
+      "displayName": "Data Hall 1500",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-2100",
+      "displayName": "Data Hall 2100",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-2500",
+      "displayName": "Data Hall 2500",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-3100",
+      "displayName": "Data Hall 3100",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-3500",
+      "displayName": "Data Hall 3500",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-4100",
+      "displayName": "Data Hall 4100",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "data-hall-4500",
+      "displayName": "Data Hall 4500",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "emw-tank-1",
+      "displayName": "EMW Tank 1",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "plant-a-restroom",
+      "displayName": "Plant A Restroom",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
+    },
+    {
+      "key": "breakroom-restroom",
+      "displayName": "Breakroom Restroom",
+      "facilityAliases": [],
+      "buildingAliases": [],
+      "defaultForFacility": false
     }
   ],
   "systems": [
     {
       "key": "towers",
-      "displayName": "Example",
-      "rangeProfile": "example",
+      "displayName": "Towers",
+      "rangeProfile": "towers",
       "aliases": []
     },
     {
-      "key": "example-2",
-      "displayName": "Example 2",
-      "rangeProfile": "example",
+      "key": "closed-loops",
+      "displayName": "Closed Loops",
+      "rangeProfile": "closed-loops",
+      "aliases": []
+    },
+    {
+      "key": "trc-analysis",
+      "displayName": "TRC Analysis",
+      "rangeProfile": "trc-analysis",
       "aliases": []
     }
   ],
   "rangeProfiles": [
     {
-      "key": "example",
-      "measurementTypes": {
-        "Example Measurement": "example"
-      }
+      "key": "towers",
+      "measurementTypes": [
+        "Conductivity",
+        "pH",
+        "Temperature",
+        "PTSA",
+        "Ca Hard",
+        "Alkalinity",
+        "CI Free",
+        "CI Total",
+        "Silica",
+        "Bacteria",
+        "LSI",
+        "Conductivity Cycles",
+        "Calcium Cycles",
+        "M Alkalinity Cycles"
+      ]
+    },{
+      "key": "closed-loops",
+      "measurementTypes": [
+        "Conductivity",
+        "pH",
+        "PTSA",
+        "Molybdate",
+        "Iron",
+        "N TCC"
+      ]
+    },{
+      "key": "trc-analysis",
+      "measurementTypes": [
+        "Temperature",
+        "CI Free",
+        "CI Total",
+        "Cond",
+        "ORP"
+      ]
     }
   ],
   "graphs": [
-    {
-      "id": "apple-example-water-quality",
-      "name": "Water Quality Conformance",
-      "title": "Apple Inc.",
-      "importType": "water_quality_compliance",
-      "sublocationKey": "city-water",
-      "traceOrder": [],
-      "traceColors": {},
-      "graphType": ""
-    }
   ],
   "derivedGraphs": [],
   "systemTypeAliases": [],
   "measurementUnits": [
     {
+      "value": "μS",
+      "aliases": [],
+      "for_measurement_names": ["Conductivity"]
+    },
+    {
+      "value": "°F",
+      "aliases": [],
+      "for_measurement_names": ["Temperature"]
+    },
+    {
       "value": "",
       "aliases": [],
-      "for_measurement_names": []
+      "for_measurement_names": [
+        "pH",
+        "Conductivity Cycles",
+        "Calcium Cycles",
+        "LSI",
+        "M Alkalinity Cycles"
+      ]
+    },
+    {
+      "value": "ppb",
+      "aliases": [],
+      "for_measurement_names": ["PTSA"]
+    },
+    {
+      "value": "ppm",
+      "aliases": [],
+      "for_measurement_names": [
+        "Ca Hard.",
+        "Alkalinity",
+        "CI (Free)",
+        "CI (Total)",
+        "Silica",
+        "Molybdate",
+        "Iron",
+        "Cond"
+      ]
+    },
+    {
+      "value": "CFU/mL",
+      "aliases": [
+        "CFU/ml"
+      ],
+      "for_measurement_names": [
+        "Bacteria",
+        "N TCC",
+        "Pseudo"
+      ]
+    },
+    {
+      "value": "mV",
+      "aliases": [],
+      "for_measurement_names": ["ORP"]
     }
   ]
 }

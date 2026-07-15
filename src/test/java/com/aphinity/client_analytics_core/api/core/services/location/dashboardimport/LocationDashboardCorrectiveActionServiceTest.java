@@ -14,7 +14,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -23,6 +25,30 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LocationDashboardCorrectiveActionServiceTest {
+
+    @Test
+    void dynamicIdentityComparisonDoesNotDependOnMapInsertionOrder() {
+        Map<String, String> firstValues = new LinkedHashMap<>();
+        firstValues.put("sampling station", "Recirc Line");
+        firstValues.put("water train", "Cooling Towers");
+        String first = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+            "HPC",
+            LocalDate.parse("2025-08-01"),
+            firstValues,
+            null
+        );
+        Map<String, String> reversedValues = new LinkedHashMap<>();
+        reversedValues.put("water train", "Cooling Towers");
+        reversedValues.put("sampling station", "Recirc Line");
+        String second = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
+            "HPC",
+            LocalDate.parse("2025-08-01"),
+            reversedValues,
+            null
+        );
+
+        assertEquals(first, second);
+    }
     @Mock
     private ServiceEventRepository serviceEventRepository;
 
@@ -188,7 +214,7 @@ class LocationDashboardCorrectiveActionServiceTest {
 
         LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction historical = service.toHistoricalCorrectiveAction(serviceEvent);
 
-        assertEquals("Cooling Towers", historical.systemName());
+        assertEquals("Cooling Towers", historical.identityValues().get("system"));
         assertEquals("HPC", historical.measurementName());
         assertEquals("Newport Beach", historical.facilityName());
     }

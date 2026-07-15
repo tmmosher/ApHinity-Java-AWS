@@ -18,11 +18,8 @@ class LocationDashboardDerivedGraphSupportTest {
                 List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
                     LocalDate.parse("2026-06-01"),
                     "Newport Beach",
-                    null,
-                    null,
                     "HPC",
-                    "Sink 1",
-                    null,
+                    Map.of("pointOfUse", "Sink 1"),
                     "row-hpc",
                     true,
                     10L
@@ -150,11 +147,8 @@ class LocationDashboardDerivedGraphSupportTest {
                 List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
                     LocalDate.parse("2026-06-01"),
                     "Newport Beach",
-                    null,
-                    null,
                     "HPC",
-                    "Sink 1",
-                    null,
+                    Map.of("pointOfUse", "Sink 1"),
                     "row-hpc",
                     true,
                     4L

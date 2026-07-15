@@ -201,11 +201,7 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         List<LocationDashboardSpreadsheetParser.ParsedDashboardRow> augmentedRows = originalWorkbook.rows().stream()
             .map(row -> new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
                 row.rowNumber(),
-                row.facility(),
-                row.building(),
-                row.system(),
-                row.pointOfUse(),
-                row.basis(),
+                row.identityValues(),
                 row.cells().stream()
                     .map(cell -> new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
                         cell.metricName(),

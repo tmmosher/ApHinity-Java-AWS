@@ -133,99 +133,25 @@ final class LocationDashboardHistoricalDataAssembler {
         AnalyzedSamplePoint sample,
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
     ) {
-        return identityValuesFromSampleIdentity(sample, identityPattern);
-    }
-
-    private Map<String, String> identityValuesFromSampleIdentity(
-        AnalyzedSamplePoint sample,
-        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
-    ) {
-        if (sample == null || sample.sampleIdentity() == null || sample.sampleIdentity().isBlank()) {
+        if (sample == null || sample.identityValues() == null || sample.identityValues().isEmpty()) {
             return Map.of();
         }
-        List<String> tokens = List.of(sample.sampleIdentity().split("\\|", -1));
-        Map<String, Integer> tokenIndexesByIdentityColumn = sampleIdentityIndexes(sample.sampleIdentity());
         Map<String, String> values = new LinkedHashMap<>();
-        for (LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn : effectiveIdentityPattern(identityPattern)) {
-            if (identityColumn == null
-                || identityColumn.identityKey() == null
-                || identityColumn.identityKey().isBlank()) {
-                continue;
+        if (identityPattern == null || identityPattern.isEmpty()) {
+            values.putAll(sample.identityValues());
+        } else {
+            for (LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn identityColumn : identityPattern) {
+                if (identityColumn == null || identityColumn.identityKey() == null) {
+                    continue;
+                }
+                putIfPresent(
+                    values,
+                    identityColumn.identityKey(),
+                    sample.identityValues().get(identityColumn.identityKey())
+                );
             }
-            Integer tokenIndex = tokenIndexesByIdentityColumn.get(identityColumn.identityKey());
-            if (tokenIndex == null || tokenIndex < 0 || tokenIndex >= tokens.size()) {
-                continue;
-            }
-            putIfPresent(values, identityColumn.identityKey(), tokens.get(tokenIndex));
         }
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
-    }
-
-    private Map<String, Integer> sampleIdentityIndexes(String sampleIdentity) {
-        if (sampleIdentity == null) {
-            return Map.of();
-        }
-        if (sampleIdentity.startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX)) {
-            return generatedSampleIdentityIndexes();
-        }
-        if (sampleIdentity.startsWith("primary-sample|")
-            || sampleIdentity.startsWith("supplemental-sample-")) {
-            return commentSampleIdentityIndexes();
-        }
-        if (sampleIdentity.startsWith("observation|")) {
-            return observationSampleIdentityIndexes();
-        }
-        return worksheetSampleIdentityIndexes();
-    }
-
-    private List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> effectiveIdentityPattern(
-        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
-    ) {
-        return identityPattern == null || identityPattern.isEmpty()
-            ? List.of(
-                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("facility", List.of()),
-                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("building", List.of()),
-                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of()),
-                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("pointOfUse", List.of()),
-                new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("basis", List.of())
-            )
-            : identityPattern;
-    }
-
-    private Map<String, Integer> worksheetSampleIdentityIndexes() {
-        return Map.of(
-            "facility", 0,
-            "building", 1,
-            "system", 2,
-            "pointOfUse", 4,
-            "basis", 5
-        );
-    }
-
-    private Map<String, Integer> generatedSampleIdentityIndexes() {
-        return Map.of(
-            "facility", 2,
-            "building", 3,
-            "system", 4,
-            "pointOfUse", 7,
-            "basis", 8
-        );
-    }
-
-    private Map<String, Integer> commentSampleIdentityIndexes() {
-        return Map.of(
-            "facility", 1,
-            "building", 2,
-            "system", 3,
-            "pointOfUse", 5,
-            "basis", 6
-        );
-    }
-
-    private Map<String, Integer> observationSampleIdentityIndexes() {
-        return Map.of(
-            "facility", 2
-        );
     }
 
     private void putIfPresent(Map<String, String> values, String key, String value) {
@@ -442,11 +368,7 @@ final class LocationDashboardHistoricalDataAssembler {
             String identity = LocationDashboardCorrectiveActionMetadataSupport.identityKey(
                 analyzedSample.measurementName(),
                 analyzedSample.observedDate(),
-                analyzedSample.facilityName(),
-                analyzedSample.buildingName(),
-                analyzedSample.systemName(),
-                analyzedSample.pointOfUse(),
-                analyzedSample.basis(),
+                analyzedSample.identityValues(),
                 analyzedSample.sampleIdentity()
             );
             if (identity == null) {
@@ -461,11 +383,8 @@ final class LocationDashboardHistoricalDataAssembler {
                 new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
                     analyzedSample.observedDate(),
                     analyzedSample.facilityName(),
-                    analyzedSample.buildingName(),
-                    analyzedSample.systemName(),
                     analyzedSample.measurementName(),
-                    analyzedSample.pointOfUse(),
-                    analyzedSample.basis(),
+                    analyzedSample.identityValues(),
                     analyzedSample.sampleIdentity(),
                     analyzedSample.resolved(),
                     analyzedSample.turnaroundDays()

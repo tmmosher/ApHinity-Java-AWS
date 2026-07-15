@@ -217,6 +217,18 @@ final class LocationDashboardCorrectiveActionService {
         String pointOfUse = descriptionFields.get("point of use");
         String basis = descriptionFields.get("basis");
         String sampleIdentity = descriptionFields.get("sample identity");
+        Map<String, String> identityValues = LocationDashboardCorrectiveActionMetadataSupport.identityValues(
+            descriptionFields
+        );
+        if (identityValues.isEmpty()) {
+            Map<String, String> legacyIdentityValues = new LinkedHashMap<>();
+            putIdentityValue(legacyIdentityValues, "facility", facilityName);
+            putIdentityValue(legacyIdentityValues, "building", buildingName);
+            putIdentityValue(legacyIdentityValues, "system", systemName);
+            putIdentityValue(legacyIdentityValues, "pointOfUse", pointOfUse);
+            putIdentityValue(legacyIdentityValues, "basis", basis);
+            identityValues = LocationDashboardIdentitySupport.immutableCopy(legacyIdentityValues);
+        }
 
         LocationDashboardImportStrategy strategy = strategyRegistry == null || serviceEvent.getLocation() == null
             ? null
@@ -226,21 +238,24 @@ final class LocationDashboardCorrectiveActionService {
         }
 
         if (facilityName == null || facilityName.isBlank()
-            || systemName == null || systemName.isBlank()
-            || measurementName == null || measurementName.isBlank()) {
+            || measurementName == null || measurementName.isBlank()
+            || (identityValues.isEmpty() && (sampleIdentity == null || sampleIdentity.isBlank()))) {
             return null;
         }
         return new LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction(
             observedDate,
             facilityName,
-            buildingName,
-            systemName,
             measurementName,
-            pointOfUse,
-            basis,
+            identityValues,
             sampleIdentity,
             serviceEvent
         );
+    }
+
+    private void putIdentityValue(Map<String, String> values, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            values.put(key, value.strip());
+        }
     }
 
     private String correctiveActionIdentity(String title, String description) {

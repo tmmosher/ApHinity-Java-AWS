@@ -12,12 +12,48 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.sample;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookComment;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCommentFixtures.workbookStyleComment;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.parsedRow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfiguredLocationDashboardImportStrategyTest {
+    @Test
+    void computeImportResolvesBusinessContextWithoutHardCodedIdentityKeys() {
+        ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
+        Map<String, String> identityValues = new java.util.LinkedHashMap<>();
+        identityValues.put("water train", "Cooling Towers");
+        identityValues.put("sampling station", "Newport Beach");
+        identityValues.put("route code", "Recirc Line");
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Newport Beach",
+                List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    5,
+                    identityValues,
+                    List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                        "HPC",
+                        LocalDate.parse("2025-08-01"),
+                        "5",
+                        new BigDecimal("5"),
+                        null,
+                        "D5"
+                    ))
+                ))
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        assertEquals(1, result.analyzedSamples().size());
+        assertEquals(identityValues, result.analyzedSamples().getFirst().identityValues());
+        assertEquals("Newport Beach", result.analyzedSamples().getFirst().facilityName());
+        assertEquals("Cooling Towers", result.analyzedSamples().getFirst().systemTypeName());
+    }
+
     @Test
     void computeImportAggregatesComplianceByMeasurementAndSystemType() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
@@ -133,7 +169,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         5,
                         "Newport Beach",
                         "Hospital",
@@ -149,7 +185,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             "F5"
                         ))
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         6,
                         null,
                         null,
@@ -286,7 +322,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                         "Newport Beach",
                         List.of(
-                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                parsedRow(
                                         5,
                                         "Newport Beach",
                                         "Hospital",
@@ -327,7 +363,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                         "Newport Beach",
                         List.of(
-                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                parsedRow(
                                         5,
                                         "Newport Beach",
                                         "Hospital",
@@ -375,7 +411,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                         "Newport Beach",
                         List.of(
-                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                parsedRow(
                                         5,
                                         "Newport Beach",
                                         "Hospital",
@@ -429,7 +465,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                 new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                         "Newport Beach",
                         List.of(
-                                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                                parsedRow(
                                         5,
                                         "Newport Beach",
                                         "Hospital",
@@ -627,7 +663,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         5,
                         "Newport Beach",
                         "Hospital",
@@ -668,7 +704,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         5,
                         "Newport Beach",
                         "Hospital",
@@ -707,7 +743,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         5,
                         "Newport Beach",
                         "Hospital",
@@ -791,7 +827,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
-                List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                List.of(parsedRow(
                     38,
                     "Newport Beach",
                     "Hospital",
@@ -835,7 +871,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
-                List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                List.of(parsedRow(
                     39,
                     "Newport Beach",
                     "Hospital",
@@ -1191,7 +1227,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Hoag Hospital",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         68,
                         "Irvine",
                         "SPD-16405",
@@ -1209,7 +1245,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             )
                         )
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         73,
                         null,
                         "16105",
@@ -1227,7 +1263,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             )
                         )
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         74,
                         null,
                         "16105",
@@ -1321,7 +1357,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Hoag Hospital",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         68,
                         "SPD-16405",
                         null,
@@ -1396,7 +1432,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Hoag Hospital",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         68,
                         "Newport Beach",
                         "Hospital",
@@ -1414,7 +1450,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             )
                         )
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         69,
                         null,
                         null,
@@ -1506,7 +1542,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Hoag Hospital",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         68,
                         "Irvine",
                         "SPD-16405",
@@ -1524,7 +1560,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             )
                         )
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         69,
                         null,
                         "16105",
@@ -1542,7 +1578,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             )
                         )
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         70,
                         null,
                         "16105",
@@ -1629,7 +1665,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Hoag Hospital",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         68,
                         "Surgical Pavilion",
                         null,
@@ -1669,7 +1705,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
             new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
                 "Newport Beach",
                 List.of(
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         5,
                         "Newport Beach",
                         "Hospital",
@@ -1685,7 +1721,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                             "F5"
                         ))
                     ),
-                    new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                    parsedRow(
                         6,
                         null,
                         null,
@@ -2026,7 +2062,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             "Newport Beach",
             List.of(
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     5,
                     "Newport Beach",
                     "Hospital",
@@ -2052,7 +2088,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
                         )
                     )
                 ),
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     6,
                     null,
                     null,
@@ -2091,7 +2127,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             "Newport Beach",
             List.of(
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     5,
                     "Newport Beach",
                     "Hospital",
@@ -2127,7 +2163,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
         return new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
             "Newport Beach",
             List.of(
-                new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+                parsedRow(
                     5,
                     "Newport Beach",
                     "Hospital",

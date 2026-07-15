@@ -1,6 +1,5 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,32 +36,35 @@ final class LocationDashboardImportContextResolver {
     }
 
     ActiveImportContext emptyContext() {
-        return new ActiveImportContext(null, null, null, null, null);
+        return new ActiveImportContext(Map.of(), null, null, null);
     }
 
     RowImportContext resolveRowContext(
         LocationDashboardSpreadsheetParser.ParsedDashboardRow row,
         ActiveImportContext activeContext
     ) {
-        String rowFacility = row == null ? null : row.facility();
-        String rowBuilding = row == null ? null : row.building();
-        String rowSystem = row == null ? null : row.system();
-        String resolvedFacility = rowFacility != null ? rowFacility : activeContext.activeFacility();
-        String resolvedBuilding = rowBuilding != null ? rowBuilding : activeContext.activeBuilding();
-        String resolvedSystem = rowSystem != null ? rowSystem : activeContext.activeSystemRaw();
-        SublocationConfig sublocation = resolveSublocation(
-            resolvedFacility,
-            resolvedBuilding,
-            activeContext.activeSublocation()
+        ActiveImportContext effectiveActiveContext = activeContext == null ? emptyContext() : activeContext;
+        Map<String, String> identityValues = mergeIdentityValues(
+            effectiveActiveContext.activeIdentityValues(),
+            row == null ? Map.of() : row.identityValues()
         );
-        SystemTypeConfig systemType = resolveSystemType(resolvedSystem, activeContext.activeSystemType());
+        SublocationConfig sublocation = resolveSublocation(
+            identityValues,
+            effectiveActiveContext.activeSublocation()
+        );
+        SystemResolution systemResolution = resolveSystemType(
+            row == null ? Map.of() : row.identityValues(),
+            effectiveActiveContext
+        );
         return new RowImportContext(
-            resolvedFacility,
-            resolvedBuilding,
-            resolvedSystem,
+            identityValues,
             sublocation,
-            systemType,
-            resolveFacilityName(sublocation, resolvedFacility)
+            systemResolution.systemType(),
+            systemResolution.identityKey(),
+            resolveFacilityName(
+                sublocation,
+                firstIdentityValue(identityValues, systemResolution.identityKey())
+            )
         );
     }
 
@@ -71,41 +73,29 @@ final class LocationDashboardImportContextResolver {
         RowImportContext rowContext,
         ActiveImportContext activeContext
     ) {
-        String activeFacility = activeContext.activeFacility();
-        String activeBuilding = activeContext.activeBuilding();
-        String activeSystemRaw = activeContext.activeSystemRaw();
-        SublocationConfig activeSublocation = activeContext.activeSublocation();
-        SystemTypeConfig activeSystemType = activeContext.activeSystemType();
-
-        if (rowContext.sublocation() != null) {
-            if (row != null
-                && row.facility() != null
-                && (Objects.equals(normalizeKey(row.facility()), normalizeKey(rowContext.sublocation().key()))
-                    || Objects.equals(normalizeKey(row.facility()), normalizeKey(rowContext.sublocation().displayName()))
-                    || matchesAny(row.facility(), rowContext.sublocation().facilityAliases()))) {
-                activeFacility = rowContext.resolvedFacility();
-            }
-            if (row != null && row.building() != null) {
-                activeBuilding = row.building();
-            }
-            activeSublocation = rowContext.sublocation();
+        if (rowContext == null) {
+            return activeContext == null ? emptyContext() : activeContext;
         }
-        if (rowContext.systemType() != null) {
-            activeSystemRaw = rowContext.resolvedSystem();
-            activeSystemType = rowContext.systemType();
-        }
-
+        ActiveImportContext effectiveActiveContext = activeContext == null ? emptyContext() : activeContext;
         return new ActiveImportContext(
-            activeFacility,
-            activeBuilding,
-            activeSystemRaw,
-            activeSublocation,
-            activeSystemType
+            rowContext.identityValues(),
+            rowContext.sublocation(),
+            rowContext.systemType() == null ? effectiveActiveContext.activeSystemType() : rowContext.systemType(),
+            rowContext.systemIdentityKey() == null
+                ? effectiveActiveContext.activeSystemIdentityKey()
+                : rowContext.systemIdentityKey()
         );
     }
 
     String canonicalFacilityName(String rawFacility, String rawBuilding) {
-        return resolveFacilityName(resolveSublocation(rawFacility, rawBuilding, null), rawFacility);
+        Map<String, String> identityValues = new LinkedHashMap<>();
+        if (rawFacility != null && !rawFacility.isBlank()) {
+            identityValues.put("legacy-1", rawFacility);
+        }
+        if (rawBuilding != null && !rawBuilding.isBlank()) {
+            identityValues.put("legacy-2", rawBuilding);
+        }
+        return resolveFacilityName(resolveSublocation(identityValues, null), rawFacility);
     }
 
     String canonicalSystemTypeName(String rawSystem) {
@@ -113,56 +103,91 @@ final class LocationDashboardImportContextResolver {
         return systemType == null ? null : resolveSystemTypeName(systemType, rawSystem);
     }
 
-    private SublocationConfig resolveSublocation(String facility, String building, SublocationConfig previousSublocation) {
-        String normalizedFacility = normalizeKey(facility);
-        if (normalizedFacility == null) {
-            return previousSublocation;
-        }
-
-        List<SublocationConfig> facilitySublocations = sublocationsByFacilityAlias.getOrDefault(normalizedFacility, List.of());
-        if (building != null) {
-            String normalizedBuilding = normalizeKey(building);
-            if (normalizedBuilding != null) {
-                for (SublocationConfig sublocation : facilitySublocations) {
-                    if (matchesAny(normalizedBuilding, sublocation.buildingAliases())) {
-                        return sublocation;
-                    }
-                }
-                SublocationConfig defaultSublocation = defaultSublocationsByFacilityAlias.get(normalizedFacility);
-                if (defaultSublocation != null) {
-                    return defaultSublocation;
+    private SublocationConfig resolveSublocation(
+        Map<String, String> identityValues,
+        SublocationConfig previousSublocation
+    ) {
+        for (String value : identityValues.values()) {
+            for (SublocationConfig sublocation : config.sublocations()) {
+                if (matchesAny(value, sublocation.buildingAliases())) {
+                    return sublocation;
                 }
             }
         }
-
-        for (SublocationConfig sublocation : config.sublocations()) {
-            if (Objects.equals(normalizedFacility, normalizeKey(sublocation.key()))
-                || Objects.equals(normalizedFacility, normalizeKey(sublocation.displayName()))) {
-                return sublocation;
+        for (String value : identityValues.values()) {
+            String normalizedValue = normalizeKey(value);
+            if (normalizedValue == null) {
+                continue;
+            }
+            for (SublocationConfig sublocation : config.sublocations()) {
+                if (Objects.equals(normalizedValue, normalizeKey(sublocation.key()))
+                    || Objects.equals(normalizedValue, normalizeKey(sublocation.displayName()))) {
+                    return sublocation;
+                }
+            }
+            List<SublocationConfig> facilityMatches = sublocationsByFacilityAlias.getOrDefault(
+                normalizedValue,
+                List.of()
+            );
+            if (facilityMatches.size() == 1) {
+                return facilityMatches.getFirst();
+            }
+            SublocationConfig defaultMatch = defaultSublocationsByFacilityAlias.get(normalizedValue);
+            if (defaultMatch != null) {
+                return defaultMatch;
             }
         }
-
-        // Some newer ST-108 exports place building/site identifiers like "SPD-16405"
-        // into the facility column. When that happens, allow the facility token to
-        // resolve through configured building aliases so sample facility names still
-        // collapse to the canonical sublocation display name.
-        for (SublocationConfig sublocation : config.sublocations()) {
-            if (matchesAny(normalizedFacility, sublocation.buildingAliases())) {
-                return sublocation;
-            }
-        }
-
-        if (building == null && belongsToFacility(previousSublocation, normalizedFacility)) {
-            return previousSublocation;
-        }
-        return defaultSublocationsByFacilityAlias.get(normalizedFacility);
+        return previousSublocation;
     }
 
-    private boolean belongsToFacility(SublocationConfig sublocation, String normalizedFacility) {
-        if (sublocation == null || normalizedFacility == null) {
-            return false;
+    private SystemResolution resolveSystemType(
+        Map<String, String> rowIdentityValues,
+        ActiveImportContext activeContext
+    ) {
+        for (Map.Entry<String, String> identity : rowIdentityValues.entrySet()) {
+            SystemTypeConfig resolved = resolveSystemType(identity.getValue(), null);
+            if (resolved != null) {
+                return new SystemResolution(resolved, identity.getKey());
+            }
         }
-        return matchesAny(normalizedFacility, effectiveFacilityAliases(sublocation));
+        if (activeContext.activeSystemIdentityKey() != null
+            && rowIdentityValues.containsKey(activeContext.activeSystemIdentityKey())) {
+            return new SystemResolution(null, activeContext.activeSystemIdentityKey());
+        }
+        return new SystemResolution(
+            activeContext.activeSystemType(),
+            activeContext.activeSystemIdentityKey()
+        );
+    }
+
+    private Map<String, String> mergeIdentityValues(
+        Map<String, String> activeValues,
+        Map<String, String> rowValues
+    ) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        if (activeValues != null) {
+            merged.putAll(activeValues);
+        }
+        if (rowValues != null) {
+            rowValues.forEach((key, value) -> {
+                if (key != null && !key.isBlank() && value != null && !value.isBlank()) {
+                    merged.put(key, value.strip());
+                }
+            });
+        }
+        return LocationDashboardIdentitySupport.immutableCopy(merged);
+    }
+
+    private String firstIdentityValue(Map<String, String> identityValues, String excludedIdentityKey) {
+        if (identityValues == null) {
+            return null;
+        }
+        return identityValues.entrySet().stream()
+            .filter(entry -> !Objects.equals(entry.getKey(), excludedIdentityKey))
+            .map(Map.Entry::getValue)
+            .filter(value -> value != null && !value.isBlank())
+            .findFirst()
+            .orElse(null);
     }
 
     private SystemTypeConfig resolveSystemType(String rawSystem, SystemTypeConfig previousSystemType) {
@@ -190,20 +215,6 @@ final class LocationDashboardImportContextResolver {
             }
         }
         return false;
-    }
-
-    private List<String> effectiveFacilityAliases(SublocationConfig sublocation) {
-        if (sublocation.facilityAliases() == null || sublocation.facilityAliases().isEmpty()) {
-            List<String> aliases = new ArrayList<>();
-            if (sublocation.displayName() != null) {
-                aliases.add(sublocation.displayName());
-            }
-            if (sublocation.key() != null) {
-                aliases.add(sublocation.key());
-            }
-            return List.copyOf(aliases);
-        }
-        return sublocation.facilityAliases();
     }
 
     private String resolveFacilityName(SublocationConfig sublocation, String resolvedFacility) {
@@ -239,26 +250,33 @@ final class LocationDashboardImportContextResolver {
     }
 
     record ActiveImportContext(
-        String activeFacility,
-        String activeBuilding,
-        String activeSystemRaw,
+        Map<String, String> activeIdentityValues,
         SublocationConfig activeSublocation,
-        SystemTypeConfig activeSystemType
+        SystemTypeConfig activeSystemType,
+        String activeSystemIdentityKey
     ) {
+        ActiveImportContext {
+            activeIdentityValues = LocationDashboardIdentitySupport.immutableCopy(activeIdentityValues);
+        }
     }
 
     record RowImportContext(
-        String resolvedFacility,
-        String resolvedBuilding,
-        String resolvedSystem,
+        Map<String, String> identityValues,
         SublocationConfig sublocation,
         SystemTypeConfig systemType,
+        String systemIdentityKey,
         String facilityName
     ) {
+        RowImportContext {
+            identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
+        }
     }
 
     record SystemTypeAliasGroup(
         SystemTypeConfig representativeSystemType
     ) {
+    }
+
+    private record SystemResolution(SystemTypeConfig systemType, String identityKey) {
     }
 }
