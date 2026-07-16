@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
@@ -24,6 +25,10 @@ final class LocationDashboardGraphMetadataSupport {
     private static final String GRAPH_SIZE_HALF = "half";
     private static final String GRAPH_SIZE_FULL = "full";
     private static final String GRAPH_SIZE_DOUBLE = "double";
+    private static final Set<String> LEGACY_IMPORTED_Y_AXIS_TITLES = Set.of(
+        "% Compliance",
+        "% Conformance"
+    );
 
     private LocationDashboardGraphMetadataSupport() {
     }
@@ -84,7 +89,7 @@ final class LocationDashboardGraphMetadataSupport {
         Map<String, Object> yAxis = copyMutableMap(asMap(layout.get("yaxis")));
         yAxis.remove("range");
         yAxis.put("rangemode", "tozero");
-        yAxis.put("title", "# Non-Conformances");
+        putImportDefaultAxisTitle(yAxis, "# Non-Conformances");
         yAxis.put("dtick", 1);
         yAxis.remove("ticksuffix");
         layout.put("yaxis", yAxis);
@@ -189,13 +194,13 @@ final class LocationDashboardGraphMetadataSupport {
         Map<String, Object> xAxis = copyMutableMap(asMap(layout.get("xaxis")));
         Map<String, Object> yAxis = copyMutableMap(asMap(layout.get("yaxis")));
         if (horizontal) {
-            xAxis.put("title", derivedGraphDefinition.name());
+            putDefaultAxisTitle(xAxis, derivedGraphDefinition.name());
             yAxis.put("automargin", true);
             yAxis.remove("title");
         } else {
             xAxis.put("automargin", true);
             xAxis.remove("title");
-            yAxis.put("title", derivedGraphDefinition.name());
+            putDefaultAxisTitle(yAxis, derivedGraphDefinition.name());
         }
         layout.put("xaxis", xAxis);
         layout.put("yaxis", yAxis);
@@ -204,6 +209,26 @@ final class LocationDashboardGraphMetadataSupport {
             : Map.of("b", 80, "l", 60, "r", 20, "t", 45));
         if (horizontal) {
             layout.put("showlegend", false);
+        }
+    }
+
+    /**
+     * Axis titles edited by a user are part of the persisted graph layout.
+     * Import and derived graph refreshes call this class while rebuilding other
+     * metadata, so generated titles must only fill an unset axis title. The
+     * import path separately recognizes the two pre-count generated labels so
+     * legacy graphs can still be migrated.
+     */
+    private static void putDefaultAxisTitle(Map<String, Object> axis, String defaultTitle) {
+        if (readLayoutTitleText(axis.get("title")) == null) {
+            axis.put("title", defaultTitle);
+        }
+    }
+
+    private static void putImportDefaultAxisTitle(Map<String, Object> axis, String defaultTitle) {
+        String existingTitle = readLayoutTitleText(axis.get("title"));
+        if (existingTitle == null || LEGACY_IMPORTED_Y_AXIS_TITLES.contains(existingTitle)) {
+            axis.put("title", defaultTitle);
         }
     }
 

@@ -203,8 +203,116 @@
     }
   ],
   "graphs": [
+    {
+      "id": "city-water-system-type-conformance",
+      "name": "System Type Conformance",
+      "title": "City Water",
+      "importType": "system_type_compliance",
+      "sublocationKey": "",
+      "traceOrder": [
+      ],
+      "traceColors": {
+      },
+      "graphType": "scatter"
+    },
+    {
+      "id": "city-water-system-type-conformance",
+      "name": "System Type Conformance",
+      "title": "City Water",
+      "importType": "system_type_compliance",
+      "sublocationKey": "",
+      "traceOrder": [
+      ],
+      "traceColors": {
+      },
+      "graphType": "scatter"
+    },
+    {
+      "id": "city-water-system-type-conformance",
+      "name": "System Type Conformance",
+      "title": "City Water",
+      "importType": "system_type_compliance",
+      "sublocationKey": "",
+      "traceOrder": [
+      ],
+      "traceColors": {
+      },
+      "graphType": "scatter"
+    },
+    {
+      "id": "city-water-system-type-conformance",
+      "name": "System Type Conformance",
+      "title": "City Water",
+      "importType": "system_type_compliance",
+      "sublocationKey": "",
+      "traceOrder": [
+      ],
+      "traceColors": {
+      },
+      "graphType": "scatter"
+    }
   ],
-  "derivedGraphs": [],
+  "derivedGraphs": [
+    {
+      "id": "total-samples",
+      "name": "Total Number of Samples",
+      "derivedType": "total_samples",
+      "graphType": "pie"
+    },
+    {
+      "id": "total-non-conformances",
+      "name": "Total Non-Conformances",
+      "derivedType": "total_non_conformances",
+      "graphType": "pie"
+    },
+    {
+      "id": "resolution-percent",
+      "name": "Percent Resolved",
+      "derivedType": "percent_resolved",
+      "graphType": "indicator"
+    },
+    {
+      "id": "percent-conformance",
+      "name": "Percent Conformance",
+      "derivedType": "percent_conformance",
+      "graphType": "indicator"
+    },
+    {
+      "id": "non-conformances-by-water-quality",
+      "name": "Non-Conformances",
+      "title": "By Water Quality Category",
+      "derivedType": "non_conformances_by_category",
+      "graphType": "bar"
+    },
+    {
+      "id": "non-conformances-by-system-type",
+      "name": "Non-Conformances",
+      "title": "By Water System Type",
+      "derivedType": "non_conformances_by_system_type",
+      "graphType": "bar"
+    },
+    {
+      "id": "non-conformances-by-facility",
+      "name": "Non-Conformances",
+      "title": "By Facility",
+      "derivedType": "non_conformances_by_facility",
+      "graphType": "bar"
+    },
+    {
+      "id": "non-conformance-status-by-turnaround-time",
+      "name": "Non-Conformance Status",
+      "title": "Turnaround Time",
+      "derivedType": "non_conformance_turnaround_time",
+      "graphType": "bar"
+    },
+    {
+      "id": "non-conformance-status-by-facility",
+      "name": "Non-Conformance Status",
+      "title": "By Facility",
+      "derivedType": "non_conformance_status_by_facility",
+      "graphType": "bar"
+    }
+  ],
   "systemTypeAliases": [],
   "measurementUnits": [
     {
