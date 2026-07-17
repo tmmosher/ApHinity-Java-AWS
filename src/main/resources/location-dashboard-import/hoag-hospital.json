@@ -11,6 +11,7 @@
       "column": "building",
       "aliases": [
         "Bldg",
+        "Bldg (Collated if unrecognized)",
         "Building"
       ]
     },
@@ -18,19 +19,22 @@
       "column": "system",
       "aliases": [
         "System",
+        "System (Collated if unrecognized)",
         "Water System"
       ]
     },
     {
       "column": "pointOfUse",
       "aliases": [
-        "Point of Use"
+        "Point of Use",
+        "Point of Use (Ignored)"
       ]
     },
     {
       "column": "basis",
       "aliases": [
         "Basis",
+        "Basis (ignored)",
         "Basis for Sampling"
       ]
     }

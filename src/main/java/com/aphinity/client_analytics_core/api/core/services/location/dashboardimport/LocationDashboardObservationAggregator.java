@@ -9,8 +9,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphAnchor;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphDimension;
 
 /**
  * Aggregates analyzed workbook samples into configured dashboard graph payloads
@@ -32,14 +33,9 @@ final class LocationDashboardObservationAggregator {
         "#17becf"
     );
 
-    private final Map<String, List<GraphConfig>> graphsBySublocationKey;
     private final List<GraphConfig> graphDefinitions;
 
-    LocationDashboardObservationAggregator(
-        Map<String, List<GraphConfig>> graphsBySublocationKey,
-        List<GraphConfig> graphDefinitions
-    ) {
-        this.graphsBySublocationKey = graphsBySublocationKey == null ? Map.of() : graphsBySublocationKey;
+    LocationDashboardObservationAggregator(List<GraphConfig> graphDefinitions) {
         this.graphDefinitions = graphDefinitions == null ? List.of() : List.copyOf(graphDefinitions);
     }
 
@@ -65,18 +61,11 @@ final class LocationDashboardObservationAggregator {
             observations.add(analyzedSample.toObservation());
             samplePoints.add(analyzedSample.toAnalyzedSamplePoint());
 
-            if (sample.sublocation() == null) {
-                continue;
-            }
-            List<GraphConfig> scopedGraphDefinitions = graphsBySublocationKey.getOrDefault(
-                normalizeKey(sample.sublocation().key()),
-                List.of()
-            );
-            for (GraphConfig graphDefinition : scopedGraphDefinitions) {
-                String traceName = switch (graphDefinition.importType()) {
-                    case SYSTEM_TYPE_COMPLIANCE -> sample.systemTypeName();
-                    case WATER_QUALITY_COMPLIANCE -> sample.measurementName();
-                };
+            for (GraphConfig graphDefinition : graphDefinitions) {
+                if (!matchesAnchor(graphDefinition.effectiveAnchor(), sample)) {
+                    continue;
+                }
+                String traceName = traceName(graphDefinition.effectiveTraceBy(), sample);
                 GraphAggregation aggregation = aggregationsByGraphId.get(graphDefinition.id());
                 if (aggregation != null) {
                     aggregation.record(traceName, sample.observedDate(), analyzedSample.compliant());
@@ -119,7 +108,7 @@ final class LocationDashboardObservationAggregator {
 
         List<Map<String, Object>> traces = new ArrayList<>();
         int traceIndex = 0;
-        boolean collapseEmptyTraces = graphDefinition.importType() == ImportType.SYSTEM_TYPE_COMPLIANCE;
+        boolean collapseEmptyTraces = graphDefinition.effectiveTraceBy() != GraphDimension.MEASUREMENT;
         for (String traceName : traceOrder) {
             List<LocalDate> observedDates = new ArrayList<>(graphAggregation.observedDatesForTrace(traceName));
             if (observedDates.isEmpty() && collapseEmptyTraces) {
@@ -161,8 +150,31 @@ final class LocationDashboardObservationAggregator {
         return List.copyOf(traces);
     }
 
+    private boolean matchesAnchor(GraphAnchor anchor, LocationDashboardImportedSample sample) {
+        if (anchor == null || anchor.dimension() == null || sample == null) {
+            return false;
+        }
+        String sampleAnchorKey = switch (anchor.dimension()) {
+            case SUBLOCATION -> sample.sublocation() == null ? null : sample.sublocation().key();
+            case SYSTEM -> sample.systemType() == null ? null : sample.systemType().key();
+            case MEASUREMENT -> sample.measurementName();
+        };
+        return Objects.equals(normalizeKey(anchor.key()), normalizeKey(sampleAnchorKey));
+    }
+
+    private String traceName(GraphDimension traceBy, LocationDashboardImportedSample sample) {
+        if (traceBy == null || sample == null) {
+            return null;
+        }
+        return switch (traceBy) {
+            case SUBLOCATION -> sample.sublocation() == null ? null : sample.sublocation().displayName();
+            case SYSTEM -> sample.systemTypeName();
+            case MEASUREMENT -> sample.measurementName();
+        };
+    }
+
     private boolean containsNormalized(List<String> values, String candidate) {
-            String normalizedCandidate = normalizeKey(candidate);
+        String normalizedCandidate = normalizeKey(candidate);
         if (normalizedCandidate == null) {
             return false;
         }

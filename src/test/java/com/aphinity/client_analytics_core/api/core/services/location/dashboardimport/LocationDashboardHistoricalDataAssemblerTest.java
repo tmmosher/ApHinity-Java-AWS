@@ -1,9 +1,13 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +21,52 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocationDashboardHistoricalDataAssemblerTest {
+    @Test
+    void reconstructsSystemAnchoredSublocationTracesWithBothDimensions() {
+        LocationDashboardHistoricalDataAssembler assembler = new LocationDashboardHistoricalDataAssembler(
+            new LocationDashboardCorrectiveActionService(
+                null,
+                Clock.fixed(Instant.parse("2025-01-10T00:00:00Z"), ZoneOffset.UTC)
+            )
+        );
+        LocationDashboardImportStrategyConfig.GraphConfig graphDefinition =
+            new LocationDashboardImportStrategyConfig.GraphConfig(
+                "towers-system-type-conformance",
+                "System Type Conformance",
+                "Towers",
+                LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
+                null,
+                List.of(),
+                Map.of(),
+                "scatter",
+                new LocationDashboardImportStrategyConfig.GraphAnchor(
+                    LocationDashboardImportStrategyConfig.GraphDimension.SYSTEM,
+                    "towers"
+                ),
+                LocationDashboardImportStrategyConfig.GraphDimension.SUBLOCATION
+            );
+        Graph graph = timeSeriesGraph("City Water", 2L, 1L);
+
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            assembler.buildHistoricalDerivedData(
+                List.of(graphDefinition),
+                Map.of("towers system type conformance", graph),
+                Map.of(graph.getId(), graph),
+                Map.of(graph.getId(), graph),
+                List.of(),
+                List.of(),
+                List.of()
+            );
+
+        LocationDashboardDerivedGraphSupport.HistoricalSamplePoint samplePoint =
+            historicalData.allSamplePoints().getFirst();
+        assertEquals("City Water", samplePoint.facilityName());
+        assertEquals("Towers", samplePoint.systemTypeName());
+        assertEquals(null, samplePoint.measurementName());
+        assertEquals(2L, samplePoint.sampleCount());
+        assertEquals(1L, samplePoint.compliantCount());
+    }
+
     @Test
     void usesSamplesAsIncidentSourceAndCorrectiveActionsAsResolutionAnnotations() {
         LocationDashboardHistoricalDataAssembler assembler = new LocationDashboardHistoricalDataAssembler(
@@ -229,5 +279,35 @@ class LocationDashboardHistoricalDataAssemblerTest {
             null,
             LocationDashboardImportStrategy.SampleOrigin.WORKSHEET
         );
+    }
+
+    private Graph timeSeriesGraph(String traceName, long sampleCount, long compliantCount) {
+        Graph graph = new Graph();
+        graph.setId(101L);
+        graph.setName("System Type Conformance");
+
+        GraphTrace trace = new GraphTrace();
+        trace.setGraph(graph);
+        trace.setTraceKey("trace-0");
+        trace.setTraceName(traceName);
+        trace.setTraceType("scatter");
+        trace.setDataMode("time_series");
+        trace.setTraceOrder(0);
+
+        GraphTimeSeriesPoint point = new GraphTimeSeriesPoint();
+        point.setGraphTrace(trace);
+        point.setObservedAt(Instant.parse("2025-01-01T00:00:00Z"));
+        point.setPointOrder(0);
+        point.setYNumeric(BigDecimal.valueOf(sampleCount - compliantCount));
+        point.setPointMeta(Map.of(
+            "x", "2025-01-01",
+            "customdata", Map.of(
+                "sampleCount", sampleCount,
+                "compliantCount", compliantCount
+            )
+        ));
+        trace.setTimeSeriesPoints(List.of(point));
+        graph.setGraphTraces(List.of(trace));
+        return graph;
     }
 }

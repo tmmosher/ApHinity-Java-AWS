@@ -66,7 +66,11 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
         ConfiguredLocationDashboardImportStrategy strategy = resolveHoagStrategy();
 
         byte[] originalBytes = readFixtureBytes(DATA_UPLOAD_FIXTURE);
-        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parsedWorkbook = parseWorkbook(originalBytes);
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook parsedWorkbook = parseWorkbook(
+            DATA_UPLOAD_FIXTURE,
+            originalBytes,
+            strategy.spreadsheetIdentityPattern()
+        );
         Map<String, LocationDashboardSpreadsheetParser.ParsedDashboardCell> originalCellsByReference =
             cellsByReference(parsedWorkbook);
         List<ResolvedInjectedCommentPlan> resolvedPlans = resolveInjectedCommentPlans(parsedWorkbook);

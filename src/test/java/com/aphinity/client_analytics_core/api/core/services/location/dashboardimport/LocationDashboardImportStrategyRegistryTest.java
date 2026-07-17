@@ -21,6 +21,17 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals("Water Quality Conformance", strategy.graphDefinitions().getFirst().name());
         assertEquals("Newport Beach", strategy.graphDefinitions().getFirst().title());
         assertEquals(
+            new LocationDashboardImportStrategyConfig.GraphAnchor(
+                LocationDashboardImportStrategyConfig.GraphDimension.SUBLOCATION,
+                "newport-beach"
+            ),
+            strategy.graphDefinitions().getFirst().effectiveAnchor()
+        );
+        assertEquals(
+            LocationDashboardImportStrategyConfig.GraphDimension.MEASUREMENT,
+            strategy.graphDefinitions().getFirst().effectiveTraceBy()
+        );
+        assertEquals(
             List.of("HPC", "Endotoxin", "Legionella", "pH", "Conductivity", "Alkalinity", "Hardness"),
             strategy.graphDefinitions().getFirst().traceOrder()
         );
@@ -51,5 +62,17 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals("system", strategy.spreadsheetIdentityPattern().get(0).column());
         assertEquals("site", strategy.spreadsheetIdentityPattern().get(1).identityKey());
         assertEquals("site", strategy.spreadsheetIdentityPattern().get(1).column());
+        assertEquals(3, strategy.graphDefinitions().size());
+        assertEquals(
+            new LocationDashboardImportStrategyConfig.GraphAnchor(
+                LocationDashboardImportStrategyConfig.GraphDimension.SYSTEM,
+                "towers"
+            ),
+            strategy.graphDefinitions().getFirst().effectiveAnchor()
+        );
+        assertEquals(
+            LocationDashboardImportStrategyConfig.GraphDimension.SUBLOCATION,
+            strategy.graphDefinitions().getFirst().effectiveTraceBy()
+        );
     }
 }

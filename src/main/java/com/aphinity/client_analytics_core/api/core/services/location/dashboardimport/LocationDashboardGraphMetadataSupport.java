@@ -12,7 +12,9 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphAnchor;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphDimension;
 
 /**
  * Shared graph payload metadata helpers for dashboard import.
@@ -71,7 +73,13 @@ final class LocationDashboardGraphMetadataSupport {
         importMeta.put("graphTitle", graphDefinition.title());
         importMeta.put("importType", graphDefinition.importType().value());
         importMeta.put("metricKey", "non_conformance_count");
-        importMeta.put("sublocationKey", graphDefinition.sublocationKey());
+        GraphAnchor anchor = graphDefinition.effectiveAnchor();
+        importMeta.put("anchorDimension", anchor.dimension().value());
+        importMeta.put("anchorKey", anchor.key());
+        importMeta.put("traceBy", graphDefinition.effectiveTraceBy().value());
+        if (anchor.dimension() == GraphDimension.SUBLOCATION) {
+            importMeta.put("sublocationKey", anchor.key());
+        }
         importMeta.put("unit", "count");
         importMeta.put("locationName", strategyLocationName);
 

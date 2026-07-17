@@ -20,6 +20,66 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfiguredLocationDashboardImportStrategyTest {
     @Test
+    void computeImportRoutesSystemAnchoredGraphsIntoSublocationTraces() {
+        ConfiguredLocationDashboardImportStrategy strategy = new ConfiguredLocationDashboardImportStrategy(
+            new LocationDashboardImportStrategyConfig(
+                "Apple Inc.",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "city-water", "City Water", List.of(), List.of(), false
+                    ),
+                    new LocationDashboardImportStrategyConfig.SublocationConfig(
+                        "plant-a", "Plant A", List.of(), List.of(), false
+                    )
+                ),
+                List.of(new LocationDashboardImportStrategyConfig.SystemTypeConfig(
+                    "towers",
+                    "Towers",
+                    new LocationDashboardImportStrategyConfig.RangeProfile("towers"),
+                    List.of()
+                )),
+                List.of(new LocationDashboardImportStrategyConfig.GraphConfig(
+                    "towers-system-type-conformance",
+                    "System Type Conformance",
+                    "Towers",
+                    LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
+                    null,
+                    List.of(),
+                    Map.of(),
+                    "scatter",
+                    new LocationDashboardImportStrategyConfig.GraphAnchor(
+                        LocationDashboardImportStrategyConfig.GraphDimension.SYSTEM,
+                        "towers"
+                    ),
+                    LocationDashboardImportStrategyConfig.GraphDimension.SUBLOCATION
+                )),
+                List.of(),
+                List.of()
+            )
+        );
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook =
+            new LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook(
+                "Apple Inc.",
+                List.of(
+                    appleRow(5, "City Water", "Towers", "12", new BigDecimal("12")),
+                    appleRow(6, "Plant A", "Towers", "5", new BigDecimal("5"))
+                )
+            );
+
+        LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
+            workbook,
+            measurementBounds()
+        );
+
+        assertEquals(1, result.graphs().size());
+        assertEquals(List.of("City Water", "Plant A"), result.graphs().getFirst().data().stream()
+            .map(trace -> String.valueOf(trace.get("name")))
+            .toList());
+        assertEquals(List.of(1L), result.graphs().getFirst().data().getFirst().get("y"));
+        assertEquals(List.of(0L), result.graphs().getFirst().data().get(1).get("y"));
+    }
+
+    @Test
     void computeImportResolvesBusinessContextWithoutHardCodedIdentityKeys() {
         ConfiguredLocationDashboardImportStrategy strategy = buildStrategy();
         Map<String, String> identityValues = new java.util.LinkedHashMap<>();
@@ -2041,6 +2101,27 @@ class ConfiguredLocationDashboardImportStrategyTest {
         return List.of(
             measurementBound(1L, "HPC", null, null, null, null, null, null, null, new BigDecimal("10")),
             measurementBound(2L, "Endotoxin", null, null, null, null, null, null, null, new BigDecimal("1"))
+        );
+    }
+
+    private LocationDashboardSpreadsheetParser.ParsedDashboardRow appleRow(
+        int rowNumber,
+        String testingSite,
+        String system,
+        String rawValue,
+        BigDecimal numericValue
+    ) {
+        return new LocationDashboardSpreadsheetParser.ParsedDashboardRow(
+            rowNumber,
+            Map.of("system", testingSite, "site", system),
+            List.of(new LocationDashboardSpreadsheetParser.ParsedDashboardCell(
+                "HPC",
+                LocalDate.parse("2025-08-01"),
+                rawValue,
+                numericValue,
+                null,
+                "C" + rowNumber
+            ))
         );
     }
 

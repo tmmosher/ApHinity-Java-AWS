@@ -149,8 +149,81 @@ public record LocationDashboardImportStrategyConfig(
         String sublocationKey,
         List<String> traceOrder,
         Map<String, String> traceColors,
-        String graphType
+        String graphType,
+        GraphAnchor anchor,
+        GraphDimension traceBy
     ) {
+        public GraphConfig(
+            String id,
+            String name,
+            String title,
+            ImportType importType,
+            String sublocationKey,
+            List<String> traceOrder,
+            Map<String, String> traceColors,
+            String graphType
+        ) {
+            this(id, name, title, importType, sublocationKey, traceOrder, traceColors, graphType, null, null);
+        }
+
+        public GraphAnchor effectiveAnchor() {
+            if (anchor != null) {
+                return anchor;
+            }
+            // Preserve existing location configurations while new graphs use
+            // the dimension-aware anchor object.
+            if (sublocationKey == null || sublocationKey.isBlank()) {
+                return null;
+            }
+            return new GraphAnchor(GraphDimension.SUBLOCATION, sublocationKey);
+        }
+
+        public GraphDimension effectiveTraceBy() {
+            if (traceBy != null) {
+                return traceBy;
+            }
+            return importType == ImportType.SYSTEM_TYPE_COMPLIANCE
+                ? GraphDimension.SYSTEM
+                : GraphDimension.MEASUREMENT;
+        }
+    }
+
+    public record GraphAnchor(
+        GraphDimension dimension,
+        String key
+    ) {
+    }
+
+    public enum GraphDimension {
+        SUBLOCATION("sublocation"),
+        SYSTEM("system"),
+        MEASUREMENT("measurement");
+
+        private final String value;
+
+        GraphDimension(String value) {
+            this.value = value;
+        }
+
+        @JsonValue
+        public String value() {
+            return value;
+        }
+
+        @JsonCreator
+        public static GraphDimension fromValue(String rawValue) {
+            if (rawValue == null || rawValue.isBlank()) {
+                return null;
+            }
+            String normalized = rawValue.strip().toLowerCase(Locale.ROOT);
+            return Arrays.stream(values())
+                .filter(dimension ->
+                    dimension.value.equals(normalized)
+                        || dimension.name().equalsIgnoreCase(normalized)
+                )
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown dashboard graph dimension: " + rawValue));
+        }
     }
 
     public record DerivedGraphConfig(

@@ -204,11 +204,15 @@
   ],
   "graphs": [
     {
-      "id": "city-water-system-type-conformance",
+      "id": "towers-system-type-conformance",
       "name": "System Type Conformance",
-      "title": "City Water",
+      "title": "Towers",
       "importType": "system_type_compliance",
-      "sublocationKey": "",
+      "anchor": {
+        "dimension": "system",
+        "key": "towers"
+      },
+      "traceBy": "sublocation",
       "traceOrder": [
       ],
       "traceColors": {
@@ -216,11 +220,15 @@
       "graphType": "scatter"
     },
     {
-      "id": "city-water-system-type-conformance",
+      "id": "closed-loops-system-type-conformance",
       "name": "System Type Conformance",
-      "title": "City Water",
+      "title": "Closed Loops",
       "importType": "system_type_compliance",
-      "sublocationKey": "",
+      "anchor": {
+        "dimension": "system",
+        "key": "closed-loops"
+      },
+      "traceBy": "sublocation",
       "traceOrder": [
       ],
       "traceColors": {
@@ -228,23 +236,15 @@
       "graphType": "scatter"
     },
     {
-      "id": "city-water-system-type-conformance",
+      "id": "trc-analysis-system-type-conformance",
       "name": "System Type Conformance",
-      "title": "City Water",
+      "title": "TRC Analysis",
       "importType": "system_type_compliance",
-      "sublocationKey": "",
-      "traceOrder": [
-      ],
-      "traceColors": {
+      "anchor": {
+        "dimension": "system",
+        "key": "trc-analysis"
       },
-      "graphType": "scatter"
-    },
-    {
-      "id": "city-water-system-type-conformance",
-      "name": "System Type Conformance",
-      "title": "City Water",
-      "importType": "system_type_compliance",
-      "sublocationKey": "",
+      "traceBy": "sublocation",
       "traceOrder": [
       ],
       "traceColors": {

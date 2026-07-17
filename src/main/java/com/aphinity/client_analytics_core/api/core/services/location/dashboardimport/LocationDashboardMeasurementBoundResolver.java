@@ -48,7 +48,7 @@ final class LocationDashboardMeasurementBoundResolver {
         if (bound == null && !measurementNamesByProfile.isEmpty()) {
             throw new IllegalStateException(
                 "No location measurement bound is configured for " + measurementName
-                    + " and database type " + profileKey
+                    + " and database type " + profileReference.value()
                     + " selected by range profile " + profileReference.value()
             );
         }

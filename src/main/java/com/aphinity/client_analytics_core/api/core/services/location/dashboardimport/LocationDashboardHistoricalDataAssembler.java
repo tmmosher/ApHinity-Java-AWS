@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphDimension;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.ImportType;
 
 /**
@@ -63,12 +64,12 @@ final class LocationDashboardHistoricalDataAssembler {
                 continue;
             }
 
-            String facilityName = LocationDashboardGraphMetadataSupport.firstNonBlank(
+            String anchorLabel = LocationDashboardGraphMetadataSupport.firstNonBlank(
                 LocationDashboardGraphMetadataSupport.readImportMetadata(effectiveGraph).get("graphTitle"),
                 graphDefinition.title(),
                 LocationDashboardGraphMetadataSupport.readGraphLayoutTitleText(effectiveGraph)
             );
-            collectPersistedSamplePoints(samplePointsByIdentity, effectiveGraph, facilityName, graphDefinition.importType());
+            collectPersistedSamplePoints(samplePointsByIdentity, effectiveGraph, anchorLabel, graphDefinition);
         }
 
         mergeImportedSamplePoints(samplePointsByIdentity, analyzedSamples);
@@ -180,8 +181,8 @@ final class LocationDashboardHistoricalDataAssembler {
     private void collectPersistedSamplePoints(
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity,
         Graph effectiveGraph,
-        String facilityName,
-        ImportType importType
+        String anchorLabel,
+        GraphConfig graphDefinition
     ) {
         if (effectiveGraph == null || effectiveGraph.getGraphTraces() == null) {
             return;
@@ -211,8 +212,15 @@ final class LocationDashboardHistoricalDataAssembler {
                     continue;
                 }
 
-                String measurementLabel = importType == ImportType.WATER_QUALITY_COMPLIANCE ? measurementName : null;
-                String systemTypeLabel = importType == ImportType.SYSTEM_TYPE_COMPLIANCE ? measurementName : null;
+                GraphDimension anchorDimension = graphDefinition.effectiveAnchor().dimension();
+                GraphDimension traceDimension = graphDefinition.effectiveTraceBy();
+                String facilityName = anchorDimension == GraphDimension.SUBLOCATION
+                    ? anchorLabel
+                    : traceDimension == GraphDimension.SUBLOCATION ? measurementName : null;
+                String measurementLabel = traceDimension == GraphDimension.MEASUREMENT ? measurementName : null;
+                String systemTypeLabel = anchorDimension == GraphDimension.SYSTEM
+                    ? anchorLabel
+                    : traceDimension == GraphDimension.SYSTEM ? measurementName : null;
                 String sampleIdentity = sampleIdentity(observedDate, facilityName, measurementLabel, systemTypeLabel);
                 samplePointsByIdentity.put(sampleIdentity, new LocationDashboardDerivedGraphSupport.HistoricalSamplePoint(
                     observedDate,

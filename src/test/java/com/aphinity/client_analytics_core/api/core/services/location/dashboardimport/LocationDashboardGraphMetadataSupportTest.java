@@ -9,6 +9,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LocationDashboardGraphMetadataSupportTest {
     @Test
+    void importMetadataRecordsGeneralizedAnchorAndTraceDimensions() {
+        Map<String, Object> layout = LocationDashboardGraphMetadataSupport.withImportMetadataAndDefaults(
+            Map.of(),
+            new LocationDashboardImportStrategyConfig.GraphConfig(
+                "towers-system-type-conformance",
+                "System Type Conformance",
+                "Towers",
+                LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE,
+                null,
+                List.of(),
+                Map.of(),
+                "scatter",
+                new LocationDashboardImportStrategyConfig.GraphAnchor(
+                    LocationDashboardImportStrategyConfig.GraphDimension.SYSTEM,
+                    "towers"
+                ),
+                LocationDashboardImportStrategyConfig.GraphDimension.SUBLOCATION
+            ),
+            "Apple Inc."
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) ((Map<?, ?>) layout.get("meta"))
+            .get(LocationDashboardGraphMetadataSupport.IMPORT_LAYOUT_META_KEY);
+        assertEquals("system", metadata.get("anchorDimension"));
+        assertEquals("towers", metadata.get("anchorKey"));
+        assertEquals("sublocation", metadata.get("traceBy"));
+        assertEquals(false, metadata.containsKey("sublocationKey"));
+    }
+
+    @Test
     void derivedBarLayoutFollowsConfiguredVerticalTraceOrientation() {
         Map<String, Object> layout = LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
             Map.of("title", Map.of("text", "Turnaround Time")),

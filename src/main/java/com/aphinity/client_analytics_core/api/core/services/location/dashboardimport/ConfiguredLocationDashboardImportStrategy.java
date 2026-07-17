@@ -11,8 +11,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphAnchor;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
+import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphDimension;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SublocationConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeAliasConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.SystemTypeConfig;
@@ -40,7 +42,6 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             buildSublocationsByFacilityAlias(this.config.sublocations());
         Map<String, SublocationConfig> defaultSublocationsByFacilityAlias =
             buildDefaultSublocationsByFacilityAlias(this.config.sublocations());
-        Map<String, List<GraphConfig>> graphsBySublocationKey = buildGraphsBySublocationKey(this.config.graphs());
         this.contextResolver = new LocationDashboardImportContextResolver(
             this.config,
             systemsByAlias,
@@ -52,7 +53,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             this.contextResolver,
             new LocationDashboardCommentParser(this.config.measurementUnits())
         );
-        this.observationAggregator = new LocationDashboardObservationAggregator(graphsBySublocationKey, this.config.graphs());
+        this.observationAggregator = new LocationDashboardObservationAggregator(this.config.graphs());
         this.correctiveActionDraftFactory = new LocationDashboardCorrectiveActionDraftFactory();
     }
 
@@ -225,8 +226,30 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             if (graph.importType() == null) {
                 throw new IllegalStateException("Dashboard import graphs must declare an import type: " + graph.id());
             }
-            if (!sublocationKeys.contains(normalizeKey(graph.sublocationKey()))) {
-                throw new IllegalStateException("Dashboard import graph references an unknown sublocation key: " + graph.sublocationKey());
+            GraphAnchor anchor = graph.effectiveAnchor();
+            if (anchor == null || anchor.dimension() == null || normalizeKey(anchor.key()) == null) {
+                throw new IllegalStateException("Dashboard import graphs must declare an anchor: " + graph.id());
+            }
+            if (anchor.dimension() == GraphDimension.MEASUREMENT) {
+                throw new IllegalStateException(
+                    "Dashboard import graph anchors must use a sublocation or system dimension: " + graph.id()
+                );
+            }
+            Set<String> validAnchorKeys = anchor.dimension() == GraphDimension.SUBLOCATION
+                ? sublocationKeys
+                : systemKeys;
+            if (!validAnchorKeys.contains(normalizeKey(anchor.key()))) {
+                throw new IllegalStateException(
+                    "Dashboard import graph references an unknown "
+                        + anchor.dimension().value()
+                        + " anchor key: "
+                        + anchor.key()
+                );
+            }
+            if (graph.effectiveTraceBy() == anchor.dimension()) {
+                throw new IllegalStateException(
+                    "Dashboard import graph anchor and trace dimensions must differ: " + graph.id()
+                );
             }
         }
 
@@ -387,15 +410,6 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
             }
         }
         return Map.copyOf(defaultsByFacilityAlias);
-    }
-
-    private Map<String, List<GraphConfig>> buildGraphsBySublocationKey(List<GraphConfig> graphDefinitions) {
-        Map<String, List<GraphConfig>> graphsBySublocationKey = new LinkedHashMap<>();
-        for (GraphConfig graphDefinition : graphDefinitions) {
-            graphsBySublocationKey.computeIfAbsent(normalizeKey(graphDefinition.sublocationKey()), ignored -> new ArrayList<>())
-                .add(graphDefinition);
-        }
-        return Map.copyOf(graphsBySublocationKey);
     }
 
     private void registerAlias(Map<String, SystemTypeConfig> systemsByAlias, String rawAlias, SystemTypeConfig systemType) {
