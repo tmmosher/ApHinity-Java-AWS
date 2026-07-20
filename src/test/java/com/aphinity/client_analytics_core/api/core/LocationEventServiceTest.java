@@ -9,7 +9,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.Locatio
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.LocationEventService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarAuthorizationService;
 import com.aphinity.client_analytics_core.api.core.services.servicecalendar.ServiceCalendarImportService;
@@ -79,7 +79,7 @@ class LocationEventServiceTest {
     private MailOutboxCommandService mailOutboxService;
 
     @Mock
-    private LocationDashboardTimeRangeService locationDashboardTimeRangeService;
+    private LocationDashboardRefreshService dashboardRefreshService;
 
     @InjectMocks
     private LocationEventService locationEventService;

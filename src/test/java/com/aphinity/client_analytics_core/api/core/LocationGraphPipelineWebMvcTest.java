@@ -3,7 +3,7 @@ package com.aphinity.client_analytics_core.api.core;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.security.AccessTokenRefreshFilter;
-import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationGraphController;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
@@ -16,11 +16,14 @@ import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
-import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardProjectionService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +65,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
-    controllers = LocationController.class,
+    controllers = LocationGraphController.class,
     excludeFilters = @ComponentScan.Filter(
         type = FilterType.ASSIGNABLE_TYPE,
         classes = AccessTokenRefreshFilter.class
@@ -72,8 +75,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     LocationGraphTemplateFactory.class,
     LocationGraphUpdatePayloadValidationFactory.class,
     LocationDashboardMutationLockService.class,
+    LocationDashboardProjectionService.class,
+    LocationDashboardRefreshService.class,
+    LocationDashboardCacheInvalidationService.class,
     GraphResponseMapper.class,
-    LocationService.class,
+    LocationGraphService.class,
     LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class
 })
 @AutoConfigureMockMvc(addFilters = false)

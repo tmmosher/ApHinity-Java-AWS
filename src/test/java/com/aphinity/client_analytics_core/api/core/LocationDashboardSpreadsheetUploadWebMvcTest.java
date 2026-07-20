@@ -1,11 +1,11 @@
 package com.aphinity.client_analytics_core.api.core;
 
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
-import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationDashboardImportController;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationDashboardUploadService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LocationController.class)
+@WebMvcTest(controllers = LocationDashboardImportController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import(LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class)
 class LocationDashboardSpreadsheetUploadWebMvcTest {
@@ -40,7 +40,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private LocationService locationService;
+    private LocationDashboardUploadService locationService;
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
@@ -54,7 +54,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             new byte[] {4, 5, 6}
         );
-        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class)))
+        when(locationService.upload(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class)))
             .thenReturn(new LocationDashboardSpreadsheetUploadResponse(
                 List.of(new GraphResponse(
                     18L,
@@ -80,7 +80,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             .andExpect(jsonPath("$.correctiveActions.length()").value(0));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
-        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class));
+        verify(locationService).upload(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class));
     }
 
     @Test
@@ -92,7 +92,7 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             new byte[] {4, 5, 6}
         );
-        when(locationService.uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class)))
+        when(locationService.upload(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class)))
             .thenThrow(new ApiClientException(
                 BAD_REQUEST,
                 "location_dashboard_file_invalid",
@@ -109,6 +109,6 @@ class LocationDashboardSpreadsheetUploadWebMvcTest {
             .andExpect(jsonPath("$.message").value("Dashboard spreadsheet could not be parsed."));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
-        verify(locationService).uploadLocationDashboardSpreadsheet(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class));
+        verify(locationService).upload(eq(42L), eq(8L), any(MultipartFile.class), eq(false), nullable(Integer.class));
     }
 }

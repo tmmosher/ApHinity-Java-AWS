@@ -1,8 +1,8 @@
 package com.aphinity.client_analytics_core.api.core;
 
-import com.aphinity.client_analytics_core.api.core.controllers.location.LocationController;
+import com.aphinity.client_analytics_core.api.core.controllers.location.LocationThumbnailController;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.location.LocationService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LocationController.class)
+@WebMvcTest(controllers = LocationThumbnailController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import(LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class)
 class LocationThumbnailWebMvcTest {
@@ -34,7 +34,7 @@ class LocationThumbnailWebMvcTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private LocationService locationService;
+    private LocationThumbnailService locationService;
 
     @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
@@ -48,7 +48,7 @@ class LocationThumbnailWebMvcTest {
             "image/png",
             new byte[] {4, 5, 6}
         );
-        when(locationService.updateLocationThumbnail(eq(42L), eq(8L), any(MultipartFile.class))).thenReturn(
+        when(locationService.updateThumbnail(eq(42L), eq(8L), any(MultipartFile.class))).thenReturn(
             new com.aphinity.client_analytics_core.api.core.response.location.LocationResponse(
                 8L,
                 "Dallas",
@@ -71,14 +71,14 @@ class LocationThumbnailWebMvcTest {
             .andExpect(jsonPath("$.thumbnailAvailable").value(true));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
-        verify(locationService).updateLocationThumbnail(eq(42L), eq(8L), any(MultipartFile.class));
+        verify(locationService).updateThumbnail(eq(42L), eq(8L), any(MultipartFile.class));
     }
 
     @Test
     void getsThumbnailAsWebpBytes() throws Exception {
         when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(42L);
         byte[] thumbnail = new byte[] {7, 8, 9};
-        when(locationService.getAccessibleLocationThumbnail(42L, 8L)).thenReturn(thumbnail);
+        when(locationService.getThumbnail(42L, 8L)).thenReturn(thumbnail);
 
         mockMvc.perform(get("/core/locations/{locationId}/thumbnail", 8L))
             .andExpect(status().isOk())
@@ -86,6 +86,6 @@ class LocationThumbnailWebMvcTest {
             .andExpect(content().bytes(thumbnail));
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(nullable(Jwt.class));
-        verify(locationService).getAccessibleLocationThumbnail(42L, 8L);
+        verify(locationService).getThumbnail(42L, 8L);
     }
 }

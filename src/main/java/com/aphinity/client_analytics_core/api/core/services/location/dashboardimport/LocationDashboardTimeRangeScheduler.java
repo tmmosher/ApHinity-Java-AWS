@@ -7,14 +7,14 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class LocationDashboardTimeRangeScheduler {
-    private final LocationDashboardTimeRangeService locationDashboardTimeRangeService;
+    private final LocationDashboardRefreshService refreshService;
     private final LocationRepository locationRepository;
 
     public LocationDashboardTimeRangeScheduler(
-        LocationDashboardTimeRangeService locationDashboardTimeRangeService,
+        LocationDashboardRefreshService refreshService,
         LocationRepository locationRepository
     ) {
-        this.locationDashboardTimeRangeService = locationDashboardTimeRangeService;
+        this.refreshService = refreshService;
         this.locationRepository = locationRepository;
     }
 
@@ -24,7 +24,7 @@ public class LocationDashboardTimeRangeScheduler {
             if (location == null || location.getId() == null) {
                 continue;
             }
-            locationDashboardTimeRangeService.refreshLocationDateGroups(location.getId());
+            refreshService.refreshDerivedGraphs(location.getId());
         }
     }
 }

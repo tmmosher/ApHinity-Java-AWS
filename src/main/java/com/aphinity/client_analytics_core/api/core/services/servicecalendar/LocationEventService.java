@@ -6,7 +6,7 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.ServiceCalendarBulkEventRowRequest;
@@ -50,7 +50,7 @@ public class LocationEventService {
     private final ServiceCalendarImportService importService;
     private final ServiceEventAuditService auditService;
     private final MailOutboxCommandService mailOutboxCommandService;
-    private final LocationDashboardTimeRangeService locationDashboardTimeRangeService;
+    private final LocationDashboardRefreshService dashboardRefreshService;
 
     public LocationEventService(
         LocationRepository locationRepository,
@@ -61,7 +61,7 @@ public class LocationEventService {
         ServiceCalendarImportService importService,
         ServiceEventAuditService auditService,
         MailOutboxCommandService mailOutboxCommandService,
-        LocationDashboardTimeRangeService locationDashboardTimeRangeService
+        LocationDashboardRefreshService dashboardRefreshService
     ) {
         this.locationRepository = locationRepository;
         this.serviceEventRepository = serviceEventRepository;
@@ -71,7 +71,7 @@ public class LocationEventService {
         this.importService = importService;
         this.auditService = auditService;
         this.mailOutboxCommandService = mailOutboxCommandService;
-        this.locationDashboardTimeRangeService = locationDashboardTimeRangeService;
+        this.dashboardRefreshService = dashboardRefreshService;
     }
 
     /**
@@ -126,7 +126,7 @@ public class LocationEventService {
     @Transactional
     public int uploadServiceCalendar(Long userId, Long locationId, MultipartFile file) {
         int importedCount = importService.uploadServiceCalendar(userId, locationId, file);
-        locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+        dashboardRefreshService.refreshDerivedGraphs(locationId);
         return importedCount;
     }
 
@@ -163,7 +163,7 @@ public class LocationEventService {
             for (ServiceEvent serviceEvent : serviceEvents) {
                 auditService.recordCreated(userId, serviceEvent);
             }
-            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+            dashboardRefreshService.refreshDerivedGraphs(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return serviceEvents.size();
         } catch (RuntimeException ex) {
@@ -200,7 +200,7 @@ public class LocationEventService {
             persisted = refreshServiceEventFromStore(persisted.getId(), persisted);
             auditService.recordCreated(userId, persisted);
             ServiceEventResponse response = requestMapper.toResponse(persisted);
-            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+            dashboardRefreshService.refreshDerivedGraphs(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return response;
         } catch (RuntimeException ex) {
@@ -254,7 +254,7 @@ public class LocationEventService {
             auditService.recordCreated(userId, persisted);
 
             ServiceEventResponse response = requestMapper.toResponse(persisted);
-            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+            dashboardRefreshService.refreshDerivedGraphs(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             mailOutboxCommandService.queueWorkOrderEmail(
                 userId,
@@ -319,7 +319,7 @@ public class LocationEventService {
             // touchUpdatedAt() clears the persistence context, so map the response first while
             // any lazy corrective-action source proxy is still attached.
             ServiceEventResponse response = requestMapper.toResponse(persisted);
-            locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+            dashboardRefreshService.refreshDerivedGraphs(locationId);
             locationRepository.touchUpdatedAt(locationId, Instant.now());
             return response;
         } catch (RuntimeException ex) {
@@ -371,7 +371,7 @@ public class LocationEventService {
                 serviceEventRepository.clearCorrectiveActionSourceEvent(locationId, serviceEvent.getId());
                 serviceEventRepository.delete(serviceEvent);
                 serviceEventRepository.flush();
-                locationDashboardTimeRangeService.refreshLocationDateGroups(locationId);
+                dashboardRefreshService.refreshDerivedGraphs(locationId);
                 locationRepository.touchUpdatedAt(locationId, Instant.now());
             } catch (RuntimeException ex) {
                 log.error(
