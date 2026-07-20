@@ -78,7 +78,7 @@ describe("LocationGanttChartPanel", () => {
     expect(html).toContain("placeholder=\"Search title...\"");
     expect(html).toContain("Upload Excel spreadsheet");
     expect(html).not.toContain("Upload CSV");
-    expect(html).toContain("accept=\".xlsx\"");
+    expect(html).toContain("accept=\".xlsx,.xlsm\"");
     expect(html).toContain("Apply");
     expect(html).toContain("Undo");
     expect(html).toContain("https://example.test/api/core/locations/42/gantt-tasks/template");

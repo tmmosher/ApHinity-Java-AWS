@@ -44,6 +44,18 @@ describe("ganttTaskSpreadsheet", () => {
     ]);
   });
 
+  it("parses a macro-enabled xlsm file without loading VBA content", async () => {
+    const file = createSpreadsheetFile([
+      ["Title", "Description", "Start Date", "End Date"],
+      ["OPS", "Operational update", excelSerialForDate(2026, 4, 10), excelSerialForDate(2026, 4, 12)]
+    ], "gantt.xlsm");
+
+    const requests = await parseGanttTaskSpreadsheetFile(file);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.title).toBe("OPS");
+  });
+
   it("rejects non-xlsx files", async () => {
     const file = new File(
       ["Title,Description,Start Date,End Date\nOPS,Operational update,2026-04-10,2026-04-12\n"],
@@ -52,7 +64,7 @@ describe("ganttTaskSpreadsheet", () => {
     );
 
     await expect(parseGanttTaskSpreadsheetFile(file)).rejects.toThrow(
-      "Only .xlsx spreadsheets are supported."
+      "Only .xlsx and .xlsm spreadsheets are supported."
     );
   });
 

@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
+import com.aphinity.client_analytics_core.api.core.services.SpreadsheetFileTypes;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -65,7 +66,7 @@ public class LocationDashboardSpreadsheetParser {
      * Parses a dashboard spreadsheet using a strategy-specific identity column
      * pattern.
      *
-     * @param file uploaded .xlsx workbook
+     * @param file uploaded .xlsx or .xlsm workbook; VBA projects are never accessed or executed
      * @param identityPattern configured identity headers and aliases
      * @return parsed workbook rows and cells
      */
@@ -174,11 +175,11 @@ public class LocationDashboardSpreadsheetParser {
             );
         }
         String fileName = file.getOriginalFilename();
-        if (fileName == null || !fileName.toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
+        if (!SpreadsheetFileTypes.isSupportedOfficeOpenXmlSpreadsheet(fileName)) {
             throw new ApiClientException(
                 HttpStatus.BAD_REQUEST,
                 "location_dashboard_file_invalid_type",
-                "Dashboard spreadsheet must be an .xlsx file."
+                "Dashboard spreadsheet must be an .xlsx or .xlsm file."
             );
         }
     }

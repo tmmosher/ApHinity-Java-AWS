@@ -48,6 +48,25 @@ class ServiceCalendarSpreadsheetParserTest {
     }
 
     @Test
+    void parseAcceptsMacroEnabledWorkbookWithoutAccessingVbaContent() throws IOException {
+        MockMultipartFile xlsxFile = createWorkbook(
+            List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),
+            List.of("Pump visit", "Inspect pump pressure", "2026-04-14", "2026-04-14", "09:15", "11:45", "False", "Partner")
+        );
+        MockMultipartFile xlsmFile = new MockMultipartFile(
+            "file",
+            "service-calendar.xlsm",
+            "application/vnd.ms-excel.sheet.macroEnabled.12",
+            xlsxFile.getBytes()
+        );
+
+        List<ServiceCalendarSpreadsheetParser.ParsedServiceCalendarRow> rows = parser.parse(xlsmFile);
+
+        assertEquals(1, rows.size());
+        assertEquals("Pump visit", rows.getFirst().request().title());
+    }
+
+    @Test
     void parseReadsAllDayRowsAndDefaultsEndDate() throws IOException {
         MockMultipartFile file = createWorkbook(
             List.of("Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"),

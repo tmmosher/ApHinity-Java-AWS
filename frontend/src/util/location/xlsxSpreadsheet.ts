@@ -62,18 +62,23 @@ const isBlankCellValue = (value: unknown): boolean => (
 
 export const loadXlsxModule = async (): Promise<XlsxModule> => import("xlsx");
 
+export const isSupportedOoxmlSpreadsheetFileName = (fileName: string): boolean => {
+  const normalizedFileName = fileName.trim().toLowerCase();
+  return normalizedFileName.endsWith(".xlsx") || normalizedFileName.endsWith(".xlsm");
+};
+
 export const loadXlsxWorkbookFromFile = async (
   file: File,
   options: LoadXlsxWorkbookOptions = {}
 ): Promise<{xlsx: XlsxModule; workbook: WorkBook}> => {
-  const selectFileErrorMessage = options.selectFileErrorMessage ?? "Select an .xlsx spreadsheet to import.";
-  const unsupportedFileErrorMessage = options.unsupportedFileErrorMessage ?? "Only .xlsx spreadsheets are supported.";
+  const selectFileErrorMessage = options.selectFileErrorMessage ?? "Select an .xlsx or .xlsm spreadsheet to import.";
+  const unsupportedFileErrorMessage = options.unsupportedFileErrorMessage ?? "Only .xlsx and .xlsm spreadsheets are supported.";
   const readErrorMessage = options.readErrorMessage ?? "Spreadsheet could not be read.";
 
   if (!(file instanceof File)) {
     throw new Error(selectFileErrorMessage);
   }
-  if (!file.name.toLowerCase().endsWith(".xlsx")) {
+  if (!isSupportedOoxmlSpreadsheetFileName(file.name)) {
     throw new Error(unsupportedFileErrorMessage);
   }
 
@@ -81,7 +86,10 @@ export const loadXlsxWorkbookFromFile = async (
   try {
     const workbook = xlsx.read(await file.arrayBuffer(), {
       type: "array",
-      ...(options.readOptions ?? {})
+      ...(options.readOptions ?? {}),
+      // SheetJS never executes VBA. Keeping bookVBA disabled also prevents the
+      // embedded VBA project from being surfaced to application code.
+      bookVBA: false
     });
     return {xlsx, workbook};
   } catch {

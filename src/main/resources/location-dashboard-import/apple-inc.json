@@ -292,9 +292,9 @@
       "graphType": "bar"
     },
     {
-      "id": "non-conformances-by-facility",
+      "id": "non-conformances-by-site",
       "name": "Non-Conformances",
-      "title": "By Facility",
+      "title": "By Site",
       "derivedType": "non_conformances_by_facility",
       "graphType": "bar"
     },
@@ -306,9 +306,9 @@
       "graphType": "bar"
     },
     {
-      "id": "non-conformance-status-by-facility",
+      "id": "non-conformance-status-by-site",
       "name": "Non-Conformance Status",
-      "title": "By Facility",
+      "title": "By Site",
       "derivedType": "non_conformance_status_by_facility",
       "graphType": "bar"
     }

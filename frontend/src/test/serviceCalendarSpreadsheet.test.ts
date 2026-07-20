@@ -5,12 +5,12 @@ import {
   parseServiceCalendarSpreadsheetFile
 } from "../util/location/serviceCalendarSpreadsheet";
 
-const createSpreadsheetFile = (rows: unknown[][]): File => {
+const createSpreadsheetFile = (rows: unknown[][], fileName = "service_calendar_upload.xlsx"): File => {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(workbook, sheet, "Service Calendar");
   const workbookArray = XLSX.write(workbook, {type: "array", bookType: "xlsx"});
-  return new File([workbookArray], "service_calendar_upload.xlsx", {
+  return new File([workbookArray], fileName, {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   });
 };
@@ -49,6 +49,18 @@ describe("serviceCalendarSpreadsheet", () => {
         status: "upcoming"
       }
     ]);
+  });
+
+  it("parses a macro-enabled xlsm file without loading VBA content", async () => {
+    const file = createSpreadsheetFile([
+      ["Title", "Description", "Start Date", "End Date", "Start Time", "End Time", "All Day", "Responsibility"],
+      ["Pump visit", "Inspect pump pressure", "2026-04-14", "2026-04-14", "09:15", "11:45", "False", "Partner"]
+    ], "service_calendar_upload.xlsm");
+
+    const requests = await parseServiceCalendarSpreadsheetFile(file, "partner");
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.title).toBe("Pump visit");
   });
 
   it("rejects partner rows for client imports", async () => {

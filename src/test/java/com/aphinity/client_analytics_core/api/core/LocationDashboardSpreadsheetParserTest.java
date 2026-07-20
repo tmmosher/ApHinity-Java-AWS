@@ -18,9 +18,11 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -75,6 +77,32 @@ class LocationDashboardSpreadsheetParserTest {
         assertEquals(LocalDate.parse("2025-09-01"), secondCell.observedDate());
         assertEquals("<1", secondCell.rawValue());
         assertEquals(new BigDecimal("1"), secondCell.numericValue());
+    }
+
+    @Test
+    void parseAcceptsMacroEnabledWorkbookWithoutAccessingVbaContent() throws IOException {
+        MockMultipartFile xlsxFile = createWorkbook();
+        byte[] macroEnabledWorkbook;
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(xlsxFile.getBytes()));
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            workbook.setVBAProject(new ByteArrayInputStream(
+                "inert-test-vba-payload".getBytes(StandardCharsets.UTF_8)
+            ));
+            assertTrue(workbook.isMacroEnabled());
+            workbook.write(outputStream);
+            macroEnabledWorkbook = outputStream.toByteArray();
+        }
+        MockMultipartFile xlsmFile = new MockMultipartFile(
+            "file",
+            "dashboard.xlsm",
+            "application/vnd.ms-excel.sheet.macroEnabled.12",
+            macroEnabledWorkbook
+        );
+
+        LocationDashboardSpreadsheetParser.ParsedDashboardWorkbook workbook = parse(xlsmFile);
+
+        assertEquals("Newport Beach", workbook.locationTitle());
+        assertEquals(1, workbook.rows().size());
     }
 
     @Test

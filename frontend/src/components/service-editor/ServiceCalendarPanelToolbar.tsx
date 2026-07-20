@@ -45,7 +45,7 @@ export const ServiceCalendarPanelToolbar = (props: ServiceCalendarPanelToolbarPr
         <input
           ref={props.spreadsheetUploadInputRef}
           type="file"
-          accept=".xlsx"
+          accept=".xlsx,.xlsm"
           style="display:none"
           aria-label="Import service calendar spreadsheet"
           data-service-calendar-upload-input=""

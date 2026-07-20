@@ -70,7 +70,7 @@ export const GanttChartToolbar = (props: GanttChartToolbarProps) => {
                 type="file"
                 ref={props.spreadsheetUploadInputRef}
                 class="hidden"
-                accept=".xlsx"
+                accept=".xlsx,.xlsm"
                 disabled={isBusy}
                 onChange={props.onSpreadsheetUploadChange}
               />

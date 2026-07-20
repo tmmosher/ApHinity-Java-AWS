@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
+import com.aphinity.client_analytics_core.api.core.services.SpreadsheetFileTypes;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -84,7 +85,7 @@ public class ServiceCalendarSpreadsheetParser {
     /**
      * Parses an uploaded service-calendar workbook.
      *
-     * @param file uploaded .xlsx workbook
+     * @param file uploaded .xlsx or .xlsm workbook; VBA projects are never accessed or executed
      * @return parsed rows with original spreadsheet row numbers
      */
     public List<ParsedServiceCalendarRow> parse(MultipartFile file) {
@@ -120,11 +121,11 @@ public class ServiceCalendarSpreadsheetParser {
             );
         }
         String fileName = file.getOriginalFilename();
-        if (fileName == null || !fileName.toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
+        if (!SpreadsheetFileTypes.isSupportedOfficeOpenXmlSpreadsheet(fileName)) {
             throw new ApiClientException(
                 HttpStatus.BAD_REQUEST,
                 "service_calendar_file_invalid_type",
-                "Service calendar spreadsheet must be an .xlsx file."
+                "Service calendar spreadsheet must be an .xlsx or .xlsm file."
             );
         }
     }

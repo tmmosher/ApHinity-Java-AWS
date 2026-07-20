@@ -8,6 +8,7 @@ import LocationDashboardToolbarOverflowMenuUploadSpreadsheetAction from "./Locat
 import LocationOverflowMenuIcon from "./LocationOverflowMenuIcon";
 import {locationToolbarIconButtonClass} from "./locationToolbarStyles";
 import {uploadLocationDashboardSpreadsheetById} from "../../util/graph/locationDetailApi";
+import {isSupportedOoxmlSpreadsheetFileName} from "../../util/location/xlsxSpreadsheet";
 import type {LocationDashboardSpreadsheetUploadResult} from "../../types/Types";
 
 const overflowMenuProps = {
@@ -60,8 +61,8 @@ export const LocationDashboardToolbarOverflowMenu = (
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith(".xlsx")) {
-      toast.error("Select an .xlsx file");
+    if (!isSupportedOoxmlSpreadsheetFileName(file.name)) {
+      toast.error("Select an .xlsx or .xlsm file");
       return;
     }
 
@@ -126,7 +127,7 @@ export const LocationDashboardToolbarOverflowMenu = (
           }}
           type="file"
           class="hidden"
-          accept=".xlsx"
+          accept=".xlsx,.xlsm"
           aria-label="Upload dashboard spreadsheet"
           data-dashboard-spreadsheet-upload-input=""
           disabled={props.isGraphMutationBusy || isUploadingSpreadsheet() || isSpreadsheetUploadDisabled()}
