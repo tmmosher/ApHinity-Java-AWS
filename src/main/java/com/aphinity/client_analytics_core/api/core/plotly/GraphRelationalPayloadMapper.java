@@ -554,6 +554,7 @@ public final class GraphRelationalPayloadMapper {
             case "bar" -> "bar";
             case "scatter", "scattergl", "line" -> "scatter";
             case "table" -> "table";
+            case "sunburst" -> "sunburst";
             default -> throw new IllegalArgumentException("Graph data is invalid");
         };
     }
