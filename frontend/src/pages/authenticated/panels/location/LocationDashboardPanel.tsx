@@ -250,6 +250,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           sectionLayout={dashboard.workingSectionLayout()}
           graphs={dashboard.workingGraphs()}
           onSave={dashboard.applyLocalSectionLayoutEdit}
+          onDeleteSection={dashboard.deleteSectionFromModal}
           onClose={dashboard.closeLayoutEditor}
         />
       </Show>

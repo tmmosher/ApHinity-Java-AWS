@@ -28,6 +28,7 @@ type LocationDashboardLayoutModalProps = {
   sectionLayout: LocationSectionLayoutConfig;
   graphs: LocationGraph[];
   onSave: (nextSectionLayout: LocationSectionLayoutConfig) => void;
+  onDeleteSection: (sectionId: number) => Promise<void>;
   onClose: () => void;
 };
 
@@ -53,6 +54,7 @@ export const LocationDashboardLayoutModal = (props: LocationDashboardLayoutModal
   const [dragState, setDragState] = createSignal<DragState>(null);
   const [dragOriginLayout, setDragOriginLayout] = createSignal<LocationSectionLayoutConfig | null>(null);
   const [saveError, setSaveError] = createSignal("");
+  const [deletingSectionId, setDeletingSectionId] = createSignal<number | null>(null);
 
   const graphLookup = createMemo(() => createMapById(props.graphs));
 
@@ -70,6 +72,7 @@ export const LocationDashboardLayoutModal = (props: LocationDashboardLayoutModal
       setDragState(null);
       setDragOriginLayout(null);
       setSaveError("");
+      setDeletingSectionId(null);
     }
   ));
 
@@ -247,6 +250,32 @@ export const LocationDashboardLayoutModal = (props: LocationDashboardLayoutModal
     setDraftLayout((current) => moveSectionWithinLayout(current, sectionIndex, targetIndex));
   };
 
+  const deleteSection = async (sectionId: number) => {
+    const section = currentSections().find((candidate) => candidate.section_id === sectionId);
+    if (!section) {
+      setSaveError("Location section not found.");
+      return;
+    }
+    if (section.graph_ids.length > 0) {
+      setSaveError("Move or delete all graphs in this section before deleting it.");
+      return;
+    }
+    if (deletingSectionId() !== null) {
+      return;
+    }
+
+    setDeletingSectionId(sectionId);
+    setSaveError("");
+    try {
+      await props.onDeleteSection(sectionId);
+      props.onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Unable to delete dashboard section.");
+    } finally {
+      setDeletingSectionId(null);
+    }
+  };
+
   const moveGraphByStep = (sectionIndex: number, graphIndex: number, direction: -1 | 1) => {
     const section = currentSections()[sectionIndex];
     if (!section) {
@@ -396,6 +425,18 @@ export const LocationDashboardLayoutModal = (props: LocationDashboardLayoutModal
                             onClick={() => moveSectionByStep(sectionIndex(), 1)}
                           >
                             Down
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-xs btn-error btn-outline"
+                            aria-label={`Delete section ${section.section_id}`}
+                            disabled={section.graph_ids.length > 0 || deletingSectionId() !== null}
+                            title={section.graph_ids.length > 0
+                              ? "Move or delete all graphs before deleting this section"
+                              : "Delete this empty section"}
+                            onClick={() => void deleteSection(section.section_id)}
+                          >
+                            {deletingSectionId() === section.section_id ? "Deleting..." : "Delete"}
                           </button>
                         </div>
                       </div>

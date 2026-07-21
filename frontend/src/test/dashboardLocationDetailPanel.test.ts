@@ -3,6 +3,7 @@ import {apiFetch} from "../util/common/apiFetch";
 import {
   createLocationGraphById,
   deleteLocationGraphById,
+  deleteLocationSectionById,
   fetchLocationById,
   fetchLocationGraphTablePageById,
   fetchLocationGraphsById,
@@ -451,6 +452,26 @@ describe("DashboardLocationDetailPanel data loaders", () => {
     expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/graphs/12", {
       method: "DELETE"
     });
+  });
+
+  it("deletes a dashboard section through the dedicated delete endpoint", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {}));
+
+    await deleteLocationSectionById(host, "55", 7);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(host + "/api/core/locations/55/sections/7", {
+      method: "DELETE"
+    });
+  });
+
+  it("surfaces a non-empty section conflict", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(false, {
+      code: "location_section_not_empty",
+      message: "Location section contains graphs"
+    }));
+
+    await expect(deleteLocationSectionById(host, "55", 7))
+      .rejects.toThrowError("Location section contains graphs");
   });
 
   it("surfaces permission errors when graph creation is rejected", async () => {

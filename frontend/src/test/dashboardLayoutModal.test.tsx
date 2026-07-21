@@ -45,6 +45,7 @@ describe("LocationDashboardLayoutModal", () => {
         sectionLayout={sectionLayout}
         graphs={graphs}
         onSave={() => undefined}
+        onDeleteSection={async () => undefined}
         onClose={() => undefined}
       />
     ));
@@ -63,5 +64,25 @@ describe("LocationDashboardLayoutModal", () => {
     expect(html).toContain("Move graph");
     expect(html).toContain("Save");
     expect(html).toContain("Cancel");
+    expect(html).toContain("aria-label=\"Delete section 7\"");
+    expect(html).toContain("Move or delete all graphs before deleting this section");
+    expect(html).toContain("disabled");
+  });
+
+  it("enables section deletion only for an empty section", () => {
+    const html = renderToString(() => (
+      <LocationDashboardLayoutModal
+        isOpen={true}
+        sectionLayout={{sections: [{section_id: 8, graph_ids: []}]}}
+        graphs={[]}
+        onSave={() => undefined}
+        onDeleteSection={async () => undefined}
+        onClose={() => undefined}
+      />
+    ));
+
+    expect(html).toContain("aria-label=\"Delete section 8\"");
+    expect(html).toContain("Delete this empty section");
+    expect(html).not.toMatch(/aria-label="Delete section 8"[^>]*disabled/);
   });
 });

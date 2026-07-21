@@ -32,6 +32,7 @@ import {
 import {
   createLocationGraphById,
   deleteLocationGraphById,
+  deleteLocationSectionById,
   renameLocationGraphById,
   saveLocationGraphsById,
   uploadLocationDashboardSpreadsheetById
@@ -72,13 +73,14 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
   const [isLayoutEditorOpen, setIsLayoutEditorOpen] = createSignal(false);
   const [isCreatingGraph, setIsCreatingGraph] = createSignal(false);
   const [isDeletingGraph, setIsDeletingGraph] = createSignal(false);
+  const [isDeletingSection, setIsDeletingSection] = createSignal(false);
   const [isSavingGraphChanges, setIsSavingGraphChanges] = createSignal(false);
   const [locationSessionToken, setLocationSessionToken] = createSignal(0);
   const hasPendingDashboardChanges = createMemo(() => dashboardUndoStack().length > 0);
   const pendingDashboardMutationCount = createMemo(() => dashboardUndoStack().length);
   const hasPendingGraphChanges = hasPendingDashboardChanges;
   const isGraphMutationBusy = createMemo(() =>
-    isSavingGraphChanges() || isCreatingGraph() || isDeletingGraph()
+    isSavingGraphChanges() || isCreatingGraph() || isDeletingGraph() || isDeletingSection()
   );
   const graphById = createMemo(() => createMapById(workingGraphs()));
   const editingGraph = createMemo(() => {
@@ -186,6 +188,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setIsLayoutEditorOpen(false);
     setIsCreatingGraph(false);
     setIsDeletingGraph(false);
+    setIsDeletingSection(false);
     setIsSavingGraphChanges(false);
     setWorkingGraphs([]);
     setGraphBaselineIndex(new Map());
@@ -511,6 +514,56 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     }
   };
 
+  const deleteSectionFromModal = async (sectionId: number): Promise<void> => {
+    if (hasPendingDashboardChanges()) {
+      throw new Error("Apply or undo your pending dashboard changes before deleting a section.");
+    }
+    if (isGraphMutationBusy() || !props.canEditGraphs()) {
+      throw new Error("Unable to delete dashboard section.");
+    }
+
+    const section = workingSectionLayout().sections.find((candidate) => candidate.section_id === sectionId);
+    if (!section) {
+      throw new Error("Location section not found");
+    }
+    if (section.graph_ids.length > 0) {
+      throw new Error("Move or delete all graphs in this section before deleting it.");
+    }
+
+    const deleteLocationId = props.locationId();
+    const deleteSessionToken = locationSessionToken();
+    setIsDeletingSection(true);
+
+    try {
+      await deleteLocationSectionById(props.host, deleteLocationId, sectionId);
+      if (deleteLocationId !== props.locationId() || deleteSessionToken !== locationSessionToken()) {
+        return;
+      }
+
+      const withoutDeletedSection = (layout: LocationSectionLayoutConfig): LocationSectionLayoutConfig => ({
+        sections: layout.sections.filter((candidate) => candidate.section_id !== sectionId)
+      });
+      setWorkingSectionLayout(withoutDeletedSection);
+      setSectionLayoutBaseline(withoutDeletedSection);
+      toast.success("Dashboard section deleted");
+
+      try {
+        await props.refetchLocation();
+      } catch {
+        toast.error("Section deleted, but location details could not refresh. Please refresh the page");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "Location section contains graphs") {
+        throw new Error("This section now contains graphs. Refresh the dashboard before trying again.");
+      }
+      throw error instanceof Error ? error : new Error("Unable to delete dashboard section.");
+    } finally {
+      if (deleteLocationId === props.locationId() && deleteSessionToken === locationSessionToken()) {
+        setIsDeletingSection(false);
+      }
+    }
+  };
+
   const undoLastDashboardEdit = () => {
     if (isGraphMutationBusy()) {
       return;
@@ -657,6 +710,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     isLayoutEditorOpen,
     isCreatingGraph,
     isDeletingGraph,
+    isDeletingSection,
     isSavingGraphChanges,
     hasPendingDashboardChanges,
     pendingDashboardMutationCount,
@@ -683,6 +737,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     renameGraphFromModal,
     createGraphFromModal,
     deleteGraphFromModal,
+    deleteSectionFromModal,
     undoLastDashboardEdit,
     applyGraphChanges
   };

@@ -62,6 +62,7 @@ public class ApiExceptionHandler {
         Map.entry("Insufficient permissions for location access", new ErrorDefinition("forbidden", "Insufficient permissions for location access")),
         Map.entry("Location not found", new ErrorDefinition("location_not_found", "Location not found")),
         Map.entry("Location section not found", new ErrorDefinition("location_section_not_found", "Location section not found")),
+        Map.entry("Location section contains graphs", new ErrorDefinition("location_section_not_empty", "Location section contains graphs")),
         Map.entry("Target user not found", new ErrorDefinition("target_user_not_found", "Target user not found")),
         Map.entry("Location membership not found", new ErrorDefinition("location_membership_not_found", "Location membership not found")),
         Map.entry("Location graph not found", new ErrorDefinition("location_graph_not_found", "Location graph not found")),

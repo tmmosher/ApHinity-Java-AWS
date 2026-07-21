@@ -49,7 +49,7 @@ type CreateLocationGraphRequest = {
 
 const throwGraphMutationError = async (
   response: Response,
-  operation: "create" | "save" | "rename" | "delete"
+  operation: "create" | "save" | "rename" | "delete" | "deleteSection"
 ): Promise<never> => {
   const errorPayload = parseApiErrorPayload(await response.json().catch(() => null));
   console.warn(`${operation}LocationGraph failed`, {
@@ -77,6 +77,9 @@ const throwGraphMutationError = async (
   if (operation === "delete") {
     throw new Error("Unable to delete graph");
   }
+  if (operation === "deleteSection") {
+    throw new Error("Unable to delete dashboard section");
+  }
   throw new Error("Unable to save location graphs");
 };
 
@@ -86,6 +89,9 @@ const throwKnownGraphMutationError = (code: string): void => {
   }
   if (code === "location_graph_not_found") {
     throw new Error("Location graph not found");
+  }
+  if (code === "location_section_not_empty") {
+    throw new Error("Location section contains graphs");
   }
   if (code === "graph_type_invalid") {
     throw new Error("Graph type is invalid");
@@ -334,6 +340,34 @@ export const deleteLocationGraphById = async (
 
   if (!response.ok) {
     await throwGraphMutationError(response, "delete");
+  }
+};
+
+/**
+ * Deletes an empty dashboard section from a location.
+ *
+ * Endpoint: `DELETE /api/core/locations/{locationId}/sections/{sectionId}`
+ *
+ * @param host API host base URL.
+ * @param locationId Location id from route params.
+ * @param sectionId Empty dashboard section id to delete.
+ * @throws {Error} When ids are invalid, the section contains graphs, or the request fails.
+ */
+export const deleteLocationSectionById = async (
+  host: string,
+  locationId: string,
+  sectionId: number
+): Promise<void> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedSectionId = parsePositiveRouteId(sectionId, "section id");
+
+  const response = await apiFetch(
+    host + "/api/core/locations/" + parsedLocationId + "/sections/" + parsedSectionId,
+    {method: "DELETE"}
+  );
+
+  if (!response.ok) {
+    await throwGraphMutationError(response, "deleteSection");
   }
 };
 

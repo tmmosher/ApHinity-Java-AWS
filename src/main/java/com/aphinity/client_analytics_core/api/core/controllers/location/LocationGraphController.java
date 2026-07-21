@@ -77,6 +77,14 @@ public class LocationGraphController {
         service.deleteLocationGraph(userId(jwt), locationId, graphId);
     }
 
+    @DeleteMapping("/locations/{locationId}/sections/{sectionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSection(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId, @PathVariable Long sectionId
+    ) {
+        service.deleteLocationSection(userId(jwt), locationId, sectionId);
+    }
+
     private Long userId(Jwt jwt) {
         return authenticatedUserService.resolveAuthenticatedUserId(jwt);
     }

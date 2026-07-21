@@ -1002,6 +1002,48 @@ class LocationGraphPipelineWebMvcTest {
     }
 
     @Test
+    void deleteLocationSectionOnlyAllowsEmptySections() throws Exception {
+        Long userId = 49L;
+        Long locationId = 85L;
+
+        AppUser user = verifiedUser(userId);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        var location = new com.aphinity.client_analytics_core.api.core.entities.location.Location();
+        location.setId(locationId);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(300L)),
+                Map.of("section_id", 2, "graph_ids", List.of())
+            )
+        ));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+        mockMvc.perform(
+                delete("/core/locations/{locationId}/sections/{sectionId}", locationId, 1L)
+                    .with(csrf().asHeader())
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("location_section_not_empty"));
+
+        mockMvc.perform(
+                delete("/core/locations/{locationId}/sections/{sectionId}", locationId, 2L)
+                    .with(csrf().asHeader())
+            )
+            .andExpect(status().isNoContent());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(1, sections.size());
+        assertEquals(1L, ((Number) sections.getFirst().get("section_id")).longValue());
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
     void updateLocationGraphNameWritesNameThroughDedicatedEndpoint() throws Exception {
         Long userId = 44L;
         Long locationId = 80L;

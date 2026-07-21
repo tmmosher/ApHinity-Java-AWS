@@ -414,6 +414,72 @@ class LocationServiceTest {
     }
 
     @Test
+    void deleteLocationSectionRejectsSectionContainingGraphs() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(Map.of("section_id", 2, "graph_ids", List.of(31L)))
+        ));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationSection(5L, 99L, 2L)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Location section contains graphs", ex.getReason());
+        verify(locationRepository, never()).saveAndFlush(any(Location.class));
+    }
+
+    @Test
+    void deleteLocationSectionRejectsCallerWithoutElevatedRole() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+            locationService.deleteLocationSection(5L, 99L, 2L)
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("Insufficient permissions", ex.getReason());
+        verifyNoInteractions(locationRepository, graphRepository, locationGraphRepository);
+    }
+
+    @Test
+    void deleteLocationSectionRemovesEmptySection() {
+        AppUser user = verifiedUser(5L);
+        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(true);
+
+        Location location = new Location();
+        location.setId(99L);
+        location.setName("Phoenix");
+        location.setSectionLayout(Map.of(
+            "sections",
+            List.of(
+                Map.of("section_id", 1, "graph_ids", List.of(31L)),
+                Map.of("section_id", 2, "graph_ids", List.of())
+            )
+        ));
+        when(locationRepository.findById(99L)).thenReturn(Optional.of(location));
+
+        locationService.deleteLocationSection(5L, 99L, 2L);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) location.getSectionLayout().get("sections");
+        assertEquals(1, sections.size());
+        assertEquals(1L, ((Number) sections.getFirst().get("section_id")).longValue());
+        verify(locationRepository).saveAndFlush(location);
+    }
+
+    @Test
     void createLocationGraphRejectsCallerWithoutElevatedRole() {
         AppUser user = verifiedUser(5L);
         when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));

@@ -345,6 +345,56 @@ public class LocationGraphService {
     }
 
     /**
+     * Deletes an empty dashboard section from a location.
+     * Only partner/admin callers may delete sections, and a section containing
+     * any graph references must be emptied before it can be deleted.
+     *
+     * @param userId authenticated user id performing the delete
+     * @param locationId target location id
+     * @param sectionId target dashboard section id
+     */
+    @Transactional
+    public void deleteLocationSection(Long userId, Long locationId, Long sectionId) {
+        AppUser user = requireUser(userId);
+        locationDashboardMutationLockService.executeWithLocationLock(locationId, () -> {
+            if (!accountRoleService.isPartnerOrAdmin(user)) {
+                log.warn(
+                    "Rejected section delete due to insufficient permissions actorUserId={} locationId={} sectionId={}",
+                    userId,
+                    locationId,
+                    sectionId
+                );
+                throw forbidden();
+            }
+
+            Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+            location.setSectionLayout(removeEmptySectionFromLayout(location.getSectionLayout(), sectionId));
+
+            try {
+                locationRepository.saveAndFlush(location);
+            } catch (RuntimeException ex) {
+                log.error(
+                    "Section delete persistence failed actorUserId={} locationId={} sectionId={}",
+                    userId,
+                    locationId,
+                    sectionId,
+                    ex
+                );
+                throw ex;
+            }
+
+            cacheInvalidationService.invalidate(locationId);
+            log.info(
+                "Deleted location section locationId={} sectionId={} actorUserId={}",
+                locationId,
+                sectionId,
+                userId
+            );
+            return null;
+        });
+    }
+
+    /**
      * Replaces graph trace data (and optional layout) for one or more graphs linked to a location.
      * Only partner/admin callers may mutate graph payloads.
      *
@@ -882,6 +932,42 @@ public class LocationGraphService {
         return nextLayout;
     }
 
+    private Map<String, Object> removeEmptySectionFromLayout(
+        Map<String, Object> sectionLayout,
+        Long sectionId
+    ) {
+        if (sectionId == null) {
+            throw locationSectionNotFound();
+        }
+
+        Map<String, Object> nextLayout = sectionLayout == null
+            ? new LinkedHashMap<>()
+            : new LinkedHashMap<>(sectionLayout);
+        List<Object> sections = readSectionList(sectionLayout);
+        List<Object> retainedSections = new ArrayList<>(sections.size());
+        boolean matchedSection = false;
+
+        for (Object sectionValue : sections) {
+            if (!(sectionValue instanceof Map<?, ?> sectionMap)
+                || !matchesSectionId(sectionMap.get("section_id"), sectionId)) {
+                retainedSections.add(sectionValue);
+                continue;
+            }
+
+            matchedSection = true;
+            if (!copyGraphIdList(sectionMap.get("graph_ids")).isEmpty()) {
+                throw locationSectionNotEmpty();
+            }
+        }
+
+        if (!matchedSection) {
+            throw locationSectionNotFound();
+        }
+
+        nextLayout.put("sections", List.copyOf(retainedSections));
+        return nextLayout;
+    }
+
     private void requireExistingSection(Map<String, Object> sectionLayout, Long sectionId) {
         if (sectionId == null) {
             throw locationSectionNotFound();
@@ -1151,6 +1237,10 @@ public class LocationGraphService {
 
     private ResponseStatusException locationSectionNotFound() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location section not found");
+    }
+
+    private ResponseStatusException locationSectionNotEmpty() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "Location section contains graphs");
     }
 
     private ResponseStatusException duplicateGraphUpdates() {
