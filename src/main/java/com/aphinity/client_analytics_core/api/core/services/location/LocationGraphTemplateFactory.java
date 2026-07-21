@@ -16,6 +16,7 @@ public class LocationGraphTemplateFactory {
     private static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
     private static final String GRAPH_SIZE_HALF = "half";
     private static final String GRAPH_SIZE_FULL = "full";
+    private static final String GRAPH_SIZE_DUPLEX = "duplex";
     private static final String GRAPH_SIZE_DOUBLE = "double";
     private static final String DEFAULT_TIME_SERIES_LINE_SHAPE = "hv";
     private static final double DEFAULT_TIME_SERIES_LINE_SMOOTHING = 1.0d;

@@ -22,6 +22,7 @@ type TabulatorGraphProps = {
 const DEFAULT_PAGE_SIZE = 19;
 const PAGE_SIZE_SELECTOR = [19, 30, 50, 100];
 const TABULATOR_THEME_LINK_ID = "aphinity-tabulator-theme";
+export const MINIMUM_TABULATOR_WIDTH_PX = 320;
 
 const getTabulatorThemeUrl = (themePreference: ThemePreference): string =>
   themePreference === "dark" ? tabulatorMidnightThemeUrl : tabulatorSimpleThemeUrl;
@@ -109,9 +110,10 @@ const toPositiveInteger = (value: unknown, fallback: number): number => {
 
 const TabulatorGraph = (props: TabulatorGraphProps) => {
   let host!: HTMLDivElement;
-  let table: {on: (event: string, callback: (...args: unknown[]) => void) => void; setData: (rows?: Record<string, unknown>[] | string) => Promise<unknown>; setColumns: (columns: TabulatorColumnDefinition[]) => void; destroy: () => void} | null = null;
+  let table: {on: (event: string, callback: (...args: unknown[]) => void) => void; setData: (rows?: Record<string, unknown>[] | string) => Promise<unknown>; setColumns: (columns: TabulatorColumnDefinition[]) => void; redraw: (force?: boolean) => void; destroy: () => void} | null = null;
   let disposed = false;
   let disconnectThemeObserver: (() => void) | undefined;
+  let disconnectResizeObserver: (() => void) | undefined;
   const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
   const pageCache = new Map<string, Promise<LocationDashboardTablePage>>();
   const [isLoading, setIsLoading] = createSignal(true);
@@ -175,7 +177,7 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
       table = new TabulatorFull(host, {
         data: canUseRemotePagination() ? undefined : currentModel.rows,
         columns: withInteractiveColumns(currentModel.columns),
-        layout: "fitDataStretch",
+        layout: "fitColumns",
         height: "100%",
         placeholder: "No recent sample measurements",
         index: "rowIdentifier",
@@ -200,6 +202,11 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
         setLoading: setIsLoading,
         notifyError: toast.error
       });
+      if (typeof ResizeObserver !== "undefined") {
+        const resizeObserver = new ResizeObserver(() => table?.redraw(true));
+        resizeObserver.observe(host);
+        disconnectResizeObserver = () => resizeObserver.disconnect();
+      }
       if (canUseRemotePagination()) {
         void table.setData();
       } else {
@@ -230,15 +237,17 @@ const TabulatorGraph = (props: TabulatorGraphProps) => {
   onCleanup(() => {
     disposed = true;
     disconnectThemeObserver?.();
+    disconnectResizeObserver?.();
     table?.destroy();
     table = null;
   });
 
   return (
-    <div class={"relative " + (props.class ?? "")}>
+    <div class={"relative min-w-0 overflow-x-auto " + (props.class ?? "")}>
       <div
         ref={host}
         class={"h-full w-full aphinity-tabulator [&_.aphinity-ca-active-row_.tabulator-cell]:!bg-error/20 [&_.aphinity-ca-resolved-row_.tabulator-cell]:!bg-success/20 " + (props.class ?? "")}
+        style={{"min-width": `${MINIMUM_TABULATOR_WIDTH_PX}px`}}
       />
       <Show when={isLoading()}>
         <div class="absolute inset-0 z-10 bg-base-100" data-tabulator-loading-placeholder="">

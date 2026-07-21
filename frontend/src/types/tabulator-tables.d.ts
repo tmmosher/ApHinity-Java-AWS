@@ -54,6 +54,7 @@ declare module "tabulator-tables" {
     on(event: string, callback: (...args: unknown[]) => void): void;
     setData(data?: Record<string, unknown>[] | string): Promise<unknown>;
     setColumns(columns: TabulatorColumnDefinition[]): void;
+    redraw(force?: boolean): void;
     destroy(): void;
   }
 }

@@ -116,7 +116,7 @@ export const DashboardManagementPanel = () => {
               type="search"
               class="input input-bordered w-full"
               value={searchControl.searchDraft()}
-              placeholder="Search by email substring"
+              placeholder="example@website.com"
               onInput={(event) => searchControl.updateSearchDraft(event.currentTarget.value)}
             />
           </label>

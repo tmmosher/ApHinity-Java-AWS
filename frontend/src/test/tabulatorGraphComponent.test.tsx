@@ -2,7 +2,7 @@ import {renderToString} from "solid-js/web";
 import {describe, expect, it} from "vitest";
 import type {LocationGraph} from "../types/Types";
 
-import TabulatorGraph from "../components/graph/TabulatorGraph";
+import TabulatorGraph, {MINIMUM_TABULATOR_WIDTH_PX} from "../components/graph/TabulatorGraph";
 
 const tableGraph: LocationGraph = {
   id: 1,
@@ -31,5 +31,7 @@ describe("TabulatorGraph", () => {
     expect(html).toContain("data-graph-loading-placeholder");
     expect(html).toContain("graph-loading-shine");
     expect(html).toContain("Graph loading: Recent Sample Measurements");
+    expect(html).toContain("overflow-x-auto");
+    expect(html).toContain(`min-width:${MINIMUM_TABULATOR_WIDTH_PX}px`);
   });
 });

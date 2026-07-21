@@ -57,7 +57,7 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
       <div class="grid gap-4 lg:grid-cols-2">
         <For each={props.graphs}>
           {(graph) => (
-            <article class={"rounded-lg border border-base-200 bg-base-200/40 p-3 " + resolveGraphGridClass(graph.layout)}>
+            <article class={"min-w-0 rounded-lg border border-base-200 bg-base-200/40 p-3 " + resolveGraphGridClass(graph.layout)}>
               <div class="mb-2 flex items-start justify-between gap-2">
                 <div class="flex min-w-0 items-center gap-1.5">
                   <h4 class="min-w-0 truncate text-sm font-medium">{graph.name}</h4>
