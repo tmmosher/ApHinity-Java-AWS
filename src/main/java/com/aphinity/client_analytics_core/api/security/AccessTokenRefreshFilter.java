@@ -91,7 +91,7 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
      * @return {@code true} when refresh logic should be skipped
      */
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         String path = resolvePath(request);
         if (path.equals("/")
             || path.equals("/index.html")
