@@ -18,8 +18,10 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Centralized exception-to-response mapping for API endpoints.
@@ -29,6 +31,12 @@ import java.util.Map;
 @RestControllerAdvice(basePackages = "com.aphinity.client_analytics_core.api")
 public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    private static final Set<String> STACK_TRACE_SUPPRESSED_EXCEPTION_TYPES = Set.of(
+        "org.springframework.web.servlet.resource.NoResourceFoundException"
+    );
+    private static final List<String> STACK_TRACE_SUPPRESSED_MESSAGE_PREFIXES = List.of(
+        "No location measurement bound is configured for "
+    );
 
     // Only reasons explicitly listed here are surfaced directly to API clients.
     // I should probably write these in a file somewhere and read them in because this is getting huge.
@@ -327,15 +335,19 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * Suppresses stack traces for expected static-resource misses so high-volume
-     * 404-style noise does not overwhelm the primary application log.
+     * Suppresses stack traces for known, actionable error pathways whose exception
+     * type and message provide enough diagnostic context on their own.
      *
      * @param ex unexpected exception
      * @return true when stack traces should be omitted from the main log
      */
     private boolean shouldSuppressStackTrace(Exception ex) {
-        return "org.springframework.web.servlet.resource.NoResourceFoundException"
-            .equals(ex.getClass().getName());
+        if (STACK_TRACE_SUPPRESSED_EXCEPTION_TYPES.contains(ex.getClass().getName())) {
+            return true;
+        }
+
+        String message = safeMessage(ex.getMessage());
+        return STACK_TRACE_SUPPRESSED_MESSAGE_PREFIXES.stream().anyMatch(message::startsWith);
     }
 
     /**

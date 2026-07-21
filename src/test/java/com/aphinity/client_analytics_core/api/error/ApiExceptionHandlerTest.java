@@ -142,6 +142,28 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void handleUnexpectedSuppressesMissingMeasurementBoundStackTrace(CapturedOutput output) {
+        IllegalStateException exception = new IllegalStateException(
+            "No location measurement bound is configured for HPC and database type domestic-hot "
+                + "selected by range profile domestic-hot"
+        );
+
+        apiExceptionHandler.handleUnexpected(exception);
+
+        String logMessage = output.getAll();
+        assertTrue(logMessage.contains("type=IllegalStateException"));
+        assertTrue(logMessage.contains("No location measurement bound is configured for HPC"));
+        assertFalse(logMessage.contains("| stack="));
+    }
+
+    @Test
+    void handleUnexpectedKeepsStackTraceForOtherIllegalStateExceptions(CapturedOutput output) {
+        apiExceptionHandler.handleUnexpected(new IllegalStateException("Different configuration failure"));
+
+        assertTrue(output.getAll().contains("| stack="));
+    }
+
+    @Test
     void handleResponseStatusFallsBackToGenericErrorForUnknownReason() {
         ResponseStatusException exception = new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown reason");
 

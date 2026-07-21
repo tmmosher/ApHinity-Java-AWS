@@ -152,9 +152,9 @@ public class AccessTokenRefreshFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Refresh token is no longer valid; clear stale cookies and continue unauthenticated.
-        authCookieService.clearAccessCookie(request, response);
-        authCookieService.clearRefreshCookie(request, response);
+        // Continue unauthenticated without writing cookie deletions. A concurrent request may
+        // have successfully rotated the same one-time refresh token, and a slower failed
+        // response must not erase the winner's newly issued cookies in the browser.
         filterChain.doFilter(request, response);
     }
 

@@ -2,9 +2,9 @@ const CSRF_COOKIE_NAME = "XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const CSRF_INVALID_ERROR_CODE = "csrf_invalid";
-// Deduplicate token priming and auth refresh work across concurrent requests.
+export const AUTHENTICATION_REQUIRED_EVENT = "aphinity:authentication-required";
+// Deduplicate CSRF token priming across concurrent requests.
 let csrfPrimeInFlight: Promise<void> | null = null;
-let authRefreshInFlight: Promise<void> | null = null;
 
 /**
  * Reads a cookie value by name from `document.cookie`.
@@ -52,10 +52,12 @@ export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {})
   } as RequestInit;
 
   if (!csrfProtectedMethod) {
-    return fetch(input, {
+    const response = await fetch(input, {
       ...requestBase,
       headers: baseHeaders
     });
+    notifyAuthenticationRequired(response);
+    return response;
   }
 
   const credentials = requestBase.credentials ?? "include";
@@ -67,12 +69,6 @@ export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {})
 
   let response = await sendMutationRequest(input, requestBase, baseHeaders, requestCsrfToken);
 
-  if (isAuthenticationRequiredResponse(response)) {
-    await refreshAuthSessionCookie(input, credentials);
-    requestCsrfToken = await resolveRetryCsrfToken(input, credentials, requestCsrfToken, true);
-    response = await sendMutationRequest(input, requestBase, baseHeaders, requestCsrfToken);
-  }
-
   if (await isCsrfInvalidResponse(response)) {
     requestCsrfToken = await resolveRetryCsrfToken(input, credentials, requestCsrfToken, false);
     if (requestCsrfToken == null || requestCsrfToken === "") {
@@ -80,11 +76,11 @@ export const apiFetch = async (input: RequestInfo | URL, init: RequestInit = {})
     }
     response = await sendMutationRequest(input, requestBase, baseHeaders, requestCsrfToken);
   } else if (await isGenericForbiddenResponse(response)) {
-    await refreshAuthSessionCookie(input, credentials);
     requestCsrfToken = await resolveRetryCsrfToken(input, credentials, requestCsrfToken, true);
     response = await sendMutationRequest(input, requestBase, baseHeaders, requestCsrfToken);
   }
 
+  notifyAuthenticationRequired(response);
   return response;
 };
 
@@ -104,8 +100,12 @@ const sendMutationRequest = async (
   });
 };
 
-const isAuthenticationRequiredResponse = (response: Response): boolean =>
-  response.status === 401;
+const notifyAuthenticationRequired = (response: Response): void => {
+  if (response.status !== 401 || typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(new Event(AUTHENTICATION_REQUIRED_EVENT));
+};
 
 /**
  * Matches the backend's CSRF failure payload so mutation retries can re-prime
@@ -208,38 +208,6 @@ const primeCsrfTokenCookie = async (
     await csrfPrimeInFlight;
   } finally {
     csrfPrimeInFlight = null;
-  }
-};
-
-const refreshAuthSessionCookie = async (
-  input: RequestInfo | URL,
-  credentials: RequestCredentials
-): Promise<void> => {
-  if (authRefreshInFlight != null) {
-    await authRefreshInFlight;
-    return;
-  }
-
-  const origin = resolveRequestOrigin(input);
-  if (origin == null || origin === "") {
-    return;
-  }
-
-  authRefreshInFlight = (async () => {
-    try {
-      await fetch(origin + "/api/auth/refresh", {
-        method: "POST",
-        credentials
-      });
-    } catch {
-      // Continue with existing cookies when refresh fails.
-    }
-  })();
-
-  try {
-    await authRefreshInFlight;
-  } finally {
-    authRefreshInFlight = null;
   }
 };
 

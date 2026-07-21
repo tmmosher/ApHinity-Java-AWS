@@ -196,7 +196,7 @@ class AccessTokenRefreshFilterTest {
     }
 
     @Test
-    void clearsCookiesWhenRefreshFailsUnauthorized() throws Exception {
+    void doesNotClearCookiesWhenRefreshFailsUnauthorized() throws Exception {
         AccessTokenRefreshFilter filter = new AccessTokenRefreshFilter(
             authService,
             authCookieService,
@@ -221,8 +221,8 @@ class AccessTokenRefreshFilterTest {
         filter.doFilter(request, response, chain);
 
         assertTrue(chain.called);
-        verify(authCookieService).clearAccessCookie(request, response);
-        verify(authCookieService).clearRefreshCookie(request, response);
+        verify(authCookieService, never()).clearAccessCookie(request, response);
+        verify(authCookieService, never()).clearRefreshCookie(request, response);
     }
 
     @ParameterizedTest

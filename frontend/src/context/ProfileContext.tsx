@@ -1,9 +1,9 @@
 import {useApiHost} from "./ApiHostContext";
-import {Accessor, createContext, createEffect, createResource, ParentProps, useContext} from "solid-js";
+import {Accessor, createContext, createEffect, createResource, onCleanup, onMount, ParentProps, useContext} from "solid-js";
 import {AccountRole, Profile} from "../types/Types";
 import {useNavigate} from "@solidjs/router";
 import {toast} from "solid-toast";
-import {apiFetch} from "../util/common/apiFetch";
+import {apiFetch, AUTHENTICATION_REQUIRED_EVENT} from "../util/common/apiFetch";
 
 type ProfileContextValue = {
     profile: Accessor<Profile | undefined>;
@@ -68,13 +68,33 @@ export const ProfileProvider = (props: ParentProps) => {
     };
 
     const [profile, { mutate, refetch }] = createResource(profileRequest);
+    let authenticationFailureReported = false;
+
+    const handleAuthenticationFailure = () => {
+        if (authenticationFailureReported) {
+            return;
+        }
+        authenticationFailureReported = true;
+        navigate("/login");
+        toast.error("Your session has expired. Please login again");
+    };
+
+    onMount(() => {
+        window.addEventListener(AUTHENTICATION_REQUIRED_EVENT, handleAuthenticationFailure);
+    });
+
+    onCleanup(() => {
+        window.removeEventListener(AUTHENTICATION_REQUIRED_EVENT, handleAuthenticationFailure);
+    });
 
     createEffect(() => {
+        if (profile()) {
+            authenticationFailureReported = false;
+        }
         if (!profile.error) {
             return;
         }
-        navigate("/login");
-        toast.error("Unable to load profile. Please login again");
+        handleAuthenticationFailure();
     });
 
     const value: ProfileContextValue = {

@@ -817,7 +817,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void locationsClearsCookiesWhenExpiredAccessTokenHasInvalidRefreshToken() throws Exception {
+    void locationsDoesNotOverwriteCookiesWhenExpiredAccessTokenHasInvalidRefreshToken() throws Exception {
         AppUser user = createUser("invalid-refresh@example.com", PASSWORD, true, "client");
         String expiredAccessToken = createExpiredAccessToken(user, 999L);
 
@@ -828,9 +828,11 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isUnauthorized())
             .andReturn();
 
-        Map<String, String> clearedCookies = readSetCookies(result);
-        assertThat(clearedCookies).containsEntry(AuthCookieNames.ACCESS_COOKIE_NAME, "");
-        assertThat(clearedCookies).containsEntry(AuthCookieNames.REFRESH_COOKIE_NAME, "");
+        Map<String, String> responseCookies = readSetCookies(result);
+        assertThat(responseCookies).doesNotContainKeys(
+            AuthCookieNames.ACCESS_COOKIE_NAME,
+            AuthCookieNames.REFRESH_COOKIE_NAME
+        );
     }
 
     @Test

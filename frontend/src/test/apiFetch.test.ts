@@ -1,9 +1,11 @@
 import {afterAll, beforeEach, describe, expect, it, vi} from "vitest";
-import {apiFetch} from "../util/common/apiFetch";
+import {apiFetch, AUTHENTICATION_REQUIRED_EVENT} from "../util/common/apiFetch";
 
 describe("apiFetch", () => {
   const originalFetch = globalThis.fetch;
   const originalDocument = (globalThis as {document?: unknown}).document;
+  const originalWindow = (globalThis as {window?: unknown}).window;
+  const dispatchEvent = vi.fn();
 
   const installDocumentCookie = (cookie: string) => {
     Object.defineProperty(globalThis, "document", {
@@ -15,6 +17,12 @@ describe("apiFetch", () => {
 
   beforeEach(() => {
     installDocumentCookie("");
+    dispatchEvent.mockReset();
+    Object.defineProperty(globalThis, "window", {
+      value: {location: {origin: "https://example.test"}, dispatchEvent},
+      configurable: true,
+      writable: true
+    });
     globalThis.fetch = vi.fn() as unknown as typeof fetch;
   });
 
@@ -172,25 +180,18 @@ describe("apiFetch", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://example.test/api/core/profile");
   });
 
-  it("refreshes auth and retries once after a 401 on a mutating request", async () => {
+  it("reports a final 401 without redundantly calling the refresh endpoint", async () => {
     installDocumentCookie("XSRF-TOKEN=token-old");
     const fetchMock = vi.mocked(globalThis.fetch);
-    fetchMock
-      .mockResolvedValueOnce(new Response(
-        JSON.stringify({code: "authentication_required"}),
-        {
-          status: 401,
-          headers: {
-            "Content-Type": "application/json"
-          }
+    fetchMock.mockResolvedValueOnce(new Response(
+      JSON.stringify({code: "authentication_required"}),
+      {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json"
         }
-      ))
-      .mockResolvedValueOnce(new Response(null, {status: 204}))
-      .mockImplementationOnce(async () => {
-        ((globalThis as {document: {cookie: string}}).document).cookie = "XSRF-TOKEN=token-new";
-        return new Response(null, {status: 200});
-      })
-      .mockResolvedValueOnce(new Response(null, {status: 204}));
+      }
+    ));
 
     const response = await apiFetch("https://example.test/api/core/locations/42/graphs", {
       method: "PUT",
@@ -200,17 +201,13 @@ describe("apiFetch", () => {
       body: JSON.stringify({graphs: []})
     });
 
-    expect(response.status).toBe(204);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/auth/refresh");
-    expect(fetchMock.mock.calls[2][0]).toBe("https://example.test/api/core/profile");
-    const firstMutationHeaders = fetchMock.mock.calls[0][1]?.headers as Headers;
-    const retryMutationHeaders = fetchMock.mock.calls[3][1]?.headers as Headers;
-    expect(firstMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-old");
-    expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-new");
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchEvent).toHaveBeenCalledTimes(1);
+    expect((dispatchEvent.mock.calls[0][0] as Event).type).toBe(AUTHENTICATION_REQUIRED_EVENT);
   });
 
-  it("refreshes auth and retries once after generic Spring Security 403 responses", async () => {
+  it("re-primes CSRF without rotating auth after generic Spring Security 403 responses", async () => {
     installDocumentCookie("XSRF-TOKEN=token-old");
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock
@@ -228,7 +225,6 @@ describe("apiFetch", () => {
           }
         }
       ))
-      .mockResolvedValueOnce(new Response(null, {status: 204}))
       .mockImplementationOnce(async () => {
         ((globalThis as {document: {cookie: string}}).document).cookie = "XSRF-TOKEN=token-new";
         return new Response(null, {status: 200});
@@ -244,10 +240,9 @@ describe("apiFetch", () => {
     });
 
     expect(response.status).toBe(204);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/auth/refresh");
-    expect(fetchMock.mock.calls[2][0]).toBe("https://example.test/api/core/profile");
-    const retryMutationHeaders = fetchMock.mock.calls[3][1]?.headers as Headers;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1][0]).toBe("https://example.test/api/core/profile");
+    const retryMutationHeaders = fetchMock.mock.calls[2][1]?.headers as Headers;
     expect(retryMutationHeaders.get("X-XSRF-TOKEN")).toBe("token-new");
   });
 
@@ -258,6 +253,15 @@ describe("apiFetch", () => {
     } else {
       Object.defineProperty(globalThis, "document", {
         value: originalDocument,
+        configurable: true,
+        writable: true
+      });
+    }
+    if (originalWindow === undefined) {
+      delete (globalThis as {window?: unknown}).window;
+    } else {
+      Object.defineProperty(globalThis, "window", {
+        value: originalWindow,
         configurable: true,
         writable: true
       });

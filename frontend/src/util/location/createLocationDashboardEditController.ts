@@ -10,6 +10,7 @@ import type {
 import {createMapById} from "../common/indexById";
 import {
   applyGraphPayloadEdit,
+  buildGraphBaselineIndex,
   buildChangedLocationGraphUpdates,
   cloneLocationGraphs,
   createEditableGraphForTimeRange,
@@ -260,6 +261,27 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     spreadsheetFile: pendingSpreadsheetFile(),
     hasFiniteRangeGraphEdit: hasFiniteRangeGraphEdit()
   });
+
+  const replaceDashboardWithRefetchedState = () => {
+    const latestGraphs = props.graphs();
+    if (latestGraphs) {
+      const clonedGraphs = cloneLocationGraphs(latestGraphs);
+      setWorkingGraphs(clonedGraphs);
+      setGraphBaselineIndex(buildGraphBaselineIndex(clonedGraphs));
+    }
+
+    const latestLocation = props.location();
+    if (latestLocation) {
+      const latestSectionLayout = cloneLocationSectionLayout(latestLocation.sectionLayout);
+      setWorkingSectionLayout(latestSectionLayout);
+      setSectionLayoutBaseline(cloneLocationSectionLayout(latestSectionLayout));
+      setSectionLayoutSyncUpdatedAt(latestLocation.updatedAt);
+    }
+
+    setDashboardUndoStack([]);
+    setPendingSpreadsheetFile(null);
+    setHasFiniteRangeGraphEdit(false);
+  };
 
   const applyLocalGraphEdit = (
     graphId: number,
@@ -616,6 +638,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
         if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
           return;
         }
+        replaceDashboardWithRefetchedState();
       } catch {
         if (saveLocationId === props.locationId() && saveSessionToken === locationSessionToken()) {
           toast.error("Saved successfully, but automatic refresh failed. Please refresh the page");
@@ -632,10 +655,11 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
           if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
             return;
           }
-          toast.error("A graph was updated by another user. Latest data was reloaded");
+          replaceDashboardWithRefetchedState();
+          toast.error("Graph data changed on the server. Latest data was reloaded");
         } catch {
           if (saveLocationId === props.locationId() && saveSessionToken === locationSessionToken()) {
-            toast.error("A graph was updated by another user, and automatic refresh failed. Please refresh the page");
+            toast.error("Graph data changed on the server, and automatic refresh failed. Please refresh the page");
           }
         }
         return;
