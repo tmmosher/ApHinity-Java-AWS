@@ -231,8 +231,56 @@ public record LocationDashboardImportStrategyConfig(
         String name,
         String title,
         DerivedGraphType derivedType,
-        String graphType
+        String graphType,
+        List<DerivedGraphHierarchyLevel> hierarchy
     ) {
+        public DerivedGraphConfig {
+            hierarchy = hierarchy == null ? List.of() : List.copyOf(hierarchy);
+        }
+
+        public DerivedGraphConfig(
+            String id,
+            String name,
+            String title,
+            DerivedGraphType derivedType,
+            String graphType
+        ) {
+            this(id, name, title, derivedType, graphType, List.of());
+        }
+    }
+
+    public record DerivedGraphHierarchyLevel(
+        DerivedGraphHierarchySource source,
+        String key
+    ) {
+    }
+
+    public enum DerivedGraphHierarchySource {
+        IDENTITY("identity"),
+        MEASUREMENT("measurement");
+
+        private final String value;
+
+        DerivedGraphHierarchySource(String value) {
+            this.value = value;
+        }
+
+        @JsonValue
+        public String value() {
+            return value;
+        }
+
+        @JsonCreator
+        public static DerivedGraphHierarchySource fromValue(String rawValue) {
+            if (rawValue == null || rawValue.isBlank()) {
+                return null;
+            }
+            String normalized = rawValue.strip().toLowerCase(Locale.ROOT);
+            return Arrays.stream(values())
+                .filter(source -> source.value.equals(normalized) || source.name().equalsIgnoreCase(normalized))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown derived graph hierarchy source: " + rawValue));
+        }
     }
 
     public enum ImportType {
@@ -298,7 +346,8 @@ public record LocationDashboardImportStrategyConfig(
         NON_CONFORMANCES_BY_CATEGORY("non_conformances_by_category"),
         NON_CONFORMANCE_STATUS_BY_FACILITY("non_conformance_status_by_facility"),
         NON_CONFORMANCE_TURNAROUND_TIME("non_conformance_turnaround_time"),
-        RECENT_SAMPLE_MEASUREMENTS("recent_sample_measurements");
+        RECENT_SAMPLE_MEASUREMENTS("recent_sample_measurements"),
+        SAMPLE_CONFORMANCE_HIERARCHY("sample_conformance_hierarchy");
 
         private final String value;
 

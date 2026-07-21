@@ -63,6 +63,17 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals("site", strategy.spreadsheetIdentityPattern().get(1).identityKey());
         assertEquals("site", strategy.spreadsheetIdentityPattern().get(1).column());
         assertEquals(3, strategy.graphDefinitions().size());
+        assertEquals(11, strategy.derivedGraphDefinitions().size());
+        LocationDashboardImportStrategyConfig.DerivedGraphConfig sunburst = strategy.derivedGraphDefinitions().get(9);
+        assertEquals("sample-conformance-hierarchy", sunburst.id());
+        assertEquals(LocationDashboardImportStrategyConfig.DerivedGraphType.SAMPLE_CONFORMANCE_HIERARCHY,
+            sunburst.derivedType());
+        assertEquals(
+            java.util.Arrays.asList("system", "site", null),
+            sunburst.hierarchy().stream()
+                .map(LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel::key)
+                .toList()
+        );
         assertEquals(
             new LocationDashboardImportStrategyConfig.GraphAnchor(
                 LocationDashboardImportStrategyConfig.GraphDimension.SYSTEM,

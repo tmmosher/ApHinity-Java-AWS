@@ -154,6 +154,12 @@ final class LocationDashboardDerivedGraphSupport {
                 identityPattern,
                 anchorDate
             ));
+            case SAMPLE_CONFORMANCE_HIERARCHY -> List.of(SampleConformanceSunburstBuilder.build(
+                findExistingTrace(graph, "sunburst", 0),
+                derivedGraphDefinition.name(),
+                historicalData.rawSamples(),
+                derivedGraphDefinition.hierarchy()
+            ));
         };
     }
 

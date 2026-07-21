@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphAnchor;
@@ -279,6 +280,7 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
                         "Dashboard import derived graphs must declare a derived type: " + derivedGraph.id()
                     );
                 }
+                validateDerivedGraphHierarchy(derivedGraph, rawConfig.identityPattern());
                 if (graphNameTitles.contains(derivedNameTitle)) {
                     throw new IllegalStateException(
                         "Dashboard import strategy graph name/title combinations must be unique across imported and derived graphs"
@@ -288,6 +290,63 @@ public class ConfiguredLocationDashboardImportStrategy implements LocationDashbo
         }
 
         return rawConfig;
+    }
+
+    private void validateDerivedGraphHierarchy(
+        DerivedGraphConfig derivedGraph,
+        List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
+    ) {
+        if (derivedGraph.derivedType()
+            != LocationDashboardImportStrategyConfig.DerivedGraphType.SAMPLE_CONFORMANCE_HIERARCHY) {
+            return;
+        }
+        if (derivedGraph.hierarchy().isEmpty()) {
+            throw new IllegalStateException(
+                "Sample conformance hierarchy graphs must declare hierarchy levels: " + derivedGraph.id()
+            );
+        }
+        Set<String> configuredIdentityKeys = (identityPattern == null ?
+            List.<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn>of() : identityPattern).stream()
+            .filter(Objects::nonNull)
+            .map(LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn::identityKey)
+            .map(ConfiguredLocationDashboardImportStrategy::normalizeKey)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Set<String> hierarchyKeys = new LinkedHashSet<>();
+        for (int index = 0; index < derivedGraph.hierarchy().size(); index += 1) {
+            LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel level = derivedGraph.hierarchy().get(index);
+            if (level == null || level.source() == null) {
+                throw new IllegalStateException(
+                    "Sample conformance hierarchy levels must declare a source: " + derivedGraph.id()
+                );
+            }
+            boolean lastLevel = index == derivedGraph.hierarchy().size() - 1;
+            if (level.source() == LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.IDENTITY
+                && (level.key() == null || level.key().isBlank())) {
+                throw new IllegalStateException(
+                    "Identity hierarchy levels must declare a key: " + derivedGraph.id()
+                );
+            }
+            if (level.source() == LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.IDENTITY) {
+                String normalizedKey = normalizeKey(level.key());
+                if (!configuredIdentityKeys.contains(normalizedKey)) {
+                    throw new IllegalStateException(
+                        "Sample conformance hierarchy references an unknown identity key: " + level.key()
+                    );
+                }
+                if (!hierarchyKeys.add(normalizedKey)) {
+                    throw new IllegalStateException(
+                        "Sample conformance hierarchy identity keys must be unique: " + level.key()
+                    );
+                }
+            }
+            if (lastLevel
+                != (level.source() == LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.MEASUREMENT)) {
+                throw new IllegalStateException(
+                    "Sample conformance hierarchy graphs must end with one measurement level: " + derivedGraph.id()
+                );
+            }
+        }
     }
 
     private Set<String> validateRangeProfiles(

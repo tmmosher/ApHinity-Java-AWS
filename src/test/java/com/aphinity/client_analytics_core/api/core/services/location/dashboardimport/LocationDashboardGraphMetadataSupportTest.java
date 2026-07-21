@@ -9,6 +9,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LocationDashboardGraphMetadataSupportTest {
     @Test
+    void derivedSunburstMetadataUsesDuplexSizeAndSquareHeight() {
+        LocationDashboardImportStrategyConfig.DerivedGraphConfig definition =
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "sample-conformance-hierarchy",
+                "Sample Conformance Hierarchy",
+                null,
+                LocationDashboardImportStrategyConfig.DerivedGraphType.SAMPLE_CONFORMANCE_HIERARCHY,
+                "sunburst",
+                List.of()
+            );
+
+        Map<String, Object> layout = LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
+            Map.of(), definition, "Apple Inc."
+        );
+        Map<String, Object> style = LocationDashboardGraphMetadataSupport.withDerivedImportStyle(
+            Map.of(), definition
+        );
+
+        assertEquals("duplex", ((Map<?, ?>) layout.get("meta")).get("aphinitySize"));
+        assertEquals(640, style.get("height"));
+    }
+
+    @Test
     void importMetadataRecordsGeneralizedAnchorAndTraceDimensions() {
         Map<String, Object> layout = LocationDashboardGraphMetadataSupport.withImportMetadataAndDefaults(
             Map.of(),

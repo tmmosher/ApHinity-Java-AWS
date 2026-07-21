@@ -187,6 +187,17 @@ class LocationGraphTemplateFactoryTest {
     }
 
     @Test
+    void createSunburstTemplateUsesDuplexSquareLayout() {
+        LocationGraphTemplateFactory.GraphTemplate template = factory.create("sunburst", "Phoenix");
+
+        assertEquals("New Sunburst Graph", template.name());
+        assertEquals("sunburst", template.data().getFirst().get("type"));
+        assertEquals("total", template.data().getFirst().get("branchvalues"));
+        assertEquals(Map.of("aphinitySize", "duplex"), template.layout().get("meta"));
+        assertEquals(640, template.style().get("height"));
+    }
+
+    @Test
     void createRejectsUnsupportedGraphTypes() {
         assertThrows(IllegalArgumentException.class, () -> factory.create("donut", "Phoenix"));
         assertThrows(IllegalArgumentException.class, () -> factory.create(null, "Phoenix"));

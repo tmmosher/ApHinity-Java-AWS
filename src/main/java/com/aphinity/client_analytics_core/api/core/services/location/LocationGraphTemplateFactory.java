@@ -46,7 +46,8 @@ public class LocationGraphTemplateFactory {
         INDICATOR,
         BAR,
         SCATTER,
-        TABLE
+        TABLE,
+        SUNBURST
     }
 
     /**
@@ -134,6 +135,26 @@ public class LocationGraphTemplateFactory {
                 buildDefaultGraphConfig(),
                 buildFullGraphStyle(640)
             );
+            case SUNBURST -> new GraphTemplate(
+                "New Sunburst Graph",
+                List.of(Map.of(
+                    "type", "sunburst",
+                    "name", "Trace 1",
+                    "ids", List.of("sample"),
+                    "labels", List.of("Sample"),
+                    "parents", List.of(""),
+                    "values", List.of(0),
+                    "branchvalues", "total",
+                    "sort", false,
+                    "hovertemplate", "%{label}: %{value}<extra></extra>"
+                )),
+                withGraphSize(Map.of(
+                    "margin", Map.of("t", 20, "r", 20, "b", 20, "l", 20),
+                    "showlegend", false
+                ), GRAPH_SIZE_DUPLEX),
+                buildDefaultGraphConfig(),
+                buildFullGraphStyle(640)
+            );
         };
     }
 
@@ -148,6 +169,7 @@ public class LocationGraphTemplateFactory {
             case "bar" -> GraphTemplateType.BAR;
             case "scatter", "line" -> GraphTemplateType.SCATTER;
             case "table" -> GraphTemplateType.TABLE;
+            case "sunburst" -> GraphTemplateType.SUNBURST;
             default -> throw new IllegalArgumentException("Graph type is invalid");
         };
     }

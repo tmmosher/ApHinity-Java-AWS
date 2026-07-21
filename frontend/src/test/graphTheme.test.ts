@@ -59,12 +59,15 @@ describe("graphTheme", () => {
   it("resolves standardized graph sizing from layout metadata", () => {
     expect(resolveGraphSize({meta: {aphinitySize: "half"}})).toBe("half");
     expect(resolveGraphSize({meta: {aphinitySize: "full"}})).toBe("full");
+    expect(resolveGraphSize({meta: {aphinitySize: "duplex"}})).toBe("duplex");
     expect(resolveGraphSize({meta: {aphinitySize: "double"}})).toBe("double");
     expect(resolveGraphSize({meta: {aphinitySize: "unsupported"}})).toBeNull();
 
     expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "half"}})).toBe("160px");
     expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "full"}})).toBe("320px");
+    expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "duplex"}})).toBe("640px");
     expect(resolveGraphHeight({height: 999}, {meta: {aphinitySize: "double"}})).toBe("640px");
+    expect(resolveGraphGridClass({meta: {aphinitySize: "duplex"}})).toBe("lg:col-span-2");
     expect(resolveGraphGridClass({meta: {aphinitySize: "double"}})).toBe("lg:col-span-2");
     expect(resolveGraphGridClass({meta: {aphinitySize: "full"}})).toBe("");
   });

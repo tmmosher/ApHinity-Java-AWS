@@ -25,6 +25,7 @@ const FALLBACK_GRAPH_HEIGHT_PX = 288;
 const GRAPH_SIZE_HEIGHT_PX = {
   half: 160,
   full: 320,
+  duplex: 640,
   double: 640
 } as const;
 const CARTESIAN_LEGEND_HEIGHT_RATIO = 1 / 3;
@@ -172,7 +173,9 @@ export const resolveGraphSize = (graphLayout: unknown): GraphDisplaySize | null 
   }
 
   const rawSize = graphLayout.meta.aphinitySize;
-  return rawSize === "half" || rawSize === "full" || rawSize === "double" ? rawSize : null;
+  return rawSize === "half" || rawSize === "full" || rawSize === "duplex" || rawSize === "double"
+    ? rawSize
+    : null;
 };
 
 export const resolveGraphHeight = (graphStyle: unknown, graphLayout?: unknown): string => {
@@ -200,7 +203,9 @@ const resolveGraphHeightPixels = (graphStyle: unknown, graphLayout?: unknown): n
 };
 
 export const resolveGraphGridClass = (graphLayout: unknown): string =>
-  resolveGraphSize(graphLayout) === "double" ? "lg:col-span-2" : "";
+  resolveGraphSize(graphLayout) === "duplex" || resolveGraphSize(graphLayout) === "double"
+    ? "lg:col-span-2"
+    : "";
 
 const hasCartesianAxes = (layout: Record<string, unknown>): boolean =>
   Object.keys(layout).some((key) => /^xaxis\d*$/.test(key) || /^yaxis\d*$/.test(key));

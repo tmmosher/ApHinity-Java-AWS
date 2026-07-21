@@ -26,6 +26,7 @@ final class LocationDashboardGraphMetadataSupport {
     static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
     private static final String GRAPH_SIZE_HALF = "half";
     private static final String GRAPH_SIZE_FULL = "full";
+    private static final String GRAPH_SIZE_DUPLEX = "duplex";
     private static final String GRAPH_SIZE_DOUBLE = "double";
     private static final Set<String> LEGACY_IMPORTED_Y_AXIS_TITLES = Set.of(
         "% Compliance",
@@ -179,7 +180,8 @@ final class LocationDashboardGraphMetadataSupport {
                 )
             ));
             style.put("height", 320);
-        } else if ("table".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
+        } else if ("table".equals(normalizeGraphType(derivedGraphDefinition.graphType()))
+            || "sunburst".equals(normalizeGraphType(derivedGraphDefinition.graphType()))) {
             style.put("height", 640);
         }
         return style;
@@ -189,6 +191,7 @@ final class LocationDashboardGraphMetadataSupport {
         return switch (normalizeGraphType(rawGraphType)) {
             case "pie", "indicator" -> GRAPH_SIZE_HALF;
             case "table" -> GRAPH_SIZE_DOUBLE;
+            case "sunburst" -> GRAPH_SIZE_DUPLEX;
             default -> GRAPH_SIZE_FULL;
         };
     }

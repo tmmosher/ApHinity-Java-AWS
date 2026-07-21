@@ -735,7 +735,7 @@ public class LocationGraphService {
             return null;
         }
         return switch (graphSize) {
-            case "half", "full", "double" -> graphSize;
+            case "half", "full", "duplex", "double" -> graphSize;
             default -> null;
         };
     }

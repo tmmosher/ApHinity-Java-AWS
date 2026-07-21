@@ -313,6 +313,25 @@
       "graphType": "bar"
     },
     {
+      "id": "sample-conformance-hierarchy",
+      "name": "Sample Conformance Hierarchy",
+      "derivedType": "sample_conformance_hierarchy",
+      "graphType": "sunburst",
+      "hierarchy": [
+        {
+          "source": "identity",
+          "key": "system"
+        },
+        {
+          "source": "identity",
+          "key": "site"
+        },
+        {
+          "source": "measurement"
+        }
+      ]
+    },
+    {
       "id": "recent-sample-measurements",
       "name": "Recent Sample Measurements",
       "derivedType": "recent_sample_measurements",

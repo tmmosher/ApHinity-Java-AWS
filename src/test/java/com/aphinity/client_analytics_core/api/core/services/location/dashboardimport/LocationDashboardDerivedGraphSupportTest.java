@@ -11,6 +11,65 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LocationDashboardDerivedGraphSupportTest {
     @Test
+    void buildsAlphabeticalSampleConformanceSunburstFromConfiguredHierarchy() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(),
+                List.of(
+                    hierarchySample("row-2", Map.of("system", "Towers", "site", "Plant A"), "HPC", false),
+                    hierarchySample("row-3", Map.of("site", "Site B"), "Copper", true),
+                    hierarchySample("row-1", Map.of("system", "Towers", "site", "Plant A"), "HPC", true)
+                )
+            );
+        LocationDashboardImportStrategyConfig.DerivedGraphConfig definition =
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "sample-conformance-hierarchy",
+                "Sample Conformance Hierarchy",
+                null,
+                LocationDashboardImportStrategyConfig.DerivedGraphType.SAMPLE_CONFORMANCE_HIERARCHY,
+                "sunburst",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                        LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.IDENTITY,
+                        "system"
+                    ),
+                    new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                        LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.IDENTITY,
+                        "site"
+                    ),
+                    new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                        LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.MEASUREMENT,
+                        null
+                    )
+                )
+            );
+
+        Map<String, Object> trace = LocationDashboardDerivedGraphSupport.buildPayload(
+            definition,
+            new Graph(),
+            historicalData,
+            List.of()
+        ).getFirst();
+
+        assertEquals("sunburst", trace.get("type"));
+        assertEquals("total", trace.get("branchvalues"));
+        assertEquals(false, trace.get("sort"));
+        assertEquals(
+            List.of(
+                "Towers", "Plant A", "HPC", "Conformances", "Non-Conformances",
+                "Unknown", "Site B", "Copper", "Conformances", "Non-Conformances"
+            ),
+            trace.get("labels")
+        );
+        assertEquals(List.of(2L, 2L, 2L, 1L, 1L, 1L, 1L, 1L, 1L, 0L), trace.get("values"));
+        @SuppressWarnings("unchecked")
+        List<String> parents = (List<String>) trace.get("parents");
+        assertEquals("", parents.get(0));
+        assertEquals("", parents.get(5));
+    }
+
+    @Test
     void buildsTurnaroundTimeGraphWithTwoWeekBucket() {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
@@ -308,6 +367,24 @@ class LocationDashboardDerivedGraphSupportTest {
             units,
             compliant,
             resolved
+        );
+    }
+
+    private LocationDashboardDerivedGraphSupport.HistoricalRawSample hierarchySample(
+        String rowIdentifier,
+        Map<String, String> identityValues,
+        String measurementName,
+        boolean compliant
+    ) {
+        return new LocationDashboardDerivedGraphSupport.HistoricalRawSample(
+            LocalDate.parse("2026-06-01"),
+            rowIdentifier,
+            identityValues,
+            measurementName,
+            "1",
+            null,
+            compliant,
+            false
         );
     }
 }
