@@ -169,6 +169,37 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
     }
 
     @Test
+    void validateForUpdateAcceptsSunburstPayloads() {
+        Map<String, Object> nextTrace = sunburstTrace(10, 6);
+
+        LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload payload = factory.validateForUpdate(
+            List.of(sunburstTrace(8, 4)),
+            List.of(nextTrace),
+            Map.of("meta", Map.of("aphinitySize", "duplex"))
+        );
+
+        assertEquals(List.of(nextTrace), payload.data());
+        assertEquals(Map.of("meta", Map.of("aphinitySize", "duplex")), payload.layout());
+    }
+
+    @Test
+    void validateForUpdateRejectsMismatchedSunburstNodeArrays() {
+        assertThrows(IllegalArgumentException.class, () ->
+            factory.validateForUpdate(
+                List.of(sunburstTrace(8, 4)),
+                List.of(Map.of(
+                    "type", "sunburst",
+                    "ids", List.of("site", "site/asset"),
+                    "labels", List.of("Site"),
+                    "parents", List.of("", "site"),
+                    "values", List.of(10, 6)
+                )),
+                Map.of()
+            )
+        );
+    }
+
+    @Test
     void validateForUpdateRejectsRaggedTableColumns() {
         assertThrows(IllegalArgumentException.class, () ->
             factory.validateForUpdate(
@@ -317,6 +348,20 @@ class LocationGraphUpdatePayloadValidationFactoryTest {
                     "value", value
                 )
             )
+        );
+    }
+
+    private Map<String, Object> sunburstTrace(int rootValue, int childValue) {
+        return Map.of(
+            "type", "sunburst",
+            "name", "Conformance",
+            "ids", List.of("site", "site/asset"),
+            "labels", List.of("Site", "Asset"),
+            "parents", List.of("", "site"),
+            "values", List.of(rootValue, childValue),
+            "branchvalues", "total",
+            "insidetextorientation", "radial",
+            "marker", Map.of("colors", List.of("#1f77b4", "#16a34a"))
         );
     }
 

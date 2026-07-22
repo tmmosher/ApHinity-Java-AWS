@@ -7,5 +7,6 @@ public enum GraphPayloadFamily {
     PIE,
     INDICATOR,
     CARTESIAN,
-    TABLE
+    TABLE,
+    SUNBURST
 }

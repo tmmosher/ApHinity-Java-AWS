@@ -18,7 +18,8 @@ public class LocationGraphUpdatePayloadValidationFactory {
         new PieGraphPayloadValidator(),
         new IndicatorGraphPayloadValidator(),
         new CartesianGraphPayloadValidator(),
-        new TableGraphPayloadValidator()
+        new TableGraphPayloadValidator(),
+        new SunburstGraphPayloadValidator()
     );
 
     /**

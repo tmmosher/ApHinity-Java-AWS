@@ -145,6 +145,7 @@ public class LocationGraphTemplateFactory {
                     "parents", List.of(""),
                     "values", List.of(0),
                     "branchvalues", "total",
+                    "insidetextorientation", "radial",
                     "sort", false,
                     "hovertemplate", "%{label}: %{value}<extra></extra>"
                 )),

@@ -11,6 +11,7 @@ import {
   getBarRowColor,
   getCartesianAxisValueMode,
   getPieRowColor,
+  getSunburstNodeColor,
   getTraceCartesianAxisTitle,
   getTraceYAxisRange,
   getTraceYAxisTitle,
@@ -24,6 +25,8 @@ import {
   setBarOrientation,
   setBarRowColor,
   setPieRowColor,
+  setSunburstLabelColor,
+  setSunburstNodeColor,
   getTraceColor,
   setTraceColor,
   swapCartesianLayoutAxes,
@@ -96,6 +99,45 @@ describe("graphTraceEditor", () => {
     expect(getPieRowColor(nextTrace, 1)).toBe("#d62728");
     expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#d62728"]);
     expect((nextTrace.marker as {color: string}).color).toBe("#1f77b4");
+  });
+
+  it("updates only the selected sunburst node color", () => {
+    const trace: Record<string, unknown> = {
+      type: "sunburst",
+      ids: ["site", "site/asset"],
+      labels: ["Site", "Asset"],
+      parents: ["", "site"],
+      values: [10, 4],
+      marker: {colors: ["#1f77b4", "#2ca02c"]}
+    };
+
+    const nextTrace = setSunburstNodeColor(trace, 1, "#d62728");
+
+    expect(getSunburstNodeColor(nextTrace, 0)).toBe("#1f77b4");
+    expect(getSunburstNodeColor(nextTrace, 1)).toBe("#d62728");
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual(["#1f77b4", "#d62728"]);
+    expect(trace.marker).toEqual({colors: ["#1f77b4", "#2ca02c"]});
+  });
+
+  it("updates every sunburst node with the selected shared label", () => {
+    const trace: Record<string, unknown> = {
+      type: "sunburst",
+      ids: ["north", "north/conductivity", "south", "south/conductivity"],
+      labels: ["North", "Conductivity", "South", "Conductivity"],
+      parents: ["", "north", "", "south"],
+      values: [10, 4, 8, 3],
+      marker: {colors: ["#1f77b4", "#2ca02c", "#1f77b4", "#ff7f0e"]}
+    };
+
+    const nextTrace = setSunburstLabelColor(trace, "Conductivity", "#d62728");
+
+    expect((nextTrace.marker as {colors: string[]}).colors).toEqual([
+      "#1f77b4",
+      "#d62728",
+      "#1f77b4",
+      "#d62728"
+    ]);
+    expect(trace.marker).toEqual({colors: ["#1f77b4", "#2ca02c", "#1f77b4", "#ff7f0e"]});
   });
 
   it("updates only the selected bar row color", () => {
@@ -598,6 +640,24 @@ describe("graphTraceEditor", () => {
           value: 0
         }
       }
+    });
+  });
+
+  it("creates sunburst traces with radial text and aligned node arrays", () => {
+    const nextTrace = createTrace("sunburst", 0);
+
+    expect(nextTrace).toEqual({
+      type: "sunburst",
+      name: "Trace 1",
+      ids: ["sample"],
+      labels: ["Sample"],
+      parents: [""],
+      values: [0],
+      branchvalues: "total",
+      insidetextorientation: "radial",
+      sort: false,
+      hovertemplate: "%{label}: %{value}<extra></extra>",
+      marker: {colors: ["#1f77b4"]}
     });
   });
 

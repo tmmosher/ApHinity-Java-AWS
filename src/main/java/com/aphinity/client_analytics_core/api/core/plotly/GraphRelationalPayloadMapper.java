@@ -28,6 +28,7 @@ import java.util.Objects;
 public final class GraphRelationalPayloadMapper {
     private static final String INTERNAL_X_FIELD = "x";
     private static final String INTERNAL_LABEL_FIELD = "label";
+    private static final String INTERNAL_PARENT_FIELD = "parent";
     private static final String INTERNAL_CUSTOMDATA_FIELD = "customdata";
     private static final String INTERNAL_COLOR_FIELD = "color";
     private static final String INTERNAL_TABLE_ROW_VALUES_FIELD = "values";
@@ -175,9 +176,9 @@ public final class GraphRelationalPayloadMapper {
         switch (canonicalType) {
             case "pie" -> populatePiePoints(graphTrace, trace);
             case "indicator" -> populateIndicatorPoint(graphTrace, trace);
-            case "bar" -> populateCartesianPoints(graphTrace, trace);
-            case "scatter" -> populateCartesianPoints(graphTrace, trace);
+            case "bar", "scatter" -> populateCartesianPoints(graphTrace, trace);
             case "table" -> populateTableRows(graphTrace, trace);
+            case "sunburst" -> populateSunburstPoints(graphTrace, trace);
             default -> throw new IllegalArgumentException("Graph data is invalid");
         }
     }
@@ -295,6 +296,37 @@ public final class GraphRelationalPayloadMapper {
                     .map(List::copyOf)
                     .toList());
                 result.put("cells", cells);
+            }
+            case "sunburst" -> {
+                List<Object> ids = new ArrayList<>();
+                List<Object> labels = new ArrayList<>();
+                List<Object> parents = new ArrayList<>();
+                List<Object> values = new ArrayList<>();
+                List<String> colors = new ArrayList<>();
+                boolean hasPointColors = false;
+
+                for (GraphCategoryPoint point : filteredCategoryPoints(trace)) {
+                    ids.add(point.getCategoryKey());
+                    labels.add(resolveLabelValue(point));
+                    values.add(resolveNumericValue(point.getValueNumeric(), point.getValueText()));
+
+                    Map<String, Object> pointMeta = point.getPointMeta();
+                    parents.add(pointMeta == null ? "" : pointMeta.getOrDefault(INTERNAL_PARENT_FIELD, ""));
+                    Object rawColor = pointMeta == null ? null : pointMeta.get(INTERNAL_COLOR_FIELD);
+                    String color = rawColor instanceof String pointColor ? pointColor : "";
+                    colors.add(color);
+                    hasPointColors |= !color.isBlank();
+                }
+
+                result.put("ids", List.copyOf(ids));
+                result.put("labels", List.copyOf(labels));
+                result.put("parents", List.copyOf(parents));
+                result.put("values", List.copyOf(values));
+                if (hasPointColors) {
+                    Map<String, Object> marker = extractTraceMarker(result);
+                    marker.put("colors", List.copyOf(colors));
+                    result.put("marker", marker);
+                }
             }
             default -> throw new IllegalArgumentException("Graph data is invalid");
         }
@@ -507,6 +539,52 @@ public final class GraphRelationalPayloadMapper {
         trimPoints(graphTrace.getCategoryPoints(), rowCount);
     }
 
+    private static void populateSunburstPoints(GraphTrace graphTrace, Map<String, Object> trace) {
+        List<?> ids = requireList(trace, "ids");
+        List<?> labels = requireList(trace, "labels");
+        List<?> parents = requireList(trace, "parents");
+        List<?> values = requireList(trace, "values");
+        List<?> colors = optionalMarkerColors(trace);
+        int pointCount = ids.size();
+
+        if (labels.size() != pointCount || parents.size() != pointCount || values.size() != pointCount
+            || (colors != null && colors.size() != pointCount)) {
+            throw new IllegalArgumentException("Graph data is invalid");
+        }
+
+        for (int index = 0; index < pointCount; index++) {
+            Object rawId = ids.get(index);
+            Object rawLabel = labels.get(index);
+            Object rawParent = parents.get(index);
+            Object rawValue = values.get(index);
+            if (!(rawId instanceof String id)
+                || !(rawLabel instanceof String label)
+                || !(rawParent instanceof String parent)
+                || !(rawValue instanceof Number number)) {
+                throw new IllegalArgumentException("Graph data is invalid");
+            }
+
+            GraphCategoryPoint point = categoryPointAt(graphTrace, index);
+            point.setCategoryKey(id);
+            point.setCategoryLabel(label);
+            point.setPointOrder(index);
+            point.setValueNumeric(toBigDecimal(number));
+            point.setValueText(null);
+            Map<String, Object> pointMeta = new LinkedHashMap<>();
+            pointMeta.put(INTERNAL_LABEL_FIELD, label);
+            pointMeta.put(INTERNAL_PARENT_FIELD, parent);
+            if (colors != null) {
+                Object rawColor = colors.get(index);
+                if (!(rawColor instanceof String color)) {
+                    throw new IllegalArgumentException("Graph data is invalid");
+                }
+                pointMeta.put(INTERNAL_COLOR_FIELD, color);
+            }
+            point.setPointMeta(pointMeta);
+        }
+        trimPoints(graphTrace.getCategoryPoints(), pointCount);
+    }
+
     private static String resolveDataMode(String canonicalType, Map<String, Object> trace) {
         if ("table".equals(canonicalType)) {
             return "table";
@@ -653,10 +731,29 @@ public final class GraphRelationalPayloadMapper {
         config.remove("x");
         config.remove("y");
         config.remove("labels");
+        config.remove("ids");
+        config.remove("parents");
         config.remove("values");
         config.remove("value");
+        if ("sunburst".equals(resolveCanonicalTraceType(trace))) {
+            config = extractSunburstTraceConfig(config);
+        }
         if ("table".equals(resolveCanonicalTraceType(trace))) {
             config = extractTableTraceConfig(config);
+        }
+        return config;
+    }
+
+    private static Map<String, Object> extractSunburstTraceConfig(Map<String, Object> traceConfig) {
+        Map<String, Object> config = new LinkedHashMap<>(traceConfig);
+        if (config.get("marker") instanceof Map<?, ?> rawMarker) {
+            Map<String, Object> marker = copyStringObjectMap(rawMarker);
+            marker.remove("colors");
+            if (marker.isEmpty()) {
+                config.remove("marker");
+            } else {
+                config.put("marker", marker);
+            }
         }
         return config;
     }

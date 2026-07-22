@@ -193,6 +193,7 @@ class LocationGraphTemplateFactoryTest {
         assertEquals("New Sunburst Graph", template.name());
         assertEquals("sunburst", template.data().getFirst().get("type"));
         assertEquals("total", template.data().getFirst().get("branchvalues"));
+        assertEquals("radial", template.data().getFirst().get("insidetextorientation"));
         assertEquals(Map.of("aphinitySize", "duplex"), template.layout().get("meta"));
         assertEquals(640, template.style().get("height"));
     }

@@ -21,6 +21,7 @@ export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
   scatter: "scatter",
   indicator: "indicator",
   table: "table",
+  sunburst: "sunburst",
   scattergl: "scatter"
 };
 
@@ -231,6 +232,34 @@ export const getBarRowColor = (
 
   return getDefaultTraceColor();
 };
+
+export const getSunburstNodeColor = (
+  trace: Record<string, unknown>,
+  nodeIndex: number
+): string => {
+  const marker = isRecord(trace.marker) ? trace.marker : null;
+  if (marker && Array.isArray(marker.colors)) {
+    const nodeColor = marker.colors[nodeIndex];
+    if (typeof nodeColor === "string") {
+      return nodeColor;
+    }
+    const firstColor = marker.colors.find((entry) => typeof entry === "string");
+    if (typeof firstColor === "string") {
+      return firstColor;
+    }
+  }
+  if (marker && typeof marker.color === "string") {
+    return marker.color;
+  }
+  return getDefaultTraceColor();
+};
+
+const getSunburstNodeCount = (trace: Record<string, unknown>): number => Math.max(
+  getTraceArray(trace, "ids").length,
+  getTraceArray(trace, "labels").length,
+  getTraceArray(trace, "parents").length,
+  getTraceArray(trace, "values").length
+);
 
 export const buildTraceLabel = (trace: Record<string, unknown>, index: number): string => {
   const traceName = typeof trace.name === "string" ? trace.name.trim() : "";
@@ -743,6 +772,60 @@ export const setBarRowColor = (
   };
 };
 
+export const setSunburstNodeColor = (
+  trace: Record<string, unknown>,
+  nodeIndex: number,
+  colorHex: string
+): Record<string, unknown> => {
+  if (getTraceType(trace) !== "sunburst" || !Number.isInteger(nodeIndex) || nodeIndex < 0) {
+    return trace;
+  }
+
+  const nodeCount = getSunburstNodeCount(trace);
+  if (nodeIndex >= nodeCount) {
+    return trace;
+  }
+
+  const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+  const colors = Array.from({length: nodeCount}, (_, index) => getSunburstNodeColor(trace, index));
+  colors[nodeIndex] = colorHex;
+  marker.colors = colors;
+  return {
+    ...trace,
+    marker
+  };
+};
+
+export const setSunburstLabelColor = (
+  trace: Record<string, unknown>,
+  label: string,
+  colorHex: string
+): Record<string, unknown> => {
+  if (getTraceType(trace) !== "sunburst") {
+    return trace;
+  }
+
+  const labels = getTraceArray(trace, "labels");
+  const matchingIndexes = labels
+    .map((entry, index) => entry === label ? index : -1)
+    .filter((index) => index >= 0);
+  if (matchingIndexes.length === 0) {
+    return trace;
+  }
+
+  const nodeCount = getSunburstNodeCount(trace);
+  const colors = Array.from({length: nodeCount}, (_, index) => getSunburstNodeColor(trace, index));
+  for (const index of matchingIndexes) {
+    colors[index] = colorHex;
+  }
+  const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+  marker.colors = colors;
+  return {
+    ...trace,
+    marker
+  };
+};
+
 export const setTraceColor = (
   trace: Record<string, unknown>,
   traceType: TraceType,
@@ -777,6 +860,16 @@ export const setTraceColor = (
     return {
       ...trace,
       gauge
+    };
+  }
+
+  if (traceType === "sunburst") {
+    const nodeCount = getSunburstNodeCount(trace);
+    const marker = isRecord(trace.marker) ? {...trace.marker} : {};
+    marker.colors = Array.from({length: nodeCount}, () => colorHex);
+    return {
+      ...trace,
+      marker
     };
   }
 

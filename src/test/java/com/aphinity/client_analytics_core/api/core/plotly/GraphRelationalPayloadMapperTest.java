@@ -256,6 +256,39 @@ class GraphRelationalPayloadMapperTest {
     }
 
     @Test
+    void setDataRoundTripsSunburstNodes() {
+        Graph graph = new Graph();
+        graph.setData(List.of(Map.of(
+            "type", "sunburst",
+            "name", "Conformance",
+            "ids", List.of("site", "site/asset"),
+            "labels", List.of("Site", "Asset"),
+            "parents", List.of("", "site"),
+            "values", List.of(10, 4),
+            "branchvalues", "total",
+            "marker", Map.of("colors", List.of("#1f77b4", "#16a34a"))
+        )));
+
+        assertEquals("sunburst", graph.getGraphType());
+        GraphTrace trace = graph.getGraphTraces().getFirst();
+        assertEquals("sunburst", trace.getTraceType());
+        assertEquals("categorical", trace.getDataMode());
+        assertEquals(2, trace.getCategoryPoints().size());
+        assertEquals("site/asset", trace.getCategoryPoints().get(1).getCategoryKey());
+        assertEquals("site", trace.getCategoryPoints().get(1).getPointMeta().get("parent"));
+        assertEquals("#16a34a", trace.getCategoryPoints().get(1).getPointMeta().get("color"));
+
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        Map<String, Object> result = traces.getFirst();
+        assertEquals(List.of("site", "site/asset"), result.get("ids"));
+        assertEquals(List.of("Site", "Asset"), result.get("labels"));
+        assertEquals(List.of("", "site"), result.get("parents"));
+        assertEquals(List.of(10L, 4L), result.get("values"));
+        assertEquals("total", result.get("branchvalues"));
+        assertEquals(Map.of("colors", List.of("#1f77b4", "#16a34a")), result.get("marker"));
+    }
+
+    @Test
     void setDataDoesNotInventBarMarkerColorsWhenNoneAreProvided() {
         Graph graph = new Graph();
         graph.setData(List.of(Map.of(

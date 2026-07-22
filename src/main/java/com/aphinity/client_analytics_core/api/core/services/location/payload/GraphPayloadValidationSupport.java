@@ -26,6 +26,7 @@ final class GraphPayloadValidationSupport {
             case "indicator" -> GraphPayloadFamily.INDICATOR;
             case "bar", "scatter", "scattergl", "line" -> GraphPayloadFamily.CARTESIAN;
             case "table" -> GraphPayloadFamily.TABLE;
+            case "sunburst" -> GraphPayloadFamily.SUNBURST;
             default -> throw invalidGraphData();
         };
     }
@@ -41,6 +42,7 @@ final class GraphPayloadValidationSupport {
             case "bar" -> "bar";
             case "scatter", "scattergl", "line" -> "scatter";
             case "table" -> "table";
+            case "sunburst" -> "sunburst";
             default -> throw invalidGraphData();
         };
     }

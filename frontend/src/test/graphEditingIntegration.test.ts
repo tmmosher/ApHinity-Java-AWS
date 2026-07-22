@@ -4,6 +4,7 @@ import type { LocationGraph } from "../types/Types";
 import {
   applyGraphPayloadEdit,
   createEditableGraphPayload,
+  updateEditableGraphTitle,
   type EditableGraphPayload
 } from "../util/graph/graphEditor";
 import {
@@ -12,6 +13,7 @@ import {
   renameTrace,
   setBarRowColor,
   setPieRowColor,
+  setSunburstLabelColor,
   setTraceColor,
   updateTraceCartesianAxisTitle,
   updateTraceYAxisTitle,
@@ -232,6 +234,63 @@ describe("graph editing integration", () => {
         }
       }
     ]);
+  });
+
+  it("applies sunburst node colors while preserving and updating layout metadata", async () => {
+    const baseGraph: LocationGraph = {
+      id: 15,
+      name: "Hierarchy",
+      data: [{
+        type: "sunburst",
+        name: "Conformance",
+        ids: ["north", "north/conductivity", "south", "south/conductivity"],
+        labels: ["North", "Conductivity", "South", "Conductivity"],
+        parents: ["", "north", "", "south"],
+        values: [10, 4, 8, 3],
+        branchvalues: "total",
+        insidetextorientation: "radial",
+        marker: {colors: ["#1f77b4", "#2ca02c", "#1f77b4", "#2ca02c"]}
+      }],
+      layout: {
+        title: {text: "Baseline"},
+        meta: {aphinitySize: "duplex", aphinityImport: {graphId: "hierarchy"}},
+        showlegend: false
+      },
+      config: {displayModeBar: false},
+      style: {height: 640},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const payload = createEditableGraphPayload(baseGraph);
+    payload.data = [setSunburstLabelColor(payload.data[0], "Conductivity", "#d62728")];
+    payload.layout = updateEditableGraphTitle(payload.layout, "Updated hierarchy");
+
+    const editResult = applyGraphPayloadEdit([baseGraph], [], baseGraph.id, payload);
+    expect(editResult.changed).toBe(true);
+    expect(editResult.nextGraphs[0].layout).toMatchObject({
+      title: {text: "Updated hierarchy"},
+      meta: {aphinitySize: "duplex", aphinityImport: {graphId: "hierarchy"}},
+      showlegend: false
+    });
+
+    const react = vi.fn().mockResolvedValue(undefined);
+    await renderPlotlyChart(
+      {react} as unknown as {react: (...args: unknown[]) => Promise<unknown>},
+      {id: "chart-root"} as unknown as HTMLDivElement,
+      editResult.nextGraphs[0].data as any,
+      editResult.nextGraphs[0].layout as any,
+      editResult.nextGraphs[0].config as any
+    );
+
+    const [, renderedData, renderedLayout] = react.mock.calls[0];
+    expect(renderedData[0].marker.colors).toEqual(["#1f77b4", "#d62728", "#1f77b4", "#d62728"]);
+    expect(renderedData[0].insidetextorientation).toBe("radial");
+    expect(renderedLayout).toMatchObject({
+      title: expect.objectContaining({text: "Updated hierarchy"}),
+      meta: {aphinitySize: "duplex", aphinityImport: {graphId: "hierarchy"}},
+      showlegend: false
+    });
   });
 
   it("applies value-axis title edits to the rendered layout", async () => {

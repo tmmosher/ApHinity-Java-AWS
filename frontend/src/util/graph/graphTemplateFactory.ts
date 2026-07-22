@@ -1,6 +1,6 @@
 import {z} from "zod";
 
-export type TraceType = "pie" | "bar" | "scatter" | "indicator" | "table";
+export type TraceType = "pie" | "bar" | "scatter" | "indicator" | "table" | "sunburst";
 
 export const TRACE_COLOR_OPTIONS: Record<string, string> = {
   "Legacy Blue": "#1f77b4",
@@ -213,6 +213,20 @@ export const createTableTraceTemplate = (traceName: string): Record<string, unkn
   }
 });
 
+export const createSunburstTraceTemplate = (traceName: string): Record<string, unknown> => ({
+  type: "sunburst",
+  name: traceName,
+  ids: ["sample"],
+  labels: ["Sample"],
+  parents: [""],
+  values: [0],
+  branchvalues: "total",
+  insidetextorientation: "radial",
+  sort: false,
+  hovertemplate: "%{label}: %{value}<extra></extra>",
+  marker: {colors: [DEFAULT_TRACE_COLOR]}
+});
+
 export const createTraceTemplate = (
   traceType: TraceType | null,
   traceName: string
@@ -230,6 +244,9 @@ export const createTraceTemplate = (
   }
   if (normalizedType === "table") {
     return createTableTraceTemplate(traceName);
+  }
+  if (normalizedType === "sunburst") {
+    return createSunburstTraceTemplate(traceName);
   }
   return createBarTraceTemplate(traceName);
 };

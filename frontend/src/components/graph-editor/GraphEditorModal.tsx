@@ -5,6 +5,7 @@ import {loadPlotlyModule} from "../common/Chart";
 import CartesianTraceEditor from "./CartesianTraceEditor";
 import IndicatorTraceEditor from "./IndicatorTraceEditor";
 import PieTraceEditor from "./PieTraceEditor";
+import SunburstTraceEditor from "./SunburstTraceEditor";
 import TableTraceEditor from "./TableTraceEditor";
 import TraceControls from "./TraceControls";
 import type {LocationGraph} from "../../types/Types";
@@ -25,6 +26,7 @@ import {
   getBarOrientation,
   getBarRowColor,
   getPieRowColor,
+  getSunburstNodeColor,
   getTraceColor,
   getTraceArray,
   getTraceType,
@@ -44,6 +46,7 @@ import {
   setBarOrientation,
   setBarRowColor,
   setPieRowColor,
+  setSunburstLabelColor,
   setTraceColor,
   parseNumericInput,
   swapCartesianLayoutAxes,
@@ -234,7 +237,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
     }
 
     const traceType = getTraceType(firstTrace);
-    return traceType === "pie" || traceType === "indicator" || traceType === "table";
+    return traceType === "pie" || traceType === "indicator" || traceType === "table" || traceType === "sunburst";
   });
 
   const selectedTrace = createMemo(() => {
@@ -296,6 +299,32 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
       return [] as string[];
     }
     return pieRowIndexes().map((rowIndex) => getPieRowColor(trace, rowIndex));
+  });
+
+  const sunburstLabels = createMemo(() => {
+    const trace = selectedTrace();
+    return trace ? getTraceArray(trace, "labels") : [] as unknown[];
+  });
+
+  const sunburstColorLabels = createMemo(() => {
+    const seenLabels = new Set<string>();
+    const labels: string[] = [];
+    for (const label of sunburstLabels()) {
+      if (typeof label === "string" && !seenLabels.has(label)) {
+        seenLabels.add(label);
+        labels.push(label);
+      }
+    }
+    return labels;
+  });
+
+  const sunburstLabelColors = createMemo(() => {
+    const trace = selectedTrace();
+    if (!trace) {
+      return [] as string[];
+    }
+    const labels = sunburstLabels();
+    return sunburstColorLabels().map((label) => getSunburstNodeColor(trace, labels.indexOf(label)));
   });
 
   const tableHeaders = createMemo(() => {
@@ -1006,7 +1035,7 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                 when={selectedTraceType()}
                 fallback={
                   <p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                    Unsupported trace type "{unsupportedTraceType()}". Supported editors: pie, indicator, bar, scatter, table.
+                    Unsupported trace type "{unsupportedTraceType()}". Supported editors: pie, indicator, bar, scatter, table, sunburst.
                   </p>
                 }
               >
@@ -1150,6 +1179,17 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                       onRemoveRow={(rowIndex) =>
                         updateSelectedTrace((trace) => removeTableRow(trace, rowIndex))
+                      }
+                    />
+                  </Match>
+                  <Match when={selectedTraceType() === "sunburst"}>
+                    <SunburstTraceEditor
+                      labels={sunburstColorLabels()}
+                      colors={sunburstLabelColors()}
+                      colorOptions={TRACE_COLOR_OPTIONS}
+                      isDataEditingDisabled={isDataEditingDisabled()}
+                      onUpdateColor={(label, colorHex) =>
+                        updateSelectedTrace((trace) => setSunburstLabelColor(trace, label, colorHex))
                       }
                     />
                   </Match>

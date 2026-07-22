@@ -8,6 +8,7 @@ let latestPieTraceEditorProps: Record<string, unknown> | null = null;
 let latestIndicatorTraceEditorProps: Record<string, unknown> | null = null;
 let latestCartesianTraceEditorProps: Record<string, unknown> | null = null;
 let latestTableTraceEditorProps: Record<string, unknown> | null = null;
+let latestSunburstTraceEditorProps: Record<string, unknown> | null = null;
 
 vi.mock("corvu/dialog", () => {
   const Dialog = (props: { children: unknown }) => props.children;
@@ -88,6 +89,13 @@ vi.mock("../components/graph-editor/TableTraceEditor", () => ({
         };
       }
     });
+    return null;
+  }
+}));
+
+vi.mock("../components/graph-editor/SunburstTraceEditor", () => ({
+  default: (props: Record<string, unknown>) => {
+    latestSunburstTraceEditorProps = props;
     return null;
   }
 }));
@@ -207,6 +215,18 @@ const getTableTraceEditorProps = () => {
   };
 };
 
+const getSunburstTraceEditorProps = () => {
+  if (!latestSunburstTraceEditorProps) {
+    throw new Error("SunburstTraceEditor mock was not rendered.");
+  }
+  return latestSunburstTraceEditorProps as {
+    labels: string[];
+    colors: string[];
+    isDataEditingDisabled: boolean;
+    onUpdateColor: (label: string, colorHex: string) => void;
+  };
+};
+
 const getCartesianTraceEditorProps = () => {
   if (!latestCartesianTraceEditorProps) {
     throw new Error("CartesianTraceEditor mock was not rendered.");
@@ -250,6 +270,7 @@ describe("GraphEditorModal trace controls", () => {
     latestIndicatorTraceEditorProps = null;
     latestCartesianTraceEditorProps = null;
     latestTableTraceEditorProps = null;
+    latestSunburstTraceEditorProps = null;
   });
 
   it("passes the trace-control contract from modal to controls", () => {
@@ -381,6 +402,43 @@ describe("GraphEditorModal trace controls", () => {
       const updatedPieProps = getPieTraceEditorProps();
       expect(updatedPieProps.values).toEqual([3, 7]);
       expect(updatedPieProps.valueDrafts[0]).toBe("abc");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("shows per-node color editing for single-trace sunburst graphs", async () => {
+    const sunburstGraph: LocationGraph = {
+      id: 30,
+      name: "Hierarchy",
+      data: [{
+        type: "sunburst",
+        name: "Trace 1",
+        ids: ["north", "north/conductivity", "south", "south/conductivity"],
+        labels: ["North", "Conductivity", "South", "Conductivity"],
+        parents: ["", "north", "", "south"],
+        values: [10, 4, 8, 3],
+        branchvalues: "total",
+        insidetextorientation: "radial",
+        marker: {colors: ["#1f77b4", "#2ca02c", "#1f77b4", "#2ca02c"]}
+      }],
+      layout: {meta: {aphinitySize: "duplex"}, showlegend: false},
+      config: null,
+      style: {height: 640},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+
+    const dispose = renderModal(sunburstGraph);
+    try {
+      await flushSolidUpdates();
+      const sunburstProps = getSunburstTraceEditorProps();
+
+      expect(latestTraceControlsProps).toBeNull();
+      expect(sunburstProps.labels).toEqual(["North", "Conductivity", "South"]);
+      expect(sunburstProps.colors).toEqual(["#1f77b4", "#2ca02c", "#1f77b4"]);
+      expect(sunburstProps.isDataEditingDisabled).toBe(false);
+      expect(() => sunburstProps.onUpdateColor("Conductivity", "#d62728")).not.toThrow();
     } finally {
       dispose();
     }
