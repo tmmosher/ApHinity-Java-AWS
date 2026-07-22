@@ -54,9 +54,35 @@ final class SampleConformanceSunburstBuilder {
         trace.put("sort", false);
         trace.put("hovertemplate", "%{label}: %{value}<extra></extra>");
         Map<String, Object> marker = copyMap(trace.get("marker"));
-        marker.put("colors", nodes.stream().map(SunburstNode::color).toList());
+        Map<String, String> persistedColorsByLabel = persistedColorsByLabel(existingTrace);
+        marker.put("colors", nodes.stream()
+            .map(node -> persistedColorsByLabel.getOrDefault(node.label(), node.color()))
+            .toList());
         trace.put("marker", marker);
         return trace;
+    }
+
+    private static Map<String, String> persistedColorsByLabel(Map<String, Object> existingTrace) {
+        if (existingTrace == null
+            || !(existingTrace.get("labels") instanceof List<?> labels)
+            || !(existingTrace.get("marker") instanceof Map<?, ?> marker)
+            || !(marker.get("colors") instanceof List<?> colors)) {
+            return Map.of();
+        }
+
+        Map<String, String> colorsByLabel = new LinkedHashMap<>();
+        int colorCount = Math.min(labels.size(), colors.size());
+        for (int index = 0; index < colorCount; index++) {
+            Object rawLabel = labels.get(index);
+            Object rawColor = colors.get(index);
+            if (rawLabel instanceof String label
+                && rawColor instanceof String color
+                && !label.isBlank()
+                && !color.isBlank()) {
+                colorsByLabel.putIfAbsent(label, color);
+            }
+        }
+        return colorsByLabel;
     }
 
     private static String hierarchyLabel(

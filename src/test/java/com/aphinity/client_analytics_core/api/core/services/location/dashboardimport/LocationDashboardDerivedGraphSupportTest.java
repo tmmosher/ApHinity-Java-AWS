@@ -70,6 +70,55 @@ class LocationDashboardDerivedGraphSupportTest {
     }
 
     @Test
+    void preservesSharedSunburstLabelColorsWhenRebuildingRangePayloads() {
+        Map<String, Object> existingTrace = Map.of(
+            "type", "sunburst",
+            "labels", List.of("System A", "Conductivity", "System B", "Conductivity"),
+            "marker", Map.of(
+                "colors", List.of("#1f77b4", "#9467bd", "#1f77b4", "#9467bd"),
+                "line", Map.of("color", "#ffffff", "width", 2)
+            )
+        );
+        List<LocationDashboardDerivedGraphSupport.HistoricalRawSample> samples = List.of(
+            hierarchySample("row-a", Map.of("system", "System A"), "Conductivity", true),
+            hierarchySample("row-b", Map.of("system", "System B"), "Conductivity", false)
+        );
+        List<LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel> hierarchy = List.of(
+            new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.IDENTITY,
+                "system"
+            ),
+            new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.MEASUREMENT,
+                null
+            )
+        );
+
+        Map<String, Object> rebuiltTrace = SampleConformanceSunburstBuilder.build(
+            existingTrace,
+            "Sample Conformance Hierarchy",
+            samples,
+            hierarchy
+        );
+
+        @SuppressWarnings("unchecked")
+        List<String> labels = (List<String>) rebuiltTrace.get("labels");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> marker = (Map<String, Object>) rebuiltTrace.get("marker");
+        @SuppressWarnings("unchecked")
+        List<String> colors = (List<String>) marker.get("colors");
+        int matchingLabelCount = 0;
+        for (int index = 0; index < labels.size(); index++) {
+            if ("Conductivity".equals(labels.get(index))) {
+                matchingLabelCount += 1;
+                assertEquals("#9467bd", colors.get(index));
+            }
+        }
+        assertEquals(2, matchingLabelCount);
+        assertEquals(Map.of("color", "#ffffff", "width", 2), marker.get("line"));
+    }
+
+    @Test
     void buildsTurnaroundTimeGraphWithTwoWeekBucket() {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
