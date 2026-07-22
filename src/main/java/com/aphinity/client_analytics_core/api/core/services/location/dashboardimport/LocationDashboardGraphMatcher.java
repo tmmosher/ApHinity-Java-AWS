@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -20,7 +21,8 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
  * Import metadata is preferred. When a strategy definition declares a title, matching must be
  * exact on name + title so same-name graphs remain unambiguous.
  */
-final class LocationDashboardGraphMatcher {
+@Component
+public final class LocationDashboardGraphMatcher {
     /**
      * Matches configured imported graphs to the assigned graphs for a location.
      *

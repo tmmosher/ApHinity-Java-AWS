@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.stereotype.Component;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphConfig;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.GraphDimension;
@@ -27,10 +28,11 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
  * Water-quality compliance graphs are the canonical sample source to avoid
  * double-counting the same physical sample through multiple system-type projections.
  */
-final class LocationDashboardHistoricalDataAssembler {
+@Component
+public final class LocationDashboardHistoricalDataAssembler {
     private final LocationDashboardCorrectiveActionService correctiveActionService;
 
-    LocationDashboardHistoricalDataAssembler(LocationDashboardCorrectiveActionService correctiveActionService) {
+    public LocationDashboardHistoricalDataAssembler(LocationDashboardCorrectiveActionService correctiveActionService) {
         this.correctiveActionService = correctiveActionService;
     }
 

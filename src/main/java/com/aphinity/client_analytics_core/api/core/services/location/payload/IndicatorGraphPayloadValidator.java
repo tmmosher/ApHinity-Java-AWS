@@ -2,10 +2,12 @@ package com.aphinity.client_analytics_core.api.core.services.location.payload;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.stereotype.Component;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.payload.GraphPayloadValidationSupport.invalidGraphData;
 
-final class IndicatorGraphPayloadValidator implements LocationGraphUpdateTraceValidator {
+@Component
+public final class IndicatorGraphPayloadValidator implements LocationGraphUpdateTraceValidator {
     private static final double VALUE_MIN = 0.0;
     private static final double VALUE_MAX = 100.0;
 

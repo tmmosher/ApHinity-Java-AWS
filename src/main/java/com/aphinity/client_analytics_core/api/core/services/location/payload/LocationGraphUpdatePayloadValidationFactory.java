@@ -1,10 +1,13 @@
 package com.aphinity.client_analytics_core.api.core.services.location.payload;
 
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphDefinition;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Validates user-submitted graph data updates against the existing graph family
@@ -12,15 +15,41 @@ import java.util.Map;
  */
 @Component
 public class LocationGraphUpdatePayloadValidationFactory {
-    private final CartesianTraceDateOrderCanonicalizer cartesianTraceDateOrderCanonicalizer =
-        new CartesianTraceDateOrderCanonicalizer();
-    private final List<LocationGraphUpdateTraceValidator> validators = List.of(
-        new PieGraphPayloadValidator(),
-        new IndicatorGraphPayloadValidator(),
-        new CartesianGraphPayloadValidator(),
-        new TableGraphPayloadValidator(),
-        new SunburstGraphPayloadValidator()
-    );
+    private CartesianTraceDateOrderCanonicalizer cartesianTraceDateOrderCanonicalizer;
+    private List<LocationGraphUpdateTraceValidator> validators;
+    private Map<String, LocationGraphUpdateTraceValidator> validatorsByDefinitionKey = Map.of();
+
+    /**
+     * Application composition constructor. Validators are discovered as Spring beans,
+     * so a graph module can contribute validation without modifying this factory.
+     */
+    @Autowired
+    public LocationGraphUpdatePayloadValidationFactory(
+        CartesianTraceDateOrderCanonicalizer cartesianTraceDateOrderCanonicalizer,
+        List<LocationGraphUpdateTraceValidator> validators,
+        List<LocationGraphDefinition> definitions
+    ) {
+        this.cartesianTraceDateOrderCanonicalizer = cartesianTraceDateOrderCanonicalizer;
+        this.validators = List.copyOf(validators);
+        configureDefinitionValidators(definitions);
+    }
+
+    public LocationGraphUpdatePayloadValidationFactory(
+        CartesianTraceDateOrderCanonicalizer canonicalizer,
+        List<LocationGraphUpdateTraceValidator> discoveredValidators
+    ) {
+        this(canonicalizer, discoveredValidators, List.of());
+    }
+
+    private void configureDefinitionValidators(List<LocationGraphDefinition> definitions) {
+        Map<String, LocationGraphUpdateTraceValidator> indexed = new HashMap<>();
+        for (LocationGraphDefinition definition : definitions) {
+            if (definition.validator() != null) {
+                indexed.put(definition.key(), definition.validator());
+            }
+        }
+        this.validatorsByDefinitionKey = Map.copyOf(indexed);
+    }
 
     /**
      * Validates and normalizes a graph update payload.
@@ -35,12 +64,21 @@ public class LocationGraphUpdatePayloadValidationFactory {
         Object nextData,
         Object rawLayout
     ) {
+        return validateForUpdate(currentData, nextData, rawLayout, null);
+    }
+
+    public ValidatedGraphPayload validateForUpdate(
+        Object currentData,
+        Object nextData,
+        Object rawLayout,
+        String graphDefinitionKey
+    ) {
         List<Map<String, Object>> currentTraces = GraphPayloadMapper.toTraceList(currentData);
         String expectedCanonicalType = currentTraces.isEmpty()
             ? null
             : GraphPayloadValidationSupport.resolveExpectedCanonicalType(currentTraces);
         if (expectedCanonicalType != null) {
-            resolveValidator(expectedCanonicalType).validate(currentTraces, expectedCanonicalType);
+            resolveValidator(expectedCanonicalType, graphDefinitionKey).validate(currentTraces, expectedCanonicalType);
         }
 
         if (nextData == null) {
@@ -63,11 +101,10 @@ public class LocationGraphUpdatePayloadValidationFactory {
         }
 
         if (expectedCanonicalType != null) {
-            resolveValidator(expectedCanonicalType).validate(nextTraces, expectedCanonicalType);
+            resolveValidator(expectedCanonicalType, graphDefinitionKey).validate(nextTraces, expectedCanonicalType);
         }
 
-        if (expectedCanonicalType != null
-            && GraphPayloadValidationSupport.resolveFamily(expectedCanonicalType) == GraphPayloadFamily.CARTESIAN) {
+        if (expectedCanonicalType != null && isCartesianFamily(expectedCanonicalType)) {
             nextTraces = cartesianTraceDateOrderCanonicalizer.canonicalize(nextTraces);
         }
 
@@ -75,11 +112,32 @@ public class LocationGraphUpdatePayloadValidationFactory {
     }
 
     private LocationGraphUpdateTraceValidator resolveValidator(String canonicalTraceType) {
+        return resolveValidator(canonicalTraceType, null);
+    }
+
+    private LocationGraphUpdateTraceValidator resolveValidator(
+        String canonicalTraceType,
+        String graphDefinitionKey
+    ) {
+        if (graphDefinitionKey != null) {
+            LocationGraphUpdateTraceValidator definitionValidator = validatorsByDefinitionKey.get(graphDefinitionKey);
+            if (definitionValidator != null) {
+                return definitionValidator;
+            }
+        }
         GraphPayloadFamily family = GraphPayloadValidationSupport.resolveFamily(canonicalTraceType);
         return validators.stream()
             .filter(validator -> validator.supports(family))
             .findFirst()
             .orElseThrow(GraphPayloadValidationSupport::invalidGraphData);
+    }
+
+    private boolean isCartesianFamily(String canonicalTraceType) {
+        try {
+            return GraphPayloadValidationSupport.resolveFamily(canonicalTraceType) == GraphPayloadFamily.CARTESIAN;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     public record ValidatedGraphPayload(

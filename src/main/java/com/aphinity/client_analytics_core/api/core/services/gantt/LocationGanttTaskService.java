@@ -8,7 +8,7 @@ import com.aphinity.client_analytics_core.api.core.repositories.location.Locatio
 import com.aphinity.client_analytics_core.api.core.requests.gantt.LocationGanttTaskRequest;
 import com.aphinity.client_analytics_core.api.core.response.gantt.GanttTaskResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import jakarta.persistence.EntityManager;
+import com.aphinity.client_analytics_core.api.core.services.PersistenceEntityReloader;
 import org.springframework.core.io.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +33,7 @@ import java.util.List;
 public class LocationGanttTaskService {
     private static final Logger log = LoggerFactory.getLogger(LocationGanttTaskService.class);
 
-    @Autowired(required = false)
-    private EntityManager entityManager;
+    private PersistenceEntityReloader entityReloader = PersistenceEntityReloader.noop();
 
     private final LocationRepository locationRepository;
     private final GanttTaskRepository ganttTaskRepository;
@@ -60,6 +59,11 @@ public class LocationGanttTaskService {
         this.dependencyService = dependencyService;
         this.templateService = templateService;
         this.auditService = auditService;
+    }
+
+    @Autowired(required = false)
+    void configureEntityReloader(PersistenceEntityReloader entityReloader) {
+        this.entityReloader = entityReloader;
     }
 
     /**
@@ -251,18 +255,8 @@ public class LocationGanttTaskService {
     }
 
     private GanttTask refreshGanttTaskFromStore(Long taskId, GanttTask fallbackTask) {
-        if (entityManager != null) {
-            if (entityManager.contains(fallbackTask)) {
-                entityManager.refresh(fallbackTask);
-                return fallbackTask;
-            }
-
-            GanttTask refreshedTask = entityManager.find(GanttTask.class, taskId);
-            if (refreshedTask != null) {
-                return refreshedTask;
-            }
-        }
-        return ganttTaskRepository.findById(taskId).orElse(fallbackTask);
+        return entityReloader.refreshOrFind(GanttTask.class, taskId, fallbackTask)
+            .orElseGet(() -> ganttTaskRepository.findById(taskId).orElse(fallbackTask));
     }
 
     /**

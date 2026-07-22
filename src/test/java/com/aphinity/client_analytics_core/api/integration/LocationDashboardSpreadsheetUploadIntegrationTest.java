@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.integration;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
@@ -454,7 +457,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         seedHoagMeasurement(location, "Hardness");
 
         HoagGraphFixture graphs = seedHoagStrategyGraphs(location);
-        graphs.waterQualityGraph().setData(namedEmptyScatterData(List.of(
+        writeData(graphs.waterQualityGraph(), namedEmptyScatterData(List.of(
             "HPC",
             "Endotoxin",
             "Legionella",
@@ -663,7 +666,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> graphData(Graph graph) {
-        return (List<Map<String, Object>>) graph.getData();
+        return (List<Map<String, Object>>) readData(graph);
     }
 
     private Map<String, Object> firstTrace(Map<String, Object> graph) {

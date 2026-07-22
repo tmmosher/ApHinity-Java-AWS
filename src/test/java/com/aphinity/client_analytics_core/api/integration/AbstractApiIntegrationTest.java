@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.integration;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.auth.AuthCookieNames;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.Role;
@@ -165,14 +168,14 @@ abstract class AbstractApiIntegrationTest {
     protected Graph createGraph(String name, Object data) {
         Graph graph = new Graph();
         graph.setName(name);
-        graph.setData(data);
+        writeData(graph, data);
         return graphRepository.saveAndFlush(graph);
     }
 
     protected Graph reloadGraph(Long graphId) {
         return transactionTemplate.execute(status -> {
             Graph graph = graphRepository.findById(graphId).orElseThrow();
-            graph.getData();
+            readData(graph);
             return graph;
         });
     }

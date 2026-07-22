@@ -8,7 +8,7 @@ import {canEditLocationGraphs} from "../../../../util/common/profileAccess";
 import {createGanttTaskImportController} from "../../../../util/location/createGanttTaskImportController";
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 import {createServiceCalendarStagingController} from "../../../../util/location/createServiceCalendarStagingController";
-import {fetchLocationById, fetchLocationGraphsById} from "../../../../util/graph/locationDetailApi";
+import {httpLocationDashboardGateway} from "../../../../util/graph/locationDashboardGateway";
 import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
 import {
   createDashboardLocationResetGuard,
@@ -51,7 +51,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
     () => props.locationId,
     async (locationId): Promise<LocationScopedResource<LocationSummary>> => ({
       locationId,
-      value: await fetchLocationById(host, locationId)
+      value: await httpLocationDashboardGateway.fetchLocation(host, locationId)
     })
   );
 
@@ -86,7 +86,7 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
       }
       const nextGraphs = {
         locationId,
-        value: await fetchLocationGraphsById(host, locationId, monthRange)
+        value: await httpLocationDashboardGateway.fetchGraphs(host, locationId, monthRange)
       };
       graphCache.set(cacheKey, nextGraphs);
       return nextGraphs;
@@ -127,7 +127,8 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
     refetchGraphs: refetchLocationGraphs,
     canEditGraphs,
     graphTimeRange,
-    shouldResetDashboardState
+    shouldResetDashboardState,
+    gateway: httpLocationDashboardGateway
   });
 
   createEffect(on(location, (currentLocation) => {

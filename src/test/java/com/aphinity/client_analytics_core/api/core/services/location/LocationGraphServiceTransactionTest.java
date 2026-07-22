@@ -1,17 +1,20 @@
 package com.aphinity.client_analytics_core.api.core.services.location;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
-import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardProjectionService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +43,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class LocationServiceTransactionTest {
+class LocationGraphServiceTransactionTest {
     @Mock
     private AppUserRepository appUserRepository;
 
@@ -57,48 +60,54 @@ class LocationServiceTransactionTest {
     private LocationUserRepository locationUserRepository;
 
     @Mock
-    private UserSubscriptionToLocationRepository userSubscriptionToLocationRepository;
-
-    @Mock
     private AccountRoleService accountRoleService;
-
-    @Mock
-    private LocationDashboardImportService locationDashboardImportService;
 
     @Mock
     private LocationDashboardTimeRangeService locationDashboardTimeRangeService;
 
-    private LocationService locationService;
+    private LocationGraphService graphService;
 
-    private LocationService proxiedLocationService;
+    private LocationGraphApplication proxiedGraphService;
 
     @BeforeEach
     void setUp() {
-        locationService = new LocationService(
+        LocationDashboardCacheInvalidationService invalidator =
+            new LocationDashboardCacheInvalidationService(locationDashboardTimeRangeService);
+        graphService = new LocationGraphService(
             appUserRepository,
             locationRepository,
             graphRepository,
             locationGraphRepository,
             locationUserRepository,
-            userSubscriptionToLocationRepository,
             accountRoleService,
-            new LocationThumbnailImageService(),
-            new LocationGraphTemplateFactory(),
-            new LocationGraphUpdatePayloadValidationFactory(),
-            locationDashboardImportService,
+            new LocationGraphTemplateFactory(List.copyOf(BuiltinLocationGraphDefinitions.defaults())),
+            new LocationGraphUpdatePayloadValidationFactory(
+                new com.aphinity.client_analytics_core.api.core.services.location.payload.CartesianTraceDateOrderCanonicalizer(),
+                List.of(
+                    new com.aphinity.client_analytics_core.api.core.services.location.payload.PieGraphPayloadValidator(),
+                    new com.aphinity.client_analytics_core.api.core.services.location.payload.IndicatorGraphPayloadValidator(),
+                    new com.aphinity.client_analytics_core.api.core.services.location.payload.CartesianGraphPayloadValidator(),
+                    new com.aphinity.client_analytics_core.api.core.services.location.payload.TableGraphPayloadValidator(),
+                    new com.aphinity.client_analytics_core.api.core.services.location.payload.SunburstGraphPayloadValidator()
+                )
+            ),
             new LocationDashboardMutationLockService(),
-            locationDashboardTimeRangeService,
-            new GraphResponseMapper()
+            new LocationDashboardProjectionService(locationDashboardTimeRangeService),
+            new LocationDashboardRefreshService(locationDashboardTimeRangeService),
+            invalidator,
+            new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()),
+            new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()
         );
 
-        ProxyFactory proxyFactory = new ProxyFactory(locationService);
+        ProxyFactory proxyFactory = new ProxyFactory(graphService);
+        proxyFactory.setProxyTargetClass(true);
         proxyFactory.addAdvice(
             new TransactionInterceptor(
                 new TestTransactionManager(),
                 new AnnotationTransactionAttributeSource()
             )
         );
-        proxiedLocationService = (LocationService) proxyFactory.getProxy();
+        proxiedGraphService = (LocationGraphApplication) proxyFactory.getProxy();
     }
 
     @Test
@@ -111,7 +120,7 @@ class LocationServiceTransactionTest {
         Graph graph = new Graph();
         graph.setId(31L);
         graph.setName("Graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
 
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(1L), anyCollection()))
             .thenAnswer(invocation -> {
@@ -119,13 +128,19 @@ class LocationServiceTransactionTest {
                 return List.of(graph);
             });
 
-        proxiedLocationService.updateLocationGraphData(
+        proxiedGraphService.updateLocationGraphs(
             2L,
             1L,
-            List.of(new LocationGraphDataUpdateRequest(
+            List.of(new LocationGraphApplication.GraphUpdateCommand(
                 31L,
-                List.of(Map.of("type", "bar", "y", List.of(9, 8, 7)))
+                null,
+                List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
+                null,
+                null,
+                null,
+                null
             )),
+            null,
             null
         );
 

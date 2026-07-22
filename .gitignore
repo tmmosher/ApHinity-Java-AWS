@@ -71,3 +71,7 @@ src/main/resources/static/
 
 # logs
 /logs
+
+# any text notes for readers
+*.txt
+/.codex/**

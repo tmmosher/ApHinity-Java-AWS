@@ -2,6 +2,7 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -120,7 +121,9 @@ class HoagConfiguredLocationDashboardImportStrategyTest {
     }
 
     private ConfiguredLocationDashboardImportStrategy resolveHoagStrategy() {
-        return (ConfiguredLocationDashboardImportStrategy) new LocationDashboardImportStrategyRegistry()
+        return (ConfiguredLocationDashboardImportStrategy) new LocationDashboardImportStrategyRegistry(
+            new ClasspathDashboardImportStrategyLoader(JsonMapper.builder().findAndAddModules().build())
+        )
             .resolve("Hoag Hospital")
             .orElseThrow(() -> new AssertionError("Expected Hoag Hospital dashboard strategy to load"));
     }

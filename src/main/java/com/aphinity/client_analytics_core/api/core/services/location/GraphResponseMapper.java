@@ -2,7 +2,6 @@ package com.aphinity.client_analytics_core.api.core.services.location;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.error.ApiClientException;
 import org.slf4j.Logger;
@@ -20,6 +19,11 @@ import java.util.Map;
 @Component
 public class GraphResponseMapper {
     private static final Logger log = LoggerFactory.getLogger(GraphResponseMapper.class);
+    private final GraphPayloadPort graphPayloadPort;
+
+    public GraphResponseMapper(GraphPayloadPort graphPayloadPort) {
+        this.graphPayloadPort = graphPayloadPort;
+    }
 
     /**
      * Maps a graph using its persisted data payload.
@@ -82,7 +86,8 @@ public class GraphResponseMapper {
 
     private GraphPayloadMapper.GraphPayload normalize(Graph graph) {
         try {
-            return GraphRelationalPayloadMapper.normalize(graph);
+            Object data = graphPayloadPort.readData(graph);
+            return GraphPayloadMapper.normalize(data, graph.getLayout(), graph.getConfig(), graph.getStyle());
         } catch (IllegalArgumentException ex) {
             log.warn(
                 "Invalid graph payload for graphId={} during response mapping",

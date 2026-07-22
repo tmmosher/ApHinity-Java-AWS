@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.integration;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.auth.AuthCookieNames;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.auth.AuthSession;
@@ -1306,7 +1309,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isNoContent());
 
         Graph persisted = reloadGraph(graph.getId());
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(persisted));
         assertEquals("h", traces.getFirst().get("orientation"));
         assertEquals(List.of(6L, 6L, 6L), traces.getFirst().get("x"));
     }
@@ -1354,7 +1357,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$[0].data[0].y[0]").value(6));
 
         Graph persisted = reloadGraph(graph.getId());
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(persisted));
         assertEquals("v", traces.getFirst().get("orientation"));
         assertEquals(List.of("Jan", "Feb"), traces.getFirst().get("x"));
         assertEquals(List.of(6L, 8L), traces.getFirst().get("y"));
@@ -1596,8 +1599,8 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         Graph updatedFirst = reloadGraph(firstGraph.getId());
         Graph unchangedSecond = reloadGraph(secondGraph.getId());
 
-        List<Map<String, Object>> firstTraces = GraphPayloadMapper.toTraceList(updatedFirst.getData());
-        List<Map<String, Object>> secondTraces = GraphPayloadMapper.toTraceList(unchangedSecond.getData());
+        List<Map<String, Object>> firstTraces = GraphPayloadMapper.toTraceList(readData(updatedFirst));
+        List<Map<String, Object>> secondTraces = GraphPayloadMapper.toTraceList(readData(unchangedSecond));
 
         assertEquals("h", firstTraces.getFirst().get("orientation"));
         assertEquals(List.of(9L, 8L, 7L), firstTraces.getFirst().get("x"));
@@ -1958,7 +1961,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isNoContent());
 
         Graph persistedPrimary = reloadGraph(primaryGraph.getId());
-        List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedPrimary.getData());
+        List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(readData(persistedPrimary));
         assertEquals("h", persistedTraces.getFirst().get("orientation"));
         assertEquals(List.of(9L, 8L, 7L), persistedTraces.getFirst().get("x"));
     }
@@ -2082,7 +2085,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.code").value("location_graph_not_found"));
 
         Graph persistedFirst = reloadGraph(firstGraph.getId());
-        List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(persistedFirst.getData());
+        List<Map<String, Object>> persistedTraces = GraphPayloadMapper.toTraceList(readData(persistedFirst));
         assertEquals("h", persistedTraces.getFirst().get("orientation"));
         assertEquals(List.of(1L, 2L, 3L), persistedTraces.getFirst().get("x"));
     }
@@ -2160,7 +2163,7 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
         }
 
         Graph persisted = reloadGraph(graph.getId());
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(persisted.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(persisted));
         assertEquals(1, traces.size());
         assertThat(traces.getFirst()).containsEntry("type", "bar");
         assertThat(traces.getFirst()).containsEntry("orientation", "h");

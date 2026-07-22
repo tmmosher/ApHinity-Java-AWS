@@ -13,8 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.stereotype.Component;
 
-final class CartesianTraceDateOrderCanonicalizer {
+@Component
+public final class CartesianTraceDateOrderCanonicalizer {
     private static final DateTimeFormatter FLEXIBLE_LOCAL_DATE_FORMATTER = new DateTimeFormatterBuilder()
         .appendValue(ChronoField.YEAR, 4)
         .appendLiteral('-')
@@ -24,7 +26,7 @@ final class CartesianTraceDateOrderCanonicalizer {
         .toFormatter(Locale.ROOT)
         .withResolverStyle(ResolverStyle.STRICT);
 
-    List<Map<String, Object>> canonicalize(List<Map<String, Object>> traces) {
+    public List<Map<String, Object>> canonicalize(List<Map<String, Object>> traces) {
         if (traces == null || traces.isEmpty()) {
             return List.of();
         }

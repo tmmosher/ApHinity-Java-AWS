@@ -23,7 +23,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,16 +44,15 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 @Service
 public class LocationDashboardTimeRangeService {
     private static final Logger log = LoggerFactory.getLogger(LocationDashboardTimeRangeService.class);
-    private static final ZoneId PHOENIX_ZONE = ZoneId.of("America/Phoenix");
 
     private final LocationRepository locationRepository;
     private final LocationGraphRepository locationGraphRepository;
     private final ServiceEventRepository serviceEventRepository;
-    private final LocationDashboardImportStrategyRegistry strategyRegistry;
+    private final DashboardImportStrategyResolver strategyRegistry;
     private final LocationDashboardSamplePersistenceService samplePersistenceService;
     private final Clock clock;
     private final LocationDashboardCache dashboardCache;
-    private final LocationDashboardGraphMatcher graphMatcher = new LocationDashboardGraphMatcher();
+    private final LocationDashboardGraphMatcher graphMatcher;
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
 
     public record MonthRangeGraphProjection(
@@ -68,48 +66,12 @@ public class LocationDashboardTimeRangeService {
         LocationRepository locationRepository,
         LocationGraphRepository locationGraphRepository,
         ServiceEventRepository serviceEventRepository,
-        LocationDashboardImportStrategyRegistry strategyRegistry,
+        DashboardImportStrategyResolver strategyRegistry,
         LocationDashboardSamplePersistenceService samplePersistenceService,
-        LocationDashboardCache dashboardCache
-    ) {
-        this(
-            locationRepository,
-            locationGraphRepository,
-            serviceEventRepository,
-            strategyRegistry,
-            samplePersistenceService,
-            Clock.system(PHOENIX_ZONE),
-            dashboardCache
-        );
-    }
-
-    LocationDashboardTimeRangeService(
-        LocationRepository locationRepository,
-        LocationGraphRepository locationGraphRepository,
-        ServiceEventRepository serviceEventRepository,
-        LocationDashboardImportStrategyRegistry strategyRegistry,
-        LocationDashboardSamplePersistenceService samplePersistenceService,
+        LocationDashboardCache dashboardCache,
+        LocationDashboardGraphMatcher graphMatcher,
+        LocationDashboardHistoricalDataAssembler historicalDataAssembler,
         Clock clock
-    ) {
-        this(
-            locationRepository,
-            locationGraphRepository,
-            serviceEventRepository,
-            strategyRegistry,
-            samplePersistenceService,
-            clock,
-            new LocationDashboardCache()
-        );
-    }
-
-    LocationDashboardTimeRangeService(
-        LocationRepository locationRepository,
-        LocationGraphRepository locationGraphRepository,
-        ServiceEventRepository serviceEventRepository,
-        LocationDashboardImportStrategyRegistry strategyRegistry,
-        LocationDashboardSamplePersistenceService samplePersistenceService,
-        Clock clock,
-        LocationDashboardCache dashboardCache
     ) {
         this.locationRepository = locationRepository;
         this.locationGraphRepository = locationGraphRepository;
@@ -118,9 +80,8 @@ public class LocationDashboardTimeRangeService {
         this.samplePersistenceService = samplePersistenceService;
         this.clock = clock;
         this.dashboardCache = dashboardCache;
-        this.historicalDataAssembler = new LocationDashboardHistoricalDataAssembler(
-            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry)
-        );
+        this.graphMatcher = graphMatcher;
+        this.historicalDataAssembler = historicalDataAssembler;
     }
 
     /**

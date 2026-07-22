@@ -10,6 +10,10 @@ import com.aphinity.client_analytics_core.api.auth.response.IssuedTokens;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
 import com.aphinity.client_analytics_core.api.auth.services.LoginAttemptService;
 import com.aphinity.client_analytics_core.api.auth.services.TokenHasher;
+import com.aphinity.client_analytics_core.api.auth.services.TurnstileCaptchaVerifier;
+import com.aphinity.client_analytics_core.api.auth.services.JdbcOneTimeCodeStore;
+import com.aphinity.client_analytics_core.api.auth.services.OutboxAuthNotificationAdapter;
+import com.aphinity.client_analytics_core.api.auth.services.SecureRandomTokenGenerator;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
 import com.aphinity.client_analytics_core.api.security.JwtService;
@@ -19,7 +23,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,6 +35,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.sql.Timestamp;
 import java.util.Map;
 import java.util.Optional;
@@ -87,11 +91,25 @@ class AuthServiceTest {
     @Spy
     private PasswordPolicyValidator passwordPolicyValidator;
 
-    @InjectMocks
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
+        authService = new AuthService(
+            appUserRepository,
+            authSessionRepository,
+            roleRepository,
+            passwordEncoder,
+            jwtService,
+            passwordPolicyValidator,
+            loginAttemptService,
+            new TurnstileCaptchaVerifier(turnstileValidationService),
+            new JdbcOneTimeCodeStore(jdbcTemplate),
+            new OutboxAuthNotificationAdapter(mailOutboxService),
+            userProfileCache,
+            new SecureRandomTokenGenerator(),
+            Clock.systemUTC()
+        );
         ReflectionTestUtils.setField(authService, "recoveryTokenTtlSeconds", 3600L);
         ReflectionTestUtils.setField(authService, "verificationTokenTtlSeconds", 600L);
         ReflectionTestUtils.setField(authService, "recoveryCodeLength", 6);

@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.entities;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import org.junit.jupiter.api.Test;
@@ -15,21 +18,21 @@ class GraphTest {
     @Test
     void setDataNormalizesMultipleTracesToArrayStorage() {
         Graph graph = new Graph();
-        graph.setData(List.of(
+        writeData(graph, List.of(
             Map.of("type", "line", "name", "baseline"),
             Map.of("type", "bar", "name", "actual")
         ));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(2, traces.size());
     }
 
     @Test
     void setDataNormalizesSingleTraceToObjectStorage() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of("type", "pie", "name", "share")));
+        writeData(graph, List.of(Map.of("type", "pie", "name", "share")));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("pie", traces.getFirst().get("type"));
     }
@@ -39,7 +42,7 @@ class GraphTest {
         Graph graph = new Graph();
         IllegalArgumentException ex = assertThrows(
             IllegalArgumentException.class,
-            () -> graph.setData(List.of(Map.of("type", "bar"), "bad"))
+            () -> writeData(graph, List.of(Map.of("type", "bar"), "bad"))
         );
 
         assertTrue(ex.getMessage().contains("index 1"));

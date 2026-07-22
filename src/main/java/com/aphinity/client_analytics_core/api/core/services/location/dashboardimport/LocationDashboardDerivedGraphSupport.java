@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventStatus;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -701,7 +702,7 @@ final class LocationDashboardDerivedGraphSupport {
             return List.of();
         }
         try {
-            return GraphPayloadMapper.toTraceList(graph.getData());
+            return GraphPayloadMapper.toTraceList(GraphRelationalPayloadMapper.readData(graph));
         } catch (IllegalArgumentException ex) {
             return List.of();
         }

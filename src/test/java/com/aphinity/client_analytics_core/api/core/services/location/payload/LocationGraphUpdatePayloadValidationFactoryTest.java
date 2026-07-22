@@ -9,7 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LocationGraphUpdatePayloadValidationFactoryTest {
-    private final LocationGraphUpdatePayloadValidationFactory factory = new LocationGraphUpdatePayloadValidationFactory();
+    private final LocationGraphUpdatePayloadValidationFactory factory = new LocationGraphUpdatePayloadValidationFactory(
+        new CartesianTraceDateOrderCanonicalizer(),
+        List.of(
+            new PieGraphPayloadValidator(),
+            new IndicatorGraphPayloadValidator(),
+            new CartesianGraphPayloadValidator(),
+            new TableGraphPayloadValidator(),
+            new SunburstGraphPayloadValidator()
+        )
+    );
 
     @Test
     void validateForUpdateAcceptsIndicatorPayloadsThatPreserveTheIndicatorContract() {

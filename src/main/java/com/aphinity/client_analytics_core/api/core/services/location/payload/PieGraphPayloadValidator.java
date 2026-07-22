@@ -2,8 +2,10 @@ package com.aphinity.client_analytics_core.api.core.services.location.payload;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.stereotype.Component;
 
-final class PieGraphPayloadValidator implements LocationGraphUpdateTraceValidator {
+@Component
+public final class PieGraphPayloadValidator implements LocationGraphUpdateTraceValidator {
     @Override
     public boolean supports(GraphPayloadFamily family) {
         return family == GraphPayloadFamily.PIE;

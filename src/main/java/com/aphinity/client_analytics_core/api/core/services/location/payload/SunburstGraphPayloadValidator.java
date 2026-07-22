@@ -4,8 +4,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.stereotype.Component;
 
-final class SunburstGraphPayloadValidator implements LocationGraphUpdateTraceValidator {
+@Component
+public final class SunburstGraphPayloadValidator implements LocationGraphUpdateTraceValidator {
     @Override
     public boolean supports(GraphPayloadFamily family) {
         return family == GraphPayloadFamily.SUNBURST;

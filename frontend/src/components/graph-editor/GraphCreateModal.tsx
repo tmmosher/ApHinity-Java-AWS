@@ -2,12 +2,14 @@ import Dialog from "corvu/dialog";
 import {For, Show, createEffect, createSignal} from "solid-js";
 import type {LocationGraphType} from "../../types/Types";
 import {DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE} from "../../util/graph/graphCreate";
+import {BUILTIN_GRAPH_DEFINITIONS, type GraphDefinition} from "../../util/graph/graphTemplateFactory";
 
 const NEW_SECTION_VALUE = "__new_section__";
 
 type GraphCreateModalProps = {
   isOpen: boolean;
   isCreating: boolean;
+  graphDefinitions?: readonly GraphDefinition[];
   sectionOptions: Array<{
     id: number;
     label: string;
@@ -22,20 +24,13 @@ type GraphCreateModalProps = {
   onClose: () => void;
 };
 
-const GRAPH_TYPE_OPTIONS: Array<{value: LocationGraphType; label: string}> = [
-  {value: "pie", label: "Pie"},
-  {value: "indicator", label: "Indicator"},
-  {value: "bar", label: "Bar"},
-  {value: "scatter", label: "Scatter"},
-  {value: "table", label: "Table"},
-  {value: "sunburst", label: "Sunburst"}
-];
-
 export const GraphCreateModal = (props: GraphCreateModalProps) => {
   const [selectedSectionId, setSelectedSectionId] = createSignal("");
   const [selectedGraphType, setSelectedGraphType] = createSignal<LocationGraphType>("pie");
   const [yAxisTitle, setYAxisTitle] = createSignal(DEFAULT_SCATTER_GRAPH_Y_AXIS_TITLE);
   const [createError, setCreateError] = createSignal("");
+  const graphTypeOptions = () => (props.graphDefinitions ?? BUILTIN_GRAPH_DEFINITIONS)
+    .map(({key, label}) => ({value: key, label}));
 
   createEffect(() => {
     if (!props.isOpen) {
@@ -127,7 +122,7 @@ export const GraphCreateModal = (props: GraphCreateModalProps) => {
                 disabled={props.isCreating}
                 onChange={(event) => setSelectedGraphType(event.currentTarget.value as LocationGraphType)}
               >
-                <For each={GRAPH_TYPE_OPTIONS}>
+                <For each={graphTypeOptions()}>
                   {(option) => (
                     <option
                       value={option.value}>{option.label}

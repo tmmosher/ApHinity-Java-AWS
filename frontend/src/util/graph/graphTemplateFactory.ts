@@ -2,6 +2,14 @@ import {z} from "zod";
 
 export type TraceType = "pie" | "bar" | "scatter" | "indicator" | "table" | "sunburst";
 
+export type GraphDefinition = {
+  key: string;
+  label: string;
+  traceType: TraceType;
+  traceAliases?: readonly string[];
+  createTrace: (traceName: string) => Record<string, unknown>;
+};
+
 export const TRACE_COLOR_OPTIONS: Record<string, string> = {
   "Legacy Blue": "#1f77b4",
   "Legacy Green": "#2ca02c",
@@ -227,26 +235,50 @@ export const createSunburstTraceTemplate = (traceName: string): Record<string, u
   marker: {colors: [DEFAULT_TRACE_COLOR]}
 });
 
+export const BUILTIN_GRAPH_DEFINITIONS: readonly GraphDefinition[] = [
+  {key: "pie", label: "Pie", traceType: "pie", createTrace: createPieTraceTemplate},
+  {key: "indicator", label: "Indicator", traceType: "indicator", createTrace: createIndicatorTraceTemplate},
+  {key: "bar", label: "Bar", traceType: "bar", createTrace: createBarTraceTemplate},
+  {
+    key: "scatter",
+    label: "Scatter",
+    traceType: "scatter",
+    traceAliases: ["scattergl", "line"],
+    createTrace: createScatterTraceTemplate
+  },
+  {key: "table", label: "Table", traceType: "table", createTrace: createTableTraceTemplate},
+  {key: "sunburst", label: "Sunburst", traceType: "sunburst", createTrace: createSunburstTraceTemplate}
+] as const;
+
+export const createGraphDefinitionRegistry = (definitions: readonly GraphDefinition[]) => {
+  const byKey = new Map<string, GraphDefinition>();
+  const byTraceType = new Map<string, GraphDefinition>();
+  definitions.forEach((definition) => {
+    if (byKey.has(definition.key)) {
+      throw new Error(`Duplicate graph definition key: ${definition.key}`);
+    }
+    byKey.set(definition.key, definition);
+    [definition.traceType, ...(definition.traceAliases ?? [])].forEach((traceType) => {
+      if (!byTraceType.has(traceType)) {
+        byTraceType.set(traceType, definition);
+      }
+    });
+  });
+  return {byKey, byTraceType};
+};
+
+export const BUILTIN_GRAPH_DEFINITION_REGISTRY = createGraphDefinitionRegistry(BUILTIN_GRAPH_DEFINITIONS);
+
 export const createTraceTemplate = (
-  traceType: TraceType | null,
+  graphDefinitionKey: string | null,
   traceName: string
 ): Record<string, unknown> => {
-  const normalizedType = traceType ?? "bar";
-
-  if (normalizedType === "pie") {
-    return createPieTraceTemplate(traceName);
+  const key = graphDefinitionKey ?? "bar";
+  const definition = BUILTIN_GRAPH_DEFINITION_REGISTRY.byKey.get(key)
+    ?? BUILTIN_GRAPH_DEFINITION_REGISTRY.byTraceType.get(key)
+    ?? BUILTIN_GRAPH_DEFINITION_REGISTRY.byKey.get("bar");
+  if (!definition) {
+    throw new Error("Bar graph definition is missing");
   }
-  if (normalizedType === "indicator") {
-    return createIndicatorTraceTemplate(traceName);
-  }
-  if (normalizedType === "scatter") {
-    return createScatterTraceTemplate(traceName);
-  }
-  if (normalizedType === "table") {
-    return createTableTraceTemplate(traceName);
-  }
-  if (normalizedType === "sunburst") {
-    return createSunburstTraceTemplate(traceName);
-  }
-  return createBarTraceTemplate(traceName);
+  return definition.createTrace(traceName);
 };

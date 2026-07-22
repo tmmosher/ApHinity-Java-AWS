@@ -6,8 +6,8 @@ import com.aphinity.client_analytics_core.api.core.entities.location.LocationUse
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationUserRepository;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
-import jakarta.persistence.EntityManager;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardProjectionInvalidator;
+import com.aphinity.client_analytics_core.api.core.services.PersistenceEntityReloader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -23,27 +23,31 @@ import java.util.Map;
 /** Owns location catalogue, identity, and operational settings. */
 @Service
 public class LocationDetailsService {
-    @Autowired(required = false)
-    private EntityManager entityManager;
+    private PersistenceEntityReloader entityReloader = PersistenceEntityReloader.noop();
 
     private final LocationRepository locationRepository;
     private final LocationUserRepository locationUserRepository;
     private final LocationAccessPolicy accessPolicy;
     private final LocationResponseMapper responseMapper;
-    private final LocationDashboardCacheInvalidationService cacheInvalidationService;
+    private final DashboardProjectionInvalidator cacheInvalidationService;
 
     public LocationDetailsService(
         LocationRepository locationRepository,
         LocationUserRepository locationUserRepository,
         LocationAccessPolicy accessPolicy,
         LocationResponseMapper responseMapper,
-        LocationDashboardCacheInvalidationService cacheInvalidationService
+        DashboardProjectionInvalidator cacheInvalidationService
     ) {
         this.locationRepository = locationRepository;
         this.locationUserRepository = locationUserRepository;
         this.accessPolicy = accessPolicy;
         this.responseMapper = responseMapper;
         this.cacheInvalidationService = cacheInvalidationService;
+    }
+
+    @Autowired(required = false)
+    void configureEntityReloader(PersistenceEntityReloader entityReloader) {
+        this.entityReloader = entityReloader;
     }
 
     @Transactional(readOnly = true)
@@ -118,9 +122,7 @@ public class LocationDetailsService {
     }
 
     private void refresh(Location location) {
-        if (entityManager != null && entityManager.contains(location)) {
-            entityManager.refresh(location);
-        }
+        entityReloader.refreshIfManaged(location);
     }
 
     private String normalizeName(String value) {

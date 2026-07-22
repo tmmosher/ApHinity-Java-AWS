@@ -5,7 +5,7 @@ import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardProjectionInvalidator;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +18,13 @@ public class LocationDashboardUploadService {
     private final LocationRepository locationRepository;
     private final LocationAccessPolicy accessPolicy;
     private final LocationDashboardImportService importService;
-    private final LocationDashboardCacheInvalidationService cacheInvalidationService;
+    private final DashboardProjectionInvalidator cacheInvalidationService;
 
     public LocationDashboardUploadService(
         LocationRepository locationRepository,
         LocationAccessPolicy accessPolicy,
         LocationDashboardImportService importService,
-        LocationDashboardCacheInvalidationService cacheInvalidationService
+        DashboardProjectionInvalidator cacheInvalidationService
     ) {
         this.locationRepository = locationRepository;
         this.accessPolicy = accessPolicy;

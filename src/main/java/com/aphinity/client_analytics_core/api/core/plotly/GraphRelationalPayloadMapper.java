@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Keeps Plotly payloads in sync with the relational trace/point tables.
@@ -42,6 +43,25 @@ public final class GraphRelationalPayloadMapper {
         .withResolverStyle(ResolverStyle.STRICT);
 
     private GraphRelationalPayloadMapper() {
+    }
+
+    /** Reads transport data without making the persistence entity depend on Plotly. */
+    public static Object readData(Graph graph) {
+        return normalize(graph).data();
+    }
+
+    /** Applies transport data to relational graph state outside the entity boundary. */
+    public static void writeData(Graph graph, Object data) {
+        GraphPayloadMapper.GraphPayload normalized = GraphPayloadMapper.normalize(
+            data,
+            graph.getLayout(),
+            graph.getConfig(),
+            graph.getStyle()
+        );
+        syncGraphData(graph, normalized.data());
+        graph.setLayout(normalized.layout());
+        graph.setConfig(normalized.config());
+        graph.setStyle(normalized.style());
     }
 
     public static void syncGraphData(Graph graph, List<Map<String, Object>> traces) {
@@ -179,7 +199,9 @@ public final class GraphRelationalPayloadMapper {
             case "bar", "scatter" -> populateCartesianPoints(graphTrace, trace);
             case "table" -> populateTableRows(graphTrace, trace);
             case "sunburst" -> populateSunburstPoints(graphTrace, trace);
-            default -> throw new IllegalArgumentException("Graph data is invalid");
+            default -> {
+                // Module-defined trace types are stored opaquely in trace_config.
+            }
         }
     }
 
@@ -328,7 +350,9 @@ public final class GraphRelationalPayloadMapper {
                     result.put("marker", marker);
                 }
             }
-            default -> throw new IllegalArgumentException("Graph data is invalid");
+            default -> {
+                // Opaque module-defined traces are already represented by trace_config.
+            }
         }
 
         return result;
@@ -626,14 +650,18 @@ public final class GraphRelationalPayloadMapper {
         if (!(rawType instanceof String type)) {
             throw new IllegalArgumentException("Graph data is invalid");
         }
-        return switch (type.strip().toLowerCase(Locale.ROOT)) {
+        String normalized = type.strip().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("[a-z][a-z0-9._-]{0,63}")) {
+            throw new IllegalArgumentException("Graph data is invalid");
+        }
+        return switch (normalized) {
             case "pie" -> "pie";
             case "indicator" -> "indicator";
             case "bar" -> "bar";
             case "scatter", "scattergl", "line" -> "scatter";
             case "table" -> "table";
             case "sunburst" -> "sunburst";
-            default -> throw new IllegalArgumentException("Graph data is invalid");
+            default -> normalized;
         };
     }
 
@@ -725,9 +753,13 @@ public final class GraphRelationalPayloadMapper {
     }
 
     private static Map<String, Object> extractTraceConfig(Map<String, Object> trace) {
+        String canonicalType = resolveCanonicalTraceType(trace);
         Map<String, Object> config = new LinkedHashMap<>(trace);
         config.remove("type");
         config.remove("name");
+        if (!isBuiltInTraceType(canonicalType)) {
+            return config;
+        }
         config.remove("x");
         config.remove("y");
         config.remove("labels");
@@ -735,13 +767,17 @@ public final class GraphRelationalPayloadMapper {
         config.remove("parents");
         config.remove("values");
         config.remove("value");
-        if ("sunburst".equals(resolveCanonicalTraceType(trace))) {
+        if ("sunburst".equals(canonicalType)) {
             config = extractSunburstTraceConfig(config);
         }
-        if ("table".equals(resolveCanonicalTraceType(trace))) {
+        if ("table".equals(canonicalType)) {
             config = extractTableTraceConfig(config);
         }
         return config;
+    }
+
+    private static boolean isBuiltInTraceType(String traceType) {
+        return Set.of("pie", "indicator", "bar", "scatter", "table", "sunburst").contains(traceType);
     }
 
     private static Map<String, Object> extractSunburstTraceConfig(Map<String, Object> traceConfig) {

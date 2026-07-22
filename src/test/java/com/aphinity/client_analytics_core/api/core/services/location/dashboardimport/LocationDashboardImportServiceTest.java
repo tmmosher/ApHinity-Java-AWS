@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTimeSeriesPoint;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
@@ -401,7 +404,7 @@ class LocationDashboardImportServiceTest {
         Graph resolutionPercentGraph = indicatorGraph(22L, "Percent Resolved", "#9333ea");
         Graph percentConformanceGraph = indicatorGraph(23L, "Percent Conformance");
         Graph byWaterQualityGraph = barGraph(24L, "Non-Conformances", "By Water Quality Category", "#ef4444");
-        byWaterQualityGraph.setData(List.of(Map.of(
+        writeData(byWaterQualityGraph, List.of(Map.of(
             "type", "bar",
             "name", "Trace 1",
             "orientation", "h",
@@ -895,15 +898,20 @@ class LocationDashboardImportServiceTest {
 
     private LocationDashboardImportService buildImportService() {
         Clock clock = Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC);
+        LocationDashboardCorrectiveActionService correctiveActionService =
+            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry);
         return new LocationDashboardImportService(
             spreadsheetParser,
             strategyRegistry,
             measurementBoundRepository,
             locationGraphRepository,
-            serviceEventRepository,
             new LocationDashboardMutationLockService(),
+            new LocationDashboardGraphMatcher(),
+            new LocationDashboardImportedGraphMerger(),
+            correctiveActionService,
             samplePersistenceService,
-            new GraphResponseMapper(),
+            new LocationDashboardHistoricalDataAssembler(correctiveActionService),
+            new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()),
             clock
         );
     }
@@ -1262,7 +1270,7 @@ class LocationDashboardImportServiceTest {
         graph.setStyle(Map.of());
         graph.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
-        graph.setData(data);
+        writeData(graph, data);
         return graph;
     }
 

@@ -6,13 +6,13 @@ import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.Serv
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEventResponsibility;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DerivedGraphRefresher;
 import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.ServiceCalendarBulkEventRowRequest;
 import com.aphinity.client_analytics_core.api.core.response.servicecalendar.ServiceEventResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import jakarta.persistence.EntityManager;
+import com.aphinity.client_analytics_core.api.core.services.PersistenceEntityReloader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -39,8 +39,7 @@ import java.util.List;
 public class LocationEventService {
     private static final Logger log = LoggerFactory.getLogger(LocationEventService.class);
 
-    @Autowired(required = false)
-    private EntityManager entityManager;
+    private PersistenceEntityReloader entityReloader = PersistenceEntityReloader.noop();
 
     private final LocationRepository locationRepository;
     private final ServiceEventRepository serviceEventRepository;
@@ -50,7 +49,7 @@ public class LocationEventService {
     private final ServiceCalendarImportService importService;
     private final ServiceEventAuditService auditService;
     private final MailOutboxCommandService mailOutboxCommandService;
-    private final LocationDashboardRefreshService dashboardRefreshService;
+    private final DerivedGraphRefresher dashboardRefreshService;
 
     public LocationEventService(
         LocationRepository locationRepository,
@@ -61,7 +60,7 @@ public class LocationEventService {
         ServiceCalendarImportService importService,
         ServiceEventAuditService auditService,
         MailOutboxCommandService mailOutboxCommandService,
-        LocationDashboardRefreshService dashboardRefreshService
+        DerivedGraphRefresher dashboardRefreshService
     ) {
         this.locationRepository = locationRepository;
         this.serviceEventRepository = serviceEventRepository;
@@ -72,6 +71,11 @@ public class LocationEventService {
         this.auditService = auditService;
         this.mailOutboxCommandService = mailOutboxCommandService;
         this.dashboardRefreshService = dashboardRefreshService;
+    }
+
+    @Autowired(required = false)
+    void configureEntityReloader(PersistenceEntityReloader entityReloader) {
+        this.entityReloader = entityReloader;
     }
 
     /**
@@ -335,18 +339,8 @@ public class LocationEventService {
     }
 
     private ServiceEvent refreshServiceEventFromStore(Long eventId, ServiceEvent fallbackEvent) {
-        if (entityManager != null) {
-            if (entityManager.contains(fallbackEvent)) {
-                entityManager.refresh(fallbackEvent);
-                return fallbackEvent;
-            }
-
-            ServiceEvent refreshedEvent = entityManager.find(ServiceEvent.class, eventId);
-            if (refreshedEvent != null) {
-                return refreshedEvent;
-            }
-        }
-        return serviceEventRepository.findById(eventId).orElse(fallbackEvent);
+        return entityReloader.refreshOrFind(ServiceEvent.class, eventId, fallbackEvent)
+            .orElseGet(() -> serviceEventRepository.findById(eventId).orElse(fallbackEvent));
     }
 
     /**

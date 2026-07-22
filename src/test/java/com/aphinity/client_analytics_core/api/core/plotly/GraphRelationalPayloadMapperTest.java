@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.plotly;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphCategoryPoint;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace;
@@ -18,9 +21,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraphRelationalPayloadMapperTest {
     @Test
+    void opaqueModuleTraceTypesRoundTripWithoutMapperChanges() {
+        Graph graph = new Graph();
+        Map<String, Object> customTrace = Map.of(
+            "type", "aphinity.custom-network",
+            "name", "Network",
+            "nodes", List.of("A", "B"),
+            "links", List.of(Map.of("source", "A", "target", "B"))
+        );
+
+        writeData(graph, List.of(customTrace));
+
+        assertEquals(List.of(customTrace), GraphPayloadMapper.toTraceList(readData(graph)));
+    }
+
+    @Test
     void setDataSyncsRelationalTraces() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "Live",
             "x", List.of("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"),
@@ -29,7 +47,7 @@ class GraphRelationalPayloadMapperTest {
 
         assertEquals("scatter", graph.getGraphType());
 
-        Object data = graph.getData();
+        Object data = readData(graph);
         assertInstanceOf(List.class, data);
         List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(data);
         assertEquals(1, traces.size());
@@ -42,7 +60,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataPreservesTimeSeriesCustomDataOnPoints() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "Live",
             "x", List.of("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"),
@@ -61,7 +79,7 @@ class GraphRelationalPayloadMapperTest {
             trace.getTimeSeriesPoints().getFirst().getPointMeta().get("customdata")
         );
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(List.of(
             Map.of("sampleCount", 1L, "compliantCount", 1L),
             Map.of("sampleCount", 2L, "compliantCount", 1L)
@@ -71,7 +89,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataPreservesScatterDateStringsWithFlexibleLocalDateFormatting() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "System Type Compliance",
             "x", List.of("2025-7-1", "2025-08-01"),
@@ -81,7 +99,7 @@ class GraphRelationalPayloadMapperTest {
         GraphTrace trace = graph.getGraphTraces().getFirst();
         assertEquals("time_series", trace.getDataMode());
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(List.of("2025-7-1", "2025-08-01"), traces.getFirst().get("x"));
         assertEquals(List.of(97L, 99L), traces.getFirst().get("y"));
     }
@@ -112,7 +130,7 @@ class GraphRelationalPayloadMapperTest {
         trace.setCategoryPoints(new ArrayList<>(List.of(first, second)));
         graph.setGraphTraces(new ArrayList<>(List.of(trace)));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(List.of("2025-7-1", "2025-08-01"), traces.getFirst().get("x"));
         assertEquals(List.of(97L, 99L), traces.getFirst().get("y"));
     }
@@ -121,7 +139,7 @@ class GraphRelationalPayloadMapperTest {
     void getDataReturnsEmptyListWhenGraphHasNoTraces() {
         Graph graph = new Graph();
 
-        Object data = graph.getData();
+        Object data = readData(graph);
         assertInstanceOf(List.class, data);
         assertTrue(GraphPayloadMapper.toTraceList(data).isEmpty());
     }
@@ -145,7 +163,7 @@ class GraphRelationalPayloadMapperTest {
         trace.setCategoryPoints(new ArrayList<>(List.of(point)));
         graph.setGraphTraces(new ArrayList<>(List.of(trace)));
 
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(5))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(5))));
 
         GraphCategoryPoint updatedPoint = graph.getGraphTraces().getFirst().getCategoryPoints().getFirst();
         assertSame(point, updatedPoint);
@@ -156,9 +174,9 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void emptyRelationalPayloadProducesEmptyData() {
         Graph graph = new Graph();
-        graph.setData(List.of());
+        writeData(graph, List.of());
 
-        assertTrue(GraphPayloadMapper.toTraceList(graph.getData()).isEmpty());
+        assertTrue(GraphPayloadMapper.toTraceList(readData(graph)).isEmpty());
     }
 
     @Test
@@ -166,7 +184,7 @@ class GraphRelationalPayloadMapperTest {
         Graph graph = new Graph();
         graph.setGraphType("line");
 
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "Trace 1",
             "x", List.of("2026-01-01T00:00:00Z"),
@@ -179,14 +197,14 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataNormalizesBarTracesToHorizontalOrientation() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "name", "Sessions",
             "x", List.of("Jan", "Feb"),
             "y", List.of(5, 7)
         )));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("h", traces.getFirst().get("orientation"));
@@ -197,7 +215,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataPreservesVerticalBarOrientation() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "name", "Sessions",
             "orientation", "v",
@@ -205,7 +223,7 @@ class GraphRelationalPayloadMapperTest {
             "y", List.of(5, 7)
         )));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("v", traces.getFirst().get("orientation"));
@@ -216,7 +234,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataRoundTripsTableTraceRows() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "table",
             "name", "Summary",
             "header", Map.of(
@@ -239,7 +257,7 @@ class GraphRelationalPayloadMapperTest {
         assertEquals(2, trace.getCategoryPoints().size());
         assertEquals(List.of("Open", 3L), trace.getCategoryPoints().getFirst().getPointMeta().get("values"));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("table", traces.getFirst().get("type"));
         assertEquals(Map.of(
@@ -258,7 +276,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataRoundTripsSunburstNodes() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "sunburst",
             "name", "Conformance",
             "ids", List.of("site", "site/asset"),
@@ -278,7 +296,7 @@ class GraphRelationalPayloadMapperTest {
         assertEquals("site", trace.getCategoryPoints().get(1).getPointMeta().get("parent"));
         assertEquals("#16a34a", trace.getCategoryPoints().get(1).getPointMeta().get("color"));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         Map<String, Object> result = traces.getFirst();
         assertEquals(List.of("site", "site/asset"), result.get("ids"));
         assertEquals(List.of("Site", "Asset"), result.get("labels"));
@@ -291,7 +309,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataDoesNotInventBarMarkerColorsWhenNoneAreProvided() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "name", "Sessions",
             "orientation", "v",
@@ -299,7 +317,7 @@ class GraphRelationalPayloadMapperTest {
             "y", List.of(5, 7)
         )));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertFalse(traces.getFirst().containsKey("marker"));
     }
@@ -307,7 +325,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataRoundTripsPerBarMarkerColors() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "name", "Sessions",
             "orientation", "v",
@@ -319,7 +337,7 @@ class GraphRelationalPayloadMapperTest {
             )
         )));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("v", traces.getFirst().get("orientation"));
@@ -334,7 +352,7 @@ class GraphRelationalPayloadMapperTest {
     @Test
     void setDataRoundTripsPlotlyBarMarkerColorArray() {
         Graph graph = new Graph();
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "name", "Sessions",
             "orientation", "v",
@@ -343,7 +361,7 @@ class GraphRelationalPayloadMapperTest {
             "marker", Map.of("color", List.of("#1f77b4", "#d62728"))
         )));
 
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         @SuppressWarnings("unchecked")
         Map<String, Object> marker = (Map<String, Object>) traces.getFirst().get("marker");
         assertEquals(List.of("#1f77b4", "#d62728"), marker.get("color"));

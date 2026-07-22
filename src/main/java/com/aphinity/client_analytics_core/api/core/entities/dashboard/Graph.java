@@ -1,7 +1,5 @@
 package com.aphinity.client_analytics_core.api.core.entities.dashboard;
 
-import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Index;
@@ -128,23 +126,6 @@ public class Graph {
 
     public void setDescription(String description) {
         this.description = description == null || description.isBlank() ? null : description.strip();
-    }
-
-    public Object getData() {
-        return GraphRelationalPayloadMapper.normalize(this).data();
-    }
-
-    public void setData(Object data) {
-        GraphPayloadMapper.GraphPayload normalized = GraphPayloadMapper.normalize(
-            data,
-            layout,
-            config,
-            style
-        );
-        GraphRelationalPayloadMapper.syncGraphData(this, normalized.data());
-        this.layout = normalized.layout();
-        this.config = normalized.config();
-        this.style = normalized.style();
     }
 
     public String getGraphType() {

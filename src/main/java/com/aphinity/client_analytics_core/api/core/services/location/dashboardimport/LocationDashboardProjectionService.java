@@ -8,19 +8,21 @@ import java.util.Map;
 
 /** Read-side boundary for finite-range graph and table projections. */
 @Service
-public class LocationDashboardProjectionService {
+public class LocationDashboardProjectionService implements DashboardProjectionQuery {
     private final LocationDashboardTimeRangeService engine;
 
     public LocationDashboardProjectionService(LocationDashboardTimeRangeService engine) {
         this.engine = engine;
     }
 
+    @Override
     public Map<Long, LocationDashboardTimeRangeService.MonthRangeGraphProjection> resolveGraphProjections(
         Long locationId, DashboardGraphMonthRange monthRange
     ) {
         return engine.resolveLocationMonthRangeProjections(locationId, monthRange);
     }
 
+    @Override
     public LocationDashboardTablePageResponse resolveTablePage(
         Long locationId, Long graphId, Integer monthRange, Integer page, Integer size
     ) {

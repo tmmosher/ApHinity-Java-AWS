@@ -9,27 +9,21 @@ import com.aphinity.client_analytics_core.api.security.PasswordPolicyValidator;
 import com.aphinity.client_analytics_core.api.security.JwtService;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
-import com.aphinity.client_analytics_core.api.notifications.MailOutboxCommandService;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.UserProfileCache;
-import com.digitalsanctuary.cf.turnstile.service.TurnstileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.security.SecureRandom;
-import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Base64;
+import java.time.Clock;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -46,8 +40,6 @@ public class AuthService {
     // constants
     private static final String TOKEN_TYPE = "Bearer";
     private static final int REFRESH_TOKEN_BYTES = 32;
-    private static final String PASSWORD_RESET_TOKEN_TABLE = "password_reset_token";
-    private static final String EMAIL_VERIFICATION_TOKEN_TABLE = "email_verification_token";
     private static final long ROTATED_TOKEN_REPLAY_GRACE_SECONDS = 5L;
 
     // services
@@ -58,11 +50,12 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordPolicyValidator passwordPolicyValidator;
     private final LoginAttemptService loginAttemptService;
-    private final TurnstileValidationService turnstileValidationService;
-    private final JdbcTemplate jdbcTemplate;
-    private final MailOutboxCommandService mailOutboxCommandService;
+    private final CaptchaVerifier captchaVerifier;
+    private final OneTimeCodeStore oneTimeCodeStore;
+    private final AuthNotificationPort notificationPort;
     private final UserProfileCache userProfileCache;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final SecurityTokenGenerator tokenGenerator;
+    private final Clock clock;
 
     @Value("${app.recovery.token-ttl-seconds:3600}")
     private long recoveryTokenTtlSeconds;
@@ -73,6 +66,7 @@ public class AuthService {
     @Value("${app.recovery.code-length:6}")
     private int recoveryCodeLength;
 
+    @Autowired
     public AuthService(
             AppUserRepository appUserRepository,
             AuthSessionRepository authSessionRepository,
@@ -81,10 +75,12 @@ public class AuthService {
             JwtService jwtService,
             PasswordPolicyValidator passwordPolicyValidator,
             LoginAttemptService loginAttemptService,
-            TurnstileValidationService turnstileValidationService,
-            JdbcTemplate jdbcTemplate,
-            MailOutboxCommandService mailOutboxCommandService,
-            UserProfileCache userProfileCache)
+            CaptchaVerifier captchaVerifier,
+            OneTimeCodeStore oneTimeCodeStore,
+            AuthNotificationPort notificationPort,
+            UserProfileCache userProfileCache,
+            SecurityTokenGenerator tokenGenerator,
+            Clock clock)
     {
         this.appUserRepository = appUserRepository;
         this.authSessionRepository = authSessionRepository;
@@ -93,10 +89,12 @@ public class AuthService {
         this.jwtService = jwtService;
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.loginAttemptService = loginAttemptService;
-        this.turnstileValidationService = turnstileValidationService;
-        this.jdbcTemplate = jdbcTemplate;
-        this.mailOutboxCommandService = mailOutboxCommandService;
+        this.captchaVerifier = captchaVerifier;
+        this.oneTimeCodeStore = oneTimeCodeStore;
+        this.notificationPort = notificationPort;
         this.userProfileCache = userProfileCache;
+        this.tokenGenerator = tokenGenerator;
+        this.clock = clock;
     }
 
     /**
@@ -127,7 +125,7 @@ public class AuthService {
             }
             boolean valid;
             try {
-                valid = turnstileValidationService.validateTurnstileResponse(captchaToken, ipAddress);
+                valid = captchaVerifier.verify(captchaToken, ipAddress);
             } catch (RuntimeException ex) {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Captcha not configured", ex);
             }
@@ -203,7 +201,7 @@ public class AuthService {
     @Transactional
     public void issueAndSendVerificationCode(Long userId, String email) {
         String verificationCode = issueVerificationCode(userId);
-        mailOutboxCommandService.queueVerificationEmail(
+        notificationPort.sendVerificationCode(
             userId,
             email,
             verificationCode,
@@ -229,7 +227,7 @@ public class AuthService {
         AuthSession session = authSessionRepository.findByRefreshTokenHash(tokenHash)
             .orElseThrow(this::invalidRefreshToken);
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         // If a rotated/revoked refresh token is reused, decide whether this looks like a
         // near-simultaneous refresh race (grace period) or a suspicious replay.
         if (session.getRevokedAt() != null || session.getReplacedBySessionId() != null) {
@@ -280,7 +278,6 @@ public class AuthService {
 
     /**
      * Determines whether a refresh token replay should revoke all active sessions.
-     *
      * Recently rotated token replays are treated as probable client-side concurrency races.
      * Outside the grace window, replays are treated as suspicious and trigger global revocation.
      */
@@ -305,7 +302,7 @@ public class AuthService {
         String tokenHash = TokenHasher.sha256(refreshToken);
         authSessionRepository.findByRefreshTokenHash(tokenHash).ifPresent(session -> {
             if (session.getRevokedAt() == null) {
-                session.setRevokedAt(Instant.now());
+                session.setRevokedAt(clock.instant());
                 authSessionRepository.save(session);
             }
         });
@@ -324,7 +321,7 @@ public class AuthService {
         // Recovery always requires captcha because the endpoint can be abused at scale.
         boolean validCaptcha;
         try {
-            validCaptcha = turnstileValidationService.validateTurnstileResponse(captchaToken, ipAddress);
+            validCaptcha = captchaVerifier.verify(captchaToken, ipAddress);
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Captcha not configured", ex);
         }
@@ -343,7 +340,7 @@ public class AuthService {
             return;
         }
 
-        mailOutboxCommandService.queueRecoveryEmail(
+        notificationPort.sendRecoveryCode(
             user.getId(),
             user.getEmail(),
             recoveryCode,
@@ -371,11 +368,14 @@ public class AuthService {
         AppUser user = appUserRepository.findByEmail(email).orElseThrow(this::invalidRecoveryCode);
 
         String tokenHash = TokenHasher.sha256(normalizedCode);
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         // Accept both verification and recovery channels for /verify while keeping each token
         // table isolated for storage and auditing purposes.
-        boolean consumed = consumeOneTimeCode(user.getId(), tokenHash, now, EMAIL_VERIFICATION_TOKEN_TABLE)
-            || consumeOneTimeCode(user.getId(), tokenHash, now, PASSWORD_RESET_TOKEN_TABLE);
+        boolean consumed = consumeOneTimeCode(
+            user.getId(), tokenHash, now, OneTimeCodeStore.Channel.EMAIL_VERIFICATION
+        ) || consumeOneTimeCode(
+            user.getId(), tokenHash, now, OneTimeCodeStore.Channel.PASSWORD_RESET
+        );
         if (!consumed) {
             throw invalidRecoveryCode();
         }
@@ -404,7 +404,7 @@ public class AuthService {
      * Builds a new refresh token session with hashed token storage and expiry metadata.
      */
     private AuthSession buildSession(AppUser user, String refreshToken, String ipAddress, String userAgent) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         AuthSession session = new AuthSession();
         session.setUser(user);
         session.setRefreshTokenHash(TokenHasher.sha256(refreshToken));
@@ -421,7 +421,7 @@ public class AuthService {
         AppUser user = new AppUser();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
-        user.setCreatedAt(Instant.now());
+        user.setCreatedAt(clock.instant());
         user.setName(name);
         Set<Role> roles = new HashSet<>();
         roles.add(requiredRole("client"));
@@ -441,20 +441,14 @@ public class AuthService {
      * Generates a URL-safe, unpadded random refresh token.
      */
     private String generateRefreshToken() {
-        byte[] tokenBytes = new byte[REFRESH_TOKEN_BYTES];
-        secureRandom.nextBytes(tokenBytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+        return tokenGenerator.urlSafeToken(REFRESH_TOKEN_BYTES);
     }
 
     /**
      * @return A random numeric recovery code
      */
     private String generateRecoveryCode() {
-        int length = recoveryCodeLength;
-        int lowerBound = (int) Math.pow(10, length - 1);
-        int upperBound = (int) Math.pow(10, length) - 1;
-        int code = lowerBound + secureRandom.nextInt(upperBound - lowerBound + 1);
-        return Integer.toString(code);
+        return tokenGenerator.numericCode(recoveryCodeLength);
     }
 
     /**
@@ -484,7 +478,7 @@ public class AuthService {
             userId,
             verificationTokenTtlSeconds,
             true,
-            EMAIL_VERIFICATION_TOKEN_TABLE,
+            OneTimeCodeStore.Channel.EMAIL_VERIFICATION,
             "Unable to issue verification code"
         );
     }
@@ -497,7 +491,7 @@ public class AuthService {
             userId,
             recoveryTokenTtlSeconds,
             false,
-            PASSWORD_RESET_TOKEN_TABLE,
+            OneTimeCodeStore.Channel.PASSWORD_RESET,
             "Unable to issue recovery code"
         );
     }
@@ -508,7 +502,7 @@ public class AuthService {
      * @param userId user id owning the code
      * @param ttlSeconds code time-to-live in seconds
      * @param failOnCollision whether token insert collisions should fail the request
-     * @param tokenTable trusted internal table name for the token channel
+     * @param channel trusted token channel
      * @param issueFailureReason error reason when collisions are treated as failures
      * @return raw code, or {@code null} when a collision occurs and collisions are tolerated
      */
@@ -516,31 +510,20 @@ public class AuthService {
             Long userId,
             long ttlSeconds,
             boolean failOnCollision,
-            String tokenTable,
+            OneTimeCodeStore.Channel channel,
             String issueFailureReason
     ) {
-        Instant now = Instant.now();
-        jdbcTemplate.update(
-            "update " + tokenTable + " set consumed_at = ? where user_id = ? and consumed_at is null",
-            Timestamp.from(now),
-            userId
-        );
+        Instant now = clock.instant();
 
         String code = generateRecoveryCode();
         String tokenHash = TokenHasher.sha256(code);
         Instant expiresAt = now.plusSeconds(ttlSeconds);
-        try {
-            jdbcTemplate.update(
-                "insert into " + tokenTable + " (user_id, token_hash, expires_at) values (?, ?, ?)",
-                userId,
-                tokenHash,
-                Timestamp.from(expiresAt)
-            );
-        } catch (DataIntegrityViolationException ex) {
+        boolean stored = oneTimeCodeStore.replaceActiveCode(userId, tokenHash, expiresAt, now, channel);
+        if (!stored) {
             if (!failOnCollision) {
                 return null;
             }
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, issueFailureReason, ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, issueFailureReason);
         }
         return code;
     }
@@ -550,29 +533,13 @@ public class AuthService {
      *
      * @return {@code true} when a matching non-expired token was consumed
      */
-    private boolean consumeOneTimeCode(Long userId, String tokenHash, Instant now, String tokenTable) {
-        Long tokenId;
-        Instant expiresAt;
-        try {
-            Map<String, Object> row = jdbcTemplate.queryForMap(
-                "select id, expires_at from " + tokenTable + " " +
-                    "where user_id = ? and token_hash = ? and consumed_at is null",
-                userId,
-                tokenHash
-            );
-            tokenId = ((Number) row.get("id")).longValue();
-            expiresAt = ((Timestamp) row.get("expires_at")).toInstant();
-        } catch (EmptyResultDataAccessException ex) {
-            return false;
-        }
-
-        // Consume-once semantics: only the first updater can mark the token as used.
-        int updated = jdbcTemplate.update(
-            "update " + tokenTable + " set consumed_at = ? where id = ? and consumed_at is null",
-            Timestamp.from(now),
-            tokenId
-        );
-        return updated != 0 && expiresAt.isAfter(now);
+    private boolean consumeOneTimeCode(
+        Long userId,
+        String tokenHash,
+        Instant now,
+        OneTimeCodeStore.Channel channel
+    ) {
+        return oneTimeCodeStore.consume(userId, tokenHash, now, channel);
     }
 
     // exceptions helpers

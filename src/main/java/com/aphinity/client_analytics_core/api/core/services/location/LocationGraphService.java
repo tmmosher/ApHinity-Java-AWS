@@ -10,7 +10,6 @@ import com.aphinity.client_analytics_core.api.core.entities.location.LocationUse
 import com.aphinity.client_analytics_core.api.core.entities.location.LocationUserId;
 import com.aphinity.client_analytics_core.api.core.entities.location.UserSubscriptionToLocation;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
-import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphDataUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.repositories.location.UserSubscriptionToLocationRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
@@ -29,12 +28,12 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService.MonthRangeGraphProjection;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardProjectionService;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardProjectionQuery;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DerivedGraphRefresher;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardProjectionInvalidator;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory.ValidatedGraphPayload;
-import jakarta.persistence.EntityManager;
+import com.aphinity.client_analytics_core.api.core.services.PersistenceEntityReloader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,11 +65,10 @@ import java.util.Set;
  * scoped to explicit {@link LocationUser} memberships.</p>
  */
 @Service
-public class LocationGraphService {
+public class LocationGraphService implements LocationGraphApplication {
     private static final Logger log = LoggerFactory.getLogger(LocationGraphService.class);
 
-    @Autowired(required = false)
-    private EntityManager entityManager;
+    private PersistenceEntityReloader entityReloader = PersistenceEntityReloader.noop();
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
@@ -81,10 +79,11 @@ public class LocationGraphService {
     private final LocationGraphTemplateFactory locationGraphTemplateFactory;
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
     private final LocationDashboardMutationLockService locationDashboardMutationLockService;
-    private final LocationDashboardProjectionService projectionService;
-    private final LocationDashboardRefreshService refreshService;
-    private final LocationDashboardCacheInvalidationService cacheInvalidationService;
+    private final DashboardProjectionQuery projectionService;
+    private final DerivedGraphRefresher refreshService;
+    private final DashboardProjectionInvalidator cacheInvalidationService;
     private final GraphResponseMapper graphResponseMapper;
+    private final GraphPayloadPort graphPayloadPort;
 
     public LocationGraphService(
         AppUserRepository appUserRepository,
@@ -96,10 +95,11 @@ public class LocationGraphService {
         LocationGraphTemplateFactory locationGraphTemplateFactory,
         LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory,
         LocationDashboardMutationLockService locationDashboardMutationLockService,
-        LocationDashboardProjectionService projectionService,
-        LocationDashboardRefreshService refreshService,
-        LocationDashboardCacheInvalidationService cacheInvalidationService,
-        GraphResponseMapper graphResponseMapper
+        DashboardProjectionQuery projectionService,
+        DerivedGraphRefresher refreshService,
+        DashboardProjectionInvalidator cacheInvalidationService,
+        GraphResponseMapper graphResponseMapper,
+        GraphPayloadPort graphPayloadPort
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
@@ -114,6 +114,12 @@ public class LocationGraphService {
         this.refreshService = refreshService;
         this.cacheInvalidationService = cacheInvalidationService;
         this.graphResponseMapper = graphResponseMapper;
+        this.graphPayloadPort = graphPayloadPort;
+    }
+
+    @Autowired(required = false)
+    void configureEntityReloader(PersistenceEntityReloader entityReloader) {
+        this.entityReloader = entityReloader;
     }
 
     /**
@@ -235,7 +241,7 @@ public class LocationGraphService {
         graph.setLayout(template.layout());
         graph.setConfig(template.config());
         graph.setStyle(template.style());
-        graph.setData(template.data());
+        graphPayloadPort.writeData(graph, template.data());
 
         Graph savedGraph;
         try {
@@ -405,29 +411,11 @@ public class LocationGraphService {
     // The controller may invoke this overload directly when a section layout is supplied,
     // so it needs its own transaction boundary instead of relying on the 3-arg wrapper.
     @Transactional
-    public void updateLocationGraphData(
+    @Override
+    public void updateLocationGraphs(
         Long userId,
         Long locationId,
-        List<LocationGraphDataUpdateRequest> graphUpdates
-    ) {
-        updateLocationGraphData(userId, locationId, graphUpdates, null, null);
-    }
-
-    @Transactional
-    public void updateLocationGraphData(
-        Long userId,
-        Long locationId,
-        List<LocationGraphDataUpdateRequest> graphUpdates,
-        Map<String, Object> sectionLayout
-    ) {
-        updateLocationGraphData(userId, locationId, graphUpdates, sectionLayout, null);
-    }
-
-    @Transactional
-    public void updateLocationGraphData(
-        Long userId,
-        Long locationId,
-        List<LocationGraphDataUpdateRequest> graphUpdates,
+        List<GraphUpdateCommand> graphUpdates,
         Map<String, Object> sectionLayout,
         Integer monthRange
     ) {
@@ -465,7 +453,7 @@ public class LocationGraphService {
             }
 
             boolean hasGraphUpdates = graphUpdates != null && !graphUpdates.isEmpty();
-            Map<Long, LocationGraphDataUpdateRequest> updatesByGraphId = hasGraphUpdates
+            Map<Long, GraphUpdateCommand> updatesByGraphId = hasGraphUpdates
                 ? mapGraphUpdatesById(graphUpdates, locationId, userId)
                 : Map.of();
             DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
@@ -497,14 +485,15 @@ public class LocationGraphService {
 
             Map<Long, ValidatedGraphPayload> validatedPayloads = new LinkedHashMap<>();
             for (Graph graph : graphs) {
-                LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
+                GraphUpdateCommand update = updatesByGraphId.get(graph.getId());
                 try {
                     validateExpectedGraphTimestamp(update, graph, locationId, userId);
                     if (update.data() != null) {
                         ValidatedGraphPayload validatedPayload = locationGraphUpdatePayloadValidationFactory.validateForUpdate(
-                            graph.getData(),
+                            graphPayloadPort.readData(graph),
                             update.data(),
-                            update.layout()
+                            update.layout(),
+                            graphDefinitionKey(graph)
                         );
                         validatedPayloads.put(
                             graph.getId(),
@@ -561,7 +550,7 @@ public class LocationGraphService {
             }
 
             for (Graph graph : graphs) {
-                LocationGraphDataUpdateRequest update = updatesByGraphId.get(graph.getId());
+                GraphUpdateCommand update = updatesByGraphId.get(graph.getId());
                 ValidatedGraphPayload validatedPayload = validatedPayloads.get(graph.getId());
                 graph.setDescription(update.description());
                 if (update.data() != null) {
@@ -577,7 +566,7 @@ public class LocationGraphService {
                     if (update.style() != null) {
                         graph.setStyle(copyGraphObject(update.style()));
                     }
-                    graph.setData(validatedPayload.data());
+                    graphPayloadPort.writeData(graph, validatedPayload.data());
                 } else {
                     if (update.layout() != null) {
                         graph.setLayout(preserveBackendGraphLayoutMetadata(graph.getLayout(), copyGraphObject(update.layout())));
@@ -667,11 +656,11 @@ public class LocationGraphService {
         return false;
     }
 
-    private boolean containsGraphDataUpdates(Collection<LocationGraphDataUpdateRequest> graphUpdates) {
+    private boolean containsGraphDataUpdates(Collection<GraphUpdateCommand> graphUpdates) {
         if (graphUpdates == null || graphUpdates.isEmpty()) {
             return false;
         }
-        for (LocationGraphDataUpdateRequest graphUpdate : graphUpdates) {
+        for (GraphUpdateCommand graphUpdate : graphUpdates) {
             if (graphUpdate != null && graphUpdate.data() != null) {
                 return true;
             }
@@ -1231,6 +1220,14 @@ public class LocationGraphService {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Graph type is invalid");
     }
 
+    private String graphDefinitionKey(Graph graph) {
+        if (graph == null || graph.getStyle() == null) {
+            return null;
+        }
+        Object rawKey = graph.getStyle().get(LocationGraphTemplateFactory.GRAPH_DEFINITION_STYLE_KEY);
+        return rawKey instanceof String key && !key.isBlank() ? key : null;
+    }
+
     private ResponseStatusException invalidSectionLayout() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location section layout is invalid");
     }
@@ -1252,43 +1249,23 @@ public class LocationGraphService {
     }
 
     private Graph refreshGraphFromStore(Long graphId, Graph fallbackGraph) {
-        if (entityManager != null) {
-            if (entityManager.contains(fallbackGraph)) {
-                entityManager.refresh(fallbackGraph);
-                return fallbackGraph;
-            }
-
-            Graph refreshedGraph = entityManager.find(Graph.class, graphId);
-            if (refreshedGraph != null) {
-                return refreshedGraph;
-            }
-        }
-        return graphRepository.findById(graphId).orElse(fallbackGraph);
+        return entityReloader.refreshOrFind(Graph.class, graphId, fallbackGraph)
+            .orElseGet(() -> graphRepository.findById(graphId).orElse(fallbackGraph));
     }
 
     private Location refreshLocationFromStore(Long locationId, Location fallbackLocation) {
-        if (entityManager != null) {
-            if (entityManager.contains(fallbackLocation)) {
-                entityManager.refresh(fallbackLocation);
-                return fallbackLocation;
-            }
-
-            Location refreshedLocation = entityManager.find(Location.class, locationId);
-            if (refreshedLocation != null) {
-                return refreshedLocation;
-            }
-        }
-        return locationRepository.findById(locationId).orElse(fallbackLocation);
+        return entityReloader.refreshOrFind(Location.class, locationId, fallbackLocation)
+            .orElseGet(() -> locationRepository.findById(locationId).orElse(fallbackLocation));
     }
 
-    private Map<Long, LocationGraphDataUpdateRequest> mapGraphUpdatesById(
-        List<LocationGraphDataUpdateRequest> graphUpdates,
+    private Map<Long, GraphUpdateCommand> mapGraphUpdatesById(
+        List<GraphUpdateCommand> graphUpdates,
         Long locationId,
         Long actorUserId
     ) {
-        Map<Long, LocationGraphDataUpdateRequest> updatesById = new LinkedHashMap<>();
+        Map<Long, GraphUpdateCommand> updatesById = new LinkedHashMap<>();
         for (int index = 0; index < graphUpdates.size(); index++) {
-            LocationGraphDataUpdateRequest update = graphUpdates.get(index);
+            GraphUpdateCommand update = graphUpdates.get(index);
             if (update == null || update.graphId() == null) {
                 log.warn(
                     "Rejected graph update row because graph id was missing actorUserId={} locationId={} rowIndex={}",
@@ -1338,7 +1315,7 @@ public class LocationGraphService {
     }
 
     private void validateExpectedGraphTimestamp(
-        LocationGraphDataUpdateRequest update,
+        GraphUpdateCommand update,
         Graph graph,
         Long locationId,
         Long actorUserId

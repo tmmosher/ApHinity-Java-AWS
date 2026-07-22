@@ -6,12 +6,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Builds the initial Plotly payloads used when users create location graphs.
  */
 @Component
 public class LocationGraphTemplateFactory {
+    public static final String GRAPH_DEFINITION_STYLE_KEY = "aphinityDefinition";
     private static final String DEFAULT_GRAPH_COLOR = "#1f77b4";
     private static final String GRAPH_SIZE_LAYOUT_META_KEY = "aphinitySize";
     private static final String GRAPH_SIZE_HALF = "half";
@@ -41,13 +43,21 @@ public class LocationGraphTemplateFactory {
     ) {
     }
 
-    private enum GraphTemplateType {
-        PIE,
-        INDICATOR,
-        BAR,
-        SCATTER,
-        TABLE,
-        SUNBURST
+    private Map<String, LocationGraphDefinition> definitionsByKey;
+
+    public LocationGraphTemplateFactory(List<LocationGraphDefinition> definitions) {
+        configureDefinitions(definitions);
+    }
+
+    private void configureDefinitions(Iterable<LocationGraphDefinition> definitions) {
+        Map<String, LocationGraphDefinition> indexedDefinitions = new LinkedHashMap<>();
+        for (LocationGraphDefinition definition : definitions) {
+            register(indexedDefinitions, definition.key(), definition);
+            for (String alias : definition.aliases()) {
+                register(indexedDefinitions, alias, definition);
+            }
+        }
+        this.definitionsByKey = Map.copyOf(indexedDefinitions);
     }
 
     /**
@@ -58,8 +68,23 @@ public class LocationGraphTemplateFactory {
      * @return graph template ready for persistence
      */
     public GraphTemplate create(String rawGraphType, String locationName) {
-        return switch (parseGraphTemplateType(rawGraphType)) {
-            case PIE -> new GraphTemplate(
+        String definitionKey = normalizeKey(rawGraphType);
+        LocationGraphDefinition definition = definitionKey == null ? null : definitionsByKey.get(definitionKey);
+        if (definition == null) {
+            throw new IllegalArgumentException("Graph type is invalid");
+        }
+        GraphTemplate template = definition.createTemplate(locationName);
+        Map<String, Object> style = new LinkedHashMap<>(template.style());
+        if (!definition.key().equals(definition.traceType())) {
+            style.put(GRAPH_DEFINITION_STYLE_KEY, definition.key());
+        }
+        return new GraphTemplate(
+            template.name(), template.data(), template.layout(), template.config(), Map.copyOf(style)
+        );
+    }
+
+    static GraphTemplate pieTemplate(String locationName) {
+        return new GraphTemplate(
                 "New Pie Graph",
                 List.of(Map.of(
                     "type", "pie",
@@ -92,14 +117,20 @@ public class LocationGraphTemplateFactory {
                 buildDefaultGraphConfig(),
                 buildCompactGraphStyle()
             );
-            case INDICATOR -> new GraphTemplate(
+    }
+
+    static GraphTemplate indicatorTemplate(String locationName) {
+        return new GraphTemplate(
                 "New Indicator Graph",
                 buildIndicatorTemplateData(),
                 buildIndicatorTemplateLayout(),
                 buildDefaultGraphConfig(),
                 buildCompactGraphStyle()
             );
-            case BAR -> new GraphTemplate(
+    }
+
+    static GraphTemplate barTemplate(String locationName) {
+        return new GraphTemplate(
                 "New Bar Graph",
                 List.of(Map.of(
                     "type", "bar",
@@ -119,14 +150,20 @@ public class LocationGraphTemplateFactory {
                 buildDefaultGraphConfig(),
                 buildBarGraphStyle()
             );
-            case SCATTER -> new GraphTemplate(
+    }
+
+    static GraphTemplate scatterTemplate(String locationName) {
+        return new GraphTemplate(
                 "New Plot Graph",
                 buildScatterTemplateData(),
                 buildScatterTemplateLayout(locationName),
                 buildScatterTemplateConfig(),
                 buildScatterTemplateStyle()
             );
-            case TABLE -> new GraphTemplate(
+    }
+
+    static GraphTemplate tableTemplate(String locationName) {
+        return new GraphTemplate(
                 "New Table Graph",
                 buildTableTemplateData(),
                 withGraphSize(Map.of(
@@ -135,7 +172,10 @@ public class LocationGraphTemplateFactory {
                 buildDefaultGraphConfig(),
                 buildFullGraphStyle(640)
             );
-            case SUNBURST -> new GraphTemplate(
+    }
+
+    static GraphTemplate sunburstTemplate(String locationName) {
+        return new GraphTemplate(
                 "New Sunburst Graph",
                 List.of(Map.ofEntries(
                     Map.entry("type", "sunburst"),
@@ -157,33 +197,35 @@ public class LocationGraphTemplateFactory {
                 buildDefaultGraphConfig(),
                 buildFullGraphStyle(640)
             );
-        };
     }
 
-    private GraphTemplateType parseGraphTemplateType(String rawGraphType) {
-        if (rawGraphType == null) {
-            throw new IllegalArgumentException("Graph type is invalid");
+    private static void register(
+        Map<String, LocationGraphDefinition> definitions,
+        String rawKey,
+        LocationGraphDefinition definition
+    ) {
+        String key = normalizeKey(rawKey);
+        if (key == null || definitions.putIfAbsent(key, definition) != null) {
+            throw new IllegalStateException("Duplicate or invalid graph definition key: " + rawKey);
         }
-
-        return switch (rawGraphType.strip().toLowerCase(Locale.ROOT)) {
-            case "pie" -> GraphTemplateType.PIE;
-            case "indicator" -> GraphTemplateType.INDICATOR;
-            case "bar" -> GraphTemplateType.BAR;
-            case "scatter", "line" -> GraphTemplateType.SCATTER;
-            case "table" -> GraphTemplateType.TABLE;
-            case "sunburst" -> GraphTemplateType.SUNBURST;
-            default -> throw new IllegalArgumentException("Graph type is invalid");
-        };
     }
 
-    private Map<String, Object> buildDefaultGraphConfig() {
+    private static String normalizeKey(String rawKey) {
+        if (rawKey == null) {
+            return null;
+        }
+        String normalized = rawKey.strip().toLowerCase(Locale.ROOT);
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private static Map<String, Object> buildDefaultGraphConfig() {
         return Map.of(
             "displayModeBar", false,
             "responsive", false
         );
     }
 
-    private List<Map<String, Object>> buildIndicatorTemplateData() {
+    private static List<Map<String, Object>> buildIndicatorTemplateData() {
         return List.of(
             Map.of(
                 "type", "indicator",
@@ -213,14 +255,14 @@ public class LocationGraphTemplateFactory {
         );
     }
 
-    private Map<String, Object> buildIndicatorTemplateLayout() {
+    private static Map<String, Object> buildIndicatorTemplateLayout() {
         return withGraphSize(Map.of(
             "margin", Map.of("t", 10, "r", 10, "b", 10, "l", 10),
             "showlegend", false
         ), GRAPH_SIZE_HALF);
     }
 
-    private Map<String, Object> buildGraphTitle(String locationName) {
+    private static Map<String, Object> buildGraphTitle(String locationName) {
         return Map.of(
             "x", 0.02,
             "text", locationName == null ? "" : locationName,
@@ -228,7 +270,7 @@ public class LocationGraphTemplateFactory {
         );
     }
 
-    private Map<String, Object> buildCompactGraphStyle() {
+    private static Map<String, Object> buildCompactGraphStyle() {
         return Map.of(
             "theme",
             Map.of(
@@ -245,17 +287,17 @@ public class LocationGraphTemplateFactory {
         );
     }
 
-    private Map<String, Object> buildBarGraphStyle() {
+    private static Map<String, Object> buildBarGraphStyle() {
         return buildFullGraphStyle(320);
     }
 
-    private Map<String, Object> buildFullGraphStyle(int height) {
+    private static Map<String, Object> buildFullGraphStyle(int height) {
         Map<String, Object> style = new LinkedHashMap<>(buildCompactGraphStyle());
         style.put("height", height);
         return Map.copyOf(style);
     }
 
-    private List<Map<String, Object>> buildScatterTemplateData() {
+    private static List<Map<String, Object>> buildScatterTemplateData() {
         return List.of(
             Map.of(
                 "type", "scatter",
@@ -274,7 +316,7 @@ public class LocationGraphTemplateFactory {
         );
     }
 
-    private Map<String, Object> buildScatterTemplateLayout(String locationName) {
+    private static Map<String, Object> buildScatterTemplateLayout(String locationName) {
         Map<String, Object> layout = new LinkedHashMap<>();
         layout.put("title", buildGraphTitle(locationName));
         layout.put("xaxis", Map.of(
@@ -301,14 +343,14 @@ public class LocationGraphTemplateFactory {
         return withGraphSize(layout, GRAPH_SIZE_FULL);
     }
 
-    private Map<String, Object> buildScatterTemplateConfig() {
+    private static Map<String, Object> buildScatterTemplateConfig() {
         return Map.of(
             "displayModeBar", false,
             "responsive", false
         );
     }
 
-    private Map<String, Object> buildScatterTemplateStyle() {
+    private static Map<String, Object> buildScatterTemplateStyle() {
         return Map.of(
             "theme",
             Map.of(
@@ -325,7 +367,7 @@ public class LocationGraphTemplateFactory {
         );
     }
 
-    private List<Map<String, Object>> buildTableTemplateData() {
+    private static List<Map<String, Object>> buildTableTemplateData() {
         return List.of(Map.of(
             "type", "table",
             "name", "Trace 1",
@@ -342,7 +384,7 @@ public class LocationGraphTemplateFactory {
         ));
     }
 
-    private Map<String, Object> withGraphSize(Map<String, Object> rawLayout, String graphSize) {
+    private static Map<String, Object> withGraphSize(Map<String, Object> rawLayout, String graphSize) {
         Map<String, Object> layout = new LinkedHashMap<>(rawLayout);
         Object rawMeta = layout.get("meta");
         Map<String, Object> meta = rawMeta instanceof Map<?, ?> rawMetaMap
@@ -353,7 +395,7 @@ public class LocationGraphTemplateFactory {
         return Map.copyOf(layout);
     }
 
-    private Map<String, Object> copyUnknownObjectMap(Map<?, ?> rawMap) {
+    private static Map<String, Object> copyUnknownObjectMap(Map<?, ?> rawMap) {
         Map<String, Object> copy = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
             if (entry.getKey() != null) {

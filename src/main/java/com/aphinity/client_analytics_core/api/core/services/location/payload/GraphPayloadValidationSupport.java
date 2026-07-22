@@ -21,7 +21,11 @@ final class GraphPayloadValidationSupport {
             throw invalidGraphData();
         }
 
-        return switch (traceType.strip().toLowerCase(Locale.ROOT)) {
+        String normalized = traceType.strip().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("[a-z][a-z0-9._-]{0,63}")) {
+            throw invalidGraphData();
+        }
+        return switch (normalized) {
             case "pie" -> GraphPayloadFamily.PIE;
             case "indicator" -> GraphPayloadFamily.INDICATOR;
             case "bar", "scatter", "scattergl", "line" -> GraphPayloadFamily.CARTESIAN;
@@ -36,14 +40,18 @@ final class GraphPayloadValidationSupport {
             throw invalidGraphData();
         }
 
-        return switch (traceType.strip().toLowerCase(Locale.ROOT)) {
+        String normalized = traceType.strip().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("[a-z][a-z0-9._-]{0,63}")) {
+            throw invalidGraphData();
+        }
+        return switch (normalized) {
             case "pie" -> "pie";
             case "indicator" -> "indicator";
             case "bar" -> "bar";
             case "scatter", "scattergl", "line" -> "scatter";
             case "table" -> "table";
             case "sunburst" -> "sunburst";
-            default -> throw invalidGraphData();
+            default -> normalized;
         };
     }
 

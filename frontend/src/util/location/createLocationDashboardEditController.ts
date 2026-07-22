@@ -30,14 +30,7 @@ import {
   cloneLocationSectionLayout,
   reconcileLocationSectionLayoutWithGraphs
 } from "./dashboardLayoutEdit";
-import {
-  createLocationGraphById,
-  deleteLocationGraphById,
-  deleteLocationSectionById,
-  renameLocationGraphById,
-  saveLocationGraphsById,
-  uploadLocationDashboardSpreadsheetById
-} from "../graph/locationDetailApi";
+import type {LocationDashboardGateway} from "../graph/locationDashboardGateway";
 import {monthRangeForDashboardTimeRange} from "./dashboardTimeRange";
 
 type LocationDashboardEditControllerProps = {
@@ -50,6 +43,7 @@ type LocationDashboardEditControllerProps = {
   canEditGraphs: Accessor<boolean>;
   graphTimeRange: Accessor<LocationGraphTimeRange>;
   shouldResetDashboardState: (nextLocationId: string) => boolean;
+  gateway: LocationDashboardGateway;
 };
 
 type DashboardSnapshot = {
@@ -349,7 +343,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
       throw new Error("Unable to rename graph.");
     }
 
-    const result = await renameLocationGraphById(props.host, props.locationId(), graphId, name);
+    const result = await props.gateway.renameGraph(props.host, props.locationId(), graphId, name);
     setWorkingGraphs((currentGraphs) =>
       currentGraphs.map((graph) =>
         graph.id === graphId
@@ -394,7 +388,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setIsCreatingGraph(true);
 
     try {
-      createdGraph = await createLocationGraphById(
+      createdGraph = await props.gateway.createGraph(
         props.host,
         createLocationId,
         buildCreateLocationGraphRequest(request)
@@ -406,7 +400,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
 
       const postCreateUpdate = buildPostCreateGraphUpdate(createdGraph, request);
       if (postCreateUpdate) {
-        await saveLocationGraphsById(props.host, createLocationId, [postCreateUpdate]);
+        await props.gateway.saveGraphs(props.host, createLocationId, [postCreateUpdate]);
         if (createLocationId !== props.locationId() || createSessionToken !== locationSessionToken()) {
           return;
         }
@@ -479,7 +473,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setIsDeletingGraph(true);
 
     try {
-      await deleteLocationGraphById(props.host, deleteLocationId, graphId);
+      await props.gateway.deleteGraph(props.host, deleteLocationId, graphId);
 
       if (deleteLocationId !== props.locationId() || deleteSessionToken !== locationSessionToken()) {
         return;
@@ -557,7 +551,7 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
     setIsDeletingSection(true);
 
     try {
-      await deleteLocationSectionById(props.host, deleteLocationId, sectionId);
+      await props.gateway.deleteSection(props.host, deleteLocationId, sectionId);
       if (deleteLocationId !== props.locationId() || deleteSessionToken !== locationSessionToken()) {
         return;
       }
@@ -619,9 +613,9 @@ export const createLocationDashboardEditController = (props: LocationDashboardEd
 
     setIsSavingGraphChanges(true);
     try {
-      await saveLocationGraphsById(props.host, saveLocationId, graphUpdates, sectionLayoutUpdate, updateMonthRange);
+      await props.gateway.saveGraphs(props.host, saveLocationId, graphUpdates, sectionLayoutUpdate, updateMonthRange);
       if (spreadsheetFile) {
-        await uploadLocationDashboardSpreadsheetById(props.host, saveLocationId, spreadsheetFile, true, -1);
+        await props.gateway.uploadSpreadsheet(props.host, saveLocationId, spreadsheetFile, true, -1);
       }
       if (saveLocationId !== props.locationId() || saveSessionToken !== locationSessionToken()) {
         return;

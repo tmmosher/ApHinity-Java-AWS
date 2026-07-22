@@ -6,6 +6,7 @@ import {
   syncPieMarkerColors,
   INDICATOR_THRESHOLD_COLOR,
   TRACE_COLOR_OPTIONS,
+  BUILTIN_GRAPH_DEFINITION_REGISTRY,
   type TraceType
 } from "./graphTemplateFactory";
 import type { EditableGraphPayload } from "./graphEditor";
@@ -14,16 +15,6 @@ export type {TraceType};
 export const AUTO_SIZE_TRACE_FLAG = "autoSize";
 export type BarOrientation = "h" | "v";
 export type CartesianAxisValueMode = "auto" | "numeric" | "categorical";
-
-export const TRACE_EDITOR_BY_TYPE: Record<string, TraceType> = {
-  pie: "pie",
-  bar: "bar",
-  scatter: "scatter",
-  indicator: "indicator",
-  table: "table",
-  sunburst: "sunburst",
-  scattergl: "scatter"
-};
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -83,7 +74,7 @@ const getTraceObject = (trace: Record<string, unknown>, field: string): Record<s
 
 export const getTraceType = (trace: Record<string, unknown>): TraceType | null => {
   const typeValue = typeof trace.type === "string" ? trace.type.toLowerCase() : "";
-  return TRACE_EDITOR_BY_TYPE[typeValue] ?? null;
+  return BUILTIN_GRAPH_DEFINITION_REGISTRY.byTraceType.get(typeValue)?.traceType ?? null;
 };
 
 const isNumericList = (values: unknown[]): boolean =>

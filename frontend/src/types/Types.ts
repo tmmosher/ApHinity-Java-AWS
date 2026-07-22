@@ -107,7 +107,8 @@ export interface LocationGraphRenameResult {
     updatedAt: string;
 }
 
-export type LocationGraphType = "pie" | "indicator" | "bar" | "scatter" | "table" | "sunburst";
+/** Semantic graph-definition key; modules may share the same Plotly trace type. */
+export type LocationGraphType = string;
 
 export type ServiceEventResponsibility = "client" | "partner";
 

@@ -3,9 +3,9 @@ package com.aphinity.client_analytics_core.api.core.services.location.dashboardi
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
+import com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.MeasurementBoundRepository;
-import com.aphinity.client_analytics_core.api.core.repositories.servicecalendar.ServiceEventRepository;
 import com.aphinity.client_analytics_core.api.core.requests.servicecalendar.LocationEventRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
@@ -45,8 +45,8 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 public class LocationDashboardImportService {
     private static final Logger log = LoggerFactory.getLogger(LocationDashboardImportService.class);
 
-    private final LocationDashboardSpreadsheetParser spreadsheetParser;
-    private final LocationDashboardImportStrategyRegistry strategyRegistry;
+    private final DashboardWorkbookParser spreadsheetParser;
+    private final DashboardImportStrategyResolver strategyRegistry;
     private final MeasurementBoundRepository measurementBoundRepository;
     private final LocationGraphRepository locationGraphRepository;
     private final LocationDashboardMutationLockService mutationLockService;
@@ -60,57 +60,8 @@ public class LocationDashboardImportService {
 
     @Autowired
     public LocationDashboardImportService(
-        LocationDashboardSpreadsheetParser spreadsheetParser,
-        LocationDashboardImportStrategyRegistry strategyRegistry,
-        MeasurementBoundRepository measurementBoundRepository,
-        LocationGraphRepository locationGraphRepository,
-        ServiceEventRepository serviceEventRepository,
-        LocationDashboardMutationLockService mutationLockService,
-        LocationDashboardSamplePersistenceService samplePersistenceService,
-        GraphResponseMapper graphResponseMapper
-    ) {
-        this(
-            spreadsheetParser,
-            strategyRegistry,
-            measurementBoundRepository,
-            locationGraphRepository,
-            serviceEventRepository,
-            mutationLockService,
-            samplePersistenceService,
-            graphResponseMapper,
-            Clock.systemDefaultZone()
-        );
-    }
-
-    LocationDashboardImportService(
-        LocationDashboardSpreadsheetParser spreadsheetParser,
-        LocationDashboardImportStrategyRegistry strategyRegistry,
-        MeasurementBoundRepository measurementBoundRepository,
-        LocationGraphRepository locationGraphRepository,
-        ServiceEventRepository serviceEventRepository,
-        LocationDashboardMutationLockService mutationLockService,
-        LocationDashboardSamplePersistenceService samplePersistenceService,
-        GraphResponseMapper graphResponseMapper,
-        Clock clock
-    ) {
-        this(
-            spreadsheetParser,
-            strategyRegistry,
-            measurementBoundRepository,
-            locationGraphRepository,
-            mutationLockService,
-            new LocationDashboardGraphMatcher(),
-            new LocationDashboardImportedGraphMerger(),
-            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry),
-            samplePersistenceService,
-            graphResponseMapper,
-            clock
-        );
-    }
-
-    LocationDashboardImportService(
-        LocationDashboardSpreadsheetParser spreadsheetParser,
-        LocationDashboardImportStrategyRegistry strategyRegistry,
+        DashboardWorkbookParser spreadsheetParser,
+        DashboardImportStrategyResolver strategyRegistry,
         MeasurementBoundRepository measurementBoundRepository,
         LocationGraphRepository locationGraphRepository,
         LocationDashboardMutationLockService mutationLockService,
@@ -118,6 +69,7 @@ public class LocationDashboardImportService {
         LocationDashboardImportedGraphMerger importedGraphMerger,
         LocationDashboardCorrectiveActionService correctiveActionService,
         LocationDashboardSamplePersistenceService samplePersistenceService,
+        LocationDashboardHistoricalDataAssembler historicalDataAssembler,
         GraphResponseMapper graphResponseMapper,
         Clock clock
     ) {
@@ -130,7 +82,7 @@ public class LocationDashboardImportService {
         this.importedGraphMerger = importedGraphMerger;
         this.correctiveActionService = correctiveActionService;
         this.samplePersistenceService = samplePersistenceService;
-        this.historicalDataAssembler = new LocationDashboardHistoricalDataAssembler(correctiveActionService);
+        this.historicalDataAssembler = historicalDataAssembler;
         this.graphResponseMapper = graphResponseMapper;
         this.clock = clock;
     }
@@ -325,7 +277,7 @@ public class LocationDashboardImportService {
                 strategy.locationName()
             ));
             previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(graphDefinition.graphType()));
-            previewGraph.setData(importedGraphMerger.mergeImportedGraphData(
+            GraphRelationalPayloadMapper.writeData(previewGraph, importedGraphMerger.mergeImportedGraphData(
                 previewGraph,
                 computedGraphPayload.data(),
                 resetLegacyPercentHistory
@@ -383,7 +335,7 @@ public class LocationDashboardImportService {
                 derivedGraphDefinition
             ));
             previewGraph.setGraphType(LocationDashboardGraphMetadataSupport.normalizeGraphType(derivedGraphDefinition.graphType()));
-            previewGraph.setData(LocationDashboardDerivedGraphSupport.buildPayload(
+            GraphRelationalPayloadMapper.writeData(previewGraph, LocationDashboardDerivedGraphSupport.buildPayload(
                 derivedGraphDefinition,
                 previewGraph,
                 historicalDerivedData,
@@ -444,7 +396,7 @@ public class LocationDashboardImportService {
         copy.setLayout(LocationDashboardGraphMetadataSupport.copyMutableMap(source.getLayout()));
         copy.setConfig(LocationDashboardGraphMetadataSupport.copyMutableMap(source.getConfig()));
         copy.setStyle(LocationDashboardGraphMetadataSupport.copyMutableMap(source.getStyle()));
-        copy.setData(LocationDashboardGraphMetadataSupport.currentTraceList(source));
+        GraphRelationalPayloadMapper.writeData(copy, LocationDashboardGraphMetadataSupport.currentTraceList(source));
         return copy;
     }
 

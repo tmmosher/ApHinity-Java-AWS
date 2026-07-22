@@ -16,26 +16,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Owns corrective-action preview rules and historical corrective-action reconstruction.
  */
-final class LocationDashboardCorrectiveActionService {
+@Component
+public final class LocationDashboardCorrectiveActionService {
     private static final LocalTime ALL_DAY_START_TIME = LocalTime.MIDNIGHT;
     private static final LocalTime ALL_DAY_END_TIME = LocalTime.of(23, 59, 59);
 
     private final ServiceEventRepository serviceEventRepository;
     private final Clock clock;
-    private final LocationDashboardImportStrategyRegistry strategyRegistry;
+    private final DashboardImportStrategyResolver strategyRegistry;
 
     LocationDashboardCorrectiveActionService(ServiceEventRepository serviceEventRepository, Clock clock) {
         this(serviceEventRepository, clock, null);
     }
 
-    LocationDashboardCorrectiveActionService(
+    @Autowired
+    public LocationDashboardCorrectiveActionService(
         ServiceEventRepository serviceEventRepository,
         Clock clock,
-        LocationDashboardImportStrategyRegistry strategyRegistry
+        DashboardImportStrategyResolver strategyRegistry
     ) {
         this.serviceEventRepository = serviceEventRepository;
         this.clock = clock;

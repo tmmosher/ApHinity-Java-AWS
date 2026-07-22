@@ -4,7 +4,7 @@ import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
-import jakarta.persistence.EntityManager;
+import com.aphinity.client_analytics_core.api.core.services.PersistenceEntityReloader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,8 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 /** Owns location thumbnail conversion, persistence, and authorized retrieval. */
 @Service
 public class LocationThumbnailService {
-    @Autowired(required = false)
-    private EntityManager entityManager;
+    private PersistenceEntityReloader entityReloader = PersistenceEntityReloader.noop();
 
     private final LocationRepository locationRepository;
     private final LocationThumbnailImageService imageService;
@@ -35,6 +34,11 @@ public class LocationThumbnailService {
         this.responseMapper = responseMapper;
     }
 
+    @Autowired(required = false)
+    void configureEntityReloader(PersistenceEntityReloader entityReloader) {
+        this.entityReloader = entityReloader;
+    }
+
     @Transactional
     public LocationResponse updateThumbnail(Long userId, Long locationId, MultipartFile file) {
         AppUser user = accessPolicy.requireUser(userId);
@@ -43,9 +47,7 @@ public class LocationThumbnailService {
         location.setThumbnail(imageService.convertToWebp(file));
         Location persisted = locationRepository.saveAndFlush(location);
         if (persisted != null) location = persisted;
-        if (entityManager != null && entityManager.contains(location)) {
-            entityManager.refresh(location);
-        }
+        entityReloader.refreshIfManaged(location);
         return responseMapper.toResponse(location, user);
     }
 

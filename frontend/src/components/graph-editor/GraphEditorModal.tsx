@@ -1,6 +1,7 @@
 import Dialog from "corvu/dialog";
 import Popover from "corvu/popover";
 import {batch, Match, Show, Switch, createEffect, createMemo, createSignal, on} from "solid-js";
+import {Dynamic} from "solid-js/web";
 import {loadPlotlyModule} from "../common/Chart";
 import CartesianTraceEditor from "./CartesianTraceEditor";
 import IndicatorTraceEditor from "./IndicatorTraceEditor";
@@ -68,6 +69,7 @@ import {
   TRACE_COLOR_OPTIONS,
   parseIndicatorValueInput
 } from "../../util/graph/graphTemplateFactory";
+import type {GraphEditorPlugin} from "../../util/graph/graphEditorPlugin";
 
 type GraphEditorModalProps = {
   isOpen: boolean;
@@ -75,6 +77,7 @@ type GraphEditorModalProps = {
   canRenameGraph: boolean;
   canDeleteGraph: boolean;
   canEditData?: boolean;
+  editorPlugins?: readonly GraphEditorPlugin[];
   canUndo: boolean;
   isDeleting: boolean;
   isSaving: boolean;
@@ -254,6 +257,12 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
   const selectedTraceType = createMemo(() => {
     const trace = selectedTrace();
     return trace ? getTraceType(trace) : null;
+  });
+
+  const selectedEditorPlugin = createMemo(() => {
+    const trace = selectedTrace();
+    const rawType = trace && typeof trace.type === "string" ? trace.type.toLowerCase() : "";
+    return props.editorPlugins?.find((plugin) => plugin.supportsTraceType(rawType));
   });
 
   const unsupportedTraceType = createMemo(() => {
@@ -1032,14 +1041,17 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
               }
             >
               <Show
-                when={selectedTraceType()}
+                when={selectedTraceType() || selectedEditorPlugin()}
                 fallback={
                   <p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                     Unsupported trace type "{unsupportedTraceType()}". Supported editors: pie, indicator, bar, scatter, table, sunburst.
                   </p>
                 }
               >
-                <Switch>
+                <Show
+                  when={selectedEditorPlugin()}
+                  keyed
+                  fallback={<Switch>
                   <Match when={selectedTraceType() === "pie"}>
                     <PieTraceEditor
                       rowIndexes={pieRowIndexes()}
@@ -1193,7 +1205,17 @@ export const GraphEditorModal = (props: GraphEditorModalProps) => {
                       }
                     />
                   </Match>
-                </Switch>
+                  </Switch>}
+                >
+                  {(plugin) => (
+                    <Dynamic
+                      component={plugin.component}
+                      trace={selectedTrace() ?? {}}
+                      isDataEditingDisabled={isDataEditingDisabled()}
+                      onChange={(nextTrace) => updateSelectedTrace(() => nextTrace)}
+                    />
+                  )}
+                </Show>
               </Show>
             </Show>
           </div>

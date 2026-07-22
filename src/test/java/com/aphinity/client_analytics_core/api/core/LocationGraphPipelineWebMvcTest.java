@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.security.AccessTokenRefreshFilter;
@@ -7,6 +10,7 @@ import com.aphinity.client_analytics_core.api.core.controllers.location.Location
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
+import com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.LocationGraphRepository;
 import com.aphinity.client_analytics_core.api.core.repositories.location.LocationRepository;
@@ -16,6 +20,7 @@ import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.location.GraphResponseMapper;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
+import com.aphinity.client_analytics_core.api.core.services.location.BuiltinLocationGraphDefinitions;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
@@ -25,6 +30,12 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.CartesianTraceDateOrderCanonicalizer;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.PieGraphPayloadValidator;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.IndicatorGraphPayloadValidator;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.CartesianGraphPayloadValidator;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.TableGraphPayloadValidator;
+import com.aphinity.client_analytics_core.api.core.services.location.payload.SunburstGraphPayloadValidator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -73,12 +84,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 )
 @Import({
     LocationGraphTemplateFactory.class,
+    BuiltinLocationGraphDefinitions.class,
     LocationGraphUpdatePayloadValidationFactory.class,
+    CartesianTraceDateOrderCanonicalizer.class,
+    PieGraphPayloadValidator.class,
+    IndicatorGraphPayloadValidator.class,
+    CartesianGraphPayloadValidator.class,
+    TableGraphPayloadValidator.class,
+    SunburstGraphPayloadValidator.class,
     LocationDashboardMutationLockService.class,
     LocationDashboardProjectionService.class,
     LocationDashboardRefreshService.class,
     LocationDashboardCacheInvalidationService.class,
     GraphResponseMapper.class,
+    RelationalPlotlyGraphPayloadAdapter.class,
     LocationGraphService.class,
     LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class
 })
@@ -135,7 +154,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(31L);
         graph.setName("Fill ratio");
-        graph.setData(Map.of(
+        writeData(graph, Map.of(
             "hole", 0.72,
             "sort", false,
             "type", "pie",
@@ -201,7 +220,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(35L);
         graph.setName("Resolution Percent");
-        graph.setData(Map.of(
+        writeData(graph, Map.of(
             "type", "indicator",
             "name", "Trace 1",
             "mode", "gauge+number",
@@ -283,7 +302,7 @@ class LocationGraphPipelineWebMvcTest {
         graph.setLayout(Map.of("showlegend", true));
         graph.setConfig(Map.of("responsive", true));
         graph.setStyle(Map.of("width", "100%"));
-        graph.setData(List.of(Map.of("type", "bar", "name", "Sessions", "y", List.of(4, 9, 6))));
+        writeData(graph, List.of(Map.of("type", "bar", "name", "Sessions", "y", List.of(4, 9, 6))));
 
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
@@ -352,7 +371,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(310L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         graph.setLayout(Map.of("title", "Original title"));
         graph.setConfig(Map.of("displayModeBar", false));
         graph.setStyle(Map.of("height", 240));
@@ -380,7 +399,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isNoContent());
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("h", traces.getFirst().get("orientation"));
@@ -402,7 +421,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(310L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
             .thenReturn(List.of(graph));
 
@@ -426,7 +445,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isNoContent());
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("v", traces.getFirst().get("orientation"));
@@ -448,7 +467,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(310L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
             .thenReturn(List.of(graph));
 
@@ -472,7 +491,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isNoContent());
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("h", traces.getFirst().get("orientation"));
@@ -494,7 +513,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(310L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
             .thenReturn(List.of(graph));
 
@@ -527,7 +546,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isNoContent());
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("bar", traces.getFirst().get("type"));
         assertEquals("v", traces.getFirst().get("orientation"));
@@ -553,7 +572,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(310L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "Utility SPD",
             "x", List.of("2025-7-1", "2025-08-01"),
@@ -587,7 +606,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isNoContent());
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(1, traces.size());
         assertEquals("scatter", traces.getFirst().get("type"));
         assertEquals(List.of("2025-7-1", "2025-08-01"), traces.getFirst().get("x"));
@@ -609,7 +628,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(311L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
             .thenReturn(List.of(graph));
 
@@ -634,7 +653,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(status().isNoContent());
 
         verify(graphRepository).saveAllAndFlush(List.of(graph));
-        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(graph.getData());
+        List<Map<String, Object>> traces = GraphPayloadMapper.toTraceList(readData(graph));
         assertEquals(2, traces.size());
         assertEquals("Actual", traces.get(0).get("name"));
         assertEquals("h", traces.get(0).get("orientation"));
@@ -981,7 +1000,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(graphId);
         graph.setName("Delete me");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, graphId))
             .thenReturn(Optional.of(graph));
         when(locationGraphRepository.findByIdGraphId(graphId)).thenReturn(List.of());
@@ -1057,7 +1076,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(410L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         graph.setUpdatedAt(Instant.parse("2026-01-03T00:00:00Z"));
         when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, 410L))
             .thenReturn(Optional.of(graph));
@@ -1094,7 +1113,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(411L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
         when(graphRepository.findByLocationIdAndGraphIdForUpdate(locationId, 411L))
             .thenReturn(Optional.of(graph));
 
@@ -1125,7 +1144,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(312L);
         graph.setName("Editable graph");
-        graph.setData(List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
+        writeData(graph, List.of(Map.of("type", "bar", "name", "Current", "y", List.of(1, 2, 3))));
         graph.setUpdatedAt(Instant.parse("2026-01-10T00:00:00Z"));
         when(graphRepository.findByLocationIdAndGraphIdInForUpdate(eq(locationId), anyCollection()))
             .thenReturn(List.of(graph));
@@ -1167,7 +1186,7 @@ class LocationGraphPipelineWebMvcTest {
         Graph graph = new Graph();
         graph.setId(313L);
         graph.setName("Resolution Percent");
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "indicator",
             "mode", "gauge+number",
             "value", 68,

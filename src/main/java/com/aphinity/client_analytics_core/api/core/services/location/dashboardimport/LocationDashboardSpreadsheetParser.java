@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * Parses a configured dashboard workbook into rows with ordered, dynamic identity values.
  */
 @Service
-public class LocationDashboardSpreadsheetParser {
+public class LocationDashboardSpreadsheetParser implements DashboardWorkbookParser {
     private static final int MIN_DATE_ROW_SCORE = 1;
     private static final String VALIDATION_SHEET_NAME = "validation";
     private static final Pattern NUMERIC_TEXT_PATTERN = Pattern.compile(
@@ -70,6 +70,7 @@ public class LocationDashboardSpreadsheetParser {
      * @param identityPattern configured identity headers and aliases
      * @return parsed workbook rows and cells
      */
+    @Override
     public ParsedDashboardWorkbook parse(
         MultipartFile file,
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern

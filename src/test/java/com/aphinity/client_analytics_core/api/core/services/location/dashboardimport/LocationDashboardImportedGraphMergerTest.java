@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import org.junit.jupiter.api.Test;
 
@@ -183,7 +186,7 @@ class LocationDashboardImportedGraphMergerTest {
         graph.setStyle(Map.of());
         graph.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-01-02T00:00:00Z"));
-        graph.setData(data);
+        writeData(graph, data);
         return graph;
     }
 }

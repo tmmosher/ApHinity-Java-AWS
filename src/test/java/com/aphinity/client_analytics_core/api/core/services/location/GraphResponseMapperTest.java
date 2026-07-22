@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.services.location;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
 import org.junit.jupiter.api.Test;
@@ -18,14 +21,14 @@ class GraphResponseMapperTest {
         graph.setName("Water Quality Compliance");
         graph.setCreatedAt(Instant.parse("2026-03-20T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-03-20T00:00:00Z"));
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "HPC",
             "x", List.of("2025-11-01", "2025-12-05", "2026-01-15", "2026-03-10"),
             "y", List.of(4, 5, 7, 9)
         )));
 
-        GraphResponse response = new GraphResponseMapper().toResponse(graph);
+        GraphResponse response = new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()).toResponse(graph);
 
         assertEquals(10L, response.id());
         assertEquals("Water Quality Compliance", response.name());
@@ -46,7 +49,7 @@ class GraphResponseMapperTest {
         graph.setLayout(Map.of("title", "All samples"));
         graph.setConfig(Map.of("displayModeBar", false));
         graph.setStyle(Map.of("height", 260));
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "scatter",
             "name", "HPC",
             "x", List.of("2025-11-01", "2026-03-10"),
@@ -59,7 +62,7 @@ class GraphResponseMapperTest {
             "y", List.of(9)
         ));
 
-        GraphResponse response = new GraphResponseMapper().toResponse(graph, rangeData);
+        GraphResponse response = new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()).toResponse(graph, rangeData);
 
         assertEquals(rangeData, response.data());
         assertEquals(Map.of("title", "All samples"), response.layout());
@@ -75,14 +78,14 @@ class GraphResponseMapperTest {
         graph.setCreatedAt(Instant.parse("2026-03-20T00:00:00Z"));
         graph.setUpdatedAt(Instant.parse("2026-03-21T00:00:00Z"));
         graph.setLayout(Map.of("title", "All samples"));
-        graph.setData(List.of(Map.of("type", "scatter", "x", List.of("2026-03-10"), "y", List.of(9))));
+        writeData(graph, List.of(Map.of("type", "scatter", "x", List.of("2026-03-10"), "y", List.of(9))));
         List<Map<String, Object>> rangeData = List.of(Map.of("type", "scatter", "x", List.of("2026-03-10"), "y", List.of(9)));
         Map<String, Object> rangeLayout = Map.of(
             "title", "All samples",
             "xaxis", Map.of("range", List.of("2026-01-01", "2026-03-20"))
         );
 
-        GraphResponse response = new GraphResponseMapper().toResponse(graph, rangeData, rangeLayout);
+        GraphResponse response = new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()).toResponse(graph, rangeData, rangeLayout);
 
         assertEquals(rangeData, response.data());
         assertEquals(rangeLayout, response.layout());

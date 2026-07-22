@@ -5,7 +5,7 @@ import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.*;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphService;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphApplication;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,10 +18,10 @@ import java.util.List;
 @RestController
 @RequestMapping({"/core", "/api/core"})
 public class LocationGraphController {
-    private final LocationGraphService service;
+    private final LocationGraphApplication service;
     private final AuthenticatedUserService authenticatedUserService;
 
-    public LocationGraphController(LocationGraphService service, AuthenticatedUserService authenticatedUserService) {
+    public LocationGraphController(LocationGraphApplication service, AuthenticatedUserService authenticatedUserService) {
         this.service = service;
         this.authenticatedUserService = authenticatedUserService;
     }
@@ -60,7 +60,18 @@ public class LocationGraphController {
         @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId,
         @Valid @RequestBody LocationGraphDataUpdateBatchRequest request
     ) {
-        service.updateLocationGraphData(userId(jwt), locationId, request.graphs(), request.sectionLayout(), request.monthRange());
+        service.updateLocationGraphs(
+            userId(jwt),
+            locationId,
+            request.graphs().stream()
+                .map(update -> new LocationGraphApplication.GraphUpdateCommand(
+                    update.graphId(), update.description(), update.data(), update.layout(), update.config(),
+                    update.style(), update.expectedUpdatedAt()
+                ))
+                .toList(),
+            request.sectionLayout(),
+            request.monthRange()
+        );
     }
 
     @PutMapping("/locations/{locationId}/graphs/{graphId}/name")

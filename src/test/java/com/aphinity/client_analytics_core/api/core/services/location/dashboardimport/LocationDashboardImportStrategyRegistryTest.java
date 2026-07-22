@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
@@ -10,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LocationDashboardImportStrategyRegistryTest {
     @Test
     void resolveLoadsConfiguredClasspathStrategiesByNormalizedLocationName() {
-        LocationDashboardImportStrategyRegistry registry = new LocationDashboardImportStrategyRegistry();
+        LocationDashboardImportStrategyRegistry registry = newRegistry();
 
         LocationDashboardImportStrategy strategy = registry.resolve("  hoag    hospital ")
             .orElseThrow(() -> new AssertionError("Expected Hoag Hospital dashboard strategy to load"));
@@ -54,7 +55,7 @@ class LocationDashboardImportStrategyRegistryTest {
 
     @Test
     void resolveUsesAppleDestinationHeadersAsIdentityKeys() {
-        LocationDashboardImportStrategyRegistry registry = new LocationDashboardImportStrategyRegistry();
+        LocationDashboardImportStrategyRegistry registry = newRegistry();
 
         LocationDashboardImportStrategy strategy = registry.resolve("apple inc.").orElseThrow();
 
@@ -84,6 +85,12 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals(
             LocationDashboardImportStrategyConfig.GraphDimension.SUBLOCATION,
             strategy.graphDefinitions().getFirst().effectiveTraceBy()
+        );
+    }
+
+    private LocationDashboardImportStrategyRegistry newRegistry() {
+        return new LocationDashboardImportStrategyRegistry(
+            new ClasspathDashboardImportStrategyLoader(JsonMapper.builder().findAndAddModules().build())
         );
     }
 }

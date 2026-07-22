@@ -1,5 +1,8 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.readData;
+import static com.aphinity.client_analytics_core.api.core.plotly.GraphRelationalPayloadMapper.writeData;
+
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraphId;
@@ -44,13 +47,19 @@ class LocationDashboardTimeRangeServiceTest {
 
     @Test
     void finiteRangePayloadResolutionSkipsMissingConfiguredGraphs() {
+        Clock clock = Clock.fixed(Instant.parse("2026-07-06T00:00:00Z"), ZoneOffset.UTC);
+        LocationDashboardCorrectiveActionService correctiveActionService =
+            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry);
         LocationDashboardTimeRangeService service = new LocationDashboardTimeRangeService(
             locationRepository,
             locationGraphRepository,
             serviceEventRepository,
             strategyRegistry,
             samplePersistenceService,
-            Clock.fixed(Instant.parse("2026-07-06T00:00:00Z"), ZoneOffset.UTC)
+            new LocationDashboardCache(),
+            new LocationDashboardGraphMatcher(),
+            new LocationDashboardHistoricalDataAssembler(correctiveActionService),
+            clock
         );
         Location location = new Location();
         location.setId(42L);
@@ -59,7 +68,7 @@ class LocationDashboardTimeRangeServiceTest {
         graph.setId(101L);
         graph.setName("Water Quality Conformance");
         graph.setLayout(Map.of("title", Map.of("text", "Newport Beach")));
-        graph.setData(List.of(Map.of("type", "scatter", "x", List.of(), "y", List.of())));
+        writeData(graph, List.of(Map.of("type", "scatter", "x", List.of(), "y", List.of())));
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setId(new LocationGraphId(42L, 101L));
         locationGraph.setGraph(graph);
@@ -75,14 +84,19 @@ class LocationDashboardTimeRangeServiceTest {
     @Test
     void finiteRangeProjectionReusesCachedGraphPayloadUntilInvalidated() {
         LocationDashboardCache cache = new LocationDashboardCache();
+        Clock clock = Clock.fixed(Instant.parse("2026-07-06T00:00:00Z"), ZoneOffset.UTC);
+        LocationDashboardCorrectiveActionService correctiveActionService =
+            new LocationDashboardCorrectiveActionService(serviceEventRepository, clock, strategyRegistry);
         LocationDashboardTimeRangeService service = new LocationDashboardTimeRangeService(
             locationRepository,
             locationGraphRepository,
             serviceEventRepository,
             strategyRegistry,
             samplePersistenceService,
-            Clock.fixed(Instant.parse("2026-07-06T00:00:00Z"), ZoneOffset.UTC),
-            cache
+            cache,
+            new LocationDashboardGraphMatcher(),
+            new LocationDashboardHistoricalDataAssembler(correctiveActionService),
+            clock
         );
         Location location = new Location();
         location.setId(42L);
@@ -90,7 +104,7 @@ class LocationDashboardTimeRangeServiceTest {
         Graph graph = new Graph();
         graph.setId(101L);
         graph.setName("Water Quality Conformance");
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "orientation", "v",
             "x", List.of("first"),
@@ -105,7 +119,7 @@ class LocationDashboardTimeRangeServiceTest {
 
         Map<Long, LocationDashboardTimeRangeService.MonthRangeGraphProjection> first =
             service.resolveLocationMonthRangeProjections(42L, new DashboardGraphMonthRange(3));
-        graph.setData(List.of(Map.of(
+        writeData(graph, List.of(Map.of(
             "type", "bar",
             "orientation", "v",
             "x", List.of("second"),

@@ -4,12 +4,15 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LocationGraphTemplateFactoryTest {
-    private final LocationGraphTemplateFactory factory = new LocationGraphTemplateFactory();
+    private final LocationGraphTemplateFactory factory = new LocationGraphTemplateFactory(
+        List.copyOf(BuiltinLocationGraphDefinitions.defaults())
+    );
 
     @Test
     void createIndicatorTemplateUsesTheSharedGaugeContract() {
@@ -202,5 +205,22 @@ class LocationGraphTemplateFactoryTest {
     void createRejectsUnsupportedGraphTypes() {
         assertThrows(IllegalArgumentException.class, () -> factory.create("donut", "Phoenix"));
         assertThrows(IllegalArgumentException.class, () -> factory.create(null, "Phoenix"));
+    }
+
+    @Test
+    void customDefinitionCanShareATraceTypeAndPersistsItsSemanticKey() {
+        LocationGraphDefinition definition = new SimpleLocationGraphDefinition(
+            "section.water-quality",
+            "bar",
+            Set.of(),
+            LocationGraphTemplateFactory::barTemplate
+        );
+        LocationGraphTemplateFactory customFactory = new LocationGraphTemplateFactory(List.of(definition));
+
+        LocationGraphTemplateFactory.GraphTemplate template =
+            customFactory.create("section.water-quality", "Phoenix");
+
+        assertEquals("bar", template.data().getFirst().get("type"));
+        assertEquals("section.water-quality", template.style().get("aphinityDefinition"));
     }
 }

@@ -10,13 +10,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.stereotype.Component;
 
 /**
  * Upserts imported graph points into the persisted graph payload.
  * The key invariant is that sparse uploads must not erase historical dates for
  * configured traces that happen to have no points in the current workbook.
  */
-final class LocationDashboardImportedGraphMerger {
+@Component
+public final class LocationDashboardImportedGraphMerger {
     private static final Set<String> TRACE_DATA_KEYS = Set.of(
         "x",
         "y",
