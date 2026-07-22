@@ -137,17 +137,18 @@ public class LocationGraphTemplateFactory {
             );
             case SUNBURST -> new GraphTemplate(
                 "New Sunburst Graph",
-                List.of(Map.of(
-                    "type", "sunburst",
-                    "name", "Trace 1",
-                    "ids", List.of("sample"),
-                    "labels", List.of("Sample"),
-                    "parents", List.of(""),
-                    "values", List.of(0),
-                    "branchvalues", "total",
-                    "insidetextorientation", "radial",
-                    "sort", false,
-                    "hovertemplate", "%{label}: %{value}<extra></extra>"
+                List.of(Map.ofEntries(
+                    Map.entry("type", "sunburst"),
+                    Map.entry("name", "Trace 1"),
+                    Map.entry("ids", List.of("sample")),
+                    Map.entry("labels", List.of("Sample")),
+                    Map.entry("parents", List.of("")),
+                    Map.entry("values", List.of(0)),
+                    Map.entry("branchvalues", "total"),
+                    Map.entry("insidetextorientation", "radial"),
+                    Map.entry("sort", false),
+                    Map.entry("hovertemplate", "%{label}: %{value}<extra></extra>"),
+                    Map.entry("marker", Map.of("line", Map.of("width", 1, "color", "#f6f6f6")))
                 )),
                 withGraphSize(Map.of(
                     "margin", Map.of("t", 20, "r", 20, "b", 20, "l", 20),
