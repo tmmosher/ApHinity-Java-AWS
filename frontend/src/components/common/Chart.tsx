@@ -18,6 +18,7 @@ let plotlyModulePromise: Promise<PlotlyModule> | null = null;
 export type PlotlyChartProps = {
     name: string;
     version?: string;
+    synchronizeDateDisplayRange?: boolean;
     data: PlotlyData[];
     layout?: PlotlyLayout;
     config?: PlotlyConfig;
@@ -324,6 +325,43 @@ export const applyDonutCenterValueToLayout = (
     };
 };
 
+const DATE_AXIS_KEY_PATTERN = /^[xy]axis\d*$/;
+
+/**
+ * Connects Plotly's UI revision to the authoritative date-axis bounds.
+ *
+ * Never enable autorange for finite dashboard ranges here. Finite graph
+ * payloads deliberately contain data from the month before the visible
+ * window so line traces enter continuously at the left edge. The backend's
+ * explicit axis range hides that lead-in month. An axis-specific uirevision
+ * makes Plotly adopt changed explicit bounds without exposing the extra data,
+ * while preserving user pan/zoom state when those bounds have not changed.
+ */
+export const synchronizeDateAxisDisplayRanges = (layout?: PlotlyLayout): PlotlyLayout | undefined => {
+    if (!layout) {
+        return layout;
+    }
+
+    let changed = false;
+    const nextLayout: Record<string, unknown> = {...layout};
+    for (const [key, value] of Object.entries(layout)) {
+        if (!DATE_AXIS_KEY_PATTERN.test(key) || !isRecord(value) || value.type !== "date") {
+            continue;
+        }
+
+        const rangeRevision = Array.isArray(value.range)
+            ? JSON.stringify(value.range)
+            : "all-data";
+        nextLayout[key] = {
+            ...value,
+            uirevision: `aphinity-date-display-range:${key}:${rangeRevision}`
+        };
+        changed = true;
+    }
+
+    return changed ? nextLayout as PlotlyLayout : layout;
+};
+
 export const purgePlotlyChart = (
     plotly: Partial<Pick<typeof Plotly, "purge">> | null | undefined,
     el: HTMLDivElement
@@ -345,11 +383,13 @@ export const renderPlotlyChart = async (
     data: PlotlyData[],
     layout?: PlotlyLayout,
     config?: PlotlyConfig,
-    themePreference: ThemePreference = getDocumentThemePreference()
+    themePreference: ThemePreference = getDocumentThemePreference(),
+    synchronizeDateDisplayRange = false
 ) => {
     const normalizedData = normalizeDateSeriesData(normalizeIndicatorData(data));
+    const normalizedLayout = applyDonutCenterValueToLayout(normalizedData, layout);
     const finalLayout = buildPlotlyLayout(
-        applyDonutCenterValueToLayout(normalizedData, layout),
+        synchronizeDateDisplayRange ? synchronizeDateAxisDisplayRanges(normalizedLayout) : normalizedLayout,
         themePreference
     );
     const finalConfig = buildPlotlyConfig(config);
@@ -438,6 +478,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
         // render version so regenerated graphs are always repainted locally.
         const renderVersion = props.version;
         void renderVersion;
+        const synchronizeDateDisplayRange = props.synchronizeDateDisplayRange;
         const activeTheme = themePreference();
         const data = props.data;
         const layout = resolveThemedGraphLayout(props.layout, props.style, activeTheme, data);
@@ -457,7 +498,8 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
                         data,
                         layout,
                         config,
-                        activeTheme
+                        activeTheme,
+                        synchronizeDateDisplayRange
                     );
                 } catch (error) {
                     if (!disposed) {

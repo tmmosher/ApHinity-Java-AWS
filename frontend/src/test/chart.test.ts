@@ -5,7 +5,8 @@ import {
   buildPlotlyConfig,
   buildPlotlyLayout,
   purgePlotlyChart,
-  renderPlotlyChart
+  renderPlotlyChart,
+  synchronizeDateAxisDisplayRanges
 } from "../components/common/Chart";
 
 vi.mock("plotly.js-dist-min", () => ({
@@ -199,6 +200,83 @@ describe("Chart helpers", () => {
       x: ["2025-07-01", "2025-8-1", "2025-9-1"],
       y: [75, 90, 100]
     }]);
+  });
+
+  it("applies changed finite date ranges without exposing continuity data through autorange", async () => {
+    const react = vi.fn().mockResolvedValue(undefined);
+    const plotly = {react} as unknown as {react: (...args: unknown[]) => Promise<unknown>};
+    const element = {id: "chart-root"} as unknown as HTMLDivElement;
+
+    await renderPlotlyChart(
+      plotly as any,
+      element,
+      [{
+        type: "scatter",
+        x: ["2025-07-01", "2026-06-01"],
+        y: [75, 100]
+      }],
+      {
+        xaxis: {
+          type: "date",
+          range: ["2026-04-01", "2026-06-01"],
+          title: {text: "Observed date"}
+        },
+        yaxis: {
+          range: [0, 100]
+        }
+      },
+      undefined,
+      "light",
+      true
+    );
+
+    const [, , calledLayout] = react.mock.calls[0];
+    expect(calledLayout.xaxis).toMatchObject({
+      type: "date",
+      range: ["2026-04-01", "2026-06-01"],
+      uirevision: expect.stringContaining("[\"2026-04-01\",\"2026-06-01\"]"),
+      title: {text: "Observed date"}
+    });
+    expect(calledLayout.xaxis).not.toHaveProperty("autorange");
+    expect(calledLayout.yaxis).toMatchObject({range: [0, 100]});
+  });
+
+  it("changes date-axis UI revision when authoritative display bounds change", () => {
+    const threeMonthLayout = synchronizeDateAxisDisplayRanges({
+      xaxis: {
+        type: "date",
+        range: ["2026-03-01", "2026-06-01"]
+      }
+    });
+    const twelveMonthLayout = synchronizeDateAxisDisplayRanges({
+      xaxis: {
+        type: "date",
+        range: ["2025-06-01", "2026-06-01"]
+      }
+    });
+    const allTimeLayout = synchronizeDateAxisDisplayRanges({
+      xaxis: {
+        type: "date"
+      }
+    });
+
+    expect(threeMonthLayout?.xaxis?.range).toEqual(["2026-03-01", "2026-06-01"]);
+    expect(twelveMonthLayout?.xaxis?.range).toEqual(["2025-06-01", "2026-06-01"]);
+    expect(threeMonthLayout?.xaxis?.uirevision).not.toBe(twelveMonthLayout?.xaxis?.uirevision);
+    expect(twelveMonthLayout?.xaxis?.uirevision).not.toBe(allTimeLayout?.xaxis?.uirevision);
+    expect(threeMonthLayout?.xaxis).not.toHaveProperty("autorange");
+    expect(twelveMonthLayout?.xaxis).not.toHaveProperty("autorange");
+    expect(allTimeLayout?.xaxis).not.toHaveProperty("autorange");
+    expect(allTimeLayout?.xaxis).not.toHaveProperty("range");
+  });
+
+  it("leaves non-date axes and layouts without date axes unchanged", () => {
+    const layout = {
+      xaxis: {type: "category" as const, range: ["A", "C"]},
+      yaxis: {range: [0, 100]}
+    };
+
+    expect(synchronizeDateAxisDisplayRanges(layout)).toBe(layout);
   });
 
   it("purges Plotly state when a chart is torn down", () => {

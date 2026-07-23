@@ -65,7 +65,8 @@ describe("LocationDashboardSection", () => {
     expect(capturedChartProps).toHaveLength(1);
     expect(capturedChartProps[0]).toMatchObject({
       name: "Water Quality Compliance",
-      version: "2026-01-03T00:00:00Z"
+      version: "2026-01-03T00:00:00Z",
+      synchronizeDateDisplayRange: true
     });
   });
 

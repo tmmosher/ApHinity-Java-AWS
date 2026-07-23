@@ -5,6 +5,10 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
+COPY frontend/vendor/xlsx/package.json \
+    frontend/vendor/xlsx/xlsx.d.ts \
+    frontend/vendor/xlsx/xlsx.full.min.js \
+    ./frontend/vendor/xlsx/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit --no-fund
 
