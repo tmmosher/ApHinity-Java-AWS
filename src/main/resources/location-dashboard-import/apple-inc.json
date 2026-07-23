@@ -172,8 +172,8 @@
         "PTSA",
         "Ca Hard",
         "Alkalinity",
-        "CI Free",
-        "CI Total",
+        "Cl (Free)",
+        "Cl (Total)",
         "Silica",
         "Bacteria",
         "LSI",
@@ -195,8 +195,8 @@
       "key": "trc-analysis",
       "measurementTypes": [
         "Temperature",
-        "CI Free",
-        "CI Total",
+        "Cl (Free)",
+        "Cl (Total)",
         "Cond",
         "ORP"
       ]
@@ -372,8 +372,8 @@
       "for_measurement_names": [
         "Ca Hard.",
         "Alkalinity",
-        "CI (Free)",
-        "CI (Total)",
+        "Cl (Free)",
+        "Cl (Total)",
         "Silica",
         "Molybdate",
         "Iron",
