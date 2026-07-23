@@ -1,0 +1,11 @@
+{
+  "name": "xlsx",
+  "version": "0.20.3",
+  "private": true,
+  "main": "xlsx.full.min.js",
+  "types": "xlsx.d.ts",
+  "files": [
+    "xlsx.full.min.js",
+    "xlsx.d.ts"
+  ]
+}
