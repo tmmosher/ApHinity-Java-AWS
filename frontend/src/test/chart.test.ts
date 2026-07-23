@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from "vitest";
 import {
   applyDonutCenterValueToLayout,
+  attachPlotlyLegendWheelIsolation,
   attachPlotlyResizeListener,
   buildPlotlyConfig,
   buildPlotlyLayout,
@@ -387,5 +388,67 @@ describe("Chart helpers", () => {
 
     cleanup();
     expect(removeEventListener).toHaveBeenCalledWith("resize", resizeHandler);
+  });
+
+  it("isolates legend wheel movement from outer page scrolling", () => {
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    const eventTarget = {
+      addEventListener,
+      removeEventListener
+    };
+
+    const cleanup = attachPlotlyLegendWheelIsolation(eventTarget as any);
+
+    expect(addEventListener).toHaveBeenCalledWith(
+      "wheel",
+      expect.any(Function),
+      {passive: false}
+    );
+    const wheelHandler = addEventListener.mock.calls[0][1] as (event: WheelEvent) => void;
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    wheelHandler({
+      target: {
+        closest: (selector: string) => selector === ".legend" ? ({} as Element) : null
+      },
+      cancelable: true,
+      preventDefault,
+      stopPropagation
+    } as unknown as WheelEvent);
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    expect(removeEventListener).toHaveBeenCalledWith(
+      "wheel",
+      wheelHandler,
+      {passive: false}
+    );
+  });
+
+  it("allows wheel movement outside the Plotly legend to reach the page", () => {
+    const addEventListener = vi.fn();
+    const eventTarget = {
+      addEventListener,
+      removeEventListener: vi.fn()
+    };
+    attachPlotlyLegendWheelIsolation(eventTarget as any);
+    const wheelHandler = addEventListener.mock.calls[0][1] as (event: WheelEvent) => void;
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+
+    wheelHandler({
+      target: {
+        closest: () => null
+      },
+      cancelable: true,
+      preventDefault,
+      stopPropagation
+    } as unknown as WheelEvent);
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(stopPropagation).not.toHaveBeenCalled();
   });
 });

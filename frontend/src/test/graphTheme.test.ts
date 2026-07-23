@@ -117,7 +117,11 @@ describe("graphTheme", () => {
       xanchor: "left",
       y: -0.16,
       yanchor: "top",
-      font: {color: "#eceff4"}
+      maxheight: 0.25,
+      itemwidth: 30,
+      itemsizing: "trace",
+      tracegroupgap: 2,
+      font: {size: 10, color: "#eceff4"}
     });
     expect(themedLayout.xaxis).toMatchObject({
       color: "#eceff4",
@@ -140,7 +144,7 @@ describe("graphTheme", () => {
       l: 10,
       r: 10,
       t: 10,
-      b: 96
+      b: 72
     });
   });
 
@@ -220,7 +224,7 @@ describe("graphTheme", () => {
     ]);
   });
 
-  it("reserves roughly the bottom third of cartesian graphs for the legend based on graph height", () => {
+  it("uses a compact bounded legend profile for cartesian scatter graphs", () => {
     const themedLayout = resolveThemedGraphLayout({
       legend: {
         orientation: "v",
@@ -248,11 +252,62 @@ describe("graphTheme", () => {
       x: 0,
       xanchor: "left",
       y: -0.16,
-      yanchor: "top"
+      yanchor: "top",
+      maxheight: 0.25,
+      itemwidth: 30,
+      itemsizing: "trace",
+      tracegroupgap: 2,
+      font: {
+        size: 10
+      }
     });
     expect(themedLayout.margin).toMatchObject({
-      b: 120
+      b: 90
     });
+  });
+
+  it("keeps the same compact legend geometry when scatter category counts grow", () => {
+    const layout = {
+      legend: {
+        font: {size: 18}
+      },
+      xaxis: {
+        type: "date"
+      },
+      yaxis: {
+        title: "Non-Conformances"
+      }
+    };
+    const fewCategories = [
+      {type: "scatter" as const, name: "City Water", x: ["2026-04-01"], y: [2]},
+      {type: "scatter" as const, name: "Plant A", x: ["2026-04-01"], y: [3]}
+    ];
+    const manyCategories = [
+      ...fewCategories,
+      {type: "scatter" as const, name: "Data Hall 1100", x: ["2026-04-01"], y: [2]},
+      {type: "scatter" as const, name: "Data Hall 1500", x: ["2026-04-01"], y: [1]},
+      {type: "scatter" as const, name: "Data Hall 2100", x: ["2026-04-01"], y: [2]},
+      {type: "scatter" as const, name: "Data Hall 2500", x: ["2026-04-01"], y: [1]},
+      {type: "scatter" as const, name: "Data Hall 3100", x: ["2026-04-01"], y: [2]},
+      {type: "scatter" as const, name: "Data Hall 3500", x: ["2026-04-01"], y: [1]}
+    ];
+
+    const fewLayout = resolveThemedGraphLayout(layout, {height: 320}, "light", fewCategories);
+    const manyLayout = resolveThemedGraphLayout(layout, {height: 320}, "light", manyCategories);
+
+    expect(fewLayout.legend).toEqual(manyLayout.legend);
+    expect(fewLayout.legend).toMatchObject({
+      maxheight: 0.25,
+      itemwidth: 30,
+      itemsizing: "trace",
+      tracegroupgap: 2,
+      font: {
+        size: 10,
+        color: "#111827"
+      }
+    });
+    expect(fewLayout.margin).toEqual(manyLayout.margin);
+    expect(fewLayout.margin).toMatchObject({b: 80});
   });
 
   it("does not force legend geometry for bar charts", () => {

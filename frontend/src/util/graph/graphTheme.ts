@@ -1,5 +1,5 @@
-import type { PlotlyData, PlotlyLayout } from "../components/Chart";
-import type { ThemePreference } from "./themePreference";
+import type { PlotlyData, PlotlyLayout } from "../../components/common/Chart";
+import type { ThemePreference } from "../common/themePreference";
 import {normalizePlotlyLayoutTitle} from "./graphLayoutTitle";
 
 export type GraphThemeStyle = {
@@ -28,7 +28,11 @@ const GRAPH_SIZE_HEIGHT_PX = {
   duplex: 640,
   double: 640
 } as const;
-const CARTESIAN_LEGEND_HEIGHT_RATIO = 1 / 3;
+const CARTESIAN_LEGEND_HEIGHT_RATIO = 1 / 4;
+const CARTESIAN_LEGEND_MAX_HEIGHT_RATIO = 1 / 4;
+const CARTESIAN_LEGEND_FONT_SIZE_PX = 10;
+const CARTESIAN_LEGEND_ITEM_WIDTH_PX = 30;
+const CARTESIAN_LEGEND_TRACE_GROUP_GAP_PX = 2;
 
 export type GraphDisplaySize = keyof typeof GRAPH_SIZE_HEIGHT_PX;
 
@@ -236,7 +240,15 @@ const applyCartesianLegendGeometry = (
       x: 0,
       xanchor: "left",
       y: -0.16,
-      yanchor: "top"
+      yanchor: "top",
+      maxheight: CARTESIAN_LEGEND_MAX_HEIGHT_RATIO,
+      itemwidth: CARTESIAN_LEGEND_ITEM_WIDTH_PX,
+      itemsizing: "trace",
+      tracegroupgap: CARTESIAN_LEGEND_TRACE_GROUP_GAP_PX,
+      font: {
+        ...(isRecord(legend.font) ? legend.font : {}),
+        size: CARTESIAN_LEGEND_FONT_SIZE_PX
+      }
     },
     margin: {
       ...margin,

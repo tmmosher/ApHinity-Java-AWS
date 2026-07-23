@@ -12,6 +12,7 @@ type PlotlyReactTarget = Pick<typeof Plotly, "react">;
 type PlotlyResizeTarget = Pick<typeof Plotly, "Plots">;
 type ResizeEventTarget = Pick<Window, "addEventListener" | "removeEventListener">;
 type PlotlyModule = typeof Plotly;
+type LegendWheelEventTarget = Pick<HTMLDivElement, "addEventListener" | "removeEventListener">;
 
 let plotlyModulePromise: Promise<PlotlyModule> | null = null;
 
@@ -415,6 +416,31 @@ export const attachPlotlyResizeListener = (
     return () => eventTarget.removeEventListener("resize", onResize);
 };
 
+const LEGEND_WHEEL_EVENT_OPTIONS: AddEventListenerOptions = {passive: false};
+
+export const attachPlotlyLegendWheelIsolation = (
+    eventTarget: LegendWheelEventTarget
+) => {
+    const onWheel = (event: WheelEvent) => {
+        const target = event.target as {closest?: (selector: string) => Element | null} | null;
+        if (!target || typeof target.closest !== "function" || !target.closest(".legend")) {
+            return;
+        }
+
+        // Plotly's SVG legend handles its own wheel movement. Cancel only the
+        // browser's default page scroll and stop the event from reaching outer
+        // scroll containers; do not use stopImmediatePropagation, because that
+        // would also suppress Plotly handlers registered on this chart root.
+        if (event.cancelable) {
+            event.preventDefault();
+        }
+        event.stopPropagation();
+    };
+
+    eventTarget.addEventListener("wheel", onWheel, LEGEND_WHEEL_EVENT_OPTIONS);
+    return () => eventTarget.removeEventListener("wheel", onWheel, LEGEND_WHEEL_EVENT_OPTIONS);
+};
+
 /**
  * Loads Plotly once and reuses the same module instance for every chart.
  *
@@ -442,6 +468,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
     let el!: HTMLDivElement;
     let disposed = false;
     let cleanupResize: (() => void) | undefined;
+    let cleanupLegendWheelIsolation: (() => void) | undefined;
     let disconnectThemeObserver: (() => void) | undefined;
     let renderQueue: Promise<void> = Promise.resolve();
     const [plotlyModule, setPlotlyModule] = createSignal<PlotlyModule | null>(null);
@@ -449,6 +476,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
 
     onMount(() => {
         setThemePreference(getDocumentThemePreference());
+        cleanupLegendWheelIsolation = attachPlotlyLegendWheelIsolation(el);
 
         void loadPlotlyModule().then((module) => {
             if (disposed) {
@@ -520,6 +548,7 @@ const PlotlyChart = (props: PlotlyChartProps)=> {
     onCleanup(() => {
         disposed = true;
         cleanupResize?.();
+        cleanupLegendWheelIsolation?.();
         disconnectThemeObserver?.();
         const module = plotlyModule();
         void renderQueue
