@@ -33,6 +33,12 @@ const CARTESIAN_LEGEND_MAX_HEIGHT_RATIO = 1 / 4;
 const CARTESIAN_LEGEND_FONT_SIZE_PX = 10;
 const CARTESIAN_LEGEND_ITEM_WIDTH_PX = 30;
 const CARTESIAN_LEGEND_TRACE_GROUP_GAP_PX = 2;
+const ANGULAR_INDICATOR_MIN_MARGIN_PX = {
+  l: 24,
+  r: 24,
+  t: 24,
+  b: 24
+} as const;
 
 export type GraphDisplaySize = keyof typeof GRAPH_SIZE_HEIGHT_PX;
 
@@ -217,6 +223,38 @@ const hasCartesianAxes = (layout: Record<string, unknown>): boolean =>
 const hasBarTrace = (data: readonly PlotlyData[] | undefined): boolean =>
   Array.isArray(data) && data.some((trace) => trace?.type === "bar");
 
+const hasAngularIndicatorTrace = (data: readonly PlotlyData[] | undefined): boolean =>
+  Array.isArray(data) && data.some((trace) =>
+    trace?.type === "indicator"
+    && isRecord(trace.gauge)
+    && trace.gauge.shape === "angular"
+  );
+
+const applyAngularIndicatorGeometry = (
+  layout: Record<string, unknown>,
+  data: readonly PlotlyData[] | undefined
+): Record<string, unknown> => {
+  if (!hasAngularIndicatorTrace(data)) {
+    return layout;
+  }
+
+  const margin = isRecord(layout.margin) ? layout.margin : {};
+
+  // Angular gauges render their endpoint tick labels outside the arc's domain.
+  // Preserve enough canvas around half-width gauges so the arc, value, and
+  // endpoint labels remain visible, while respecting any larger custom margin.
+  return {
+    ...layout,
+    margin: {
+      ...margin,
+      l: Math.max(toFiniteNumber(margin.l) ?? 0, ANGULAR_INDICATOR_MIN_MARGIN_PX.l),
+      r: Math.max(toFiniteNumber(margin.r) ?? 0, ANGULAR_INDICATOR_MIN_MARGIN_PX.r),
+      t: Math.max(toFiniteNumber(margin.t) ?? 0, ANGULAR_INDICATOR_MIN_MARGIN_PX.t),
+      b: Math.max(toFiniteNumber(margin.b) ?? 0, ANGULAR_INDICATOR_MIN_MARGIN_PX.b)
+    }
+  };
+};
+
 const applyCartesianLegendGeometry = (
   layout: Record<string, unknown>,
   graphStyle: unknown,
@@ -263,7 +301,11 @@ export const resolveThemedGraphLayout = (
   theme: ThemePreference,
   data?: readonly PlotlyData[]
 ): PlotlyLayout => {
-  const layout = isRecord(layoutValue) ? applyCartesianLegendGeometry(layoutValue, graphStyle, data) : {};
+  const sourceLayout = isRecord(layoutValue) ? layoutValue : {};
+  const layout = applyAngularIndicatorGeometry(
+    applyCartesianLegendGeometry(sourceLayout, graphStyle, data),
+    data
+  );
   const themeStyle = resolveGraphThemeStyle(graphStyle, theme);
 
   return omitUndefinedEntries({

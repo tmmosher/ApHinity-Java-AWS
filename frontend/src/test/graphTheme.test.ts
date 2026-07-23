@@ -224,6 +224,55 @@ describe("graphTheme", () => {
     ]);
   });
 
+  it("keeps angular indicator gauges and their endpoint labels inside the canvas", () => {
+    const themedLayout = resolveThemedGraphLayout({
+      margin: {l: 10, r: 10, t: 10, b: 10, pad: 3},
+      showlegend: false
+    }, {}, "light", [
+      {
+        type: "indicator",
+        mode: "gauge+number",
+        value: 94,
+        gauge: {
+          shape: "angular",
+          axis: {range: [0, 100]}
+        }
+      }
+    ]);
+
+    expect(themedLayout.margin).toEqual({
+      l: 24,
+      r: 24,
+      t: 24,
+      b: 24,
+      pad: 3
+    });
+  });
+
+  it("preserves larger custom margins and leaves non-gauge indicators unchanged", () => {
+    const angularLayout = resolveThemedGraphLayout({
+      margin: {l: 40, r: 32, t: 30, b: 28}
+    }, {}, "light", [
+      {
+        type: "indicator",
+        mode: "gauge+number",
+        gauge: {shape: "angular"}
+      }
+    ]);
+    const numberLayout = resolveThemedGraphLayout({
+      margin: {l: 10, r: 10, t: 10, b: 10}
+    }, {}, "light", [
+      {
+        type: "indicator",
+        mode: "number",
+        value: 12
+      }
+    ]);
+
+    expect(angularLayout.margin).toEqual({l: 40, r: 32, t: 30, b: 28});
+    expect(numberLayout.margin).toEqual({l: 10, r: 10, t: 10, b: 10});
+  });
+
   it("uses a compact bounded legend profile for cartesian scatter graphs", () => {
     const themedLayout = resolveThemedGraphLayout({
       legend: {
