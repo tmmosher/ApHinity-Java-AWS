@@ -156,9 +156,9 @@
       "aliases": []
     },
     {
-      "key": "trc-analysis",
-      "displayName": "TRC Analysis",
-      "rangeProfile": "trc-analysis",
+      "key": "wmp-analysis",
+      "displayName": "WMP Analysis",
+      "rangeProfile": "wmp-analysis",
       "aliases": []
     }
   ],
@@ -192,7 +192,7 @@
         "N TCC"
       ]
     },{
-      "key": "trc-analysis",
+      "key": "wmp-analysis",
       "measurementTypes": [
         "Temperature",
         "Cl Free",
@@ -236,13 +236,13 @@
       "graphType": "scatter"
     },
     {
-      "id": "trc-analysis-system-type-conformance",
+      "id": "wmp-analysis-system-type-conformance",
       "name": "System Type Conformance",
-      "title": "TRC Analysis",
+      "title": "WMP Analysis",
       "importType": "system_type_compliance",
       "anchor": {
         "dimension": "system",
-        "key": "trc-analysis"
+        "key": "wmp-analysis"
       },
       "traceBy": "sublocation",
       "traceOrder": [
