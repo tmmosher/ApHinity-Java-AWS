@@ -153,6 +153,40 @@ class LocationDashboardDerivedGraphSupportTest {
     }
 
     @Test
+    void buildsTurnaroundTimeGraphWithThreeMonthsOrMoreBucket() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(),
+                List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                    LocalDate.parse("2026-01-01"),
+                    "Newport Beach",
+                    "HPC",
+                    Map.of("pointOfUse", "Sink 1"),
+                    "row-hpc",
+                    true,
+                    120L
+                )),
+                List.of()
+            );
+
+        List<Map<String, Object>> payload = LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "non-conformance-status-by-turnaround-time",
+                "Non-Conformance Status",
+                "Turnaround Time",
+                LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME,
+                "bar"
+            ),
+            new Graph(),
+            historicalData,
+            List.of()
+        );
+
+        assertEquals(List.of(1L), payload.getFirst().get("x"));
+        assertEquals(List.of("≥ 3 months"), payload.getFirst().get("y"));
+    }
+
+    @Test
     void buildsRecentSampleMeasurementsTableFromIdentityPatternAndLatestMonthlySamples() {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(

@@ -84,7 +84,7 @@ class LocationDashboardSampleBucketsTest {
     }
 
     @Test
-    void analyzedSamplesUsesClosestFutureSampleForTurnaroundEvenWhenStillNonConforming() {
+    void analyzedSamplesUsesFirstFutureConformingSampleForTurnaround() {
         LocationDashboardSampleBuckets buckets = new LocationDashboardSampleBuckets();
 
         buckets.add(sample(
@@ -122,11 +122,12 @@ class LocationDashboardSampleBucketsTest {
 
         assertFalse(analyzedSamples.get(2).compliant());
         assertTrue(analyzedSamples.getFirst().resolved());
-        assertEquals(2L, analyzedSamples.getFirst().turnaroundDays());
+        assertEquals(9L, analyzedSamples.getFirst().turnaroundDays());
+        assertEquals(LocalDate.parse("2025-08-10"), analyzedSamples.getFirst().conformanceRestoredDate());
     }
 
     @Test
-    void analyzedSamplesResolvesToNextSampleEvenWhenNoFutureConformanceExists() {
+    void analyzedSamplesRemainsActiveWhenNoFutureConformanceExists() {
         LocationDashboardSampleBuckets buckets = new LocationDashboardSampleBuckets();
 
         buckets.add(sample(
@@ -152,8 +153,8 @@ class LocationDashboardSampleBucketsTest {
 
         List<LocationDashboardAnalyzedSample> analyzedSamples = buckets.analyzedSamples();
 
-        assertTrue(analyzedSamples.getFirst().resolved());
-        assertEquals(2L, analyzedSamples.getFirst().turnaroundDays());
+        assertFalse(analyzedSamples.getFirst().resolved());
+        assertNull(analyzedSamples.getFirst().turnaroundDays());
     }
 
     @Test

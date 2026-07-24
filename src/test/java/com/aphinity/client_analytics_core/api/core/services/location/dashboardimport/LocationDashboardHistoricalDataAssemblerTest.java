@@ -18,6 +18,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.identityValues;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocationDashboardHistoricalDataAssemblerTest {
@@ -130,8 +132,8 @@ class LocationDashboardHistoricalDataAssemblerTest {
             );
 
         assertEquals(1, historicalData.nonConformances().size());
-        assertTrue(historicalData.nonConformances().getFirst().resolved());
-        assertEquals(2L, historicalData.nonConformances().getFirst().turnaroundDays());
+        assertFalse(historicalData.nonConformances().getFirst().resolved());
+        assertNull(historicalData.nonConformances().getFirst().turnaroundDays());
     }
 
     @Test

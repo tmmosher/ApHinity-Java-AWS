@@ -137,7 +137,7 @@ class LocationDashboardCorrectiveActionServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of(matchingPersisted, unmatchedPersisted));
 
-        service.completeResolvedPersistedCorrectiveActions(location, List.of(resolvedDraft));
+        service.reconcilePersistedCorrectiveActions(location, List.of(resolvedDraft));
 
         assertEquals(ServiceEventStatus.COMPLETED, matchingPersisted.getStatus());
         assertEquals(LocalDate.parse("2025-08-09"), matchingPersisted.getEndEventDate());
@@ -160,10 +160,32 @@ class LocationDashboardCorrectiveActionServiceTest {
         when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
             .thenReturn(List.of(matchingPersisted));
 
-        service.completeResolvedPersistedCorrectiveActions(location, List.of(resolvedDraft));
+        service.reconcilePersistedCorrectiveActions(location, List.of(resolvedDraft));
 
         assertEquals(ServiceEventStatus.COMPLETED, matchingPersisted.getStatus());
         assertEquals(LocalDate.parse("2025-08-09"), matchingPersisted.getEndEventDate());
+        verify(serviceEventRepository).saveAllAndFlush(List.of(matchingPersisted));
+    }
+
+    @Test
+    void reconcilePersistedCorrectiveActionsReopensPrematurelyCompletedEvent() {
+        LocationDashboardCorrectiveActionService service = new LocationDashboardCorrectiveActionService(
+            serviceEventRepository,
+            Clock.fixed(Instant.parse("2025-08-10T00:00:00Z"), ZoneOffset.UTC)
+        );
+        Location location = new Location();
+        location.setId(9L);
+        LocationDashboardImportStrategy.CorrectiveActionDraft unresolvedDraft = draft(false);
+        ServiceEvent matchingPersisted = serviceEvent(unresolvedDraft);
+        matchingPersisted.setStatus(ServiceEventStatus.COMPLETED);
+        matchingPersisted.setEndEventDate(LocalDate.parse("2025-08-03"));
+        when(serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(9L))
+            .thenReturn(List.of(matchingPersisted));
+
+        service.reconcilePersistedCorrectiveActions(location, List.of(unresolvedDraft));
+
+        assertEquals(ServiceEventStatus.OVERDUE, matchingPersisted.getStatus());
+        assertEquals(LocalDate.parse("2025-08-01"), matchingPersisted.getEndEventDate());
         verify(serviceEventRepository).saveAllAndFlush(List.of(matchingPersisted));
     }
 

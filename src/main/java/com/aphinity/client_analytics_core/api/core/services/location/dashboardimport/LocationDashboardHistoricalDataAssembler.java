@@ -6,7 +6,6 @@ import com.aphinity.client_analytics_core.api.core.entities.dashboard.GraphTrace
 import com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardDerivedGraphSupport.HistoricalNonConformance;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategy.AnalyzedSamplePoint;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardDerivedGraphSupport.HistoricalCorrectiveAction;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -30,10 +29,12 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
  */
 @Component
 public final class LocationDashboardHistoricalDataAssembler {
-    private final LocationDashboardCorrectiveActionService correctiveActionService;
+    public LocationDashboardHistoricalDataAssembler() {
+    }
 
-    public LocationDashboardHistoricalDataAssembler(LocationDashboardCorrectiveActionService correctiveActionService) {
-        this.correctiveActionService = correctiveActionService;
+    public LocationDashboardHistoricalDataAssembler(DashboardCorrectiveActionPort correctiveActionService) {
+        // Compatibility constructor retained while callers transition to the
+        // measurement-only historical assembler.
     }
 
     LocationDashboardDerivedGraphSupport.HistoricalDerivedData buildHistoricalDerivedData(
@@ -42,7 +43,7 @@ public final class LocationDashboardHistoricalDataAssembler {
         Map<Long, Graph> assignedGraphsById,
         Map<Long, Graph> previewGraphsById,
         List<LocationDashboardImportStrategy.AnalyzedSamplePoint> analyzedSamples,
-        List<ServiceEvent> effectiveCorrectiveActions,
+        List<ServiceEvent> ignoredCorrectiveActions,
         List<LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn> identityPattern
     ) {
         Map<String, LocationDashboardDerivedGraphSupport.HistoricalSamplePoint> samplePointsByIdentity = new LinkedHashMap<>();
@@ -86,14 +87,9 @@ public final class LocationDashboardHistoricalDataAssembler {
                 .computeIfAbsent(samplePoint.observedDate(), ignored -> new ArrayList<>())
                 .add(samplePoint));
 
-        List<HistoricalCorrectiveAction> correctiveActions = effectiveCorrectiveActions.stream()
-            .map(correctiveActionService::toHistoricalCorrectiveAction)
-            .filter(Objects::nonNull)
-            .toList();
-
         return new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
             samplesByDate,
-            mergeHistoricalNonConformances(analyzedSamples, correctiveActions),
+            mergeHistoricalNonConformances(analyzedSamples),
             collectRawSamples(analyzedSamples, identityPattern)
         );
     }
@@ -361,8 +357,7 @@ public final class LocationDashboardHistoricalDataAssembler {
     }
 
     private List<HistoricalNonConformance> mergeHistoricalNonConformances(
-        List<AnalyzedSamplePoint> analyzedSamples,
-        List<HistoricalCorrectiveAction> correctiveActions
+        List<AnalyzedSamplePoint> analyzedSamples
     ) {
         Map<String, HistoricalNonConformance> nonConformancesByIdentity =
             new LinkedHashMap<>();
@@ -406,20 +401,8 @@ public final class LocationDashboardHistoricalDataAssembler {
             );
         }
 
-        for (HistoricalCorrectiveAction correctiveAction : correctiveActions) {
-            if (correctiveAction == null) {
-                continue;
-            }
-            String identity = correctiveAction.identityKey();
-            if (identity == null || !nonConformancesByIdentity.containsKey(identity)) {
-                continue;
-            }
-            nonConformancesByIdentity.merge(
-                identity,
-                correctiveAction.toHistoricalNonConformance(),
-                LocationDashboardDerivedGraphSupport.HistoricalNonConformance::merge
-            );
-        }
+        // Corrective-action status is operational workflow state. It must not
+        // override the conformance outcome derived from measurements.
 
         return List.copyOf(nonConformancesByIdentity.values());
     }

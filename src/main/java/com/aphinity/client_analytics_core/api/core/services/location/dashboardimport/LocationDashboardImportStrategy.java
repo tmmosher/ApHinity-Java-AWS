@@ -86,9 +86,38 @@ public interface LocationDashboardImportStrategy {
         String facilityName,
         String systemTypeName,
         String measurementName,
-        boolean resolved,
-        LocalDate resolvedDate
+        ConformanceResolution resolution
     ) {
+        public CorrectiveActionDraft(
+            LocalDate observedDate,
+            String title,
+            String description,
+            String facilityName,
+            String systemTypeName,
+            String measurementName,
+            boolean resolved,
+            LocalDate resolvedDate
+        ) {
+            this(
+                observedDate,
+                title,
+                description,
+                facilityName,
+                systemTypeName,
+                measurementName,
+                resolved && resolvedDate != null && observedDate != null && resolvedDate.isAfter(observedDate)
+                    ? new ConformanceResolution(observedDate, resolvedDate)
+                    : null
+            );
+        }
+
+        public boolean resolved() {
+            return resolution != null;
+        }
+
+        public LocalDate resolvedDate() {
+            return resolution == null ? null : resolution.restoredDate();
+        }
     }
 
     enum SampleOrigin {
@@ -108,8 +137,7 @@ public interface LocationDashboardImportStrategy {
         String units,
         String sampleIdentity,
         boolean compliant,
-        boolean resolved,
-        Long turnaroundDays,
+        ConformanceResolution resolution,
         SampleOrigin origin
     ) {
         public AnalyzedSamplePoint {
@@ -118,8 +146,64 @@ public interface LocationDashboardImportStrategy {
                 : Collections.unmodifiableMap(new LinkedHashMap<>(identityValues));
         }
 
+        public AnalyzedSamplePoint(
+            LocalDate observedDate,
+            String facilityName,
+            String systemTypeName,
+            String measurementName,
+            Map<String, String> identityValues,
+            String rawValue,
+            String units,
+            String sampleIdentity,
+            boolean compliant,
+            boolean resolved,
+            Long turnaroundDays,
+            SampleOrigin origin
+        ) {
+            this(
+                observedDate,
+                facilityName,
+                systemTypeName,
+                measurementName,
+                identityValues,
+                rawValue,
+                units,
+                sampleIdentity,
+                compliant,
+                legacyResolution(observedDate, resolved, turnaroundDays),
+                origin
+            );
+        }
+
+        public boolean resolved() {
+            return resolution != null;
+        }
+
+        public Long turnaroundDays() {
+            return resolution == null ? null : resolution.turnaroundDays();
+        }
+
+        public LocalDate resolutionAnchorDate() {
+            return resolution == null ? null : resolution.anchorDate();
+        }
+
+        public LocalDate conformanceRestoredDate() {
+            return resolution == null ? null : resolution.restoredDate();
+        }
+
         boolean nonConforming() {
             return !compliant;
+        }
+
+        private static ConformanceResolution legacyResolution(
+            LocalDate observedDate,
+            boolean resolved,
+            Long turnaroundDays
+        ) {
+            if (!resolved || observedDate == null || turnaroundDays == null || turnaroundDays <= 0L) {
+                return null;
+            }
+            return new ConformanceResolution(observedDate, observedDate.plusDays(turnaroundDays));
         }
     }
 }

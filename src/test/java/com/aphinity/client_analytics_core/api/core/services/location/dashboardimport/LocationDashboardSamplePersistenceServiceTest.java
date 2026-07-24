@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardIdentityFixtures.identityValues;
 import static org.mockito.Mockito.mock;
@@ -69,7 +71,7 @@ class LocationDashboardSamplePersistenceServiceTest {
         assertEquals(3, persistedSamples.stream().map(LocationDashboardSample::getSampleIdentity).distinct().count());
         assertTrue(persistedSamples.stream().allMatch(sample -> sample.getSampleIdentity() != null));
         assertTrue(persistedSamples.stream().allMatch(sample -> sample.getSampleIdentity().startsWith(
-            LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX + "v2|"
+            LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX + "v3|"
         )));
 
         List<LocationDashboardImportStrategy.AnalyzedSamplePoint> rehydratedSamples = persistedSamples.stream()
@@ -110,6 +112,26 @@ class LocationDashboardSamplePersistenceServiceTest {
     }
 
     @Test
+    void doesNotTrustLegacyTurnaroundWithoutExplicitRestorationDates() {
+        LocationDashboardSample sample = new LocationDashboardSample();
+        sample.setObservedDate(LocalDate.parse("2025-01-01"));
+        sample.setMeasurementName("HPC");
+        sample.setSampleIdentity(
+            "__generated__|v2|2025-01-01|Irvine|Critical%20SPD|HPC|WORKSHEET|facility=Irvine|"
+        );
+        sample.setCompliant(false);
+        sample.setResolved(true);
+        sample.setTurnaroundDays(2L);
+        sample.setOrigin(LocationDashboardImportStrategy.SampleOrigin.WORKSHEET.name());
+
+        LocationDashboardImportStrategy.AnalyzedSamplePoint rehydratedSample =
+            service.toAnalyzedSamplePoint(sample);
+
+        assertFalse(rehydratedSample.resolved());
+        assertNull(rehydratedSample.turnaroundDays());
+    }
+
+    @Test
     void persistsAnalyzedSampleRawValues() {
         Location location = new Location();
         location.setId(10L);
@@ -134,6 +156,36 @@ class LocationDashboardSamplePersistenceServiceTest {
         assertEquals(1, persistedSamples.size());
         assertEquals("CFU.mL", persistedSamples.getFirst().getUnits());
         assertEquals("CFU.mL", service.toAnalyzedSamplePoint(persistedSamples.getFirst()).units());
+    }
+
+    @Test
+    void persistsExplicitConformanceResolutionDatesInGeneratedIdentity() {
+        Location location = new Location();
+        location.setId(10L);
+        ConformanceResolution resolution = new ConformanceResolution(
+            LocalDate.parse("2025-01-03"),
+            LocalDate.parse("2025-01-10")
+        );
+        LocationDashboardImportStrategy.AnalyzedSamplePoint sample =
+            new LocationDashboardImportStrategy.AnalyzedSamplePoint(
+                LocalDate.parse("2025-01-01"),
+                "Irvine",
+                "Critical SPD",
+                "HPC",
+                identityValues("Irvine", "Irvine", "Critical SPD", "POU 1", "Range"),
+                "12",
+                "CFU.mL",
+                null,
+                false,
+                resolution,
+                LocationDashboardImportStrategy.SampleOrigin.COMMENT_PRIMARY
+            );
+
+        LocationDashboardSample persisted = service.toPersistedSamples(location, List.of(sample)).getFirst();
+        LocationDashboardImportStrategy.AnalyzedSamplePoint rehydrated = service.toAnalyzedSamplePoint(persisted);
+
+        assertEquals(resolution, rehydrated.resolution());
+        assertEquals(7L, rehydrated.turnaroundDays());
     }
 
     @Test
@@ -182,6 +234,7 @@ class LocationDashboardSamplePersistenceServiceTest {
             .startsWith(LocationDashboardSamplePersistenceService.GENERATED_SAMPLE_IDENTITY_PREFIX));
         assertEquals("HPC", rehydratedSample.measurementName());
         assertEquals(LocalDate.parse("2025-01-01"), rehydratedSample.observedDate());
+        assertFalse(rehydratedSample.resolved());
     }
 
     private LocationDashboardImportStrategy.AnalyzedSamplePoint analyzedSample(

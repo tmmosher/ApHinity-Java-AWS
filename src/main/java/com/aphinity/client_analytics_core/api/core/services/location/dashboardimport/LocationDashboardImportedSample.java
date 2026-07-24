@@ -152,15 +152,30 @@ record LocationDashboardCommentSample(
 record LocationDashboardAnalyzedSample(
     LocationDashboardImportedSample sample,
     boolean compliant,
-    boolean resolved,
-    Long turnaroundDays
+    ConformanceResolution resolution
 ) {
     LocationDashboardAnalyzedSample(LocationDashboardImportedSample sample, boolean compliant) {
-        this(sample, compliant, false, null);
+        this(sample, compliant, null);
     }
 
-    LocationDashboardAnalyzedSample withResolution(boolean resolved, Long turnaroundDays) {
-        return new LocationDashboardAnalyzedSample(sample, compliant, resolved, turnaroundDays);
+    boolean resolved() {
+        return resolution != null;
+    }
+
+    Long turnaroundDays() {
+        return resolution == null ? null : resolution.turnaroundDays();
+    }
+
+    LocalDate resolutionAnchorDate() {
+        return resolution == null ? null : resolution.anchorDate();
+    }
+
+    LocalDate conformanceRestoredDate() {
+        return resolution == null ? null : resolution.restoredDate();
+    }
+
+    LocationDashboardAnalyzedSample withResolution(ConformanceResolution resolution) {
+        return new LocationDashboardAnalyzedSample(sample, compliant, resolution);
     }
 
     LocationDashboardImportStrategy.ImportedObservation toObservation() {
@@ -184,8 +199,7 @@ record LocationDashboardAnalyzedSample(
             sample.units(),
             sample.sampleIdentity(),
             compliant,
-            resolved,
-            turnaroundDays,
+            resolution,
             sample.origin()
         );
     }

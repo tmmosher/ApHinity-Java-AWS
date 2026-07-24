@@ -9,9 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -257,8 +254,10 @@ public class LocationDashboardSamplePersistenceService {
             persistedSample.setMeasurementName(truncate(measurementName, 256));
             persistedSample.setSampleIdentity(truncate(sampleIdentity, MAX_TEXT_LENGTH));
             persistedSample.setCompliant(false);
-            persistedSample.setResolved(correctiveAction.getStatus() == ServiceEventStatus.COMPLETED);
-            persistedSample.setTurnaroundDays(turnaroundDays(observedDate, correctiveAction));
+            // Calendar workflow completion is not evidence that the measured
+            // system returned to conformance.
+            persistedSample.setResolved(false);
+            persistedSample.setTurnaroundDays(null);
             persistedSample.setOrigin(LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT.name());
             samples.add(persistedSample);
             analyzedIdentities.put(identity, Boolean.TRUE);
@@ -287,7 +286,8 @@ public class LocationDashboardSamplePersistenceService {
             measurementName,
             LocationDashboardImportStrategy.SampleOrigin.CORRECTIVE_ACTION_DRAFT,
             identityValues,
-            correctiveActionIdentity
+            correctiveActionIdentity,
+            null
         );
         return correctiveActionIdentity == null ? baseIdentity : baseIdentity + "|" + correctiveActionIdentity;
     }
@@ -344,21 +344,6 @@ public class LocationDashboardSamplePersistenceService {
         return LocationDashboardGraphMetadataSupport.firstNonBlank(values);
     }
 
-    private Long turnaroundDays(LocalDate observedDate, ServiceEvent correctiveAction) {
-        if (observedDate == null
-            || correctiveAction == null
-            || correctiveAction.getStatus() != ServiceEventStatus.COMPLETED
-            || correctiveAction.getEndEventDate() == null) {
-            return null;
-        }
-        LocalDateTime observedAt = LocalDateTime.of(observedDate, LocalTime.MIDNIGHT);
-        LocalDateTime resolvedAt = LocalDateTime.of(
-            correctiveAction.getEndEventDate(),
-            correctiveAction.getEndEventTime() == null ? LocalTime.MIDNIGHT : correctiveAction.getEndEventTime()
-        );
-        return Math.max(0L, ChronoUnit.DAYS.between(observedAt, resolvedAt));
-    }
-
     private String truncate(String value, int maxLength) {
         if (value == null) {
             return null;
@@ -389,7 +374,8 @@ public class LocationDashboardSamplePersistenceService {
             analyzedSample.measurementName(),
             analyzedSample.origin(),
             analyzedSample.identityValues(),
-            analyzedSample.sampleIdentity()
+            analyzedSample.sampleIdentity(),
+            analyzedSample.resolution()
         );
     }
 
@@ -400,17 +386,20 @@ public class LocationDashboardSamplePersistenceService {
         String measurementName,
         LocationDashboardImportStrategy.SampleOrigin origin,
         Map<String, String> identityValues,
-        String sourceIdentity
+        String sourceIdentity,
+        ConformanceResolution resolution
     ) {
         return GENERATED_SAMPLE_IDENTITY_PREFIX
-            + "v2|"
+            + "v3|"
             + (observedDate == null ? "" : observedDate)
             + "|" + LocationDashboardIdentitySupport.encodeValue(facilityName)
             + "|" + LocationDashboardIdentitySupport.encodeValue(systemTypeName)
             + "|" + LocationDashboardIdentitySupport.encodeValue(measurementName)
             + "|" + (origin == null ? "" : origin.name())
             + "|" + LocationDashboardIdentitySupport.encode(identityValues)
-            + "|" + LocationDashboardIdentitySupport.encodeValue(sourceIdentity);
+            + "|" + LocationDashboardIdentitySupport.encodeValue(sourceIdentity)
+            + "|" + (resolution == null ? "" : resolution.anchorDate())
+            + "|" + (resolution == null ? "" : resolution.restoredDate());
     }
 
     private String nullSafeNormalized(String value) {
@@ -446,10 +435,28 @@ public class LocationDashboardSamplePersistenceService {
                     : identity.sourceIdentity()
             ),
             sample.isCompliant(),
-            sample.isResolved(),
-            sample.getTurnaroundDays(),
+            persistedResolution(sample),
             origin
         );
+    }
+
+    private ConformanceResolution persistedResolution(LocationDashboardSample sample) {
+        if (sample == null || !sample.isResolved()) {
+            return null;
+        }
+        PersistedSampleIdentity identity = PersistedSampleIdentity.parse(sample.getSampleIdentity());
+        if (identity.resolutionAnchorDate() != null
+            && identity.conformanceRestoredDate() != null
+            && identity.conformanceRestoredDate().isAfter(identity.resolutionAnchorDate())) {
+            return new ConformanceResolution(
+                identity.resolutionAnchorDate(),
+                identity.conformanceRestoredDate()
+            );
+        }
+        // Legacy rows do not prove that the terminal measurement conformed.
+        // Treat them as unresolved until the next committed import writes a v3
+        // identity with explicit restoration dates.
+        return null;
     }
 
     private String rehydratedSampleIdentity(String persistedIdentity, String sourceIdentity) {
@@ -461,20 +468,35 @@ public class LocationDashboardSamplePersistenceService {
         String systemTypeName,
         String measurementName,
         Map<String, String> identityValues,
-        String sourceIdentity
+        String sourceIdentity,
+        LocalDate resolutionAnchorDate,
+        LocalDate conformanceRestoredDate
     ) {
         static PersistedSampleIdentity parse(String sampleIdentity) {
             if (!notBlank(sampleIdentity)) {
                 return empty();
             }
             String[] tokens = sampleIdentity.split("\\|", -1);
+            if (sampleIdentity.startsWith(GENERATED_SAMPLE_IDENTITY_PREFIX + "v3|")) {
+                return new PersistedSampleIdentity(
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 3)),
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 4)),
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 5)),
+                    LocationDashboardIdentitySupport.decode(token(tokens, 7)),
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 8)),
+                    LocationDashboardGraphMetadataSupport.parseLocalDate(token(tokens, 9)),
+                    LocationDashboardGraphMetadataSupport.parseLocalDate(token(tokens, 10))
+                );
+            }
             if (sampleIdentity.startsWith(GENERATED_SAMPLE_IDENTITY_PREFIX + "v2|")) {
                 return new PersistedSampleIdentity(
                     LocationDashboardIdentitySupport.decodeValue(token(tokens, 3)),
                     LocationDashboardIdentitySupport.decodeValue(token(tokens, 4)),
                     LocationDashboardIdentitySupport.decodeValue(token(tokens, 5)),
                     LocationDashboardIdentitySupport.decode(token(tokens, 7)),
-                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 8))
+                    LocationDashboardIdentitySupport.decodeValue(token(tokens, 8)),
+                    null,
+                    null
                 );
             }
             if (sampleIdentity.startsWith(GENERATED_SAMPLE_IDENTITY_PREFIX)) {
@@ -483,6 +505,8 @@ public class LocationDashboardSamplePersistenceService {
                     token(tokens, 5),
                     token(tokens, 6),
                     legacyIdentityValues(tokens, 2, 3, 4, 7, 8),
+                    null,
+                    null,
                     null
                 );
             }
@@ -493,7 +517,9 @@ public class LocationDashboardSamplePersistenceService {
                     null,
                     token(tokens, 4),
                     legacyIdentityValues(tokens, 1, 2, 3, 5, 6),
-                    sampleIdentity
+                    sampleIdentity,
+                    null,
+                    null
                 );
             }
             if (sampleIdentity.startsWith("observation|")) {
@@ -502,6 +528,8 @@ public class LocationDashboardSamplePersistenceService {
                     token(tokens, 3),
                     token(tokens, 4),
                     legacyIdentityValues(tokens, 2, -1, -1, -1, -1),
+                    null,
+                    null,
                     null
                 );
             }
@@ -509,7 +537,7 @@ public class LocationDashboardSamplePersistenceService {
         }
 
         private static PersistedSampleIdentity empty() {
-            return new PersistedSampleIdentity(null, null, null, Map.of(), null);
+            return new PersistedSampleIdentity(null, null, null, Map.of(), null, null, null);
         }
 
         private static Map<String, String> legacyIdentityValues(

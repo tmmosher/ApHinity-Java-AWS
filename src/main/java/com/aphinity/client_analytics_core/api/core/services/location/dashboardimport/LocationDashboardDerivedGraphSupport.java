@@ -32,7 +32,8 @@ final class LocationDashboardDerivedGraphSupport {
     private static final String UNKNOWN_FACILITY_LABEL = "Unknown Facility";
     private static final String UNKNOWN_SYSTEM_TYPE_LABEL = "Unknown System Type";
     private static final String UNKNOWN_CATEGORY_LABEL = "Unknown Category";
-    private static final List<String> TURNAROUND_BUCKETS = List.of("< 1 week", "< 2 weeks", "< 1 month", "< 3 months");
+    private static final List<String> TURNAROUND_BUCKETS =
+        List.of("< 1 week", "< 2 weeks", "< 1 month", "< 3 months", "≥ 3 months");
     private static final ZoneId DASHBOARD_TIME_ZONE = ZoneId.of("America/Phoenix");
 
     private LocationDashboardDerivedGraphSupport() {
@@ -471,7 +472,7 @@ final class LocationDashboardDerivedGraphSupport {
         if (turnaroundDays < 92L) {
             return "< 3 months";
         }
-        return null;
+        return "≥ 3 months";
     }
 
     private static Map<String, Object> buildPieTrace(
@@ -998,8 +999,8 @@ final class LocationDashboardDerivedGraphSupport {
             if (sample == null) {
                 return;
             }
-            // Table presentation tracks physical resolution of the follow-up chain.
-            // Turnaround-time resolution remains encoded on the sample itself and may be true for a still-failing follow-up.
+            // The persisted analysis remains authoritative; this presentation
+            // chain preserves resolution while monthly rows are folded.
             resolutionChain.recordFollowUp(observedDate, sample);
             addFollowUp(Map.of(
                 "date", String.valueOf(sample.observedDate()),

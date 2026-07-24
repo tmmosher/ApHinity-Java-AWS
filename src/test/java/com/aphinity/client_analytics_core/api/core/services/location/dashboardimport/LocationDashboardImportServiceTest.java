@@ -711,9 +711,9 @@ class LocationDashboardImportServiceTest {
         List<GraphResponse> responses = importService.importLocationDashboard(location, file).graphs();
 
         assertEquals(5, responses.size());
-        assertEquals(50L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
-        assertEquals(List.of(1L), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
-        assertEquals(List.of("< 1 week"), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
+        assertEquals(0L, ((Number) findResponseByName(responses, "Percent Resolved").data().getFirst().get("value")).longValue());
+        assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("x"));
+        assertEquals(List.of(), findResponseByNameAndTitle(responses, "Non-Conformance Status", "Turnaround Time").data().getFirst().get("y"));
 
         Map<String, Object> activeByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().getFirst();
         Map<String, Object> resolvedByFacility = findResponseByNameAndTitle(responses, "Non-Conformance Status", "By Facility").data().get(1);
@@ -721,8 +721,8 @@ class LocationDashboardImportServiceTest {
         assertEquals("v", resolvedByFacility.get("orientation"));
         assertEquals(List.of("Newport Beach"), activeByFacility.get("x"));
         assertEquals(List.of("Newport Beach"), resolvedByFacility.get("x"));
-        assertEquals(List.of(1L), activeByFacility.get("y"));
-        assertEquals(List.of(1L), resolvedByFacility.get("y"));
+        assertEquals(List.of(2L), activeByFacility.get("y"));
+        assertEquals(List.of(0L), resolvedByFacility.get("y"));
         assertEquals(Map.of("color", List.of("#b91c1c"), "colors", List.of("#b91c1c")), activeByFacility.get("marker"));
         assertEquals(Map.of("color", List.of("#15803d"), "colors", List.of("#15803d")), resolvedByFacility.get("marker"));
 

@@ -1,7 +1,6 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 final class LocationDashboardSampleBuckets {
@@ -47,16 +46,16 @@ final class LocationDashboardSampleBuckets {
     }
 
     private void analyzeResolutionLeaf(ResolutionBucketLeaf leaf) {
-        if (leaf == null || leaf.sampleIndexes().isEmpty() || leaf.nonConformingIndexes().isEmpty()) {
+        if (leaf == null || leaf.conformingIndexes().isEmpty() || leaf.nonConformingIndexes().isEmpty()) {
             return;
         }
 
-        List<LocalDate> sortedSampleDates = leaf.sampleIndexes().stream()
+        List<LocalDate> sortedConformingDates = leaf.conformingIndexes().stream()
             .map(this::resolutionAnchorDate)
             .filter(Objects::nonNull)
             .sorted(Comparator.naturalOrder())
             .toList();
-        if (sortedSampleDates.isEmpty()) {
+        if (sortedConformingDates.isEmpty()) {
             return;
         }
 
@@ -72,12 +71,17 @@ final class LocationDashboardSampleBuckets {
                 continue;
             }
 
-            LocalDate nextSampleAt = firstDateAfter(sortedSampleDates, resolutionAnchorDate);
-            if (nextSampleAt == null) {
+            LocalDate conformanceRestoredDate = firstDateAfter(sortedConformingDates, resolutionAnchorDate);
+            if (conformanceRestoredDate == null) {
                 continue;
             }
-            long turnaroundDays = Math.max(0L, ChronoUnit.DAYS.between(resolutionAnchorDate, nextSampleAt));
-            analyzedSamples.set(nonConformingIndex, analyzedSample.withResolution(true, turnaroundDays));
+            analyzedSamples.set(
+                nonConformingIndex,
+                analyzedSample.withResolution(new ConformanceResolution(
+                    resolutionAnchorDate,
+                    conformanceRestoredDate
+                ))
+            );
         }
     }
 
@@ -133,18 +137,19 @@ final class LocationDashboardSampleBuckets {
     }
 
     private static final class ResolutionBucketLeaf {
-        private final List<Integer> sampleIndexes = new ArrayList<>();
+        private final List<Integer> conformingIndexes = new ArrayList<>();
         private final List<Integer> nonConformingIndexes = new ArrayList<>();
 
         void append(int analyzedSampleIndex, boolean compliant) {
-            sampleIndexes.add(analyzedSampleIndex);
-            if (!compliant) {
+            if (compliant) {
+                conformingIndexes.add(analyzedSampleIndex);
+            } else {
                 nonConformingIndexes.add(analyzedSampleIndex);
             }
         }
 
-        List<Integer> sampleIndexes() {
-            return sampleIndexes;
+        List<Integer> conformingIndexes() {
+            return conformingIndexes;
         }
 
         List<Integer> nonConformingIndexes() {

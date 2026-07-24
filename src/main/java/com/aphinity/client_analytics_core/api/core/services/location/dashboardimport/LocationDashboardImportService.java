@@ -52,7 +52,7 @@ public class LocationDashboardImportService {
     private final LocationDashboardMutationLockService mutationLockService;
     private final LocationDashboardGraphMatcher graphMatcher;
     private final LocationDashboardImportedGraphMerger importedGraphMerger;
-    private final LocationDashboardCorrectiveActionService correctiveActionService;
+    private final DashboardCorrectiveActionPort correctiveActionService;
     private final LocationDashboardSamplePersistenceService samplePersistenceService;
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
     private final GraphResponseMapper graphResponseMapper;
@@ -67,7 +67,7 @@ public class LocationDashboardImportService {
         LocationDashboardMutationLockService mutationLockService,
         LocationDashboardGraphMatcher graphMatcher,
         LocationDashboardImportedGraphMerger importedGraphMerger,
-        LocationDashboardCorrectiveActionService correctiveActionService,
+        DashboardCorrectiveActionPort correctiveActionService,
         LocationDashboardSamplePersistenceService samplePersistenceService,
         LocationDashboardHistoricalDataAssembler historicalDataAssembler,
         GraphResponseMapper graphResponseMapper,
@@ -178,7 +178,7 @@ public class LocationDashboardImportService {
         List<com.aphinity.client_analytics_core.api.core.entities.servicecalendar.ServiceEvent> previewCorrectiveActions =
             correctiveActionService.buildPreviewCorrectiveActions(location.getId(), computation.correctiveActions());
         if (persistSamples) {
-            correctiveActionService.completeResolvedPersistedCorrectiveActions(location, computation.correctiveActions());
+            correctiveActionService.reconcilePersistedCorrectiveActions(location, computation.correctiveActions());
             samplePersistenceService.replaceLocationSamples(location, computation, previewCorrectiveActions);
         }
 
