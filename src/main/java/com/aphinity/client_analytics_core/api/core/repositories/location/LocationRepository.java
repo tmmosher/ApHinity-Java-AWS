@@ -15,6 +15,9 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
 
     Optional<Location> findByName(String name);
 
+    @Query("select l.name from Location l where l.id = :locationId")
+    Optional<String> findNameById(@Param("locationId") Long locationId);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Location l set l.updatedAt = :updatedAt where l.id = :locationId")
     int touchUpdatedAt(@Param("locationId") Long locationId, @Param("updatedAt") Instant updatedAt);
