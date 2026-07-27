@@ -5,10 +5,11 @@ import com.aphinity.client_analytics_core.api.core.services.location.DashboardGr
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Collection;
 
 /** Read-side boundary for finite-range graph and table projections. */
 @Service
-public class LocationDashboardProjectionService implements DashboardProjectionQuery {
+public class LocationDashboardProjectionService implements DashboardGraphProjectionQuery, DashboardTableProjectionQuery {
     private final LocationDashboardTimeRangeService engine;
 
     public LocationDashboardProjectionService(LocationDashboardTimeRangeService engine) {
@@ -16,10 +17,17 @@ public class LocationDashboardProjectionService implements DashboardProjectionQu
     }
 
     @Override
-    public Map<Long, LocationDashboardTimeRangeService.MonthRangeGraphProjection> resolveGraphProjections(
+    public Map<Long, DashboardGraphProjection> resolveGraphProjections(
         Long locationId, DashboardGraphMonthRange monthRange
     ) {
         return engine.resolveLocationMonthRangeProjections(locationId, monthRange);
+    }
+
+    @Override
+    public Map<Long, DashboardGraphProjection> resolveGraphProjections(
+        Long locationId, Collection<Long> graphIds, DashboardGraphMonthRange monthRange
+    ) {
+        return engine.resolveLocationMonthRangeProjections(locationId, graphIds, monthRange);
     }
 
     @Override

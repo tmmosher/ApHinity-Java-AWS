@@ -9,6 +9,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -24,13 +28,13 @@ class LocationDashboardCacheTest {
             1024 * 1024,
             Ticker.systemTicker()
         );
-        LocationDashboardTimeRangeService.MonthRangeGraphProjection firstProjection =
-            new LocationDashboardTimeRangeService.MonthRangeGraphProjection(
+        DashboardGraphProjection firstProjection =
+            new DashboardGraphProjection(
                 List.of(Map.of("name", "first")),
                 Map.of()
             );
-        LocationDashboardTimeRangeService.MonthRangeGraphProjection secondProjection =
-            new LocationDashboardTimeRangeService.MonthRangeGraphProjection(
+        DashboardGraphProjection secondProjection =
+            new DashboardGraphProjection(
                 List.of(Map.of("name", "second")),
                 Map.of()
             );
@@ -79,11 +83,60 @@ class LocationDashboardCacheTest {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(Map.of(), List.of(), List.of());
 
-        cache.putHistoricalData(key, historicalData);
-        assertEquals(historicalData, cache.getHistoricalData(key));
+        assertEquals(historicalData, cache.getOrComputeHistoricalData(key, () -> historicalData));
+        assertEquals(historicalData, cache.getOrComputeHistoricalData(
+            key,
+            () -> { throw new AssertionError("unexpired historical data was recomputed"); }
+        ));
 
         tickerNanos.addAndGet(Duration.ofSeconds(6).toNanos());
 
-        assertNull(cache.getHistoricalData(key));
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData replacement =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(Map.of(), List.of(), List.of());
+        assertEquals(replacement, cache.getOrComputeHistoricalData(key, () -> replacement));
+    }
+
+    @Test
+    void historicalDataComputationIsSingleFlightForConcurrentRequests() throws Exception {
+        LocationDashboardCache cache = new LocationDashboardCache();
+        LocationDashboardCache.HistoricalDataCacheKey key =
+            new LocationDashboardCache.HistoricalDataCacheKey(1L, Instant.ofEpochSecond(1));
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(Map.of(), List.of(), List.of());
+        AtomicLong computations = new AtomicLong();
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch loaderStarted = new CountDownLatch(1);
+        CountDownLatch releaseLoader = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<LocationDashboardDerivedGraphSupport.HistoricalDerivedData>> futures =
+                java.util.stream.IntStream.range(0, 8)
+                    .mapToObj(ignored -> executor.submit(() -> {
+                        start.await();
+                        return cache.getOrComputeHistoricalData(key, () -> {
+                            computations.incrementAndGet();
+                            loaderStarted.countDown();
+                            try {
+                                releaseLoader.await();
+                            } catch (InterruptedException ex) {
+                                Thread.currentThread().interrupt();
+                                throw new IllegalStateException(ex);
+                            }
+                            return historicalData;
+                        });
+                    }))
+                    .toList();
+
+            start.countDown();
+            loaderStarted.await();
+            releaseLoader.countDown();
+            for (Future<LocationDashboardDerivedGraphSupport.HistoricalDerivedData> future : futures) {
+                assertEquals(historicalData, future.get());
+            }
+            assertEquals(1L, computations.get());
+        } finally {
+            releaseLoader.countDown();
+            executor.shutdownNow();
+        }
     }
 }

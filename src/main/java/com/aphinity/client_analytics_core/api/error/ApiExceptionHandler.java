@@ -91,6 +91,10 @@ public class ApiExceptionHandler {
         Map.entry("Graph data is invalid", new ErrorDefinition("graph_data_invalid", "Graph data is invalid")),
         Map.entry("Graph update list contains duplicate graph ids", new ErrorDefinition("graph_update_duplicates", "Graph update list contains duplicate graph ids")),
         Map.entry("Graph update conflict", new ErrorDefinition("graph_update_conflict", "Graph update conflict")),
+        Map.entry(
+            "Graph projection unavailable",
+            new ErrorDefinition("graph_projection_unavailable", "Graph data is temporarily unavailable")
+        ),
         Map.entry("Event title is required", new ErrorDefinition("event_title_required", "Event title is required")),
         Map.entry("Event responsibility is required", new ErrorDefinition("event_responsibility_required", "Event responsibility is required")),
         Map.entry("Event date is required", new ErrorDefinition("event_date_required", "Event date is required")),

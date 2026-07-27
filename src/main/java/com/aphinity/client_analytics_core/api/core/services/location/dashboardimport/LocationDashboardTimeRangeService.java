@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Collection;
 import java.util.stream.Collectors;
 
 import static com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportStrategyConfig.DerivedGraphConfig;
@@ -54,12 +55,6 @@ public class LocationDashboardTimeRangeService {
     private final LocationDashboardCache dashboardCache;
     private final LocationDashboardGraphMatcher graphMatcher;
     private final LocationDashboardHistoricalDataAssembler historicalDataAssembler;
-
-    public record MonthRangeGraphProjection(
-        List<Map<String, Object>> data,
-        Map<String, Object> layout
-    ) {
-    }
 
     @Autowired
     public LocationDashboardTimeRangeService(
@@ -184,11 +179,28 @@ public class LocationDashboardTimeRangeService {
     }
 
     @Transactional
-    public Map<Long, MonthRangeGraphProjection> resolveLocationMonthRangeProjections(
+    public Map<Long, DashboardGraphProjection> resolveLocationMonthRangeProjections(
         Long locationId,
         DashboardGraphMonthRange monthRange
     ) {
-        RefreshContext refreshContext = loadRefreshContext(locationId);
+        return resolveLocationMonthRangeProjections(locationId, null, monthRange);
+    }
+
+    /**
+     * Resolves only the requested graph projections while loading any imported
+     * graph dependencies needed to rebuild requested derived graphs.
+     */
+    @Transactional
+    public Map<Long, DashboardGraphProjection> resolveLocationMonthRangeProjections(
+        Long locationId,
+        Collection<Long> graphIds,
+        DashboardGraphMonthRange monthRange
+    ) {
+        Set<Long> requestedGraphIds = normalizedGraphIds(graphIds);
+        if (graphIds != null && requestedGraphIds.isEmpty()) {
+            return Map.of();
+        }
+        RefreshContext refreshContext = loadRefreshContext(locationId, requestedGraphIds);
         if (refreshContext == null) {
             return Map.of();
         }
@@ -201,12 +213,12 @@ public class LocationDashboardTimeRangeService {
                 normalizedRange,
                 refreshContext.anchorDate(),
                 refreshContext.refreshedAt(),
-                null
+                requestedGraphIds
             );
             return Map.of();
         }
 
-        Map<Long, MonthRangeGraphProjection> projectionsByGraphId = new LinkedHashMap<>();
+        Map<Long, DashboardGraphProjection> projectionsByGraphId = new LinkedHashMap<>();
         Map<Long, Graph> graphsById = refreshContext.assignedGraphs().stream()
             .filter(graph -> graph != null && graph.getId() != null)
             .collect(Collectors.toMap(Graph::getId, graph -> graph, (left, right) -> left, LinkedHashMap::new));
@@ -215,9 +227,12 @@ public class LocationDashboardTimeRangeService {
             if (graph == null || graph.getId() == null) {
                 continue;
             }
+            if (requestedGraphIds != null && !requestedGraphIds.contains(graph.getId())) {
+                continue;
+            }
             LocationDashboardCache.GraphProjectionCacheKey cacheKey =
                 graphProjectionCacheKey(refreshContext, graph, normalizedRange);
-            MonthRangeGraphProjection cachedProjection = dashboardCache.getGraphProjection(cacheKey);
+            DashboardGraphProjection cachedProjection = dashboardCache.getGraphProjection(cacheKey);
             if (cachedProjection != null) {
                 projectionsByGraphId.put(graph.getId(), cachedProjection);
                 continue;
@@ -227,7 +242,7 @@ public class LocationDashboardTimeRangeService {
                 continue;
             }
 
-            MonthRangeGraphProjection projection = projectImportedGraph(graph, normalizedRange, refreshContext.anchorDate());
+            DashboardGraphProjection projection = projectImportedGraph(graph, normalizedRange, refreshContext.anchorDate());
             dashboardCache.putGraphProjection(cacheKey, projection);
             projectionsByGraphId.put(graph.getId(), projection);
         }
@@ -243,7 +258,7 @@ public class LocationDashboardTimeRangeService {
                 missingDerivedGraphIds
             ).forEach((graphId, payload) -> {
                 Graph graph = graphsById.get(graphId);
-                MonthRangeGraphProjection projection = new MonthRangeGraphProjection(
+                DashboardGraphProjection projection = new DashboardGraphProjection(
                     payload,
                     DashboardGraphMonthRangePayloadProjector.projectLayout(
                         graph == null ? null : graph.getLayout(),
@@ -292,6 +307,10 @@ public class LocationDashboardTimeRangeService {
     }
 
     private RefreshContext loadRefreshContext(Long locationId) {
+        return loadRefreshContext(locationId, null);
+    }
+
+    private RefreshContext loadRefreshContext(Long locationId, Set<Long> requestedGraphIds) {
         if (locationId == null) {
             return null;
         }
@@ -300,9 +319,13 @@ public class LocationDashboardTimeRangeService {
             return null;
         }
 
-        List<LocationGraph> locationGraphs = locationGraphRepository.findByLocationIdWithGraphDetails(locationId);
+        List<LocationGraph> locationGraphs = requestedGraphIds == null
+            ? locationGraphRepository.findByLocationIdWithGraphDetails(locationId)
+            : loadScopedLocationGraphs(location, requestedGraphIds);
         if (locationGraphs.isEmpty()) {
-            return null;
+            return requestedGraphIds == null
+                ? null
+                : new RefreshContext(location, List.of(), LocalDate.now(clock), Instant.now(clock));
         }
 
         List<Graph> assignedGraphs = locationGraphs.stream()
@@ -315,6 +338,54 @@ public class LocationDashboardTimeRangeService {
             LocalDate.now(clock),
             Instant.now(clock)
         );
+    }
+
+    private List<LocationGraph> loadScopedLocationGraphs(Location location, Set<Long> requestedGraphIds) {
+        if (location == null || location.getId() == null || requestedGraphIds == null || requestedGraphIds.isEmpty()) {
+            return List.of();
+        }
+        List<LocationGraph> requestedLocationGraphs =
+            locationGraphRepository.findByLocationIdAndGraphIdInWithGraphDetails(location.getId(), requestedGraphIds);
+        boolean includesDerivedGraph = requestedLocationGraphs.stream()
+            .map(LocationGraph::getGraph)
+            .filter(Objects::nonNull)
+            .anyMatch(this::isDerivedGraph);
+        if (!includesDerivedGraph) {
+            return requestedLocationGraphs;
+        }
+
+        Set<Long> dependencyGraphIds = new LinkedHashSet<>(requestedGraphIds);
+        strategyRegistry.resolve(location.getName()).ifPresent(strategy -> {
+            List<Graph> availableGraphs = locationGraphRepository.findByLocationIdWithGraph(location.getId()).stream()
+                .map(LocationGraph::getGraph)
+                .filter(Objects::nonNull)
+                .toList();
+            graphMatcher.matchAvailableImportGraphs(
+                strategy.graphDefinitions(),
+                availableGraphs,
+                location.getName()
+            ).values().stream()
+                .map(Graph::getId)
+                .filter(Objects::nonNull)
+                .forEach(dependencyGraphIds::add);
+        });
+        if (dependencyGraphIds.equals(requestedGraphIds)) {
+            return requestedLocationGraphs;
+        }
+        return locationGraphRepository.findByLocationIdAndGraphIdInWithGraphDetails(
+            location.getId(),
+            dependencyGraphIds
+        );
+    }
+
+    private Set<Long> normalizedGraphIds(Collection<Long> graphIds) {
+        if (graphIds == null) {
+            return null;
+        }
+        return graphIds.stream()
+            .filter(Objects::nonNull)
+            .filter(graphId -> graphId > 0L)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private void refreshDerivedGraphs(
@@ -554,7 +625,7 @@ public class LocationDashboardTimeRangeService {
         );
     }
 
-    private MonthRangeGraphProjection projectImportedGraph(
+    private DashboardGraphProjection projectImportedGraph(
         Graph graph,
         DashboardGraphMonthRange monthRange,
         LocalDate anchorDate
@@ -563,7 +634,7 @@ public class LocationDashboardTimeRangeService {
         List<Map<String, Object>> projectedPayload = graphContainsTimeSeries(graph)
             ? DashboardGraphMonthRangePayloadProjector.project(allTimePayload, monthRange, anchorDate)
             : allTimePayload;
-        return new MonthRangeGraphProjection(
+        return new DashboardGraphProjection(
             projectedPayload,
             DashboardGraphMonthRangePayloadProjector.projectLayout(
                 graph.getLayout(),
@@ -583,18 +654,12 @@ public class LocationDashboardTimeRangeService {
     ) {
         LocationDashboardCache.HistoricalDataCacheKey cacheKey =
             new LocationDashboardCache.HistoricalDataCacheKey(locationId, locationRevision(location));
-        LocationDashboardDerivedGraphSupport.HistoricalDerivedData cachedHistoricalData =
-            dashboardCache.getHistoricalData(cacheKey);
-        if (cachedHistoricalData != null) {
-            return cachedHistoricalData;
-        }
-
-        List<ServiceEvent> correctiveActions =
-            serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
-        List<LocationDashboardImportStrategy.AnalyzedSamplePoint> persistedSamples =
-            samplePersistenceService.loadLocationSamples(locationId);
-        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
-            historicalDataAssembler.buildHistoricalDerivedData(
+        return dashboardCache.getOrComputeHistoricalData(cacheKey, () -> {
+            List<ServiceEvent> correctiveActions =
+                serviceEventRepository.findByLocation_IdAndCorrectiveActionTrueOrderByEventDateAscEventTimeAscIdAsc(locationId);
+            List<LocationDashboardImportStrategy.AnalyzedSamplePoint> persistedSamples =
+                samplePersistenceService.loadLocationSamples(locationId);
+            return historicalDataAssembler.buildHistoricalDerivedData(
                 strategy.graphDefinitions(),
                 matchedImportGraphsByDefinitionId,
                 assignedGraphsById,
@@ -603,8 +668,7 @@ public class LocationDashboardTimeRangeService {
                 correctiveActions,
                 strategy.spreadsheetIdentityPattern()
             );
-        dashboardCache.putHistoricalData(cacheKey, historicalData);
-        return historicalData;
+        });
     }
 
     private LocationDashboardCache.GraphProjectionCacheKey graphProjectionCacheKey(

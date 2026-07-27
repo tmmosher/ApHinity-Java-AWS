@@ -15,6 +15,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Bounded cache for location dashboard derivation inputs and range projections.
@@ -34,7 +35,7 @@ public class LocationDashboardCache {
 
     private final Cache<HistoricalDataCacheKey, LocationDashboardDerivedGraphSupport.HistoricalDerivedData>
         historicalDataCache;
-    private final Cache<GraphProjectionCacheKey, LocationDashboardTimeRangeService.MonthRangeGraphProjection>
+    private final Cache<GraphProjectionCacheKey, DashboardGraphProjection>
         graphProjectionCache;
 
     public LocationDashboardCache() {
@@ -66,7 +67,7 @@ public class LocationDashboardCache {
             .build();
         this.graphProjectionCache = Caffeine.newBuilder()
             .maximumWeight(graphProjectionMaximumWeight)
-            .weigher((GraphProjectionCacheKey key, LocationDashboardTimeRangeService.MonthRangeGraphProjection value) ->
+            .weigher((GraphProjectionCacheKey key, DashboardGraphProjection value) ->
                 estimateWeight(value))
             .expireAfterAccess(graphProjectionIdleTtl)
             .expireAfterWrite(graphProjectionTtl)
@@ -75,22 +76,20 @@ public class LocationDashboardCache {
             .build();
     }
 
-    LocationDashboardDerivedGraphSupport.HistoricalDerivedData getHistoricalData(
-        HistoricalDataCacheKey key
-    ) {
-        return key == null ? null : historicalDataCache.getIfPresent(key);
-    }
-
-    void putHistoricalData(
+    LocationDashboardDerivedGraphSupport.HistoricalDerivedData getOrComputeHistoricalData(
         HistoricalDataCacheKey key,
-        LocationDashboardDerivedGraphSupport.HistoricalDerivedData value
+        Supplier<LocationDashboardDerivedGraphSupport.HistoricalDerivedData> loader
     ) {
-        if (key != null && value != null) {
-            historicalDataCache.put(key, value);
+        if (key == null) {
+            return Objects.requireNonNull(loader.get(), "Historical data loader returned null");
         }
+        return historicalDataCache.get(
+            key,
+            ignored -> Objects.requireNonNull(loader.get(), "Historical data loader returned null")
+        );
     }
 
-    LocationDashboardTimeRangeService.MonthRangeGraphProjection getGraphProjection(
+    DashboardGraphProjection getGraphProjection(
         GraphProjectionCacheKey key
     ) {
         return key == null ? null : graphProjectionCache.getIfPresent(key);
@@ -98,7 +97,7 @@ public class LocationDashboardCache {
 
     void putGraphProjection(
         GraphProjectionCacheKey key,
-        LocationDashboardTimeRangeService.MonthRangeGraphProjection value
+        DashboardGraphProjection value
     ) {
         if (key != null && value != null) {
             graphProjectionCache.put(key, value);
@@ -167,7 +166,7 @@ public class LocationDashboardCache {
                 + estimateValue(historicalData.nonConformances(), visited)
                 + estimateValue(historicalData.rawSamples(), visited);
         }
-        if (value instanceof LocationDashboardTimeRangeService.MonthRangeGraphProjection projection) {
+        if (value instanceof DashboardGraphProjection projection) {
             return 48L
                 + estimateValue(projection.data(), visited)
                 + estimateValue(projection.layout(), visited);

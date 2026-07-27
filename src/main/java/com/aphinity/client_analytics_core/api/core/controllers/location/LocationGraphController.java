@@ -5,7 +5,10 @@ import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGr
 import com.aphinity.client_analytics_core.api.core.requests.dashboard.LocationGraphNameUpdateRequest;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.*;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
-import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphApplication;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphMutationApplication;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphReadApplication;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTableReadApplication;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationSectionGraphReadApplication;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,11 +21,23 @@ import java.util.List;
 @RestController
 @RequestMapping({"/core", "/api/core"})
 public class LocationGraphController {
-    private final LocationGraphApplication service;
+    private final LocationGraphReadApplication graphReader;
+    private final LocationSectionGraphReadApplication sectionGraphReader;
+    private final LocationGraphTableReadApplication tableReader;
+    private final LocationGraphMutationApplication graphMutator;
     private final AuthenticatedUserService authenticatedUserService;
 
-    public LocationGraphController(LocationGraphApplication service, AuthenticatedUserService authenticatedUserService) {
-        this.service = service;
+    public LocationGraphController(
+        LocationGraphReadApplication graphReader,
+        LocationSectionGraphReadApplication sectionGraphReader,
+        LocationGraphTableReadApplication tableReader,
+        LocationGraphMutationApplication graphMutator,
+        AuthenticatedUserService authenticatedUserService
+    ) {
+        this.graphReader = graphReader;
+        this.sectionGraphReader = sectionGraphReader;
+        this.tableReader = tableReader;
+        this.graphMutator = graphMutator;
         this.authenticatedUserService = authenticatedUserService;
     }
 
@@ -31,7 +46,17 @@ public class LocationGraphController {
         @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId,
         @RequestParam(required = false) Integer monthRange
     ) {
-        return service.getAccessibleLocationGraphs(userId(jwt), locationId, monthRange);
+        return graphReader.getAccessibleLocationGraphs(userId(jwt), locationId, monthRange);
+    }
+
+    @GetMapping("/locations/{locationId}/sections/{sectionId}/graphs")
+    public LocationSectionGraphsResponse sectionGraphs(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long locationId,
+        @PathVariable Long sectionId,
+        @RequestParam Integer monthRange
+    ) {
+        return sectionGraphReader.getAccessibleLocationSectionGraphs(userId(jwt), locationId, sectionId, monthRange);
     }
 
     @GetMapping("/locations/{locationId}/graphs/{graphId}/table-page")
@@ -40,7 +65,7 @@ public class LocationGraphController {
         @RequestParam(required = false) Integer monthRange,
         @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size
     ) {
-        return service.getAccessibleLocationGraphTablePage(userId(jwt), locationId, graphId, monthRange, page, size);
+        return tableReader.getAccessibleLocationGraphTablePage(userId(jwt), locationId, graphId, monthRange, page, size);
     }
 
     @PostMapping("/locations/{locationId}/graphs")
@@ -49,7 +74,7 @@ public class LocationGraphController {
         @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId,
         @Valid @RequestBody LocationGraphCreateRequest request
     ) {
-        return service.createLocationGraph(
+        return graphMutator.createLocationGraph(
             userId(jwt), locationId, request.sectionId(), Boolean.TRUE.equals(request.createNewSection()), request.graphType()
         );
     }
@@ -60,11 +85,11 @@ public class LocationGraphController {
         @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId,
         @Valid @RequestBody LocationGraphDataUpdateBatchRequest request
     ) {
-        service.updateLocationGraphs(
+        graphMutator.updateLocationGraphs(
             userId(jwt),
             locationId,
             request.graphs().stream()
-                .map(update -> new LocationGraphApplication.GraphUpdateCommand(
+                .map(update -> new LocationGraphMutationApplication.GraphUpdateCommand(
                     update.graphId(), update.description(), update.data(), update.layout(), update.config(),
                     update.style(), update.expectedUpdatedAt()
                 ))
@@ -79,13 +104,13 @@ public class LocationGraphController {
         @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId, @PathVariable Long graphId,
         @RequestBody LocationGraphNameUpdateRequest request
     ) {
-        return service.updateLocationGraphName(userId(jwt), locationId, graphId, request == null ? null : request.name());
+        return graphMutator.updateLocationGraphName(userId(jwt), locationId, graphId, request == null ? null : request.name());
     }
 
     @DeleteMapping("/locations/{locationId}/graphs/{graphId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId, @PathVariable Long graphId) {
-        service.deleteLocationGraph(userId(jwt), locationId, graphId);
+        graphMutator.deleteLocationGraph(userId(jwt), locationId, graphId);
     }
 
     @DeleteMapping("/locations/{locationId}/sections/{sectionId}")
@@ -93,7 +118,7 @@ public class LocationGraphController {
     public void deleteSection(
         @AuthenticationPrincipal Jwt jwt, @PathVariable Long locationId, @PathVariable Long sectionId
     ) {
-        service.deleteLocationSection(userId(jwt), locationId, sectionId);
+        graphMutator.deleteLocationSection(userId(jwt), locationId, sectionId);
     }
 
     private Long userId(Jwt jwt) {

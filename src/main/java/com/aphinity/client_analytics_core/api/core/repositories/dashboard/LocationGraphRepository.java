@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface LocationGraphRepository extends JpaRepository<LocationGraph, LocationGraphId> {
@@ -27,6 +28,18 @@ public interface LocationGraphRepository extends JpaRepository<LocationGraph, Lo
         order by locationGraph.createdAt asc
         """)
     List<LocationGraph> findByLocationIdWithGraphDetails(@Param("locationId") Long locationId);
+
+    @Query("""
+        select distinct locationGraph from LocationGraph locationGraph
+        join fetch locationGraph.graph graph
+        left join fetch graph.graphTraces
+        where locationGraph.id.locationId = :locationId
+          and locationGraph.id.graphId in :graphIds
+        """)
+    List<LocationGraph> findByLocationIdAndGraphIdInWithGraphDetails(
+        @Param("locationId") Long locationId,
+        @Param("graphIds") Collection<Long> graphIds
+    );
 
     List<LocationGraph> findByIdGraphId(Long graphId);
 

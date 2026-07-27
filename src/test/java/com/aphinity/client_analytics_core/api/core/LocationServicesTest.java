@@ -34,8 +34,9 @@ import com.aphinity.client_analytics_core.api.core.services.location.LocationAcc
 import com.aphinity.client_analytics_core.api.core.services.location.LocationAlertSubscriptionService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationDashboardUploadService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationDetailsService;
-import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphApplication;
+import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphMutationApplication;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphService;
+import com.aphinity.client_analytics_core.api.core.services.location.JsonDashboardSectionGraphSelector;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationMembershipService;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationResponseMapper;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailService;
@@ -163,6 +164,8 @@ class LocationServicesTest {
         detailsService = new LocationDetailsService(
             locationRepository, locationUserRepository, accessPolicy, responseMapper, invalidator
         );
+        LocationDashboardProjectionService projectionService =
+            new LocationDashboardProjectionService(locationDashboardTimeRangeService);
         graphService = new LocationGraphService(
             appUserRepository,
             locationRepository,
@@ -173,11 +176,13 @@ class LocationServicesTest {
             locationGraphTemplateFactory,
             locationGraphUpdatePayloadValidationFactory,
             locationDashboardMutationLockService,
-            new LocationDashboardProjectionService(locationDashboardTimeRangeService),
+            projectionService,
+            projectionService,
             new LocationDashboardRefreshService(locationDashboardTimeRangeService),
             invalidator,
             graphResponseMapper,
-            graphPayloadPort
+            graphPayloadPort,
+            new JsonDashboardSectionGraphSelector()
         );
         thumbnailService = new LocationThumbnailService(
             locationRepository, locationThumbnailImageService, accessPolicy, responseMapper
@@ -2225,9 +2230,9 @@ class LocationServicesTest {
         Map<String, Object> sectionLayout,
         Integer monthRange
     ) {
-        List<LocationGraphApplication.GraphUpdateCommand> commands = updates == null
+        List<LocationGraphMutationApplication.GraphUpdateCommand> commands = updates == null
             ? null
-            : updates.stream().map(update -> new LocationGraphApplication.GraphUpdateCommand(
+            : updates.stream().map(update -> new LocationGraphMutationApplication.GraphUpdateCommand(
                 update.graphId(),
                 update.description(),
                 update.data(),

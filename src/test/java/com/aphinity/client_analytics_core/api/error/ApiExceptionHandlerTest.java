@@ -31,6 +31,20 @@ class ApiExceptionHandlerTest {
     private final ApiExceptionHandler apiExceptionHandler = new ApiExceptionHandler();
 
     @Test
+    void graphProjectionFailureUsesSafeClientMessage() {
+        ResponseStatusException exception = new ResponseStatusException(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Graph projection unavailable"
+        );
+
+        ResponseEntity<ApiErrorResponse> response = apiExceptionHandler.handleResponseStatus(exception);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals("graph_projection_unavailable", response.getBody().code());
+        assertEquals("Graph data is temporarily unavailable", response.getBody().message());
+    }
+
+    @Test
     void handleResponseStatusMapsInvitedUserNotFoundReason() {
         ResponseStatusException exception = new ResponseStatusException(HttpStatus.NOT_FOUND, "Invited user not found");
 

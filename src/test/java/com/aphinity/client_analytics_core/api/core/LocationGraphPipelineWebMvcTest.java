@@ -9,6 +9,7 @@ import com.aphinity.client_analytics_core.api.security.AccessTokenRefreshFilter;
 import com.aphinity.client_analytics_core.api.core.controllers.location.LocationGraphController;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.LocationGraph;
+import com.aphinity.client_analytics_core.api.core.entities.location.Location;
 import com.aphinity.client_analytics_core.api.core.plotly.GraphPayloadMapper;
 import com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter;
 import com.aphinity.client_analytics_core.api.core.repositories.dashboard.GraphRepository;
@@ -22,10 +23,13 @@ import com.aphinity.client_analytics_core.api.core.services.location.GraphRespon
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphTemplateFactory;
 import com.aphinity.client_analytics_core.api.core.services.location.BuiltinLocationGraphDefinitions;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationGraphService;
+import com.aphinity.client_analytics_core.api.core.services.location.JsonDashboardSectionGraphSelector;
+import com.aphinity.client_analytics_core.api.core.services.location.DashboardGraphMonthRange;
 import com.aphinity.client_analytics_core.api.core.services.location.LocationThumbnailImageService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardGraphProjection;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardProjectionService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
@@ -99,6 +103,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     GraphResponseMapper.class,
     RelationalPlotlyGraphPayloadAdapter.class,
     LocationGraphService.class,
+    JsonDashboardSectionGraphSelector.class,
     LocationGraphPipelineWebMvcTest.JwtArgumentResolverConfig.class
 })
 @AutoConfigureMockMvc(addFilters = false)
@@ -203,6 +208,211 @@ class LocationGraphPipelineWebMvcTest {
         verify(locationRepository).existsById(locationId);
         verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
         verify(locationGraphRepository).findByLocationIdWithGraphDetails(locationId);
+    }
+
+    @Test
+    void sectionGraphsReturnsOnlyTheSectionInLayoutOrderWithMissingAssignments() throws Exception {
+        Long userId = 7L;
+        Long locationId = 11L;
+        AppUser user = verifiedUser(userId);
+        Location location = new Location();
+        location.setId(locationId);
+        location.setName("Hoag Hospital");
+        location.setSectionLayout(Map.of("sections", List.of(Map.of(
+            "section_id", 2,
+            "graph_ids", List.of(31, 999, 12)
+        ))));
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
+
+        Graph first = new Graph();
+        first.setId(31L);
+        first.setName("First");
+        writeData(first, List.of(Map.of("type", "bar", "x", List.of("all"), "y", List.of(1))));
+        Graph last = new Graph();
+        last.setId(12L);
+        last.setName("Last");
+        writeData(last, List.of(Map.of("type", "bar", "x", List.of("all"), "y", List.of(2))));
+        LocationGraph lastAssignment = new LocationGraph();
+        lastAssignment.setGraph(last);
+        LocationGraph firstAssignment = new LocationGraph();
+        firstAssignment.setGraph(first);
+        when(locationGraphRepository.findByLocationIdAndGraphIdInWithGraphDetails(
+            eq(locationId), anyCollection()
+        )).thenReturn(List.of(lastAssignment, firstAssignment));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangeProjections(
+            eq(locationId), anyCollection(), eq(new DashboardGraphMonthRange(4))
+        )).thenReturn(Map.of(
+            31L,
+            new DashboardGraphProjection(
+                List.of(Map.of("type", "bar", "x", List.of("ranged"), "y", List.of(9))),
+                Map.of("title", "Four months")
+            ),
+            12L,
+            new DashboardGraphProjection(
+                List.of(Map.of("type", "bar", "x", List.of("last-ranged"), "y", List.of(2))),
+                Map.of()
+            )
+        ));
+
+        mockMvc.perform(get(
+                "/api/core/locations/{locationId}/sections/{sectionId}/graphs?monthRange=4",
+                locationId,
+                2L
+            ))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sectionId").value(2))
+            .andExpect(jsonPath("$.monthRange").value(4))
+            .andExpect(jsonPath("$.graphs.length()").value(2))
+            .andExpect(jsonPath("$.graphs[0].id").value(31))
+            .andExpect(jsonPath("$.graphs[0].data[0].x[0]").value("ranged"))
+            .andExpect(jsonPath("$.graphs[1].id").value(12))
+            .andExpect(jsonPath("$.missingGraphIds[0]").value(999));
+    }
+
+    @Test
+    void sectionGraphsReturnsHandledErrorWhenAnAssignedGraphCannotBeProjected() throws Exception {
+        Long userId = 7L;
+        Long locationId = 11L;
+        AppUser user = verifiedUser(userId);
+        Location location = new Location();
+        location.setId(locationId);
+        location.setName("Hoag Hospital");
+        location.setSectionLayout(Map.of("sections", List.of(Map.of(
+            "section_id", 2,
+            "graph_ids", List.of(31)
+        ))));
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
+
+        Graph graph = new Graph();
+        graph.setId(31L);
+        graph.setName("Unresolved graph");
+        writeData(graph, List.of(Map.of("type", "bar", "x", List.of("all"), "y", List.of(1))));
+        LocationGraph assignment = new LocationGraph();
+        assignment.setGraph(graph);
+        when(locationGraphRepository.findByLocationIdAndGraphIdInWithGraphDetails(
+            eq(locationId), anyCollection()
+        )).thenReturn(List.of(assignment));
+        when(locationDashboardTimeRangeService.resolveLocationMonthRangeProjections(
+            eq(locationId), anyCollection(), eq(new DashboardGraphMonthRange(4))
+        )).thenReturn(Map.of());
+
+        mockMvc.perform(get(
+                "/api/core/locations/{locationId}/sections/{sectionId}/graphs?monthRange=4",
+                locationId,
+                2L
+            ))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.code").value("graph_projection_unavailable"))
+            .andExpect(jsonPath("$.message").value("Graph data is temporarily unavailable"));
+    }
+
+    @Test
+    void sectionGraphsReturnsNotFoundWhenLocationDoesNotExist() throws Exception {
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(verifiedUser(7L)));
+        when(locationRepository.findById(11L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/core/locations/11/sections/2/graphs?monthRange=2"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("location_not_found"));
+
+        verifyNoInteractions(locationGraphRepository);
+    }
+
+    @Test
+    void sectionGraphsRejectsCallerWithoutLocationAccess() throws Exception {
+        AppUser user = verifiedUser(7L);
+        Location location = new Location();
+        location.setId(11L);
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(7L);
+        when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(11L)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(11L, 7L)).thenReturn(false);
+
+        mockMvc.perform(get("/core/locations/11/sections/2/graphs?monthRange=2"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("forbidden"));
+
+        verifyNoInteractions(locationGraphRepository);
+    }
+
+    @Test
+    void sectionGraphsRejectsNonPositiveMonthRangesBeforeLoadingData() throws Exception {
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(7L);
+
+        mockMvc.perform(get(
+                "/core/locations/{locationId}/sections/{sectionId}/graphs?monthRange=0",
+                11L,
+                2L
+            ))
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(locationGraphRepository);
+    }
+
+    @Test
+    void sectionGraphsReturnsNotFoundForASectionOutsideTheStoredLayout() throws Exception {
+        Long userId = 7L;
+        Long locationId = 11L;
+        AppUser user = verifiedUser(userId);
+        Location location = new Location();
+        location.setId(locationId);
+        location.setSectionLayout(Map.of("sections", List.of(
+            Map.of("section_id", 1, "graph_ids", List.of())
+        )));
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
+
+        mockMvc.perform(get(
+                "/core/locations/{locationId}/sections/{sectionId}/graphs?monthRange=1",
+                locationId,
+                2L
+            ))
+            .andExpect(status().isNotFound());
+
+        verifyNoInteractions(locationGraphRepository);
+    }
+
+    @Test
+    void sectionGraphsReturnsAnEmptyResourceForAValidEmptySection() throws Exception {
+        Long userId = 7L;
+        Long locationId = 11L;
+        AppUser user = verifiedUser(userId);
+        Location location = new Location();
+        location.setId(locationId);
+        location.setSectionLayout(Map.of("sections", List.of(
+            Map.of("section_id", 2, "graph_ids", List.of())
+        )));
+        when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+        when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
+        when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
+
+        mockMvc.perform(get(
+                "/core/locations/{locationId}/sections/{sectionId}/graphs?monthRange=2",
+                locationId,
+                2L
+            ))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sectionId").value(2))
+            .andExpect(jsonPath("$.monthRange").value(2))
+            .andExpect(jsonPath("$.graphs.length()").value(0))
+            .andExpect(jsonPath("$.missingGraphIds.length()").value(0));
+
+        verifyNoInteractions(locationGraphRepository);
     }
 
     @Test

@@ -20,6 +20,7 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphRespo
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardSpreadsheetUploadResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardTablePageResponse;
+import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationSectionGraphsResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationMembershipResponse;
 import com.aphinity.client_analytics_core.api.core.response.location.LocationResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -27,8 +28,9 @@ import com.aphinity.client_analytics_core.api.core.services.location.LocationGra
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardImportService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService.MonthRangeGraphProjection;
-import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardProjectionQuery;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardGraphProjection;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardGraphProjectionQuery;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardTableProjectionQuery;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DerivedGraphRefresher;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardProjectionInvalidator;
 import com.aphinity.client_analytics_core.api.core.services.location.payload.LocationGraphUpdatePayloadValidationFactory;
@@ -56,6 +58,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Coordinates graph assignment, editing, dashboard layout, and range-aware reads
@@ -65,7 +68,8 @@ import java.util.Set;
  * scoped to explicit {@link LocationUser} memberships.</p>
  */
 @Service
-public class LocationGraphService implements LocationGraphApplication {
+public class LocationGraphService implements LocationGraphReadApplication,
+    LocationSectionGraphReadApplication, LocationGraphTableReadApplication, LocationGraphMutationApplication {
     private static final Logger log = LoggerFactory.getLogger(LocationGraphService.class);
 
     private PersistenceEntityReloader entityReloader = PersistenceEntityReloader.noop();
@@ -79,11 +83,13 @@ public class LocationGraphService implements LocationGraphApplication {
     private final LocationGraphTemplateFactory locationGraphTemplateFactory;
     private final LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory;
     private final LocationDashboardMutationLockService locationDashboardMutationLockService;
-    private final DashboardProjectionQuery projectionService;
+    private final DashboardGraphProjectionQuery graphProjectionQuery;
+    private final DashboardTableProjectionQuery tableProjectionQuery;
     private final DerivedGraphRefresher refreshService;
     private final DashboardProjectionInvalidator cacheInvalidationService;
     private final GraphResponseMapper graphResponseMapper;
     private final GraphPayloadPort graphPayloadPort;
+    private final DashboardSectionGraphSelector sectionGraphSelector;
 
     public LocationGraphService(
         AppUserRepository appUserRepository,
@@ -95,11 +101,13 @@ public class LocationGraphService implements LocationGraphApplication {
         LocationGraphTemplateFactory locationGraphTemplateFactory,
         LocationGraphUpdatePayloadValidationFactory locationGraphUpdatePayloadValidationFactory,
         LocationDashboardMutationLockService locationDashboardMutationLockService,
-        DashboardProjectionQuery projectionService,
+        DashboardGraphProjectionQuery graphProjectionQuery,
+        DashboardTableProjectionQuery tableProjectionQuery,
         DerivedGraphRefresher refreshService,
         DashboardProjectionInvalidator cacheInvalidationService,
         GraphResponseMapper graphResponseMapper,
-        GraphPayloadPort graphPayloadPort
+        GraphPayloadPort graphPayloadPort,
+        DashboardSectionGraphSelector sectionGraphSelector
     ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
@@ -110,11 +118,13 @@ public class LocationGraphService implements LocationGraphApplication {
         this.locationGraphTemplateFactory = locationGraphTemplateFactory;
         this.locationGraphUpdatePayloadValidationFactory = locationGraphUpdatePayloadValidationFactory;
         this.locationDashboardMutationLockService = locationDashboardMutationLockService;
-        this.projectionService = projectionService;
+        this.graphProjectionQuery = graphProjectionQuery;
+        this.tableProjectionQuery = tableProjectionQuery;
         this.refreshService = refreshService;
         this.cacheInvalidationService = cacheInvalidationService;
         this.graphResponseMapper = graphResponseMapper;
         this.graphPayloadPort = graphPayloadPort;
+        this.sectionGraphSelector = sectionGraphSelector;
     }
 
     @Autowired(required = false)
@@ -154,18 +164,91 @@ public class LocationGraphService implements LocationGraphApplication {
         }
 
         DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
-        Map<Long, MonthRangeGraphProjection> rangeProjectionsByGraphId = resolvedMonthRange.isAllTime()
+        Map<Long, DashboardGraphProjection> rangeProjectionsByGraphId = resolvedMonthRange.isAllTime()
             ? Map.of()
-            : projectionService.resolveGraphProjections(locationId, resolvedMonthRange);
+            : graphProjectionQuery.resolveGraphProjections(locationId, resolvedMonthRange);
         return locationGraphRepository.findByLocationIdWithGraphDetails(locationId).stream()
             .map(LocationGraph::getGraph)
             .map(graph -> {
-                MonthRangeGraphProjection projection = rangeProjectionsByGraphId.get(graph.getId());
+                DashboardGraphProjection projection = rangeProjectionsByGraphId.get(graph.getId());
                 return projection == null
                     ? graphResponseMapper.toResponse(graph)
                     : graphResponseMapper.toResponse(graph, projection.data(), projection.layout());
             })
             .toList();
+    }
+
+    /**
+     * Returns one dashboard section in layout order for an arbitrary positive
+     * rolling month range without rebuilding unrelated section graphs.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public LocationSectionGraphsResponse getAccessibleLocationSectionGraphs(
+        Long userId,
+        Long locationId,
+        Long sectionId,
+        Integer monthRange
+    ) {
+        if (monthRange == null || monthRange <= 0) {
+            throw invalidSectionMonthRange();
+        }
+        AppUser user = requireUser(userId);
+        Location location = locationRepository.findById(locationId).orElseThrow(this::locationNotFound);
+        if (!hasLocationAccess(user, locationId)) {
+            throw forbidden();
+        }
+        List<Long> sectionGraphIds = sectionGraphSelector.select(location.getSectionLayout(), sectionId)
+            .orElseThrow(this::locationSectionReadNotFound)
+            .graphIds();
+        if (sectionGraphIds.isEmpty()) {
+            return new LocationSectionGraphsResponse(sectionId, monthRange, List.of(), List.of());
+        }
+
+        Map<Long, Graph> assignedGraphsById = locationGraphRepository
+            .findByLocationIdAndGraphIdInWithGraphDetails(locationId, sectionGraphIds)
+            .stream()
+            .map(LocationGraph::getGraph)
+            .filter(Objects::nonNull)
+            .filter(graph -> graph.getId() != null)
+            .collect(Collectors.toMap(
+                Graph::getId,
+                graph -> graph,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+        DashboardGraphMonthRange resolvedMonthRange = DashboardGraphMonthRange.fromRequestValue(monthRange);
+        Map<Long, DashboardGraphProjection> projectionsByGraphId = graphProjectionQuery.resolveGraphProjections(
+            locationId,
+            sectionGraphIds,
+            resolvedMonthRange
+        );
+        List<Long> unresolvedProjectionIds = assignedGraphsById.keySet().stream()
+            .filter(graphId -> !projectionsByGraphId.containsKey(graphId))
+            .toList();
+        if (!unresolvedProjectionIds.isEmpty()) {
+            log.error(
+                "Section graph projection failed locationId={} sectionId={} monthRange={} graphIds={}",
+                locationId,
+                sectionId,
+                monthRange,
+                unresolvedProjectionIds
+            );
+            throw graphProjectionUnavailable();
+        }
+
+        List<GraphResponse> graphs = sectionGraphIds.stream()
+            .map(assignedGraphsById::get)
+            .filter(Objects::nonNull)
+            .map(graph -> {
+                DashboardGraphProjection projection = projectionsByGraphId.get(graph.getId());
+                return graphResponseMapper.toResponse(graph, projection.data(), projection.layout());
+            })
+            .toList();
+        List<Long> missingGraphIds = sectionGraphIds.stream()
+            .filter(graphId -> !assignedGraphsById.containsKey(graphId))
+            .toList();
+        return new LocationSectionGraphsResponse(sectionId, monthRange, graphs, missingGraphIds);
     }
 
     @Transactional(readOnly = true)
@@ -187,7 +270,7 @@ public class LocationGraphService implements LocationGraphApplication {
         if (!locationGraphRepository.existsByIdLocationIdAndIdGraphId(locationId, graphId)) {
             throw locationGraphNotFound();
         }
-        return projectionService.resolveTablePage(
+        return tableProjectionQuery.resolveTablePage(
             locationId,
             graphId,
             monthRange,
@@ -1234,6 +1317,18 @@ public class LocationGraphService implements LocationGraphApplication {
 
     private ResponseStatusException locationSectionNotFound() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location section not found");
+    }
+
+    private ResponseStatusException locationSectionReadNotFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Location section not found");
+    }
+
+    private ResponseStatusException invalidSectionMonthRange() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Section graph month range must be positive");
+    }
+
+    private ResponseStatusException graphProjectionUnavailable() {
+        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Graph projection unavailable");
     }
 
     private ResponseStatusException locationSectionNotEmpty() {

@@ -2,19 +2,12 @@ package com.aphinity.client_analytics_core.api.core.services.location;
 
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphNameUpdateResponse;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.GraphResponse;
-import com.aphinity.client_analytics_core.api.core.response.dashboard.LocationDashboardTablePageResponse;
 
 import java.util.List;
 import java.util.Map;
 
-/** Application boundary exposed to HTTP and future section-scoped graph adapters. */
-public interface LocationGraphApplication {
-    List<GraphResponse> getAccessibleLocationGraphs(Long userId, Long locationId, Integer monthRange);
-
-    LocationDashboardTablePageResponse getAccessibleLocationGraphTablePage(
-        Long userId, Long locationId, Long graphId, Integer monthRange, Integer page, Integer size
-    );
-
+/** Mutation boundary for location graph and section-layout operations. */
+public interface LocationGraphMutationApplication {
     GraphResponse createLocationGraph(
         Long userId, Long locationId, Long sectionId, boolean createNewSection, String graphDefinitionKey
     );

@@ -1026,6 +1026,35 @@ class CoreApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void getLocationSectionGraphsReturnsFiniteRangeResourceInSectionOrder() throws Exception {
+        createUser("partner-section-graphs@example.com", PASSWORD, true, "partner");
+        Location location = createLocation("Section Graphs Location");
+        Graph firstGraph = createGraph("First graph", List.of(Map.of("type", "bar", "y", List.of(1, 2, 3))));
+        Graph secondGraph = createGraph("Second graph", List.of(Map.of("type", "bar", "y", List.of(4, 5, 6))));
+        addLocationGraph(location, firstGraph);
+        addLocationGraph(location, secondGraph);
+        location.setSectionLayout(Map.of("sections", List.of(Map.of(
+            "section_id", 8,
+            "graph_ids", List.of(secondGraph.getId(), 999999L, firstGraph.getId())
+        ))));
+        locationRepository.saveAndFlush(location);
+        AuthCookies authCookies = loginAndCaptureCookies("partner-section-graphs@example.com", PASSWORD);
+
+        mockMvc.perform(get(
+                "/api/core/locations/{locationId}/sections/{sectionId}/graphs?monthRange=7",
+                location.getId(),
+                8L
+            ).cookie(authCookies(authCookies)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sectionId").value(8))
+            .andExpect(jsonPath("$.monthRange").value(7))
+            .andExpect(jsonPath("$.graphs.length()").value(2))
+            .andExpect(jsonPath("$.graphs[0].id").value(secondGraph.getId()))
+            .andExpect(jsonPath("$.graphs[1].id").value(firstGraph.getId()))
+            .andExpect(jsonPath("$.missingGraphIds[0]").value(999999));
+    }
+
+    @Test
     void updateLocationGraphNameAllowsPartnerAndPersistsTrimmedName() throws Exception {
         createUser("partner-graph-rename@example.com", PASSWORD, true, "partner");
         Location location = createLocation("Casa Grande");

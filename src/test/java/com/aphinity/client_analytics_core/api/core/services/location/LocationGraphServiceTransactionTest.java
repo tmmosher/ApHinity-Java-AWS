@@ -67,12 +67,14 @@ class LocationGraphServiceTransactionTest {
 
     private LocationGraphService graphService;
 
-    private LocationGraphApplication proxiedGraphService;
+    private LocationGraphMutationApplication proxiedGraphService;
 
     @BeforeEach
     void setUp() {
         LocationDashboardCacheInvalidationService invalidator =
             new LocationDashboardCacheInvalidationService(locationDashboardTimeRangeService);
+        LocationDashboardProjectionService projectionService =
+            new LocationDashboardProjectionService(locationDashboardTimeRangeService);
         graphService = new LocationGraphService(
             appUserRepository,
             locationRepository,
@@ -92,11 +94,13 @@ class LocationGraphServiceTransactionTest {
                 )
             ),
             new LocationDashboardMutationLockService(),
-            new LocationDashboardProjectionService(locationDashboardTimeRangeService),
+            projectionService,
+            projectionService,
             new LocationDashboardRefreshService(locationDashboardTimeRangeService),
             invalidator,
             new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()),
-            new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()
+            new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter(),
+            new JsonDashboardSectionGraphSelector()
         );
 
         ProxyFactory proxyFactory = new ProxyFactory(graphService);
@@ -107,7 +111,7 @@ class LocationGraphServiceTransactionTest {
                 new AnnotationTransactionAttributeSource()
             )
         );
-        proxiedGraphService = (LocationGraphApplication) proxyFactory.getProxy();
+        proxiedGraphService = (LocationGraphMutationApplication) proxyFactory.getProxy();
     }
 
     @Test
@@ -131,7 +135,7 @@ class LocationGraphServiceTransactionTest {
         proxiedGraphService.updateLocationGraphs(
             2L,
             1L,
-            List.of(new LocationGraphApplication.GraphUpdateCommand(
+            List.of(new LocationGraphMutationApplication.GraphUpdateCommand(
                 31L,
                 null,
                 List.of(Map.of("type", "bar", "y", List.of(9, 8, 7))),
