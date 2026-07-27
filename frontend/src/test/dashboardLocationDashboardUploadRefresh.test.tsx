@@ -29,6 +29,8 @@ vi.mock("../context/LocationDetailContext", () => ({
     graphsError: () => undefined,
     graphTimeRange: () => "threeMonths",
     setGraphTimeRange: vi.fn(),
+    selectGraphTimeRange: vi.fn(),
+    fetchSectionGraphs: vi.fn(),
     dashboardEdit: {
       orderedSections: () => [],
       sectionGraphs: () => [],

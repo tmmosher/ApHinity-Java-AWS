@@ -14,6 +14,8 @@ import {loadPlotlyModule} from "../../../../components/common/Chart";
 import type {LocationDashboardSpreadsheetUploadResult} from "../../../../types/Types";
 import {isTabulatorGraph} from "../../../../util/graph/tabulatorGraph";
 import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
+import {sectionSupportsTimeRange} from "../../../../util/graph/graphTimeRangeCapability";
+import {createSectionGraphRangeController} from "../../../../util/location/createSectionGraphRangeController";
 
 type LocationDashboardPanelProps = {
   locationId: string;
@@ -27,6 +29,8 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
     graphsError,
     graphTimeRange,
     setGraphTimeRange,
+    selectGraphTimeRange,
+    fetchSectionGraphs,
     dashboardEdit: dashboard,
     serviceCalendarStaging
   } = useLocationDetail();
@@ -50,6 +54,12 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   type DashboardSectionGroup =
     | {type: "flow"; sections: DashboardSection[]}
     | {type: "full"; section: DashboardSection};
+  const sectionRange = createSectionGraphRangeController({
+    commonMonthRange: () => monthRangeForDashboardTimeRange(selectedTimeRange()),
+    graphsForSection: sectionGraphs,
+    missingGraphIdsForSection: missingGraphIds,
+    fetchSectionGraphs
+  });
 
   createEffect(on(
     () => props.locationId,
@@ -58,8 +68,56 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
     }
   ));
 
+  createEffect(on(
+    () => [props.locationId, graphTimeRange()] as const,
+    sectionRange.resetAll,
+    {defer: true}
+  ));
+
+  createEffect(on(graphs, sectionRange.resetAll, {defer: true}));
+
+  createEffect(on(
+    () => dashboard.hasPendingDashboardChanges() || dashboard.isGraphMutationBusy(),
+    (blocked) => {
+      if (blocked) {
+        sectionRange.resetAll();
+      }
+    }
+  ));
+
   const displayedSectionGraphs = (section: ReturnType<typeof orderedSections>[number]) =>
-    sectionGraphs(section);
+    sectionRange.graphs(section);
+
+  const displayedMissingGraphIds = (section: DashboardSection) =>
+    sectionRange.missingGraphIds(section);
+
+  const effectiveSectionMonthRange = (section: DashboardSection) =>
+    sectionRange.monthRange(section);
+
+  const sectionTimeRangeDisabledReason = () => {
+    if (dashboard.hasPendingDashboardChanges()) {
+      return "Apply or undo pending dashboard changes before changing a section range.";
+    }
+    if (dashboard.isGraphMutationBusy()) {
+      return "Wait for the current graph action to finish.";
+    }
+    return undefined;
+  };
+
+  const graphEditingDisabledReason = (section: DashboardSection) => {
+    if (sectionRange.state(section)?.loading) {
+      return "Wait for the section range to finish loading before editing.";
+    }
+    if (sectionRange.hasOverride(section)) {
+      return "Use the common range before editing graphs in this section.";
+    }
+    return undefined;
+  };
+
+  const selectCommonTimeRange = (timeRange: DashboardTimeRange) => {
+    sectionRange.resetAll();
+    selectGraphTimeRange(timeRange);
+  };
 
   const sectionLayoutGroups = createMemo<DashboardSectionGroup[]>(() => {
     const groups: DashboardSectionGroup[] = [];
@@ -106,6 +164,30 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
     async (shouldLoad) => (shouldLoad ? loadPlotlyModule() : null)
   );
 
+  const DashboardSectionView = (viewProps: {section: DashboardSection; flowItem?: boolean}) => (
+    <LocationDashboardSection
+      section={viewProps.section}
+      graphs={displayedSectionGraphs(viewProps.section)}
+      missingGraphIds={displayedMissingGraphIds(viewProps.section)}
+      apiHost={host}
+      locationId={props.locationId}
+      monthRange={effectiveSectionMonthRange(viewProps.section)}
+      sectionTimeRangeEnabled={sectionSupportsTimeRange(displayedSectionGraphs(viewProps.section))}
+      hasSectionTimeRangeOverride={sectionRange.hasOverride(viewProps.section)}
+      sectionTimeRangeLoading={sectionRange.state(viewProps.section)?.loading ?? false}
+      sectionTimeRangeError={sectionRange.state(viewProps.section)?.error}
+      sectionTimeRangeDisabledReason={sectionTimeRangeDisabledReason()}
+      graphEditingDisabledReason={graphEditingDisabledReason(viewProps.section)}
+      canEditGraphs={canEditGraphs()}
+      isGraphMutationBusy={dashboard.isGraphMutationBusy()}
+      plotlyModule={plotlyModule}
+      flowItem={viewProps.flowItem}
+      onOpenGraphEditor={dashboard.openGraphEditor}
+      onApplySectionTimeRange={(monthRange) => void sectionRange.apply(viewProps.section, monthRange)}
+      onResetSectionTimeRange={() => sectionRange.reset(viewProps.section)}
+    />
+  );
+
   return (
     <div class="space-y-4">
       <LocationDashboardToolbar
@@ -139,7 +221,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           <div class="flex justify-center md:justify-end">
             <LocationDashboardTimeRangeSelector
               selectedRange={selectedTimeRange}
-              onSelectRange={setGraphTimeRange}
+              onSelectRange={selectCommonTimeRange}
             />
           </div>
         </div>
@@ -175,18 +257,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           <div class="space-y-4">
             <For each={sectionLayoutGroups()}>
               {(group) => group.type === "full" ? (
-                <LocationDashboardSection
-                  section={group.section}
-                  graphs={displayedSectionGraphs(group.section)}
-                  missingGraphIds={missingGraphIds(group.section)}
-                  apiHost={host}
-                  locationId={props.locationId}
-                  monthRange={monthRangeForDashboardTimeRange(selectedTimeRange())}
-                  canEditGraphs={canEditGraphs()}
-                  isGraphMutationBusy={dashboard.isGraphMutationBusy()}
-                  plotlyModule={plotlyModule}
-                  onOpenGraphEditor={dashboard.openGraphEditor}
-                />
+                <DashboardSectionView section={group.section} />
               ) : (
                 <div class="grid gap-4 xl:grid-cols-2">
                   <For each={flowSectionColumns(group.sections)}>
@@ -194,19 +265,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
                       <div class="space-y-4">
                         <For each={columnSections}>
                           {(section) => (
-                            <LocationDashboardSection
-                              section={section}
-                              graphs={displayedSectionGraphs(section)}
-                              missingGraphIds={missingGraphIds(section)}
-                              apiHost={host}
-                              locationId={props.locationId}
-                              monthRange={monthRangeForDashboardTimeRange(selectedTimeRange())}
-                              canEditGraphs={canEditGraphs()}
-                              isGraphMutationBusy={dashboard.isGraphMutationBusy()}
-                              plotlyModule={plotlyModule}
-                              flowItem
-                              onOpenGraphEditor={dashboard.openGraphEditor}
-                            />
+                            <DashboardSectionView section={section} flowItem />
                           )}
                         </For>
                       </div>

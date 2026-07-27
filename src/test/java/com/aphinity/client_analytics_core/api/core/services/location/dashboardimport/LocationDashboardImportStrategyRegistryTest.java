@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocationDashboardImportStrategyRegistryTest {
@@ -47,6 +48,8 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals("total-samples", strategy.derivedGraphDefinitions().getFirst().id());
         assertEquals("Total Number of Samples", strategy.derivedGraphDefinitions().getFirst().name());
         assertEquals("non-conformance-status-by-facility", strategy.derivedGraphDefinitions().get(8).id());
+        assertEquals("recent-sample-measurements", strategy.derivedGraphDefinitions().get(9).id());
+        assertFalse(strategy.derivedGraphDefinitions().get(9).supportsSectionTimeRange());
         assertEquals("sample-conformance-hierarchy", strategy.derivedGraphDefinitions().get(10).id());
         assertTrue(
             strategy.graphDefinitions().stream()
@@ -70,6 +73,7 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals("site", strategy.spreadsheetIdentityPattern().get(1).column());
         assertEquals(3, strategy.graphDefinitions().size());
         assertEquals(11, strategy.derivedGraphDefinitions().size());
+        assertFalse(strategy.derivedGraphDefinitions().get(10).supportsSectionTimeRange());
         LocationDashboardImportStrategyConfig.DerivedGraphConfig sunburst = strategy.derivedGraphDefinitions().get(9);
         assertEquals("sample-conformance-hierarchy", sunburst.id());
         assertEquals(LocationDashboardImportStrategyConfig.DerivedGraphType.SAMPLE_CONFORMANCE_HIERARCHY,

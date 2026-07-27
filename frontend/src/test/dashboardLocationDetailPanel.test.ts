@@ -7,6 +7,7 @@ import {
   fetchLocationById,
   fetchLocationGraphTablePageById,
   fetchLocationGraphsById,
+  fetchLocationSectionGraphsById,
   renameLocationGraphById,
   parseRouteLocationId,
   saveLocationGraphsById
@@ -162,6 +163,73 @@ describe("DashboardLocationDetailPanel data loaders", () => {
       page: 2,
       size: 10
     });
+  });
+
+  it("requests and validates an independently ranged dashboard section", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      sectionId: 8,
+      monthRange: 7,
+      graphs: [{
+        id: 11,
+        name: "Daily sessions",
+        data: [{type: "bar", x: [1], y: [9]}],
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-03T00:00:00Z"
+      }],
+      missingGraphIds: [99]
+    }));
+
+    const result = await fetchLocationSectionGraphsById(host, "55", 8, 7);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      host + "/api/core/locations/55/sections/8/graphs?monthRange=7",
+      {method: "GET"}
+    );
+    expect(result.graphs[0].id).toBe(11);
+    expect(result.missingGraphIds).toEqual([99]);
+  });
+
+  it("rejects invalid section ranges before issuing a request", async () => {
+    await expect(fetchLocationSectionGraphsById(host, "55", 8, 0))
+      .rejects.toThrowError("positive integer");
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects section responses that do not match the requested scope", async () => {
+    apiFetchMock.mockResolvedValue(createMockResponse(true, {
+      sectionId: 9,
+      monthRange: 7,
+      graphs: [],
+      missingGraphIds: []
+    }));
+
+    await expect(fetchLocationSectionGraphsById(host, "55", 8, 7))
+      .rejects.toThrowError("did not match the request");
+  });
+
+  it("surfaces handled section projection failures and authorization errors", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockResolvedValue({
+        code: "graph_projection_unavailable",
+        message: "Graph data is temporarily unavailable",
+        status: 500
+      })
+    } as unknown as Response);
+
+    await expect(fetchLocationSectionGraphsById(host, "55", 8, 7))
+      .rejects.toThrowError("Graph data is temporarily unavailable");
+
+    apiFetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: vi.fn().mockResolvedValue({code: "forbidden", message: "Insufficient permissions", status: 403})
+    } as unknown as Response);
+
+    await expect(fetchLocationSectionGraphsById(host, "55", 8, 7))
+      .rejects.toThrowError("Insufficient permissions");
   });
 
   it("normalizes legacy nested graph payloads", async () => {

@@ -74,6 +74,7 @@ export interface LocationGraph {
     style?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
+    sectionTimeRangeEnabled?: boolean;
 }
 
 export interface LocationDashboardSpreadsheetUploadResult {
@@ -87,6 +88,13 @@ export interface LocationDashboardTablePage {
     total: number;
     page: number;
     size: number;
+}
+
+export interface LocationSectionGraphsResult {
+    sectionId: number;
+    monthRange: number;
+    graphs: LocationGraph[];
+    missingGraphIds: number[];
 }
 
 export type LocationGraphTimeRange = "threeMonths" | "twelveMonths" | "allTime";

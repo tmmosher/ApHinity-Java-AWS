@@ -10,6 +10,7 @@ import {
   LocationGraphType,
   LocationGraphUpdate,
   LocationSectionLayoutConfig,
+  LocationSectionGraphsResult,
   LocationSummary
 } from "../../types/Types";
 import {parseCreateLocationServiceEventRequestList} from "../location/locationEventApi";
@@ -152,6 +153,67 @@ export const fetchLocationGraphsById = async (
     throw new Error("Unable to load location graphs");
   }
   return parseLocationGraphList(await response.json());
+};
+
+const parseLocationSectionGraphsResult = (value: unknown): LocationSectionGraphsResult => {
+  if (!isRecord(value)) {
+    throw new Error("Invalid section graph response");
+  }
+  if (
+    typeof value.sectionId !== "number"
+    || !Number.isInteger(value.sectionId)
+    || value.sectionId <= 0
+    || typeof value.monthRange !== "number"
+    || !Number.isInteger(value.monthRange)
+    || value.monthRange <= 0
+    || !Array.isArray(value.graphs)
+    || !Array.isArray(value.missingGraphIds)
+    || value.missingGraphIds.some((graphId) =>
+      typeof graphId !== "number" || !Number.isInteger(graphId) || graphId <= 0
+    )
+  ) {
+    throw new Error("Invalid section graph response shape");
+  }
+  return {
+    sectionId: value.sectionId,
+    monthRange: value.monthRange,
+    graphs: parseLocationGraphList(value.graphs),
+    missingGraphIds: value.missingGraphIds
+  };
+};
+
+/** Loads one dashboard section at an independently selected positive month range. */
+export const fetchLocationSectionGraphsById = async (
+  host: string,
+  locationId: string,
+  sectionId: number,
+  monthRange: number,
+  signal?: AbortSignal
+): Promise<LocationSectionGraphsResult> => {
+  const parsedLocationId = parseRouteLocationId(locationId);
+  const parsedSectionId = parsePositiveRouteId(sectionId, "section id");
+  if (!Number.isInteger(monthRange) || monthRange <= 0) {
+    throw new Error("Section graph month range must be a positive integer");
+  }
+  const query = new URLSearchParams({monthRange: String(monthRange)});
+  const requestInit: RequestInit = {method: "GET"};
+  if (signal) {
+    requestInit.signal = signal;
+  }
+  const response = await apiFetch(
+    host + "/api/core/locations/" + parsedLocationId + "/sections/" + parsedSectionId + "/graphs?" + query.toString(),
+    requestInit
+  );
+  if (!response.ok) {
+    const payload = parseApiErrorPayload(await response.json().catch(() => null));
+    throwAuthenticationOrSecurityError(response, payload);
+    throw new Error(payload?.message || "Unable to load section graphs");
+  }
+  const result = parseLocationSectionGraphsResult(await response.json());
+  if (result.sectionId !== parsedSectionId || result.monthRange !== monthRange) {
+    throw new Error("Section graph response did not match the request");
+  }
+  return result;
 };
 
 const parseLocationDashboardTablePage = (value: unknown): LocationDashboardTablePage => {

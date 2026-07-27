@@ -100,7 +100,8 @@ class LocationGraphServiceTransactionTest {
             invalidator,
             new GraphResponseMapper(new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter()),
             new com.aphinity.client_analytics_core.api.core.plotly.RelationalPlotlyGraphPayloadAdapter(),
-            new JsonDashboardSectionGraphSelector()
+            new JsonDashboardSectionGraphSelector(),
+            (locationName, graphs) -> Map.of()
         );
 
         ProxyFactory proxyFactory = new ProxyFactory(graphService);

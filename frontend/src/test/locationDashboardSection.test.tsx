@@ -55,10 +55,15 @@ describe("LocationDashboardSection", () => {
         apiHost="https://example.test"
         locationId="42"
         monthRange={3}
+        sectionTimeRangeEnabled={false}
+        hasSectionTimeRangeOverride={false}
+        sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
         plotlyModule={plotlyModule as never}
         onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
       />
     ));
 
@@ -99,10 +104,15 @@ describe("LocationDashboardSection", () => {
         apiHost="https://example.test"
         locationId="42"
         monthRange={3}
+        sectionTimeRangeEnabled={false}
+        hasSectionTimeRangeOverride={false}
+        sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
         plotlyModule={plotlyModule as never}
         onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
       />
     ));
 
@@ -142,10 +152,15 @@ describe("LocationDashboardSection", () => {
         apiHost="https://example.test"
         locationId="42"
         monthRange={3}
+        sectionTimeRangeEnabled={false}
+        hasSectionTimeRangeOverride={false}
+        sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
         plotlyModule={plotlyModule as never}
         onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
       />
     ));
 
@@ -180,10 +195,15 @@ describe("LocationDashboardSection", () => {
         apiHost="https://example.test"
         locationId="42"
         monthRange={3}
+        sectionTimeRangeEnabled={false}
+        hasSectionTimeRangeOverride={false}
+        sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
         plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
         onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
       />
     ));
 
@@ -206,14 +226,87 @@ describe("LocationDashboardSection", () => {
         apiHost="https://example.test"
         locationId="42"
         monthRange={3}
+        sectionTimeRangeEnabled={false}
+        hasSectionTimeRangeOverride={false}
+        sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
         plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
         flowItem
         onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
       />
     ));
 
     expect(html).toContain("break-inside-avoid");
+  });
+
+  it("renders the folded section range control only for enabled sections", () => {
+    const section: LocationSectionLayout = {section_id: 7, graph_ids: [101]};
+    const graph: LocationGraph = {
+      id: 101,
+      name: "Compliance",
+      data: [{type: "bar", x: ["A"], y: [1]}],
+      layout: {},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z"
+    };
+    const html = renderToString(() => (
+      <LocationDashboardSection
+        section={section}
+        graphs={[graph]}
+        missingGraphIds={[]}
+        apiHost="https://example.test"
+        locationId="42"
+        monthRange={3}
+        sectionTimeRangeEnabled
+        hasSectionTimeRangeOverride={false}
+        sectionTimeRangeLoading={false}
+        canEditGraphs={false}
+        isGraphMutationBusy={false}
+        plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
+        onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
+      />
+    ));
+
+    expect(html).toContain("data-section-time-range-control");
+    expect(html).toContain("data-section-time-range-trigger");
+    expect(html).toContain("clip-path:polygon(0 0, 100% 0, 100% 100%)");
+  });
+
+  it("prevents editing a graph rendered from a section override", () => {
+    const section: LocationSectionLayout = {section_id: 7, graph_ids: [101]};
+    const graph: LocationGraph = {
+      id: 101,
+      name: "Compliance",
+      data: [{type: "bar", x: ["A"], y: [1]}],
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z"
+    };
+    const html = renderToString(() => (
+      <LocationDashboardSection
+        section={section}
+        graphs={[graph]}
+        missingGraphIds={[]}
+        apiHost="https://example.test"
+        locationId="42"
+        monthRange={7}
+        sectionTimeRangeEnabled
+        hasSectionTimeRangeOverride
+        sectionTimeRangeLoading={false}
+        graphEditingDisabledReason="Use the common range before editing graphs in this section."
+        canEditGraphs
+        isGraphMutationBusy={false}
+        plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
+        onOpenGraphEditor={() => undefined}
+        onApplySectionTimeRange={() => undefined}
+        onResetSectionTimeRange={() => undefined}
+      />
+    ));
+
+    expect(html).toMatch(/<button[^>]*disabled[^>]*title="Use the common range before editing graphs in this section\."[^>]*>Edit/);
   });
 });

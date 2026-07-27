@@ -78,6 +78,7 @@ final class LocationDashboardGraphMetadataSupport {
         importMeta.put("anchorDimension", anchor.dimension().value());
         importMeta.put("anchorKey", anchor.key());
         importMeta.put("traceBy", graphDefinition.effectiveTraceBy().value());
+        importMeta.put("sectionTimeRangeEnabled", graphDefinition.supportsSectionTimeRange());
         if (anchor.dimension() == GraphDimension.SUBLOCATION) {
             importMeta.put("sublocationKey", anchor.key());
         }
@@ -150,6 +151,7 @@ final class LocationDashboardGraphMetadataSupport {
         );
         importMeta.put("metricKey", derivedMetricKey(derivedGraphDefinition.derivedType()));
         importMeta.put("unit", derivedGraphUnit(derivedGraphDefinition.derivedType()));
+        importMeta.put("sectionTimeRangeEnabled", derivedGraphDefinition.supportsSectionTimeRange());
         if (derivedGraphDefinition.derivedType() == LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS) {
             importMeta.put("renderer", "tabulator");
         }

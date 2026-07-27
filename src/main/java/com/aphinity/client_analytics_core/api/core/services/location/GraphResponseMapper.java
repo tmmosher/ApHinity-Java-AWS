@@ -49,6 +49,15 @@ public class GraphResponseMapper {
     }
 
     public GraphResponse toResponse(Graph graph, List<Map<String, Object>> data, Map<String, Object> layout) {
+        return toResponse(graph, data, layout, true);
+    }
+
+    public GraphResponse toResponse(
+        Graph graph,
+        List<Map<String, Object>> data,
+        Map<String, Object> layout,
+        boolean sectionTimeRangeEnabled
+    ) {
         if (data != null) {
             return new GraphResponse(
                 graph.getId(),
@@ -59,17 +68,27 @@ public class GraphResponseMapper {
                 graph.getConfig(),
                 graph.getStyle(),
                 graph.getCreatedAt(),
-                graph.getUpdatedAt()
+                graph.getUpdatedAt(),
+                sectionTimeRangeEnabled
             );
         }
         GraphPayloadMapper.GraphPayload payload = normalize(graph);
-        return toResponse(graph, payload, payload.data());
+        return toResponse(graph, payload, payload.data(), sectionTimeRangeEnabled);
     }
 
     private GraphResponse toResponse(
         Graph graph,
         GraphPayloadMapper.GraphPayload payload,
         List<Map<String, Object>> data
+    ) {
+        return toResponse(graph, payload, data, true);
+    }
+
+    private GraphResponse toResponse(
+        Graph graph,
+        GraphPayloadMapper.GraphPayload payload,
+        List<Map<String, Object>> data,
+        boolean sectionTimeRangeEnabled
     ) {
         return new GraphResponse(
             graph.getId(),
@@ -80,7 +99,8 @@ public class GraphResponseMapper {
             payload.config(),
             payload.style(),
             graph.getCreatedAt(),
-            graph.getUpdatedAt()
+            graph.getUpdatedAt(),
+            sectionTimeRangeEnabled
         );
     }
 

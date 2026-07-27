@@ -239,7 +239,10 @@ export const parseLocationGraph = (value: unknown): LocationGraph => {
     description: typeof value.description === "string" ? value.description : null,
     ...parseLocationGraphColumns(value),
     createdAt: value.createdAt,
-    updatedAt: value.updatedAt
+    updatedAt: value.updatedAt,
+    sectionTimeRangeEnabled: typeof value.sectionTimeRangeEnabled === "boolean"
+      ? value.sectionTimeRangeEnabled
+      : undefined
   };
 };
 

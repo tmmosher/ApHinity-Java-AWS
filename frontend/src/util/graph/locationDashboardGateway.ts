@@ -4,6 +4,7 @@ import {
   deleteLocationSectionById,
   fetchLocationById,
   fetchLocationGraphsById,
+  fetchLocationSectionGraphsById,
   renameLocationGraphById,
   saveLocationGraphsById,
   uploadLocationDashboardSpreadsheetById
@@ -13,6 +14,7 @@ import {
 export type LocationDashboardGateway = {
   fetchLocation: typeof fetchLocationById;
   fetchGraphs: typeof fetchLocationGraphsById;
+  fetchSectionGraphs: typeof fetchLocationSectionGraphsById;
   createGraph: typeof createLocationGraphById;
   saveGraphs: typeof saveLocationGraphsById;
   renameGraph: typeof renameLocationGraphById;
@@ -24,6 +26,7 @@ export type LocationDashboardGateway = {
 export const httpLocationDashboardGateway: LocationDashboardGateway = {
   fetchLocation: fetchLocationById,
   fetchGraphs: fetchLocationGraphsById,
+  fetchSectionGraphs: fetchLocationSectionGraphsById,
   createGraph: createLocationGraphById,
   saveGraphs: saveLocationGraphsById,
   renameGraph: renameLocationGraphById,

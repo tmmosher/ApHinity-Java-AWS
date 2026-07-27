@@ -29,3 +29,17 @@ export const monthRangeForDashboardTimeRange = (timeRange: DashboardTimeRange): 
   }
   return -1;
 };
+
+export type CommonDashboardTimeRangeSelectionPort = {
+  invalidateGraphCache: () => void;
+  setGraphTimeRange: (timeRange: DashboardTimeRange) => void;
+};
+
+/** Resets the complete dashboard slate before selecting any common range, including the current one. */
+export const selectCommonDashboardTimeRange = (
+  timeRange: DashboardTimeRange,
+  port: CommonDashboardTimeRangeSelectionPort
+): void => {
+  port.invalidateGraphCache();
+  port.setGraphTimeRange(timeRange);
+};

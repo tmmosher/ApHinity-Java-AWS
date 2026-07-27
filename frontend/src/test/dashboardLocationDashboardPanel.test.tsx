@@ -48,12 +48,14 @@ const locationDetailMock = vi.hoisted(() => {
     graphsError: () => undefined as unknown,
     graphTimeRange: () => "threeMonths",
     setGraphTimeRange: vi.fn(),
+    selectGraphTimeRange: vi.fn(),
     dashboardEdit,
     serviceCalendarStaging: {
       stageImportedRequests: vi.fn()
     },
     refetchLocation: async () => undefined,
-    refetchGraphs: async () => undefined
+    refetchGraphs: async () => undefined,
+    fetchSectionGraphs: vi.fn()
   };
 });
 
@@ -141,6 +143,7 @@ describe("LocationDashboardPanel", () => {
     locationDetailMock.dashboardEdit.orderedSections = () => [];
     locationDetailMock.dashboardEdit.sectionGraphs = () => [];
     locationDetailMock.dashboardEdit.missingGraphIds = () => [];
+    locationDetailMock.dashboardEdit.hasPendingDashboardChanges = () => false;
   });
 
   it("renders the dashboard toolbar with the updated title and overflow actions", () => {
@@ -221,7 +224,29 @@ describe("LocationDashboardPanel", () => {
     expect(html).toContain("space-y-4");
     expect(html).toContain("grid gap-4 xl:grid-cols-2");
     expect(html).toMatch(/data-section-id="1"[\s\S]*data-section-id="2"[\s\S]*data-section-id="3"/);
-    expect(html).toMatch(/class="w-full rounded-xl[^"]*break-inside-avoid" data-section-id="1"/);
-    expect(html).toMatch(/class="w-full rounded-xl[^"]*shadow-sm " data-section-id="2"/);
+    expect(html).toMatch(/class="relative w-full rounded-xl[^"]*break-inside-avoid" data-section-id="1"/);
+    expect(html).toMatch(/class="relative w-full rounded-xl[^"]*shadow-sm " data-section-id="2"/);
+    expect(html.match(/data-section-time-range-control/g)).toHaveLength(2);
+    expect(html).not.toMatch(/data-section-id="2"[\s\S]*?data-section-time-range-control[\s\S]*?Recent Sample Measurements/);
+  });
+
+  it("disables section range controls while dashboard edits are pending", () => {
+    const graph: LocationGraph = {
+      id: 101,
+      name: "Compliance",
+      data: [{type: "bar", x: ["A"], y: [1]}],
+      layout: {},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z"
+    };
+    locationDetailMock.graphs = () => [graph];
+    locationDetailMock.dashboardEdit.orderedSections = () => [{section_id: 1, graph_ids: [101]}];
+    locationDetailMock.dashboardEdit.sectionGraphs = () => [graph];
+    locationDetailMock.dashboardEdit.hasPendingDashboardChanges = () => true;
+
+    const html = renderToString(() => <LocationDashboardPanel locationId="42" />);
+
+    expect(html).toContain("Apply or undo pending dashboard changes before changing a section range.");
+    expect(html).toMatch(/aria-label="Set section date range"[^>]*disabled/);
   });
 });

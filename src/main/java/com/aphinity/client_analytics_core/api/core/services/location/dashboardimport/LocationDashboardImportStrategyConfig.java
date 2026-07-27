@@ -20,6 +20,14 @@ public record LocationDashboardImportStrategyConfig(
     List<MeasurementUnitConfig> measurementUnits,
     List<RangeProfileConfig> rangeProfiles
 ) {
+    public interface SectionTimeRangeConfig {
+        Boolean sectionTimeRangeEnabled();
+
+        default boolean supportsSectionTimeRange() {
+            return !Boolean.FALSE.equals(sectionTimeRangeEnabled());
+        }
+    }
+
     public LocationDashboardImportStrategyConfig {
         identityPattern = identityPattern == null ? List.of() : List.copyOf(identityPattern);
         measurementUnits = measurementUnits == null ? List.of() : List.copyOf(measurementUnits);
@@ -151,8 +159,9 @@ public record LocationDashboardImportStrategyConfig(
         Map<String, String> traceColors,
         String graphType,
         GraphAnchor anchor,
-        GraphDimension traceBy
-    ) {
+        GraphDimension traceBy,
+        Boolean sectionTimeRangeEnabled
+    ) implements SectionTimeRangeConfig {
         public GraphConfig(
             String id,
             String name,
@@ -163,7 +172,22 @@ public record LocationDashboardImportStrategyConfig(
             Map<String, String> traceColors,
             String graphType
         ) {
-            this(id, name, title, importType, sublocationKey, traceOrder, traceColors, graphType, null, null);
+            this(id, name, title, importType, sublocationKey, traceOrder, traceColors, graphType, null, null, null);
+        }
+
+        public GraphConfig(
+            String id,
+            String name,
+            String title,
+            ImportType importType,
+            String sublocationKey,
+            List<String> traceOrder,
+            Map<String, String> traceColors,
+            String graphType,
+            GraphAnchor anchor,
+            GraphDimension traceBy
+        ) {
+            this(id, name, title, importType, sublocationKey, traceOrder, traceColors, graphType, anchor, traceBy, null);
         }
 
         public GraphAnchor effectiveAnchor() {
@@ -186,6 +210,7 @@ public record LocationDashboardImportStrategyConfig(
                 ? GraphDimension.SYSTEM
                 : GraphDimension.MEASUREMENT;
         }
+
     }
 
     public record GraphAnchor(
@@ -232,8 +257,9 @@ public record LocationDashboardImportStrategyConfig(
         String title,
         DerivedGraphType derivedType,
         String graphType,
-        List<DerivedGraphHierarchyLevel> hierarchy
-    ) {
+        List<DerivedGraphHierarchyLevel> hierarchy,
+        Boolean sectionTimeRangeEnabled
+    ) implements SectionTimeRangeConfig {
         public DerivedGraphConfig {
             hierarchy = hierarchy == null ? List.of() : List.copyOf(hierarchy);
         }
@@ -245,8 +271,20 @@ public record LocationDashboardImportStrategyConfig(
             DerivedGraphType derivedType,
             String graphType
         ) {
-            this(id, name, title, derivedType, graphType, List.of());
+            this(id, name, title, derivedType, graphType, List.of(), null);
         }
+
+        public DerivedGraphConfig(
+            String id,
+            String name,
+            String title,
+            DerivedGraphType derivedType,
+            String graphType,
+            List<DerivedGraphHierarchyLevel> hierarchy
+        ) {
+            this(id, name, title, derivedType, graphType, hierarchy, null);
+        }
+
     }
 
     public record DerivedGraphHierarchyLevel(

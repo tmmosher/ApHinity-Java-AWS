@@ -182,7 +182,8 @@ class LocationServicesTest {
             invalidator,
             graphResponseMapper,
             graphPayloadPort,
-            new JsonDashboardSectionGraphSelector()
+            new JsonDashboardSectionGraphSelector(),
+            (locationName, graphs) -> Map.of()
         );
         thumbnailService = new LocationThumbnailService(
             locationRepository, locationThumbnailImageService, accessPolicy, responseMapper
@@ -1634,6 +1635,7 @@ class LocationServicesTest {
         LocationGraph locationGraph = new LocationGraph();
         locationGraph.setGraph(graph);
         when(locationGraphRepository.findByLocationIdWithGraphDetails(99L)).thenReturn(List.of(locationGraph));
+        when(locationRepository.findNameById(99L)).thenReturn(Optional.of("Test Location"));
 
         List<GraphResponse> responses = graphService.getAccessibleLocationGraphs(5L, 99L, -1);
 
@@ -1765,7 +1767,7 @@ class LocationServicesTest {
     void getAccessibleLocationGraphsReturnsMappedGraphsForAuthorizedUser() {
         AppUser user = verifiedUser(7L);
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(11L)).thenReturn(true);
+        when(locationRepository.findNameById(11L)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(11L, 7L)).thenReturn(true);
 
@@ -1806,7 +1808,7 @@ class LocationServicesTest {
     void getAccessibleLocationGraphsReturnsRelationalPayloadWhenDataIsPresent() {
         AppUser user = verifiedUser(17L);
         when(appUserRepository.findById(17L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(44L)).thenReturn(true);
+        when(locationRepository.findNameById(44L)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(44L, 17L)).thenReturn(true);
 
@@ -1846,7 +1848,7 @@ class LocationServicesTest {
     void getAccessibleLocationGraphsSupportsStoredTraceArrays() {
         AppUser user = verifiedUser(23L);
         when(appUserRepository.findById(23L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(57L)).thenReturn(true);
+        when(locationRepository.findNameById(57L)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(57L, 23L)).thenReturn(true);
 
@@ -1880,7 +1882,7 @@ class LocationServicesTest {
     void getAccessibleLocationGraphsReturnsEmptyDataWhenGraphHasNoTraces() {
         AppUser user = verifiedUser(24L);
         when(appUserRepository.findById(24L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(58L)).thenReturn(true);
+        when(locationRepository.findNameById(58L)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(58L, 24L)).thenReturn(true);
 
@@ -2178,7 +2180,7 @@ class LocationServicesTest {
     void getAccessibleLocationGraphsRejectsUnauthorizedUser() {
         AppUser user = verifiedUser(8L);
         when(appUserRepository.findById(8L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(12L)).thenReturn(true);
+        when(locationRepository.findNameById(12L)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(12L, 8L)).thenReturn(false);
 
@@ -2195,7 +2197,7 @@ class LocationServicesTest {
     void getAccessibleLocationGraphsRejectsMissingLocation() {
         AppUser user = verifiedUser(9L);
         when(appUserRepository.findById(9L)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(33L)).thenReturn(false);
+        when(locationRepository.findNameById(33L)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             graphService.getAccessibleLocationGraphs(9L, 33L)

@@ -30,6 +30,7 @@ import com.aphinity.client_analytics_core.api.core.services.location.dashboardim
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardMutationLockService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardTimeRangeService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardGraphProjection;
+import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.DashboardGraphCapabilityQuery;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardProjectionService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardRefreshService;
 import com.aphinity.client_analytics_core.api.core.services.location.dashboardimport.LocationDashboardCacheInvalidationService;
@@ -142,6 +143,9 @@ class LocationGraphPipelineWebMvcTest {
     private LocationDashboardTimeRangeService locationDashboardTimeRangeService;
 
     @MockitoBean
+    private DashboardGraphCapabilityQuery dashboardGraphCapabilityQuery;
+
+    @MockitoBean
     private AuthenticatedUserService authenticatedUserService;
 
     @Test
@@ -152,7 +156,7 @@ class LocationGraphPipelineWebMvcTest {
         AppUser user = verifiedUser(userId);
         when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
         when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(locationId)).thenReturn(true);
+        when(locationRepository.findNameById(locationId)).thenReturn(Optional.of("Hoag Hospital"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
 
@@ -192,6 +196,9 @@ class LocationGraphPipelineWebMvcTest {
         when(locationDashboardTimeRangeService.resolveLocationMonthRangePayloads(eq(locationId), any()))
             .thenReturn(Map.of());
         when(locationGraphRepository.findByLocationIdWithGraphDetails(locationId)).thenReturn(List.of(locationGraph));
+        when(dashboardGraphCapabilityQuery.resolveSectionTimeRangeCapabilities(
+            eq("Hoag Hospital"), anyCollection()
+        )).thenReturn(Map.of(31L, false));
 
         mockMvc.perform(get("/core/locations/{locationId}/graphs", locationId))
             .andExpect(status().isOk())
@@ -203,9 +210,10 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$[0].layout.showlegend").value(false))
             .andExpect(jsonPath("$[0].layout.annotations[0].text").value("<b>Test</b>"))
             .andExpect(jsonPath("$[0].config.displayModeBar").value(false))
-            .andExpect(jsonPath("$[0].style.height").value(240));
+            .andExpect(jsonPath("$[0].style.height").value(240))
+            .andExpect(jsonPath("$[0].sectionTimeRangeEnabled").value(false));
 
-        verify(locationRepository).existsById(locationId);
+        verify(locationRepository).findNameById(locationId);
         verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
         verify(locationGraphRepository).findByLocationIdWithGraphDetails(locationId);
     }
@@ -423,7 +431,7 @@ class LocationGraphPipelineWebMvcTest {
         AppUser user = verifiedUser(userId);
         when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
         when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(locationId)).thenReturn(true);
+        when(locationRepository.findNameById(locationId)).thenReturn(Optional.of("Hoag Hospital"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
 
@@ -489,7 +497,7 @@ class LocationGraphPipelineWebMvcTest {
             .andExpect(jsonPath("$[0].config.responsive").value(false))
             .andExpect(jsonPath("$[0].style.height").value(160));
 
-        verify(locationRepository).existsById(locationId);
+        verify(locationRepository).findNameById(locationId);
         verify(locationUserRepository).existsByIdLocationIdAndIdUserId(locationId, userId);
         verify(locationGraphRepository).findByLocationIdWithGraphDetails(locationId);
     }
@@ -502,7 +510,7 @@ class LocationGraphPipelineWebMvcTest {
         AppUser user = verifiedUser(userId);
         when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
         when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(locationId)).thenReturn(true);
+        when(locationRepository.findNameById(locationId)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
 
@@ -540,7 +548,7 @@ class LocationGraphPipelineWebMvcTest {
         AppUser user = verifiedUser(userId);
         when(authenticatedUserService.resolveAuthenticatedUserId(nullable(Jwt.class))).thenReturn(userId);
         when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(locationRepository.existsById(locationId)).thenReturn(true);
+        when(locationRepository.findNameById(locationId)).thenReturn(Optional.of("Test Location"));
         when(accountRoleService.isPartnerOrAdmin(user)).thenReturn(false);
         when(locationUserRepository.existsByIdLocationIdAndIdUserId(locationId, userId)).thenReturn(true);
 

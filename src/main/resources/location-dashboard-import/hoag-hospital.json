@@ -424,7 +424,8 @@
       "id": "recent-sample-measurements",
       "name": "Recent Sample Measurements",
       "derivedType": "recent_sample_measurements",
-      "graphType": "table"
+      "graphType": "table",
+      "sectionTimeRangeEnabled": false
     },
     {
       "id": "sample-conformance-hierarchy",

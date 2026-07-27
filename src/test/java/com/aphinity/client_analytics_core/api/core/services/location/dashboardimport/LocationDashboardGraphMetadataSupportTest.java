@@ -9,6 +9,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LocationDashboardGraphMetadataSupportTest {
     @Test
+    void derivedMetadataPublishesSectionTimeRangeCapability() {
+        LocationDashboardImportStrategyConfig.DerivedGraphConfig definition =
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "recent-sample-measurements",
+                "Recent Sample Measurements",
+                null,
+                LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS,
+                "table",
+                List.of(),
+                false
+            );
+
+        Map<String, Object> layout = LocationDashboardGraphMetadataSupport.withDerivedImportMetadata(
+            Map.of(), definition, "Hoag Hospital"
+        );
+
+        Map<?, ?> metadata = (Map<?, ?>) ((Map<?, ?>) layout.get("meta")).get("aphinityImport");
+        assertEquals(false, metadata.get("sectionTimeRangeEnabled"));
+    }
+
+    @Test
     void derivedSunburstMetadataUsesDuplexSizeAndSquareHeight() {
         LocationDashboardImportStrategyConfig.DerivedGraphConfig definition =
             new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
@@ -59,6 +80,7 @@ class LocationDashboardGraphMetadataSupportTest {
         assertEquals("system", metadata.get("anchorDimension"));
         assertEquals("towers", metadata.get("anchorKey"));
         assertEquals("sublocation", metadata.get("traceBy"));
+        assertEquals(true, metadata.get("sectionTimeRangeEnabled"));
         assertEquals(false, metadata.containsKey("sublocationKey"));
     }
 

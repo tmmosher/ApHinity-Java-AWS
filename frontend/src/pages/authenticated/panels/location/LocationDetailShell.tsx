@@ -1,5 +1,5 @@
 import {A} from "@solidjs/router";
-import {For, Show, createEffect, createMemo, createResource, createSignal, on, type ParentProps} from "solid-js";
+import {For, Show, batch, createEffect, createMemo, createResource, createSignal, on, type ParentProps} from "solid-js";
 import {useApiHost} from "../../../../context/ApiHostContext";
 import {LocationDetailProvider} from "../../../../context/LocationDetailContext";
 import {useProfile} from "../../../../context/ProfileContext";
@@ -9,7 +9,10 @@ import {createGanttTaskImportController} from "../../../../util/location/createG
 import {createLocationDashboardEditController} from "../../../../util/location/createLocationDashboardEditController";
 import {createServiceCalendarStagingController} from "../../../../util/location/createServiceCalendarStagingController";
 import {httpLocationDashboardGateway} from "../../../../util/graph/locationDashboardGateway";
-import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
+import {
+  monthRangeForDashboardTimeRange,
+  selectCommonDashboardTimeRange
+} from "../../../../util/location/dashboardTimeRange";
 import {
   createDashboardLocationResetGuard,
   createLocationViewActive,
@@ -66,6 +69,13 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
     setGraphCacheVersion((version) => version + 1);
   };
 
+  const selectGraphTimeRange = (timeRange: LocationGraphTimeRange) => batch(() =>
+    selectCommonDashboardTimeRange(timeRange, {
+      invalidateGraphCache: clearGraphCache,
+      setGraphTimeRange
+    })
+  );
+
   const [graphResource, {refetch: refetchGraphResource}] = createResource(
     () => {
       const locationId = requestedGraphLocationId();
@@ -112,6 +122,9 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
     clearGraphCache();
     await refetchGraphResource();
   };
+
+  const fetchSectionGraphs = (sectionId: number, monthRange: number, signal?: AbortSignal) =>
+    httpLocationDashboardGateway.fetchSectionGraphs(host, props.locationId, sectionId, monthRange, signal);
 
   const retryLocation = () => {
     void refetchLocationDetail();
@@ -185,12 +198,14 @@ export const LocationDetailShell = (props: LocationDetailShellProps) => {
               graphsError={graphsError}
               graphTimeRange={graphTimeRange}
               setGraphTimeRange={setGraphTimeRange}
+              selectGraphTimeRange={selectGraphTimeRange}
               dashboardEdit={dashboardEdit}
               serviceCalendarStaging={serviceCalendarStaging}
               ganttTaskImport={ganttTaskImport}
               setGanttTaskRefetcher={setGanttTaskRefetcher}
               refetchLocation={refetchLocationDetail}
               refetchGraphs={refetchLocationGraphs}
+              fetchSectionGraphs={fetchSectionGraphs}
             >
               <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div class="min-w-0 space-y-1">

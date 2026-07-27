@@ -5,6 +5,7 @@ import TabulatorGraph from "../graph/TabulatorGraph";
 import type {LocationGraph, LocationSectionLayout} from "../../types/Types";
 import {resolveGraphGridClass, resolveGraphHeight} from "../../util/graph/graphTheme";
 import {isTabulatorGraph} from "../../util/graph/tabulatorGraph";
+import LocationDashboardSectionTimeRangeControl from "./LocationDashboardSectionTimeRangeControl";
 
 type LocationDashboardSectionProps = {
   section: LocationSectionLayout;
@@ -13,11 +14,19 @@ type LocationDashboardSectionProps = {
   apiHost: string;
   locationId: string;
   monthRange: number;
+  sectionTimeRangeEnabled: boolean;
+  hasSectionTimeRangeOverride: boolean;
+  sectionTimeRangeLoading: boolean;
+  sectionTimeRangeError?: string;
+  sectionTimeRangeDisabledReason?: string;
+  graphEditingDisabledReason?: string;
   canEditGraphs: boolean;
   isGraphMutationBusy: boolean;
   plotlyModule: Resource<unknown>;
   flowItem?: boolean;
   onOpenGraphEditor: (graphId: number) => void;
+  onApplySectionTimeRange: (monthRange: number) => void;
+  onResetSectionTimeRange: () => void;
 };
 
 const GraphDescriptionPopover = (props: {description: string}) => (
@@ -42,10 +51,22 @@ const GraphDescriptionPopover = (props: {description: string}) => (
 
 export const LocationDashboardSection = (props: LocationDashboardSectionProps) => (
   <section
-    class={"w-full rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm "
+    class={"relative w-full rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm "
+      + (props.sectionTimeRangeEnabled ? "pt-12 " : "")
       + (props.flowItem ? "break-inside-avoid" : "")}
     data-section-id={props.section.section_id}
   >
+    <Show when={props.sectionTimeRangeEnabled}>
+      <LocationDashboardSectionTimeRangeControl
+        monthRange={props.monthRange}
+        hasOverride={props.hasSectionTimeRangeOverride}
+        loading={props.sectionTimeRangeLoading}
+        error={props.sectionTimeRangeError}
+        disabledReason={props.sectionTimeRangeDisabledReason}
+        onApply={props.onApplySectionTimeRange}
+        onReset={props.onResetSectionTimeRange}
+      />
+    </Show>
     <Show
       when={props.graphs.length > 0}
       fallback={
@@ -68,8 +89,11 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
                 <Show when={props.canEditGraphs}>
                   <button
                     type="button"
-                    class={"btn btn-xs " + (props.isGraphMutationBusy ? "btn-disabled" : "btn-outline")}
-                    disabled={props.isGraphMutationBusy}
+                    class={"btn btn-xs " + (
+                      props.isGraphMutationBusy || props.graphEditingDisabledReason ? "btn-disabled" : "btn-outline"
+                    )}
+                    disabled={props.isGraphMutationBusy || Boolean(props.graphEditingDisabledReason)}
+                    title={props.graphEditingDisabledReason}
                     onClick={() => props.onOpenGraphEditor(graph.id)}
                   >
                     Edit
