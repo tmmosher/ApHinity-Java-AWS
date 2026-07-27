@@ -689,7 +689,6 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .orElseThrow(() -> new AssertionError("Expected graph not found: " + name + " / " + title));
     }
 
-    @SuppressWarnings("unchecked")
     private String graphTitle(Map<String, Object> graph) {
         Object layoutValue = graph.get("layout");
         if (!(layoutValue instanceof Map<?, ?> layout)) {
@@ -725,7 +724,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
 
     private List<Map<String, Object>> namedEmptyScatterData(List<String> traceNames) {
         return traceNames.stream()
-            .map(traceName -> Map.<String, Object>of(
+            .map(traceName -> Map.of(
                 "type", "scatter",
                 "name", traceName,
                 "x", List.of(),

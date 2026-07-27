@@ -127,8 +127,7 @@ export const DashboardLocationsPanel = () => {
       </Show>
 
       <LocationOverviewGrid
-        title="List"
-        description="Favorite a location for faster access."
+        title="Favorite a location for faster access."
         apiHost={host}
         locations={locations}
         favoriteLocationId={favoriteLocationId()}

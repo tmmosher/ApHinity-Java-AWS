@@ -221,7 +221,7 @@ public final class LocationDashboardHistoricalDataAssembler {
                     continue;
                 }
 
-                GraphDimension anchorDimension = graphDefinition.effectiveAnchor().dimension();
+                GraphDimension anchorDimension = Objects.requireNonNull(graphDefinition.effectiveAnchor()).dimension();
                 GraphDimension traceDimension = graphDefinition.effectiveTraceBy();
                 String facilityName = anchorDimension == GraphDimension.SUBLOCATION
                     ? anchorLabel
@@ -237,7 +237,7 @@ public final class LocationDashboardHistoricalDataAssembler {
                     measurementLabel,
                     systemTypeLabel,
                     sampleCount,
-                    Math.max(0L, Math.min(compliantCount, sampleCount))
+                    Math.clamp(compliantCount, 0L, sampleCount)
                 ));
             }
         }

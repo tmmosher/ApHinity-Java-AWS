@@ -4,7 +4,7 @@ import {LocationOverviewCard} from "./LocationOverviewCard";
 
 type LocationOverviewGridProps = {
   title: string;
-  description: string;
+  description?: string;
   apiHost: string;
   locations: Resource<LocationSummary[] | undefined>;
   favoriteLocationId: string;
