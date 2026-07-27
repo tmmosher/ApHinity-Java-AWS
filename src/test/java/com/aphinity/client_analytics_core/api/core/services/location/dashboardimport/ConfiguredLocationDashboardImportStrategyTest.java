@@ -1,6 +1,7 @@
 package com.aphinity.client_analytics_core.api.core.services.location.dashboardimport;
 
 import com.aphinity.client_analytics_core.api.core.entities.dashboard.MeasurementBound;
+import com.aphinity.client_analytics_core.api.core.entities.dashboard.Graph;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -1661,7 +1662,7 @@ class ConfiguredLocationDashboardImportStrategyTest {
 
         LocationDashboardImportStrategy.LocationDashboardImportComputation result = strategy.computeImport(
             workbook,
-            List.of(measurementBound(1L, "HPC", null, null, null, new BigDecimal("500"), null, new BigDecimal("500"), null, null))
+            List.of(measurementBound(1L, "HPC", null, null, null, BigDecimal.ZERO, null, new BigDecimal("500"), null, null))
         );
 
         assertEquals(2, result.graphs().size());
@@ -1669,11 +1670,13 @@ class ConfiguredLocationDashboardImportStrategyTest {
         assertEquals("Utility SPD", result.observations().getFirst().systemTypeName());
         assertEquals("Utility SPD", result.observations().get(1).systemTypeName());
         assertEquals("Utility SPD", result.observations().get(2).systemTypeName());
+        assertTrue(result.analyzedSamples().stream()
+            .allMatch(sample -> "Utility SPD".equals(sample.identityValues().get("system"))));
 
         Map<String, Object> waterQualityTrace = result.graphs().getFirst().data().getFirst();
         assertEquals("HPC", waterQualityTrace.get("name"));
         assertEquals(List.of("2025-08-01"), waterQualityTrace.get("x"));
-        assertEquals(List.of(0L), waterQualityTrace.get("y"));
+        assertEquals(List.of(3L), waterQualityTrace.get("y"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> customData = (List<Map<String, Object>>) waterQualityTrace.get("customdata");
         assertEquals(3L, ((Number) customData.getFirst().get("sampleCount")).longValue());
@@ -1681,7 +1684,81 @@ class ConfiguredLocationDashboardImportStrategyTest {
         Map<String, Object> systemTypeTrace = result.graphs().get(1).data().getFirst();
         assertEquals("Utility SPD", systemTypeTrace.get("name"));
         assertEquals(List.of("2025-08-01"), systemTypeTrace.get("x"));
-        assertEquals(List.of(0L), systemTypeTrace.get("y"));
+        assertEquals(List.of(3L), systemTypeTrace.get("y"));
+
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardHistoricalDataAssembler().buildHistoricalDerivedData(
+                List.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                result.analyzedSamples(),
+                List.of(),
+                List.of()
+            );
+
+        Map<String, Object> barTrace = LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "non-conformances-by-system-type",
+                "Non-Conformances",
+                "By Water System Type",
+                LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_SYSTEM_TYPE,
+                "bar"
+            ),
+            new Graph(),
+            historicalData,
+            List.of()
+        ).getFirst();
+        assertEquals(List.of(2L), barTrace.get("x"));
+        assertEquals(List.of("Utility SPD"), barTrace.get("y"));
+
+        Map<String, Object> tableTrace = LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "recent-sample-measurements",
+                "Recent Sample Measurements",
+                null,
+                LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS,
+                "table"
+            ),
+            new Graph(),
+            historicalData,
+            List.of(new LocationDashboardImportStrategyConfig.SpreadsheetIdentityColumn("system", List.of())),
+            LocalDate.parse("2025-09-01")
+        ).getFirst();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> tableCells = (Map<String, Object>) tableTrace.get("cells");
+        @SuppressWarnings("unchecked")
+        List<List<Object>> tableColumns = (List<List<Object>>) tableCells.get("values");
+        assertFalse(tableColumns.getFirst().isEmpty());
+        assertTrue(tableColumns.getFirst().stream().allMatch("Utility SPD"::equals));
+
+        Map<String, Object> sunburstTrace = LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                "sample-conformance-hierarchy",
+                "Sample Conformance Hierarchy",
+                null,
+                LocationDashboardImportStrategyConfig.DerivedGraphType.SAMPLE_CONFORMANCE_HIERARCHY,
+                "sunburst",
+                List.of(
+                    new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                        LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.IDENTITY,
+                        "system"
+                    ),
+                    new LocationDashboardImportStrategyConfig.DerivedGraphHierarchyLevel(
+                        LocationDashboardImportStrategyConfig.DerivedGraphHierarchySource.MEASUREMENT,
+                        null
+                    )
+                )
+            ),
+            new Graph(),
+            historicalData,
+            List.of()
+        ).getFirst();
+        assertEquals(
+            List.of("Utility SPD", "HPC", "Conformances", "Non-Conformances"),
+            sunburstTrace.get("labels")
+        );
+        assertEquals(List.of(3L, 3L, 0L, 3L), sunburstTrace.get("values"));
     }
 
     @Test

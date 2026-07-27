@@ -52,7 +52,7 @@ final class HistoricalDerivedDataTimeRangeProjector {
                     LinkedHashMap::new
                 ));
 
-        List<LocationDashboardDerivedGraphSupport.HistoricalNonConformance> filteredNonConformances =
+        List<LocationDashboardNonConformanceIncident> filteredNonConformances =
             historicalData.nonConformances().stream()
                 .filter(nonConformance -> nonConformance != null
                     && nonConformance.observedDate() != null

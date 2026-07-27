@@ -41,6 +41,8 @@ import static com.aphinity.client_analytics_core.api.core.services.location.dash
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -75,7 +77,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.graphs.length()").value(18))
+            .andExpect(jsonPath("$.graphs.length()").value(19))
             .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$.graphs[0].data[0].name").value("HPC"))
             .andExpect(jsonPath("$.graphs[0].data[0].y[0]").value(0))
@@ -88,19 +90,19 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$.graphs[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$.graphs[2].data[0].values[0]").value(6))
             .andExpect(jsonPath("$.graphs[3].name").value("Total Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[3].data[0].values[0]").value(2))
+            .andExpect(jsonPath("$.graphs[3].data[0].values[0]").value(1))
             .andExpect(jsonPath("$.graphs[4].name").value("Percent Resolved"))
             .andExpect(jsonPath("$.graphs[4].data[0].value").value(0))
             .andExpect(jsonPath("$.graphs[5].name").value("Percent Conformance"))
             .andExpect(jsonPath("$.graphs[5].data[0].value").value(67))
             .andExpect(jsonPath("$.graphs[6].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[6].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[6].data[0].x[0]").value(1))
             .andExpect(jsonPath("$.graphs[6].data[0].y[0]").value("Endotoxin"))
             .andExpect(jsonPath("$.graphs[7].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[7].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[7].data[0].x[0]").value(1))
             .andExpect(jsonPath("$.graphs[7].data[0].y[0]").value("Cooling Tower"))
             .andExpect(jsonPath("$.graphs[8].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[8].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[8].data[0].x[0]").value(1))
             .andExpect(jsonPath("$.graphs[8].data[0].y[0]").value("Newport Beach"))
             .andExpect(jsonPath("$.graphs[11].name").value("Recent Sample Measurements"))
             .andExpect(jsonPath("$.graphs[11].data[0].type").value("table"))
@@ -266,17 +268,17 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.graphs[3].name").value("Total Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[3].data[0].values[0]").value(3))
+            .andExpect(jsonPath("$.graphs[3].data[0].values[0]").value(2))
             .andExpect(jsonPath("$.graphs[6].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[6].data[0].x[0]").value(2))
+            .andExpect(jsonPath("$.graphs[6].data[0].x[0]").value(1))
             .andExpect(jsonPath("$.graphs[6].data[0].y[0]").value("Endotoxin"))
             .andExpect(jsonPath("$.graphs[6].data[0].x[1]").value(1))
             .andExpect(jsonPath("$.graphs[6].data[0].y[1]").value("HPC"))
             .andExpect(jsonPath("$.graphs[7].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[7].data[0].x[0]").value(3))
+            .andExpect(jsonPath("$.graphs[7].data[0].x[0]").value(2))
             .andExpect(jsonPath("$.graphs[7].data[0].y[0]").value("Cooling Tower"))
             .andExpect(jsonPath("$.graphs[8].name").value("Non-Conformances"))
-            .andExpect(jsonPath("$.graphs[8].data[0].x[0]").value(3))
+            .andExpect(jsonPath("$.graphs[8].data[0].x[0]").value(2))
             .andExpect(jsonPath("$.graphs[8].data[0].y[0]").value("Newport Beach"));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
@@ -312,7 +314,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.graphs.length()").value(18))
+            .andExpect(jsonPath("$.graphs.length()").value(19))
             .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$.graphs[0].data.length()").value(7))
             .andExpect(jsonPath("$.graphs[0].data[0].name").value("HPC"))
@@ -324,7 +326,12 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             .andExpect(jsonPath("$.graphs[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$.graphs[2].data[0].values[0]").value(greaterThan(0)))
             .andExpect(jsonPath("$.graphs[4].name").value("Percent Resolved"))
-            .andExpect(jsonPath("$.graphs[5].name").value("Percent Conformance"));
+            .andExpect(jsonPath("$.graphs[5].name").value("Percent Conformance"))
+            .andExpect(jsonPath("$.graphs[12].name").value("Sample Conformance Hierarchy"))
+            .andExpect(jsonPath("$.graphs[12].data[0].type").value("sunburst"))
+            .andExpect(jsonPath("$.graphs[12].data[0].labels").value(hasItem("Utility Domestic Hot")))
+            .andExpect(jsonPath("$.graphs[12].data[0].labels").value(not(hasItem("Utility Hot"))))
+            .andExpect(jsonPath("$.graphs[12].data[0].labels").value(not(hasItem("Utility- Domestic Hot"))));
 
         List<ServiceEvent> persistedEvents = serviceEventRepository.findAll();
         assertEquals(0, persistedEvents.size());
@@ -548,7 +555,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
                     .with(csrfDoubleSubmit())
             )
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.graphs.length()").value(18))
+            .andExpect(jsonPath("$.graphs.length()").value(19))
             .andExpect(jsonPath("$.graphs[0].name").value("Water Quality Conformance"))
             .andExpect(jsonPath("$.graphs[2].name").value("Total Number of Samples"))
             .andExpect(jsonPath("$.graphs[2].data[0].values[0]").value(6));
@@ -770,6 +777,18 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         ));
     }
 
+    private List<Map<String, Object>> blankSunburstData() {
+        return List.of(Map.of(
+            "type", "sunburst",
+            "name", "Trace 1",
+            "ids", List.of("sample"),
+            "labels", List.of("Sample"),
+            "parents", List.of(""),
+            "values", List.of(0),
+            "branchvalues", "total"
+        ));
+    }
+
     private Graph createGraphWithLayout(String name, Object data, Map<String, Object> layout) {
         Graph graph = createGraph(name, data);
         graph.setLayout(layout);
@@ -813,6 +832,10 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
             Map.of("title", Map.of("text", "By Facility"))
         );
         Graph recentSampleMeasurementsGraph = createGraph("Recent Sample Measurements", blankTableData());
+        Graph sampleConformanceHierarchyGraph = createGraph(
+            "Sample Conformance Hierarchy",
+            blankSunburstData()
+        );
 
         addLocationGraph(location, waterQualityGraph);
         addLocationGraph(location, systemTypeGraph);
@@ -826,6 +849,7 @@ class LocationDashboardSpreadsheetUploadIntegrationTest extends AbstractApiInteg
         addLocationGraph(location, turnaroundTimeGraph);
         addLocationGraph(location, statusByFacilityGraph);
         addLocationGraph(location, recentSampleMeasurementsGraph);
+        addLocationGraph(location, sampleConformanceHierarchyGraph);
         addLocationGraph(location, createGraphWithTitle("Water Quality Conformance", "Irvine", blankScatterData()));
         addLocationGraph(location, createGraphWithTitle("System Type Conformance", "Irvine", blankScatterData()));
         addLocationGraph(location, createGraphWithTitle("Water Quality Conformance", "16405 Irvine", blankScatterData()));

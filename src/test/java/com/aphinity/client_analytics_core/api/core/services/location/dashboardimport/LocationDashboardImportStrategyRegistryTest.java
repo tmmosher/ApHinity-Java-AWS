@@ -43,14 +43,19 @@ class LocationDashboardImportStrategyRegistryTest {
         assertEquals("irvine-water-quality-conformance", strategy.graphDefinitions().get(2).id());
         assertEquals("Irvine", strategy.graphDefinitions().get(2).title());
         assertEquals("surgical-pavilion-system-type-conformance", strategy.graphDefinitions().get(7).id());
-        assertEquals(10, strategy.derivedGraphDefinitions().size());
+        assertEquals(11, strategy.derivedGraphDefinitions().size());
         assertEquals("total-samples", strategy.derivedGraphDefinitions().getFirst().id());
         assertEquals("Total Number of Samples", strategy.derivedGraphDefinitions().getFirst().name());
         assertEquals("non-conformance-status-by-facility", strategy.derivedGraphDefinitions().get(8).id());
+        assertEquals("sample-conformance-hierarchy", strategy.derivedGraphDefinitions().get(10).id());
         assertTrue(
             strategy.graphDefinitions().stream()
                 .anyMatch(graph -> graph.importType() == LocationDashboardImportStrategyConfig.ImportType.SYSTEM_TYPE_COMPLIANCE)
         );
+        ConfiguredLocationDashboardImportStrategy configuredStrategy =
+            (ConfiguredLocationDashboardImportStrategy) strategy;
+        assertEquals("Utility Domestic Hot", configuredStrategy.canonicalSystemTypeName("Utility Hot"));
+        assertEquals("Utility Domestic Hot", configuredStrategy.canonicalSystemTypeName("Utility- Domestic Hot"));
     }
 
     @Test

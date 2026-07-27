@@ -56,6 +56,7 @@ final class LocationDashboardImportContextResolver {
             row == null ? Map.of() : row.identityValues(),
             effectiveActiveContext
         );
+        identityValues = canonicalizeSystemIdentity(identityValues, systemResolution);
         return new RowImportContext(
             identityValues,
             sublocation,
@@ -176,6 +177,28 @@ final class LocationDashboardImportContextResolver {
             });
         }
         return LocationDashboardIdentitySupport.immutableCopy(merged);
+    }
+
+    private Map<String, String> canonicalizeSystemIdentity(
+        Map<String, String> identityValues,
+        SystemResolution systemResolution
+    ) {
+        if (identityValues == null
+            || systemResolution == null
+            || systemResolution.identityKey() == null
+            || systemResolution.systemType() == null) {
+            return identityValues == null ? Map.of() : identityValues;
+        }
+        String canonicalSystemName = resolveSystemTypeName(
+            systemResolution.systemType(),
+            identityValues.get(systemResolution.identityKey())
+        );
+        if (canonicalSystemName == null) {
+            return identityValues;
+        }
+        Map<String, String> canonicalIdentityValues = new LinkedHashMap<>(identityValues);
+        canonicalIdentityValues.put(systemResolution.identityKey(), canonicalSystemName);
+        return LocationDashboardIdentitySupport.immutableCopy(canonicalIdentityValues);
     }
 
     private String firstIdentityValue(Map<String, String> identityValues, String excludedIdentityKey) {

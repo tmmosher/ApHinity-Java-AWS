@@ -69,18 +69,14 @@ final class LocationDashboardDerivedGraphSupport {
         List<HistoricalSamplePoint> waterQualitySamplePoints = historicalData.allSamplePoints().stream()
             .filter(samplePoint -> samplePoint.measurementName() != null)
             .toList();
-        List<HistoricalSamplePoint> systemTypeSamplePoints = historicalData.allSamplePoints().stream()
-            .filter(samplePoint -> samplePoint.systemTypeName() != null)
-            .toList();
-        List<HistoricalNonConformance> nonConformances = historicalData.nonConformances();
+        List<LocationDashboardNonConformanceIncident> nonConformances = historicalData.nonConformances();
 
         long totalSamples = waterQualitySamplePoints.stream().mapToLong(HistoricalSamplePoint::sampleCount).sum();
         long compliantSamples = waterQualitySamplePoints.stream().mapToLong(HistoricalSamplePoint::compliantCount).sum();
-        long totalSampleNonConformances = waterQualitySamplePoints.stream()
-            .mapToLong(HistoricalSamplePoint::nonConformingCount)
-            .sum();
         long totalIncidentNonConformances = nonConformances.size();
-        long resolvedNonConformances = nonConformances.stream().filter(HistoricalNonConformance::resolved).count();
+        long resolvedNonConformances = nonConformances.stream()
+            .filter(LocationDashboardNonConformanceIncident::resolved)
+            .count();
         long activeNonConformances = totalIncidentNonConformances - resolvedNonConformances;
 
         return switch (derivedGraphType) {
@@ -95,7 +91,7 @@ final class LocationDashboardDerivedGraphSupport {
                 graph,
                 "Non-Conformances",
                 List.of("Total Non-Conformances"),
-                List.of(totalSampleNonConformances),
+                List.of(totalIncidentNonConformances),
                 List.of(ACTIVE_GRAPH_COLOR)
             ));
             case ACTIVE_NON_CONFORMANCE_PERCENT -> {
@@ -115,7 +111,7 @@ final class LocationDashboardDerivedGraphSupport {
             case NON_CONFORMANCE_COUNT -> buildCountPayload(
                 graph,
                 "Non-Conformances",
-                totalSampleNonConformances,
+                totalIncidentNonConformances,
                 ACTIVE_GRAPH_COLOR
             );
             case PERCENT_RESOLVED -> {
@@ -125,21 +121,21 @@ final class LocationDashboardDerivedGraphSupport {
             case NON_CONFORMANCES_BY_FACILITY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countSampleLabels(waterQualitySamplePoints, HistoricalSamplePoint::facilityName, UNKNOWN_FACILITY_LABEL),
+                countIncidentLabels(nonConformances, LocationDashboardNonConformanceIncident::facilityName, UNKNOWN_FACILITY_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_SYSTEM_TYPE -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countSampleLabels(systemTypeSamplePoints, HistoricalSamplePoint::systemTypeName, UNKNOWN_SYSTEM_TYPE_LABEL),
+                countIncidentLabels(nonConformances, LocationDashboardNonConformanceIncident::systemTypeName, UNKNOWN_SYSTEM_TYPE_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
             case NON_CONFORMANCES_BY_CATEGORY -> List.of(buildHorizontalBarTrace(
                 graph,
                 "Non-Conformances",
-                countSampleLabels(waterQualitySamplePoints, HistoricalSamplePoint::measurementName, UNKNOWN_CATEGORY_LABEL),
+                countIncidentLabels(nonConformances, LocationDashboardNonConformanceIncident::measurementName, UNKNOWN_CATEGORY_LABEL),
                 DEFAULT_GRAPH_COLOR,
                 0
             ));
@@ -382,10 +378,10 @@ final class LocationDashboardDerivedGraphSupport {
 
     private static List<Map<String, Object>> buildStatusByFacilityPayload(
         Graph graph,
-        List<HistoricalNonConformance> nonConformances
+        List<LocationDashboardNonConformanceIncident> nonConformances
     ) {
         Map<String, long[]> countsByFacility = new LinkedHashMap<>();
-        for (HistoricalNonConformance nonConformance : nonConformances) {
+        for (LocationDashboardNonConformanceIncident nonConformance : nonConformances) {
             String facilityName = labelOrFallback(nonConformance.facilityName(), UNKNOWN_FACILITY_LABEL);
             long[] counts = countsByFacility.computeIfAbsent(facilityName, ignored -> new long[2]);
             if (nonConformance.resolved()) {
@@ -411,18 +407,18 @@ final class LocationDashboardDerivedGraphSupport {
         );
     }
 
-    private static Map<String, Long> countSampleLabels(
-        List<HistoricalSamplePoint> samplePoints,
-        Function<HistoricalSamplePoint, String> labelExtractor,
+    private static Map<String, Long> countIncidentLabels(
+        List<LocationDashboardNonConformanceIncident> nonConformances,
+        Function<LocationDashboardNonConformanceIncident, String> labelExtractor,
         String fallbackLabel
     ) {
         Map<String, Long> countsByLabel = new LinkedHashMap<>();
-        for (HistoricalSamplePoint samplePoint : samplePoints) {
-            if (samplePoint == null || samplePoint.nonConformingCount() <= 0L) {
+        for (LocationDashboardNonConformanceIncident nonConformance : nonConformances) {
+            if (nonConformance == null) {
                 continue;
             }
-            String label = labelOrFallback(labelExtractor.apply(samplePoint), fallbackLabel);
-            countsByLabel.merge(label, samplePoint.nonConformingCount(), Long::sum);
+            String label = labelOrFallback(labelExtractor.apply(nonConformance), fallbackLabel);
+            countsByLabel.merge(label, 1L, Long::sum);
         }
 
         return countsByLabel.entrySet().stream()
@@ -437,7 +433,9 @@ final class LocationDashboardDerivedGraphSupport {
             ));
     }
 
-    private static Map<String, Long> countLabelsByTurnaround(List<HistoricalNonConformance> nonConformances) {
+    private static Map<String, Long> countLabelsByTurnaround(
+        List<LocationDashboardNonConformanceIncident> nonConformances
+    ) {
         Map<String, Long> countsByTurnaround = new LinkedHashMap<>();
         TURNAROUND_BUCKETS.forEach(label -> countsByTurnaround.put(label, 0L));
         nonConformances.stream()
@@ -455,7 +453,7 @@ final class LocationDashboardDerivedGraphSupport {
             ));
     }
 
-    private static String turnaroundLabel(HistoricalNonConformance nonConformance) {
+    private static String turnaroundLabel(LocationDashboardNonConformanceIncident nonConformance) {
         if (nonConformance == null || nonConformance.turnaroundDays() == null) {
             return null;
         }
@@ -843,8 +841,8 @@ final class LocationDashboardDerivedGraphSupport {
             );
         }
 
-        HistoricalNonConformance toHistoricalNonConformance() {
-            return new HistoricalNonConformance(
+        LocationDashboardNonConformanceIncident toHistoricalNonConformance() {
+            return new LocationDashboardNonConformanceIncident(
                 observedDate,
                 facilityName,
                 measurementName,
@@ -856,48 +854,9 @@ final class LocationDashboardDerivedGraphSupport {
         }
     }
 
-    record HistoricalNonConformance(
-        LocalDate observedDate,
-        String facilityName,
-        String measurementName,
-        Map<String, String> identityValues,
-        String sampleIdentity,
-        boolean resolved,
-        Long turnaroundDays
-    ) {
-        HistoricalNonConformance {
-            identityValues = LocationDashboardIdentitySupport.immutableCopy(identityValues);
-        }
-
-        static HistoricalNonConformance merge(
-            HistoricalNonConformance persisted,
-            HistoricalNonConformance analyzed
-        ) {
-            if (persisted == null) {
-                return analyzed;
-            }
-            if (analyzed == null) {
-                return persisted;
-            }
-            boolean resolved = persisted.resolved || analyzed.resolved;
-            Long turnaroundDays = analyzed.turnaroundDays != null
-                ? analyzed.turnaroundDays
-                : persisted.turnaroundDays;
-            return new HistoricalNonConformance(
-                analyzed.observedDate != null ? analyzed.observedDate : persisted.observedDate,
-                analyzed.facilityName != null ? analyzed.facilityName : persisted.facilityName,
-                analyzed.measurementName != null ? analyzed.measurementName : persisted.measurementName,
-                !analyzed.identityValues.isEmpty() ? analyzed.identityValues : persisted.identityValues,
-                analyzed.sampleIdentity != null ? analyzed.sampleIdentity : persisted.sampleIdentity,
-                resolved,
-                turnaroundDays
-            );
-        }
-    }
-
     record HistoricalDerivedData(
         Map<LocalDate, List<HistoricalSamplePoint>> samplesByDate,
-        List<HistoricalNonConformance> nonConformances,
+        List<LocationDashboardNonConformanceIncident> nonConformances,
         List<HistoricalRawSample> rawSamples
     ) {
         HistoricalDerivedData {
@@ -917,7 +876,7 @@ final class LocationDashboardDerivedGraphSupport {
 
         HistoricalDerivedData(
             Map<LocalDate, List<HistoricalSamplePoint>> samplesByDate,
-            List<HistoricalNonConformance> nonConformances
+            List<LocationDashboardNonConformanceIncident> nonConformances
         ) {
             this(samplesByDate, nonConformances, List.of());
         }

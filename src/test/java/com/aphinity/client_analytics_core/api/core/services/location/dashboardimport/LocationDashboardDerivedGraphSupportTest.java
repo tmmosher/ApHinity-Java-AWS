@@ -11,6 +11,51 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LocationDashboardDerivedGraphSupportTest {
     @Test
+    void usesCanonicalIncidentsForEveryNonConformanceDerivedGraph() {
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
+            new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
+                Map.of(LocalDate.parse("2026-06-01"), List.of(
+                    new LocationDashboardDerivedGraphSupport.HistoricalSamplePoint(
+                        LocalDate.parse("2026-06-01"),
+                        "Hoag Hospital Newport Beach",
+                        "HPC",
+                        null,
+                        5L,
+                        2L
+                    )
+                )),
+                List.of(
+                    incident("HPC", "Utility Domestic Hot", false, null),
+                    incident("Legionella", "Utility Cold", true, 10L)
+                ),
+                List.of()
+            );
+
+        assertEquals(List.of(2L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.TOTAL_NON_CONFORMANCES).get("values"));
+        assertEquals(List.of(2L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_COUNT).get("values"));
+        assertEquals(List.of(50L, 50L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.ACTIVE_NON_CONFORMANCE_PERCENT).get("values"));
+        assertEquals(List.of(50L, 50L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.PERCENT_RESOLVED).get("values"));
+
+        assertEquals(List.of(2L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_FACILITY).get("x"));
+        assertEquals(List.of(1L, 1L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_SYSTEM_TYPE).get("x"));
+        assertEquals(List.of(1L, 1L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCES_BY_CATEGORY).get("x"));
+
+        List<Map<String, Object>> status = payload(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_STATUS_BY_FACILITY);
+        assertEquals(List.of(1L), status.get(0).get("x"));
+        assertEquals(List.of(1L), status.get(1).get("x"));
+        assertEquals(List.of(1L), trace(historicalData,
+            LocationDashboardImportStrategyConfig.DerivedGraphType.NON_CONFORMANCE_TURNAROUND_TIME).get("x"));
+    }
+
+    @Test
     void buildsAlphabeticalSampleConformanceSunburstFromConfiguredHierarchy() {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
@@ -123,7 +168,7 @@ class LocationDashboardDerivedGraphSupportTest {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
                 Map.of(),
-                List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                List.of(new LocationDashboardNonConformanceIncident(
                     LocalDate.parse("2026-06-01"),
                     "Newport Beach",
                     "HPC",
@@ -157,7 +202,7 @@ class LocationDashboardDerivedGraphSupportTest {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
                 Map.of(),
-                List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                List.of(new LocationDashboardNonConformanceIncident(
                     LocalDate.parse("2026-01-01"),
                     "Newport Beach",
                     "HPC",
@@ -286,7 +331,7 @@ class LocationDashboardDerivedGraphSupportTest {
         LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData =
             new LocationDashboardDerivedGraphSupport.HistoricalDerivedData(
                 Map.of(),
-                List.of(new LocationDashboardDerivedGraphSupport.HistoricalNonConformance(
+                List.of(new LocationDashboardNonConformanceIncident(
                     LocalDate.parse("2026-06-01"),
                     "Newport Beach",
                     "HPC",
@@ -394,6 +439,56 @@ class LocationDashboardDerivedGraphSupportTest {
             null,
             LocationDashboardImportStrategyConfig.DerivedGraphType.RECENT_SAMPLE_MEASUREMENTS,
             "table"
+        );
+    }
+
+    private LocationDashboardNonConformanceIncident incident(
+        String measurementName,
+        String systemTypeName,
+        boolean resolved,
+        Long turnaroundDays
+    ) {
+        return new LocationDashboardNonConformanceIncident(
+            LocalDate.parse("2026-06-01"),
+            "Hoag Hospital Newport Beach",
+            measurementName,
+            Map.of("system", systemTypeName),
+            "sample-" + measurementName,
+            resolved,
+            turnaroundDays,
+            systemTypeName
+        );
+    }
+
+    private Map<String, Object> trace(
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
+        LocationDashboardImportStrategyConfig.DerivedGraphType type
+    ) {
+        return payload(historicalData, type).getFirst();
+    }
+
+    private List<Map<String, Object>> payload(
+        LocationDashboardDerivedGraphSupport.HistoricalDerivedData historicalData,
+        LocationDashboardImportStrategyConfig.DerivedGraphType type
+    ) {
+        return LocationDashboardDerivedGraphSupport.buildPayload(
+            new LocationDashboardImportStrategyConfig.DerivedGraphConfig(
+                type.value(),
+                type.value(),
+                null,
+                type,
+                switch (type) {
+                    case NON_CONFORMANCES_BY_FACILITY,
+                         NON_CONFORMANCES_BY_SYSTEM_TYPE,
+                         NON_CONFORMANCES_BY_CATEGORY,
+                         NON_CONFORMANCE_STATUS_BY_FACILITY,
+                         NON_CONFORMANCE_TURNAROUND_TIME -> "bar";
+                    default -> "pie";
+                }
+            ),
+            new Graph(),
+            historicalData,
+            List.of()
         );
     }
 

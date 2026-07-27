@@ -425,6 +425,29 @@
       "name": "Recent Sample Measurements",
       "derivedType": "recent_sample_measurements",
       "graphType": "table"
+    },
+    {
+      "id": "sample-conformance-hierarchy",
+      "name": "Sample Conformance Hierarchy",
+      "derivedType": "sample_conformance_hierarchy",
+      "graphType": "sunburst",
+      "hierarchy": [
+        {
+          "source": "identity",
+          "key": "facility"
+        },
+        {
+          "source": "identity",
+          "key": "building"
+        },
+        {
+          "source": "identity",
+          "key": "system"
+        },
+        {
+          "source": "measurement"
+        }
+      ]
     }
   ],
   "systemTypeAliases": [
@@ -435,7 +458,8 @@
         "Utility SPD",
         "Utility Water SPD",
         "Utility Soft",
-        "Utility Water"
+        "Utility Water",
+        "Utility-SPD"
       ]
     },
     {
@@ -447,7 +471,10 @@
     {
       "Utility Domestic Hot" : [
         "Utility Hot",
-        "Utility Main Hot 120F"
+        "Utility Main Hot 120F",
+        "Utility Domestic Hot",
+        "Utility-Domestic Hot",
+        "Utility- Domestic Hot"
       ]
     },
     {
