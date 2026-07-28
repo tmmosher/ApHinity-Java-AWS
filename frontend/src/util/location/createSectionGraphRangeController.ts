@@ -38,7 +38,7 @@ export const createSectionGraphRangeController = (props: SectionGraphRangeContro
   const missingGraphIds = (section: LocationSectionLayout) =>
     state(section)?.missingGraphIds ?? props.missingGraphIdsForSection(section);
   const monthRange = (section: LocationSectionLayout) => state(section)?.monthRange ?? props.commonMonthRange();
-  const hasOverride = (section: LocationSectionLayout) => state(section)?.active === true;
+  const hasOverride = (section: LocationSectionLayout) => createSignal<boolean>(state(section)?.active);
 
   const apply = async (section: LocationSectionLayout, requestedMonthRange: number): Promise<void> => {
     const current = state(section);

@@ -1,8 +1,8 @@
-import {Show, createEffect, createSignal, createUniqueId} from "solid-js";
+import {Show, createEffect, createSignal, createUniqueId, Signal} from "solid-js";
 
 export type LocationDashboardSectionTimeRangeControlProps = {
   monthRange: number;
-  hasOverride: boolean;
+  hasOverride: Signal<boolean>;
   loading: boolean;
   error?: string;
   disabledReason?: string;
@@ -17,12 +17,19 @@ export const LocationDashboardSectionTimeRangeControl = (
   const [open, setOpen] = createSignal(false);
   const [monthRange, setMonthRange] = createSignal(props.monthRange > 0 ? props.monthRange : 1);
   const inputId = createUniqueId();
+
   createEffect(() => {
     if (props.monthRange > 0) {
       setMonthRange(props.monthRange);
     }
     if (props.disabledReason) {
       setOpen(false);
+    }
+  });
+
+  createEffect(() => {
+    if (props.monthRange === 3 || props.monthRange === 12) {
+      props.hasOverride[1](false);
     }
   });
 
@@ -41,7 +48,7 @@ export const LocationDashboardSectionTimeRangeControl = (
           "relative block h-12 w-12 overflow-hidden rounded-tr-xl text-primary-content transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 "
           + (props.disabledReason
             ? "cursor-not-allowed bg-base-300 text-base-content/40"
-            : props.hasOverride
+            : props.hasOverride[0]()
               ? "bg-secondary hover:brightness-110"
               : "bg-primary hover:brightness-110")
         }
@@ -76,7 +83,7 @@ export const LocationDashboardSectionTimeRangeControl = (
             {(message) => <p class="mt-2 text-xs text-error" role="alert">{message()}</p>}
           </Show>
           <div class="mt-3 flex justify-end gap-2">
-            <Show when={props.hasOverride}>
+            <Show when={props.hasOverride[0]()}>
               <button
                 type="button"
                 class="btn btn-ghost btn-xs"
