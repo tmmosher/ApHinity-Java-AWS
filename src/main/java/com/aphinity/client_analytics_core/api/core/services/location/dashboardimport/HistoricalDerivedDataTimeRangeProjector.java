@@ -31,7 +31,7 @@ final class HistoricalDerivedDataTimeRangeProjector {
         if (historicalData == null || monthRange == null || monthRange.isAllTime()) {
             return historicalData;
         }
-        LocalDate windowStart = monthRange.windowStartInclusive(anchorDate);
+        LocalDate windowStart = monthRange.selectedWindowStartInclusive(anchorDate);
         if (windowStart == null) {
             return historicalData;
         }

@@ -49,7 +49,7 @@ public final class DashboardGraphMonthRangePayloadProjector {
         if (allTimePayload == null || allTimePayload.isEmpty() || monthRange == null || monthRange.isAllTime()) {
             return allTimePayload == null ? List.of() : allTimePayload;
         }
-        LocalDate windowStart = monthRange.windowStartInclusive(anchorDate);
+        LocalDate windowStart = monthRange.dataWindowStartInclusive(anchorDate);
         if (windowStart == null) {
             return allTimePayload;
         }

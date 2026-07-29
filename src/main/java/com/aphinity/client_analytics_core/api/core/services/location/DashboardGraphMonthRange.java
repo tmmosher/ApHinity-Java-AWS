@@ -39,17 +39,11 @@ public record DashboardGraphMonthRange(Integer months) {
     }
 
     /**
-     * Resolves the inclusive first day of the fetched data window. One month
-     * before the selected range is included so Plotly trendlines have enough
-     * context to enter the displayed window cleanly.
-     *
-     * @param anchorDate date used as the end of the requested window
-     * @return first included month, or null for all-time ranges
+     * Resolves the inclusive first day of the expanded data window used by
+     * time-series renderers. One month before the selected range is included
+     * so Plotly trendlines have enough context to enter the displayed window
+     * cleanly.
      */
-    public LocalDate windowStartInclusive(LocalDate anchorDate) {
-        return dataWindowStartInclusive(anchorDate);
-    }
-
     public LocalDate dataWindowStartInclusive(LocalDate anchorDate) {
         if (isAllTime() || anchorDate == null) {
             return null;
@@ -64,6 +58,11 @@ public record DashboardGraphMonthRange(Integer months) {
         return selectedWindowStartInclusive(anchorDate).minusDays(5);
     }
 
+    /**
+     * Resolves the inclusive first day of the selected reporting window. This
+     * boundary is suitable for aggregate and derived graph inputs that must not
+     * include renderer-only context from the preceding month.
+     */
     public LocalDate selectedWindowStartInclusive(LocalDate anchorDate) {
         if (isAllTime() || anchorDate == null) {
             return null;
