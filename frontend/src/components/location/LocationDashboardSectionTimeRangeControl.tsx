@@ -45,7 +45,7 @@ export const LocationDashboardSectionTimeRangeControl = (
       <button
         type="button"
         class={
-          "relative block h-12 w-12 overflow-hidden rounded-tr-xl text-primary-content transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 "
+          "relative block h-12 w-12 z-10 overflow-hidden rounded-tr-xl text-primary-content transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 "
           + (props.disabledReason
             ? "cursor-not-allowed bg-base-300 text-base-content/40"
             : props.hasOverride[0]()

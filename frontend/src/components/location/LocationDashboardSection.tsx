@@ -52,7 +52,6 @@ const GraphDescriptionPopover = (props: {description: string}) => (
 export const LocationDashboardSection = (props: LocationDashboardSectionProps) => (
   <section
     class={"relative w-full rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm "
-      + (props.sectionTimeRangeEnabled ? "pt-12 " : "")
       + (props.flowItem ? "break-inside-avoid" : "")}
     data-section-id={props.section.section_id}
   >

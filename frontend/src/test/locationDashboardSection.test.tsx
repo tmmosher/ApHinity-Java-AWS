@@ -1,4 +1,5 @@
 import {renderToString} from "solid-js/web";
+import {createSignal} from "solid-js";
 import {describe, expect, it, vi} from "vitest";
 import type {LocationGraph, LocationSectionLayout} from "../types/Types";
 
@@ -56,7 +57,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={3}
         sectionTimeRangeEnabled={false}
-        hasSectionTimeRangeOverride={false}
+        hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
@@ -105,7 +106,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={3}
         sectionTimeRangeEnabled={false}
-        hasSectionTimeRangeOverride={false}
+        hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
@@ -153,7 +154,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={3}
         sectionTimeRangeEnabled={false}
-        hasSectionTimeRangeOverride={false}
+        hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
@@ -196,7 +197,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={3}
         sectionTimeRangeEnabled={false}
-        hasSectionTimeRangeOverride={false}
+        hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
@@ -227,7 +228,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={3}
         sectionTimeRangeEnabled={false}
-        hasSectionTimeRangeOverride={false}
+        hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
@@ -261,7 +262,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={3}
         sectionTimeRangeEnabled
-        hasSectionTimeRangeOverride={false}
+        hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
         canEditGraphs={false}
         isGraphMutationBusy={false}
@@ -275,6 +276,7 @@ describe("LocationDashboardSection", () => {
     expect(html).toContain("data-section-time-range-control");
     expect(html).toContain("data-section-time-range-trigger");
     expect(html).toContain("clip-path:polygon(0 0, 100% 0, 100% 100%)");
+    expect(html).not.toContain("pt-12");
   });
 
   it("prevents editing a graph rendered from a section override", () => {
@@ -295,7 +297,7 @@ describe("LocationDashboardSection", () => {
         locationId="42"
         monthRange={7}
         sectionTimeRangeEnabled
-        hasSectionTimeRangeOverride
+        hasSectionTimeRangeOverride={createSignal(true)}
         sectionTimeRangeLoading={false}
         graphEditingDisabledReason="Use the common range before editing graphs in this section."
         canEditGraphs
