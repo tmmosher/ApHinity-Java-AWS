@@ -63,7 +63,10 @@ export const LocationDashboardSectionTimeRangeControl = (
         data-section-time-range-trigger=""
         onClick={() => setOpen((current) => !current)}
       >
-        <span class="absolute right-1.5 top-1 text-sm" aria-hidden="true">◷</span>
+        <span class="pointer-events-none absolute left-[78%] top-[18%] -translate-x-1/2 -translate-y-1/2 text-sm leading-none"
+              aria-hidden="true">
+          ◷
+        </span>
       </button>
       <Show when={open()}>
         <div
