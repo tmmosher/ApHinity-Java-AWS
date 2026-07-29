@@ -224,6 +224,13 @@ public class AuthService {
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public IssuedTokens refresh(String refreshToken, String ipAddress, String userAgent) {
         String tokenHash = TokenHasher.sha256(refreshToken);
+        Long userId = authSessionRepository.findUserIdByRefreshTokenHash(tokenHash)
+            .orElseThrow(this::invalidRefreshToken);
+        AppUser lockedUser = appUserRepository.findByIdForSessionMutation(userId)
+            .orElseThrow(this::invalidRefreshToken);
+
+        // Read session state only after acquiring the same account lock used by password
+        // changes. This prevents a refresh from retaining stale pre-revocation state.
         AuthSession session = authSessionRepository.findByRefreshTokenHash(tokenHash)
             .orElseThrow(this::invalidRefreshToken);
 
@@ -259,14 +266,14 @@ public class AuthService {
 
         // Rotate token material on every refresh to enforce one-time refresh token semantics.
         String newRefreshToken = generateRefreshToken();
-        AuthSession newSession = buildSession(session.getUser(), newRefreshToken, ipAddress, userAgent);
+        AuthSession newSession = buildSession(lockedUser, newRefreshToken, ipAddress, userAgent);
         authSessionRepository.save(newSession);
 
         session.setRevokedAt(now);
         session.setReplacedBySessionId(newSession.getId());
         authSessionRepository.save(session);
 
-        String accessToken = jwtService.createAccessToken(session.getUser(), newSession.getId());
+        String accessToken = jwtService.createAccessToken(lockedUser, newSession.getId());
         return new IssuedTokens(
             accessToken,
             newRefreshToken,

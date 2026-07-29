@@ -13,6 +13,15 @@ import java.util.Optional;
 public interface AuthSessionRepository extends JpaRepository<AuthSession, Long> {
     Optional<AuthSession> findByRefreshTokenHash(String refreshTokenHash);
 
+    @Query("select s.user.id from AuthSession s where s.refreshTokenHash = :refreshTokenHash")
+    Optional<Long> findUserIdByRefreshTokenHash(@Param("refreshTokenHash") String refreshTokenHash);
+
+    boolean existsByIdAndUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+        Long sessionId,
+        Long userId,
+        Instant activeAt
+    );
+
     @Modifying
     @Query("update AuthSession s set s.revokedAt = :revokedAt where s.user.id = :userId and s.revokedAt is null")
     void revokeAllActiveForUser(@Param("userId") Long userId, @Param("revokedAt") Instant revokedAt);

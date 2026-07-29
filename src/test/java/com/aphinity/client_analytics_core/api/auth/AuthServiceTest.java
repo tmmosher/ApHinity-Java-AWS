@@ -313,7 +313,7 @@ class AuthServiceTest {
     @Test
     void refreshRejectsMissingSession() {
         String refreshToken = "refresh-token";
-        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
+        when(authSessionRepository.findUserIdByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
             .thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
@@ -330,8 +330,7 @@ class AuthServiceTest {
         AuthSession session = buildSession(user, Instant.now().plusSeconds(60));
         session.setRevokedAt(Instant.now());
 
-        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
-            .thenReturn(Optional.of(session));
+        stubRefreshSession(refreshToken, user, session);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             authService.refresh(refreshToken, "10.0.0.1", "agent")
@@ -350,8 +349,7 @@ class AuthServiceTest {
         session.setRevokedAt(Instant.now().minusSeconds(1));
         session.setReplacedBySessionId(200L);
 
-        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
-            .thenReturn(Optional.of(session));
+        stubRefreshSession(refreshToken, user, session);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             authService.refresh(refreshToken, "10.0.0.1", "agent")
@@ -370,8 +368,7 @@ class AuthServiceTest {
         session.setRevokedAt(Instant.now().minusSeconds(30));
         session.setReplacedBySessionId(200L);
 
-        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
-            .thenReturn(Optional.of(session));
+        stubRefreshSession(refreshToken, user, session);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             authService.refresh(refreshToken, "10.0.0.1", "agent")
@@ -388,8 +385,7 @@ class AuthServiceTest {
         AppUser user = buildUser("user@example.com");
         AuthSession session = buildSession(user, Instant.now().minusSeconds(5));
 
-        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
-            .thenReturn(Optional.of(session));
+        stubRefreshSession(refreshToken, user, session);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             authService.refresh(refreshToken, "10.0.0.1", "agent")
@@ -407,8 +403,7 @@ class AuthServiceTest {
         AppUser user = buildUser("user@example.com");
         AuthSession session = buildSession(user, Instant.now().plusSeconds(600));
 
-        when(authSessionRepository.findByRefreshTokenHash(TokenHasher.sha256(refreshToken)))
-            .thenReturn(Optional.of(session));
+        stubRefreshSession(refreshToken, user, session);
         when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
         when(jwtService.getRefreshTokenTtlSeconds()).thenReturn(3600L);
         when(authSessionRepository.save(any(AuthSession.class))).thenAnswer(invocation -> {
@@ -608,6 +603,16 @@ class AuthServiceTest {
         session.setRefreshTokenHash(TokenHasher.sha256("stored"));
         session.setExpiresAt(expiresAt);
         return session;
+    }
+
+    private void stubRefreshSession(String refreshToken, AppUser user, AuthSession session) {
+        String tokenHash = TokenHasher.sha256(refreshToken);
+        when(authSessionRepository.findUserIdByRefreshTokenHash(tokenHash))
+            .thenReturn(Optional.of(user.getId()));
+        when(appUserRepository.findByIdForSessionMutation(user.getId()))
+            .thenReturn(Optional.of(user));
+        when(authSessionRepository.findByRefreshTokenHash(tokenHash))
+            .thenReturn(Optional.of(session));
     }
 
     private Role clientRole(Long id) {

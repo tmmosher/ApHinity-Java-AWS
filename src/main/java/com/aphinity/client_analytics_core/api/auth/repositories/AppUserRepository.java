@@ -5,8 +5,11 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.Collection;
 import java.util.List;
@@ -19,6 +22,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     @EntityGraph(attributePaths = "roles")
     Optional<AppUser> findByEmail(String email);
+
+    /**
+     * Serializes security-sensitive session mutations for one account.
+     * Callers must keep the surrounding transaction open for the duration of the mutation.
+    */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUser u where u.id = :userId")
+    Optional<AppUser> findByIdForSessionMutation(@Param("userId") Long userId);
 
     @Query("""
         select u.id from AppUser u

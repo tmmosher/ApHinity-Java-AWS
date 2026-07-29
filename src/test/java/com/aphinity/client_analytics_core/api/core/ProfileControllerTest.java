@@ -7,6 +7,9 @@ import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRol
 import com.aphinity.client_analytics_core.api.core.response.dashboard.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.ProfileService;
+import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -30,6 +34,9 @@ class ProfileControllerTest {
 
     @Mock
     private AuthenticatedUserService authenticatedUserService;
+
+    @Mock
+    private AuthCookieService authCookieService;
 
     @InjectMocks
     private ProfileController profileController;
@@ -111,11 +118,37 @@ class ProfileControllerTest {
             .subject("13")
             .build();
         ProfilePasswordUpdateRequest request = new ProfilePasswordUpdateRequest("old-pass", "new-pass");
+        HttpServletRequest httpRequest = org.mockito.Mockito.mock(HttpServletRequest.class);
+        HttpServletResponse httpResponse = org.mockito.Mockito.mock(HttpServletResponse.class);
 
         when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(13L);
-        profileController.updatePassword(jwt, request);
+        profileController.updatePassword(jwt, request, httpRequest, httpResponse);
 
         verify(authenticatedUserService).resolveAuthenticatedUserId(jwt);
         verify(profileService).updatePassword(13L, "old-pass", "new-pass");
+        verify(authCookieService).clearRefreshCookie(httpRequest, httpResponse);
+        verify(authCookieService).clearAccessCookie(httpRequest, httpResponse);
+    }
+
+    @Test
+    void updatePasswordKeepsCookiesWhenPasswordChangeFails() {
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "HS256")
+            .subject("13")
+            .build();
+        ProfilePasswordUpdateRequest request = new ProfilePasswordUpdateRequest("wrong-pass", "new-pass");
+        HttpServletRequest httpRequest = org.mockito.Mockito.mock(HttpServletRequest.class);
+        HttpServletResponse httpResponse = org.mockito.Mockito.mock(HttpServletResponse.class);
+
+        when(authenticatedUserService.resolveAuthenticatedUserId(jwt)).thenReturn(13L);
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect"))
+            .when(profileService).updatePassword(13L, "wrong-pass", "new-pass");
+
+        assertThrows(
+            ResponseStatusException.class,
+            () -> profileController.updatePassword(jwt, request, httpRequest, httpResponse)
+        );
+
+        verifyNoInteractions(authCookieService);
     }
 }

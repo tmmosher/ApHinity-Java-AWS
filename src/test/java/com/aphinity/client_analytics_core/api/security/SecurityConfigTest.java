@@ -59,6 +59,9 @@ class SecurityConfigTest {
     @MockitoBean
     private ClientRequestMetadataResolver clientRequestMetadataResolver;
 
+    @MockitoBean
+    private ActiveAuthSessionTokenValidator activeAuthSessionTokenValidator;
+
     @Test
     void usesApiAuthenticationEntryPointForApiRoutes() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/core/probe"))

@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.core.services.dashboard;
 import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
+import com.aphinity.client_analytics_core.api.auth.services.RefreshSessionRevoker;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.AccountRoleService;
@@ -25,6 +26,7 @@ public class ProfileService {
     private final PasswordEncoder passwordEncoder;
     private final AccountRoleService accountRoleService;
     private final PasswordPolicyValidator passwordPolicyValidator;
+    private final RefreshSessionRevoker refreshSessionRevoker;
     private final AuthService authService;
     private final UserProfileCache userProfileCache;
 
@@ -33,6 +35,7 @@ public class ProfileService {
         PasswordEncoder passwordEncoder,
         AccountRoleService accountRoleService,
         PasswordPolicyValidator passwordPolicyValidator,
+        RefreshSessionRevoker refreshSessionRevoker,
         AuthService authService,
         UserProfileCache userProfileCache
     ) {
@@ -40,6 +43,7 @@ public class ProfileService {
         this.passwordEncoder = passwordEncoder;
         this.accountRoleService = accountRoleService;
         this.passwordPolicyValidator = passwordPolicyValidator;
+        this.refreshSessionRevoker = refreshSessionRevoker;
         this.authService = authService;
         this.userProfileCache = userProfileCache;
     }
@@ -125,7 +129,7 @@ public class ProfileService {
      */
     @Transactional
     public void updatePassword(Long userId, String currentPassword, String newPassword) {
-        AppUser user = appUserRepository.findById(userId)
+        AppUser user = appUserRepository.findByIdForSessionMutation(userId)
             .orElseThrow(this::invalidAuthenticatedUser);
         requireVerified(user);
 
@@ -143,6 +147,7 @@ public class ProfileService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         appUserRepository.save(user);
+        refreshSessionRevoker.revokeAllForUser(userId);
     }
 
     /**

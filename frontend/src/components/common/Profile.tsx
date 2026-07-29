@@ -12,6 +12,7 @@ import {action, useNavigate, useSubmission} from "@solidjs/router";
 import {canEditProfileEmail} from "../../util/common/profileAccess";
 import {FieldError, parseVerifyFormData} from "../../util/common/landingSchemas";
 import {ActionResult} from "../../types/Types";
+import PasswordChangeSection from "../profile/PasswordChangeSection";
 
 const extractApiErrorMessage = async (response: Response, fallback: string): Promise<string> => {
     const errorBody = await response.json().catch(() => null) as {message?: unknown} | null;
@@ -27,8 +28,6 @@ const Profile = () => {
 
     const [name, setName] = createSignal("");
     const [email, setEmail] = createSignal("");
-    const [currentPassword, setCurrentPassword] = createSignal("");
-    const [newPassword, setNewPassword] = createSignal("");
     const [verificationCode, setVerificationCode] = createSignal("");
     const [themePreference, setThemePreference] = createSignal<ThemePreference>(getDocumentThemePreference());
     const canEditEmail = () => canEditProfileEmail(profileContext.profile()?.role);
@@ -81,35 +80,6 @@ const Profile = () => {
             };
         }
     }, "updateProfile");
-
-    const updatePasswordAction = action(async (formData: FormData): Promise<ActionResult> => {
-        try {
-            const response = await apiFetch(host + "/api/core/profile/password", {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    currentPassword: (formData.get("currentPassword")?.toString() ?? "").trim(),
-                    newPassword: (formData.get("newPassword")?.toString() ?? "").trim()
-                })
-            });
-            if (!response.ok) {
-                return {
-                    ok: false,
-                    message: await extractApiErrorMessage(response, "Unable to update password")
-                };
-            }
-            return {
-                ok: true
-            };
-        } catch {
-            return {
-                ok: false,
-                message: "Unable to update password"
-            };
-        }
-    }, "updatePassword");
 
     const verifyEmailAction = action(async (formData: FormData): Promise<ActionResult> => {
         const profile = profileContext.profile();
@@ -175,7 +145,6 @@ const Profile = () => {
     }, "logout");
 
     const profileUpdateSubmission = useSubmission(updateProfileAction);
-    const passwordUpdateSubmission = useSubmission(updatePasswordAction);
     const verifyEmailSubmission = useSubmission(verifyEmailAction);
     const logoutSubmission = useSubmission(logoutAction);
 
@@ -191,21 +160,6 @@ const Profile = () => {
             toast.error(result.message ?? "Unable to update profile");
         }
         profileUpdateSubmission.clear();
-    });
-
-    createEffect(() => {
-        const result = passwordUpdateSubmission.result;
-        if (!result) {
-            return;
-        }
-        if (result.ok) {
-            setCurrentPassword("");
-            setNewPassword("");
-            toast.success("Password updated");
-        } else {
-            toast.error(result.message ?? "Unable to update password");
-        }
-        passwordUpdateSubmission.clear();
     });
 
     createEffect(() => {
@@ -237,7 +191,6 @@ const Profile = () => {
     });
 
     const isSavingProfile = () => profileUpdateSubmission.pending;
-    const isSavingPassword = () => passwordUpdateSubmission.pending;
     const isVerifyingEmail = () => verifyEmailSubmission.pending;
     const isLoggingOut = () => logoutSubmission.pending;
 
@@ -347,35 +300,7 @@ const Profile = () => {
                         </form>
                     </section>
 
-                    <section class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm">
-                        <h2 class="text-lg font-semibold">Password</h2>
-                        <p class="mt-1 text-sm text-base-content/70">Set a new password for this account.</p>
-                        <form class="mt-4 grid gap-4" method="post" action={updatePasswordAction}>
-                            <label class="form-control">
-                                <span class="label-text">Current password</span>
-                                <input
-                                    type="password"
-                                    name="currentPassword"
-                                    class="input input-bordered mt-1"
-                                    value={currentPassword()}
-                                    onInput={(event) => setCurrentPassword(event.currentTarget.value)}
-                                />
-                            </label>
-                            <label class="form-control">
-                                <span class="label-text">New password</span>
-                                <input
-                                    type="password"
-                                    name="newPassword"
-                                    class="input input-bordered mt-1"
-                                    value={newPassword()}
-                                    onInput={(event) => setNewPassword(event.currentTarget.value)}
-                                />
-                            </label>
-                            <button type="submit" class="btn btn-primary w-fit" disabled={isSavingPassword()}>
-                                {isSavingPassword() ? "Saving..." : "Update password"}
-                            </button>
-                        </form>
-                    </section>
+                    <PasswordChangeSection />
                     <section>
                         <form method="post" action={logoutAction}>
                             <button type="submit" class="btn btn-outline" disabled={isLoggingOut()}>

@@ -4,14 +4,22 @@ services:
   app:
     build:
       context: .
+    # NGINX is bound to this loopback interface as well
     ports:
-      - "8080:8080"
-      - "5005:5005"
+      - "127.0.0.1:8080:8080"
+    networks:
+      - aim-network
+    extra_hosts:
+      - "host.docker.internal:172.18.0.1"
     env_file:
       - .env.runtime
-    network_mode: "host"
     volumes:
       - ${LOG_HOST_DIR:-./logs}:/logs
     environment:
       - LOG_DIR=/logs
-      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+
+networks:
+  aim-network:
+    external: true
+    name: aim-network
+    driver: bridge

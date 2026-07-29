@@ -4,6 +4,7 @@ import com.aphinity.client_analytics_core.api.auth.entities.AppUser;
 import com.aphinity.client_analytics_core.api.auth.entities.Role;
 import com.aphinity.client_analytics_core.api.auth.repositories.AppUserRepository;
 import com.aphinity.client_analytics_core.api.auth.services.AuthService;
+import com.aphinity.client_analytics_core.api.auth.services.RefreshSessionRevoker;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.AccountRole;
 import com.aphinity.client_analytics_core.api.core.response.dashboard.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.ProfileService;
@@ -44,6 +45,9 @@ class ProfileServiceTest {
 
     @Spy
     private PasswordPolicyValidator passwordPolicyValidator;
+
+    @Mock
+    private RefreshSessionRevoker refreshSessionRevoker;
 
     @Mock
     private AuthService authService;
@@ -173,7 +177,7 @@ class ProfileServiceTest {
         user.setPasswordHash("encoded");
         user.setEmailVerifiedAt(Instant.now());
 
-        when(appUserRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(appUserRepository.findByIdForSessionMutation(5L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("bad-current", "encoded")).thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
@@ -182,6 +186,7 @@ class ProfileServiceTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Current password is incorrect", ex.getReason());
+        verify(refreshSessionRevoker, never()).revokeAllForUser(5L);
     }
 
     @Test
@@ -191,7 +196,7 @@ class ProfileServiceTest {
         user.setPasswordHash("encoded");
         user.setEmailVerifiedAt(Instant.now());
 
-        when(appUserRepository.findById(6L)).thenReturn(Optional.of(user));
+        when(appUserRepository.findByIdForSessionMutation(6L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("current-pass", "encoded")).thenReturn(true);
         when(passwordEncoder.matches("NewPassword12!", "encoded")).thenReturn(false);
         when(passwordEncoder.encode("NewPassword12!")).thenReturn("new-hash");
@@ -200,6 +205,7 @@ class ProfileServiceTest {
 
         assertEquals("new-hash", user.getPasswordHash());
         verify(appUserRepository).save(user);
+        verify(refreshSessionRevoker).revokeAllForUser(6L);
     }
 
     @Test
@@ -235,6 +241,7 @@ class ProfileServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("Account email is not verified", ex.getReason());
+        verify(refreshSessionRevoker, never()).revokeAllForUser(11L);
     }
 
     @Test
@@ -330,7 +337,7 @@ class ProfileServiceTest {
         user.setPasswordHash("encoded");
         user.setEmailVerifiedAt(null);
 
-        when(appUserRepository.findById(11L)).thenReturn(Optional.of(user));
+        when(appUserRepository.findByIdForSessionMutation(11L)).thenReturn(Optional.of(user));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
             profileService.updatePassword(11L, "current-pass", "NewPassword12!")

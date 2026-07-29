@@ -5,6 +5,9 @@ import com.aphinity.client_analytics_core.api.core.requests.dashboard.ProfileUpd
 import com.aphinity.client_analytics_core.api.core.response.dashboard.ProfileResponse;
 import com.aphinity.client_analytics_core.api.core.services.AuthenticatedUserService;
 import com.aphinity.client_analytics_core.api.core.services.dashboard.ProfileService;
+import com.aphinity.client_analytics_core.api.auth.services.AuthCookieService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,10 +29,16 @@ import java.util.Locale;
 public class ProfileController {
     private final ProfileService profileService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final AuthCookieService authCookieService;
 
-    public ProfileController(ProfileService profileService, AuthenticatedUserService authenticatedUserService) {
+    public ProfileController(
+        ProfileService profileService,
+        AuthenticatedUserService authenticatedUserService,
+        AuthCookieService authCookieService
+    ) {
         this.profileService = profileService;
         this.authenticatedUserService = authenticatedUserService;
+        this.authCookieService = authCookieService;
     }
 
     /**
@@ -64,17 +73,23 @@ public class ProfileController {
      *
      * @param jwt authenticated principal JWT
      * @param request validated password update payload
+     * @param httpRequest request used to preserve authentication cookie attributes while clearing them
+     * @param httpResponse response receiving expired authentication cookies
      */
     @PutMapping("/profile/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updatePassword(
         @AuthenticationPrincipal Jwt jwt,
-        @Valid @RequestBody ProfilePasswordUpdateRequest request
+        @Valid @RequestBody ProfilePasswordUpdateRequest request,
+        HttpServletRequest httpRequest,
+        HttpServletResponse httpResponse
     ) {
         profileService.updatePassword(
             authenticatedUserService.resolveAuthenticatedUserId(jwt),
             request.currentPassword().strip(),
             request.newPassword().strip()
         );
+        authCookieService.clearRefreshCookie(httpRequest, httpResponse);
+        authCookieService.clearAccessCookie(httpRequest, httpResponse);
     }
 }

@@ -85,6 +85,30 @@ class AuthApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void loginIgnoresRevokedAccessCookieFromPreviousSession() throws Exception {
+        AppUser user = createUser("relogin@example.com", PASSWORD, true, "client");
+        AuthCookies staleCookies = loginAndCaptureCookies(user.getEmail(), PASSWORD);
+        transactionTemplate.executeWithoutResult(status ->
+            authSessionRepository.revokeAllActiveForUser(user.getId(), java.time.Instant.now())
+        );
+
+        MvcResult result = mockMvc.perform(
+                post("/api/auth/login")
+                    .cookie(authCookies(staleCookies))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"email":"relogin@example.com","password":"ValidPass12!"}
+                        """)
+            )
+            .andExpect(status().isNoContent())
+            .andReturn();
+
+        Map<String, String> cookies = readSetCookies(result);
+        assertNotNull(cookies.get(AuthCookieNames.ACCESS_COOKIE_NAME));
+        assertNotNull(cookies.get(AuthCookieNames.REFRESH_COOKIE_NAME));
+    }
+
+    @Test
     void loginRequiresCaptchaAfterThreeFailures() throws Exception {
         createUser("locked@example.com", PASSWORD, true, "client");
         String wrongPasswordPayload = """

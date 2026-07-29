@@ -3,6 +3,7 @@ package com.aphinity.client_analytics_core.api.security;
 import com.aphinity.client_analytics_core.api.auth.AuthCookieNames;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 
@@ -26,6 +27,12 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
             return headerToken;
         }
 
+        // A stale or revoked browser cookie must not prevent permit-all authentication
+        // operations such as logging in again. Explicit bearer headers remain honored.
+        if (isPublicAuthenticationRequest(request)) {
+            return null;
+        }
+
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;
@@ -39,5 +46,13 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
             }
         }
         return null;
+    }
+
+    private boolean isPublicAuthenticationRequest(HttpServletRequest request) {
+        if (!HttpMethod.POST.matches(request.getMethod())) {
+            return false;
+        }
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return path.equals("/api/auth") || path.startsWith("/api/auth/");
     }
 }

@@ -14,7 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -214,15 +216,26 @@ public class SecurityConfig {
 
     /**
      * @param properties JWT configuration properties
+     * @param activeSessionValidator validator enforcing server-side session revocation
      * @return HS256 JWT decoder
      */
     @Bean
-    JwtDecoder jwtDecoder(JwtProperties properties) {
+    JwtDecoder jwtDecoder(
+        JwtProperties properties,
+        ActiveAuthSessionTokenValidator activeSessionValidator
+    ) {
         SecretKey secretKey = new SecretKeySpec(
             properties.getSecret().getBytes(StandardCharsets.UTF_8),
             "HmacSHA256"
         );
-        return NimbusJwtDecoder.withSecretKey(secretKey).macAlgorithm(MacAlgorithm.HS256).build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
+            .macAlgorithm(MacAlgorithm.HS256)
+            .build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefaultWithIssuer(properties.getIssuer()),
+            activeSessionValidator
+        ));
+        return decoder;
     }
 
     /**
