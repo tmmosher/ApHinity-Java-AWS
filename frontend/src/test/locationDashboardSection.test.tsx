@@ -2,6 +2,7 @@ import {renderToString} from "solid-js/web";
 import {createSignal} from "solid-js";
 import {describe, expect, it, vi} from "vitest";
 import type {LocationGraph, LocationSectionLayout} from "../types/Types";
+import {DashboardTimeRangeProvider} from "../context/DashboardTimeRangeContext";
 
 const capturedChartProps: Array<Record<string, unknown>> = [];
 const capturedTabulatorProps: Array<Record<string, unknown>> = [];
@@ -55,7 +56,7 @@ describe("LocationDashboardSection", () => {
         missingGraphIds={[]}
         apiHost="https://example.test"
         locationId="42"
-        monthRange={3}
+        monthRange={() => 3}
         sectionTimeRangeEnabled={false}
         hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
@@ -104,7 +105,7 @@ describe("LocationDashboardSection", () => {
         missingGraphIds={[]}
         apiHost="https://example.test"
         locationId="42"
-        monthRange={3}
+        monthRange={() => 3}
         sectionTimeRangeEnabled={false}
         hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
@@ -152,7 +153,7 @@ describe("LocationDashboardSection", () => {
         missingGraphIds={[]}
         apiHost="https://example.test"
         locationId="42"
-        monthRange={3}
+        monthRange={() => 3}
         sectionTimeRangeEnabled={false}
         hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
@@ -195,7 +196,7 @@ describe("LocationDashboardSection", () => {
         missingGraphIds={[]}
         apiHost="https://example.test"
         locationId="42"
-        monthRange={3}
+        monthRange={() => 3}
         sectionTimeRangeEnabled={false}
         hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
@@ -226,7 +227,7 @@ describe("LocationDashboardSection", () => {
         missingGraphIds={[]}
         apiHost="https://example.test"
         locationId="42"
-        monthRange={3}
+        monthRange={() => 3}
         sectionTimeRangeEnabled={false}
         hasSectionTimeRangeOverride={createSignal(false)}
         sectionTimeRangeLoading={false}
@@ -254,28 +255,30 @@ describe("LocationDashboardSection", () => {
       updatedAt: "2026-01-03T00:00:00Z"
     };
     const html = renderToString(() => (
-      <LocationDashboardSection
-        section={section}
-        graphs={[graph]}
-        missingGraphIds={[]}
-        apiHost="https://example.test"
-        locationId="42"
-        monthRange={3}
-        sectionTimeRangeEnabled
-        hasSectionTimeRangeOverride={createSignal(false)}
-        sectionTimeRangeLoading={false}
-        canEditGraphs={false}
-        isGraphMutationBusy={false}
-        plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
-        onOpenGraphEditor={() => undefined}
-        onApplySectionTimeRange={() => undefined}
-        onResetSectionTimeRange={() => undefined}
-      />
+      <DashboardTimeRangeProvider monthRange={() => 3}>
+        <LocationDashboardSection
+          section={section}
+          graphs={[graph]}
+          missingGraphIds={[]}
+          apiHost="https://example.test"
+          locationId="42"
+          monthRange={() => 3}
+          sectionTimeRangeEnabled
+          hasSectionTimeRangeOverride={createSignal(false)}
+          sectionTimeRangeLoading={false}
+          canEditGraphs={false}
+          isGraphMutationBusy={false}
+          plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
+          onOpenGraphEditor={() => undefined}
+          onApplySectionTimeRange={() => undefined}
+          onResetSectionTimeRange={() => undefined}
+        />
+      </DashboardTimeRangeProvider>
     ));
 
     expect(html).toContain("data-section-time-range-control");
     expect(html).toContain("data-section-time-range-trigger");
-    expect(html).toContain("clip-path:polygon(0 0, 100% 0, 100% 100%)");
+    expect(html).toContain("clip-path:polygon(33.33% 0, 100% 0, 100% 66.67%)");
     expect(html).not.toContain("pt-12");
   });
 
@@ -289,24 +292,26 @@ describe("LocationDashboardSection", () => {
       updatedAt: "2026-01-03T00:00:00Z"
     };
     const html = renderToString(() => (
-      <LocationDashboardSection
-        section={section}
-        graphs={[graph]}
-        missingGraphIds={[]}
-        apiHost="https://example.test"
-        locationId="42"
-        monthRange={7}
-        sectionTimeRangeEnabled
-        hasSectionTimeRangeOverride={createSignal(true)}
-        sectionTimeRangeLoading={false}
-        graphEditingDisabledReason="Use the common range before editing graphs in this section."
-        canEditGraphs
-        isGraphMutationBusy={false}
-        plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
-        onOpenGraphEditor={() => undefined}
-        onApplySectionTimeRange={() => undefined}
-        onResetSectionTimeRange={() => undefined}
-      />
+      <DashboardTimeRangeProvider monthRange={() => 3}>
+        <LocationDashboardSection
+          section={section}
+          graphs={[graph]}
+          missingGraphIds={[]}
+          apiHost="https://example.test"
+          locationId="42"
+          monthRange={() => 7}
+          sectionTimeRangeEnabled
+          hasSectionTimeRangeOverride={createSignal(true)}
+          sectionTimeRangeLoading={false}
+          graphEditingDisabledReason="Use the common range before editing graphs in this section."
+          canEditGraphs
+          isGraphMutationBusy={false}
+          plotlyModule={Object.assign(() => ({}), {error: undefined}) as never}
+          onOpenGraphEditor={() => undefined}
+          onApplySectionTimeRange={() => undefined}
+          onResetSectionTimeRange={() => undefined}
+        />
+      </DashboardTimeRangeProvider>
     ));
 
     expect(html).toMatch(/<button[^>]*disabled[^>]*title="Use the common range before editing graphs in this section\."[^>]*>Edit/);

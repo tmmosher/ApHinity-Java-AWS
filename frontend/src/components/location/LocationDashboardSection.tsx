@@ -1,4 +1,4 @@
-import {For, Show, Suspense, type Resource, Signal} from "solid-js";
+import {For, Show, Suspense, type Resource, Signal, Accessor} from "solid-js";
 import PlotlyChart, {type PlotlyConfig, type PlotlyData, type PlotlyLayout} from "../common/Chart";
 import GraphLoadingPlaceholder from "../graph/GraphLoadingPlaceholder";
 import TabulatorGraph from "../graph/TabulatorGraph";
@@ -13,7 +13,7 @@ type LocationDashboardSectionProps = {
   missingGraphIds: number[];
   apiHost: string;
   locationId: string;
-  monthRange: number;
+  monthRange: Accessor<number>;
   sectionTimeRangeEnabled: boolean;
   hasSectionTimeRangeOverride: Signal<boolean>;
   sectionTimeRangeLoading: boolean;
@@ -107,7 +107,7 @@ export const LocationDashboardSection = (props: LocationDashboardSectionProps) =
                       graph={graph}
                       apiHost={props.apiHost}
                       locationId={props.locationId}
-                      monthRange={props.monthRange}
+                      monthRange={props.monthRange()}
                       class="h-full w-full"
                     />
                   }

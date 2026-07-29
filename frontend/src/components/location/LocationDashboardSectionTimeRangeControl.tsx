@@ -1,7 +1,9 @@
-import {Show, createEffect, createSignal, createUniqueId, Signal} from "solid-js";
+import {Show, createEffect, createSignal, createUniqueId, type Accessor, type Signal} from "solid-js";
+import {useDashboardTimeRange} from "../../context/DashboardTimeRangeContext";
+import {toast} from "solid-toast";
 
 export type LocationDashboardSectionTimeRangeControlProps = {
-  monthRange: number;
+  monthRange: Accessor<number>;
   hasOverride: Signal<boolean>;
   loading: boolean;
   error?: string;
@@ -14,28 +16,29 @@ export type LocationDashboardSectionTimeRangeControlProps = {
 export const LocationDashboardSectionTimeRangeControl = (
   props: LocationDashboardSectionTimeRangeControlProps
 ) => {
+  const dashboardTimeRange = useDashboardTimeRange();
   const [open, setOpen] = createSignal(false);
-  const [monthRange, setMonthRange] = createSignal(props.monthRange > 0 ? props.monthRange : 1);
+  const [monthRange, setMonthRange] = createSignal(props.monthRange() > 0 ? props.monthRange() : 1);
   const inputId = createUniqueId();
 
   createEffect(() => {
-    if (props.monthRange > 0) {
-      setMonthRange(props.monthRange);
+    if (props.monthRange() > 0) {
+      setMonthRange(props.monthRange());
     }
     if (props.disabledReason) {
       setOpen(false);
     }
   });
 
-  createEffect(() => {
-    if (props.monthRange === 3 || props.monthRange === 12) {
-      props.hasOverride[1](false);
-    }
-  });
-
   const apply = () => {
     const nextRange = monthRange();
-    if (Number.isInteger(nextRange) && nextRange > 0) {
+    if (!Number.isInteger(nextRange) || nextRange <= 0) {
+      toast.error("Month range invalid.");
+      return;
+    }
+    if (nextRange === dashboardTimeRange.monthRange()) {
+      props.onReset();
+    } else {
       props.onApply(nextRange);
     }
   };
@@ -52,7 +55,7 @@ export const LocationDashboardSectionTimeRangeControl = (
               ? "bg-secondary hover:brightness-110"
               : "bg-primary hover:brightness-110")
         }
-        style={{"clip-path": "polygon(0 0, 100% 0, 100% 100%)"}}
+        style={{"clip-path": "polygon(33.33% 0, 100% 0, 100% 66.67%)"}}
         aria-label="Set section date range"
         aria-expanded={open()}
         disabled={Boolean(props.disabledReason)}
@@ -93,7 +96,7 @@ export const LocationDashboardSectionTimeRangeControl = (
                   setOpen(false);
                 }}
               >
-                Use common range
+                Reset
               </button>
             </Show>
             <button

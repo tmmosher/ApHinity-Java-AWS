@@ -16,6 +16,7 @@ import {isTabulatorGraph} from "../../../../util/graph/tabulatorGraph";
 import {monthRangeForDashboardTimeRange} from "../../../../util/location/dashboardTimeRange";
 import {sectionSupportsTimeRange} from "../../../../util/graph/graphTimeRangeCapability";
 import {createSectionGraphRangeController} from "../../../../util/location/createSectionGraphRangeController";
+import {DashboardTimeRangeProvider} from "../../../../context/DashboardTimeRangeContext";
 
 type LocationDashboardPanelProps = {
   locationId: string;
@@ -92,7 +93,7 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
     sectionRange.missingGraphIds(section);
 
   const effectiveSectionMonthRange = (section: DashboardSection) =>
-    sectionRange.monthRange(section);
+    () => sectionRange.monthRange(section);
 
   const sectionTimeRangeDisabledReason = () => {
     if (dashboard.hasPendingDashboardChanges()) {
@@ -189,7 +190,8 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
   );
 
   return (
-    <div class="space-y-4">
+    <DashboardTimeRangeProvider monthRange={() => monthRangeForDashboardTimeRange(selectedTimeRange())}>
+      <div class="space-y-4">
       <LocationDashboardToolbar
         canEditGraphs={canEditGraphs()}
         canManageWorkOrderEmail={canEditGraphs()}
@@ -313,7 +315,8 @@ export const LocationDashboardPanel = (props: LocationDashboardPanelProps) => {
           onClose={dashboard.closeLayoutEditor}
         />
       </Show>
-    </div>
+      </div>
+    </DashboardTimeRangeProvider>
   );
 };
 
